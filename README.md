@@ -20,6 +20,7 @@
 - [Công nghệ sử dụng](#-công-nghệ-sử-dụng)
 - [Cấu trúc thư mục](#-cấu-trúc-thư-mục)
 - [Cài đặt & Chạy](#-cài-đặt--chạy)
+- [Tài khoản demo (Supabase)](#-tài-khoản-dùng-thử--demo-accounts)
 - [Cơ sở dữ liệu](#-cơ-sở-dữ-liệu)
 - [API Endpoints](#-api-endpoints)
 - [Chức năng chính](#-chức-năng-chính)
@@ -180,12 +181,16 @@ AI_Vegetable/
 | Redis | 7+ |
 | Docker (tuỳ chọn) | 24+ |
 
-### Cách 1: Chạy từng service (Development)
-1. **Tạo file `.env` từ mẫu**
-   ```bash
-   cp .env.example .env
-   # Sửa thông tin PostgreSQL, JWT secret trong .env
-   ```
+### Cách 1: Khởi động nhanh 1-Click (Khuyến nghị trên Windows)
+Dự án đã tích hợp sẵn script tự động kiểm tra database, khởi chạy cả Backend Spring Boot và Frontend Next.js:
+```powershell
+.\start-all.ps1
+```
+
+### Cách 2: Chạy thủ công từng service (Development)
+1. **Cấu hình Backend**
+   - Tạo file `backend/.env` từ `backend/.env.example`.
+   - Mặc định hệ thống đã trỏ sẵn vào **Supabase Cloud Database**. Nếu dùng Local, bạn cấu hình lại thông số trong file `.env`.
 2. **Chạy Backend**
    ```bash
    cd backend
@@ -201,14 +206,31 @@ AI_Vegetable/
    # Frontend chạy tại http://localhost:3000
    ```
 
-### Cách 2: Chạy bằng Docker Compose
+### Cách 3: Chạy bằng Docker Compose
 ```bash
 cp .env.example .env
-# Sửa biến môi trường trong .env
-
 docker compose up -d
 # Toàn bộ hệ thống chạy tại http://localhost
 ```
+
+---
+
+## 🔐 Tài khoản dùng thử / Demo Accounts
+
+Database trên **Supabase Cloud** đã được khởi tạo sẵn toàn bộ 29 bảng cùng các tài khoản mẫu cho **5 vai trò trong chuỗi cung ứng** để bạn và nhóm dễ dàng demo, kiểm thử ngay lập tức:
+
+| Vai trò | Email đăng nhập | Mật khẩu mặc định | Họ và tên | Chức năng demo |
+|---|---|---|---|---|
+| 👑 **ADMIN** | `admin@agritrace.vn` | `password123` | Quản Trị Viên (Admin) | Quản lý toàn bộ hệ thống, phân quyền, người dùng, xem audit logs |
+| 🌾 **FARMER** | `farmer.hung@agritrace.vn` | `password123` | Nguyễn Văn Hùng | Quản lý Nông Trại Xanh Đà Lạt, lô rau xà lách, cam sành, chứng nhận VietGAP |
+| 🏢 **WAREHOUSE** | `warehouse.kho@agritrace.vn` | `password123` | Trần Thị Thu | Nhập/xuất kho, quản lý kho lạnh, theo dõi hạn dùng theo chuẩn FEFO |
+| 🚚 **DISTRIBUTOR** | `distributor.van@agritrace.vn` | `password123` | Lê Hoàng Vận | Quản lý xe hàng, điều phối vận chuyển, cập nhật checkpoint giao nhận |
+| 🛒 **CUSTOMER** | `customer.minh@agritrace.vn` | `password123` | Lê Quang Minh | Mua nông sản, quét mã QR truy xuất nguồn gốc, điểm thưởng Loyalty Gold |
+
+> [!TIP]
+> - **Mật khẩu chung cho tất cả tài khoản mẫu**: `password123`
+> - Bạn cũng có thể đăng ký tài khoản mới bất kỳ lúc nào tại giao diện: [http://localhost:3000/register](http://localhost:3000/register).
+> - Để truy xuất nguồn gốc sản phẩm nhanh bằng mã QR demo: [http://localhost:3000/trace/AGRI-QR-XL-2026-08-DEMO](http://localhost:3000/trace/AGRI-QR-XL-2026-08-DEMO).
 
 ---
 
