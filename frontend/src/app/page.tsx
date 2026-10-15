@@ -4,168 +4,23 @@ import {
   BarChart3,
   Bot,
   CheckCircle,
+  ChevronDown,
   ChevronRight,
   Leaf,
-  Mail,
-  MapPin,
-  Menu,
   MessageCircle,
   Package,
-  Phone,
   QrCode,
   ShieldCheck,
   Star,
   Truck,
   Users,
   Warehouse,
-  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
-/* ─── Navbar ─── */
-function Navbar() {
-  const [open, setOpen] = useState(false);
 
-  const links = [
-    { href: "#gioi-thieu", label: "Giới thiệu" },
-    { href: "#tinh-nang", label: "Tính năng" },
-    { href: "#quy-trinh", label: "Quy trình" },
-    { href: "#doi-tuong", label: "Đối tượng" },
-  ];
-
-  return (
-    <header
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-        background: "rgba(255,255,255,0.97)",
-        backdropFilter: "blur(8px)",
-        borderBottom: "1px solid #e8e8e8",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          height: 64,
-        }}
-      >
-        {/* Logo */}
-        <a href="/" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 9,
-              background: "#1a7a3a",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Leaf size={18} color="#fff" strokeWidth={2} />
-          </div>
-          <span style={{ fontWeight: 700, fontSize: 17, color: "#1a1a1a" }}>
-            AgriTrace<span style={{ color: "#1a7a3a" }}> AI</span>
-          </span>
-        </a>
-
-        {/* Desktop nav */}
-        <nav style={{ display: "flex", gap: 2 }} className="hidden md:flex">
-          {links.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 8,
-                fontSize: 14,
-                fontWeight: 500,
-                color: "#555",
-                transition: "color 0.15s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#1a7a3a")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#555")}
-            >
-              {l.label}
-            </a>
-          ))}
-        </nav>
-
-        {/* Auth buttons */}
-        <div style={{ display: "flex", gap: 10 }} className="hidden md:flex">
-          <Link
-            href="/login"
-            style={{
-              padding: "8px 18px",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 500,
-              color: "#333",
-              border: "1px solid #ddd",
-            }}
-          >
-            Đăng nhập
-          </Link>
-          <Link
-            href="/register"
-            style={{
-              padding: "8px 18px",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              color: "#fff",
-              background: "#1a7a3a",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            Đăng ký <ChevronRight size={15} />
-          </Link>
-        </div>
-
-        {/* Mobile */}
-        <button
-          className="md:hidden"
-          onClick={() => setOpen(!open)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#333" }}
-        >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
-      </div>
-
-      {open && (
-        <div
-          className="md:hidden"
-          style={{ padding: "12px 24px 20px", borderTop: "1px solid #eee", background: "#fff" }}
-        >
-          {links.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              style={{ display: "block", padding: "10px 0", color: "#555", fontSize: 15 }}
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </a>
-          ))}
-          <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-            <Link href="/login" style={{ flex: 1, textAlign: "center", padding: 10, border: "1px solid #ddd", borderRadius: 8, fontSize: 14 }}>Đăng nhập</Link>
-            <Link href="/register" style={{ flex: 1, textAlign: "center", padding: 10, background: "#1a7a3a", color: "#fff", borderRadius: 8, fontSize: 14 }}>Đăng ký</Link>
-          </div>
-        </div>
-      )}
-    </header>
-  );
-}
 
 /* ─── Hero ─── */
 function Hero() {
@@ -655,6 +510,219 @@ function ProductHighlight() {
   );
 }
 
+/* ─── Home Blog Preview ─── */
+function HomeBlogPreview() {
+  const blogs = [
+    {
+      title: "Ứng Dụng AI Trong Dự Báo Nhu Cầu & Quản Trị Chuỗi Nông Sản 2026",
+      tag: "Công nghệ AI",
+      date: "14/10/2026",
+      desc: "Cách mô hình AI Demand Forecasting giúp giảm 35% hao hụt nông sản và tối ưu kế hoạch thu hoạch.",
+    },
+    {
+      title: "Cẩm Nang Quét Mã QR Truy Xuất Nguồn Gốc Thực Phẩm Cho Mọi Gia Đình",
+      tag: "Cẩm nang",
+      date: "12/10/2026",
+      desc: "Hướng dẫn nhận biết chứng chỉ VietGAP, số hiệu lô hàng và nhật ký vận chuyển qua mã QR.",
+    },
+    {
+      title: "Lịch Trái Cây Mùa Vụ Quý 4: Thời Điểm Vàng Thưởng Thức Cam Sành & Bơ Sáp",
+      tag: "Nông sản mùa vụ",
+      date: "10/10/2026",
+      desc: "Bảng tổng hợp thời điểm thu hoạch rộ của các loại trái cây đặc sản miền Tây và Tây Nguyên.",
+    },
+  ];
+
+  return (
+    <section style={{ padding: "80px 24px", background: "#fff" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 40, flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#1a7a3a", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Tin tức & Kiến thức
+            </span>
+            <h2 style={{ fontSize: 30, fontWeight: 700, margin: "10px 0 0", color: "#1a1a1a" }}>
+              Bản Tin Nông Nghiệp & Công Nghệ
+            </h2>
+          </div>
+          <Link
+            href="/blog"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              color: "#1a7a3a",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            Xem tất cả bài viết <ChevronRight size={16} />
+          </Link>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
+          {blogs.map((b) => (
+            <Link
+              key={b.title}
+              href="/blog"
+              style={{
+                display: "block",
+                background: "#fafbfa",
+                border: "1px solid #eee",
+                borderRadius: 14,
+                padding: "24px 22px",
+                transition: "box-shadow 0.2s, transform 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.06)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, background: "#e8f5e9", color: "#1a7a3a", padding: "3px 10px", borderRadius: 20 }}>
+                  {b.tag}
+                </span>
+                <span style={{ fontSize: 12, color: "#999" }}>{b.date}</span>
+              </div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 8, lineHeight: 1.4 }}>
+                {b.title}
+              </h3>
+              <p style={{ fontSize: 13.5, color: "#666", lineHeight: 1.6, margin: 0 }}>
+                {b.desc}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Home FAQ ─── */
+function HomeFAQ() {
+  const [openId, setOpenId] = useState<string | null>("faq-1");
+
+  const faqs = [
+    {
+      id: "faq-1",
+      q: "Làm thế nào để quét mã QR truy xuất nguồn gốc nông sản?",
+      a: "Bạn chỉ cần mở camera điện thoại hoặc truy cập tính năng 'Truy Xuất QR' trên hệ thống, hướng ống kính vào tem QR dán trên sản phẩm để xem ngay nông trại, ngày thu hoạch và chứng chỉ VietGAP.",
+    },
+    {
+      id: "faq-2",
+      q: "Trí tuệ nhân tạo (AI) giúp ích gì trong chuỗi cung ứng nông sản?",
+      a: "AgriTrace AI tích hợp 3 tính năng AI then chốt: Trợ lý AI chatbot giải đáp thông tin 24/7, AI dự báo nhu cầu thị trường 7 ngày tới, và AI cảnh báo rủi ro tồn kho quá hạn theo chuẩn FEFO.",
+    },
+    {
+      id: "faq-3",
+      q: "Chương trình Voucher và Tích điểm thành viên hoạt động thế nào?",
+      a: "Mỗi 10,000 VNĐ mua sắm bạn được cộng 1 điểm thưởng để thăng hạng (Đồng, Bạc, Vàng, Kim Cương). Hạng thành viên càng cao, bạn nhận được càng nhiều mã giảm giá và ưu đãi độc quyền.",
+    },
+    {
+      id: "faq-4",
+      q: "Nông dân và Hợp tác xã làm thế nào để tham gia bán hàng?",
+      a: "Nông dân có thể đăng ký tài khoản với vai trò Farmer, tải lên chứng nhận VietGAP/GlobalGAP để Admin phê duyệt, sau đó bắt đầu tạo lô thu hoạch và in mã QR cho nông sản.",
+    },
+  ];
+
+  return (
+    <section style={{ padding: "80px 24px", background: "#f8f9fa" }}>
+      <div style={{ maxWidth: 880, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 44 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#1a7a3a", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Giải đáp thắc mắc
+          </span>
+          <h2 style={{ fontSize: 30, fontWeight: 700, margin: "10px 0 12px", color: "#1a1a1a" }}>
+            Câu Hỏi Thường Gặp (FAQ)
+          </h2>
+          <p style={{ color: "#777", fontSize: 15, maxWidth: 520, margin: "0 auto" }}>
+            Những câu hỏi phổ biến nhất về cách vận hành hệ thống, công nghệ AI và quy trình truy xuất nguồn gốc.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {faqs.map((f) => {
+            const isOpen = openId === f.id;
+            return (
+              <div
+                key={f.id}
+                style={{
+                  background: "#fff",
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  overflow: "hidden",
+                  transition: "all 0.2s",
+                }}
+              >
+                <button
+                  onClick={() => setOpenId(isOpen ? null : f.id)}
+                  style={{
+                    width: "100%",
+                    padding: "18px 22px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    gap: 16,
+                  }}
+                >
+                  <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{f.q}</span>
+                  <ChevronDown
+                    size={18}
+                    color={isOpen ? "#1a7a3a" : "#999"}
+                    style={{
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s",
+                      flexShrink: 0,
+                    }}
+                  />
+                </button>
+                {isOpen && (
+                  <div
+                    style={{
+                      padding: "0 22px 18px",
+                      fontSize: 14,
+                      color: "#555",
+                      lineHeight: 1.7,
+                      borderTop: "1px solid #f3f4f6",
+                      paddingTop: 14,
+                    }}
+                  >
+                    {f.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 32 }}>
+          <Link
+            href="/faq"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              color: "#1a7a3a",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            Xem tất cả câu hỏi thường gặp <ChevronRight size={16} />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ─── CTA ─── */
 function CTA() {
   return (
@@ -706,104 +774,20 @@ function CTA() {
   );
 }
 
-/* ─── Footer ─── */
-function Footer() {
-  return (
-    <footer style={{ background: "#f8f8f8", padding: "52px 0 28px", borderTop: "1px solid #eee" }}>
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 24px",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 40,
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ maxWidth: 270 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 7, background: "#1a7a3a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Leaf size={15} color="#fff" />
-            </div>
-            <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>
-              AgriTrace <span style={{ color: "#1a7a3a" }}>AI</span>
-            </span>
-          </div>
-          <p style={{ fontSize: 13, color: "#888", lineHeight: 1.75 }}>
-            Nền tảng quản lý chuỗi cung ứng nông sản sạch tích hợp trí tuệ nhân tạo và truy xuất nguồn gốc bằng QR Code.
-          </p>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 14 }}>Hệ thống</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {["Tính năng", "Quy trình", "Đối tượng"].map((l) => (
-              <a key={l} href="#" style={{ fontSize: 13, color: "#888" }}>{l}</a>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 14 }}>Tài khoản</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Link href="/login" style={{ fontSize: 13, color: "#888" }}>Đăng nhập</Link>
-            <Link href="/register" style={{ fontSize: 13, color: "#888" }}>Đăng ký</Link>
-          </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 14 }}>Liên hệ</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {[
-              { icon: Mail, text: "support@agritrace.vn" },
-              { icon: Phone, text: "1900 1234" },
-              { icon: MapPin, text: "TP. Hồ Chí Minh, Việt Nam" },
-            ].map((c) => {
-              const IconComp = c.icon;
-              return (
-                <div key={c.text} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <IconComp size={13} color="#999" />
-                  <span style={{ fontSize: 13, color: "#888" }}>{c.text}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: "32px auto 0",
-          padding: "16px 24px 0",
-          borderTop: "1px solid #e8e8e8",
-          textAlign: "center",
-          fontSize: 12,
-          color: "#bbb",
-        }}
-      >
-        © 2026 AgriTrace AI — Đồ án tốt nghiệp. Hệ thống quản lý chuỗi cung ứng nông sản sạch.
-      </div>
-    </footer>
-  );
-}
-
 /* ─── Page ─── */
 export default function HomePage() {
   return (
-    <>
-      <Navbar />
-      <main>
-        <Hero />
-        <About />
-        <Features />
-        <HowItWorks />
-        <ProductHighlight />
-        <Roles />
-        <CTA />
-      </main>
-      <Footer />
-    </>
+    <div>
+      <Hero />
+      <About />
+      <Features />
+      <HowItWorks />
+      <ProductHighlight />
+      <Roles />
+      <HomeBlogPreview />
+      <HomeFAQ />
+      <CTA />
+    </div>
   );
 }
+

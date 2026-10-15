@@ -4,10 +4,10 @@
 <img width="1887" height="974" alt="image" src="https://github.com/user-attachments/assets/52841df6-978f-4940-906a-f846f8b364a2" />
 <img width="1902" height="979" alt="image" src="https://github.com/user-attachments/assets/22bc5ead-d561-4883-8108-4b3d70b77557" />
 
-**# 🌿 AgriTrace AI — Hệ Thống Quản Lý Chuỗi Cung Ứng Nông Sản Sạch Và Có tích hợp AI 
-**
-> Nền tảng web quản lý chuỗi cung ứng nông sản sạch tích hợp trí tuệ nhân tạo.  
-> Truy xuất nguồn gốc bằng QR Code, quản lý nông trại, kho hàng, vận chuyển và đặt hàng trực tuyến.
+# 🌿 AgriTrace AI — Hệ Thống Quản Lý Chuỗi Cung Ứng Nông Sản Sạch Tích Hợp Trí Tuệ Nhân Tạo
+
+> Nền tảng web quản lý chuỗi cung ứng nông sản sạch tích hợp trí tuệ nhân tạo (AI).  
+> Truy xuất nguồn gốc bằng mã QR độc bản, quản lý nông trại, kho lạnh, vận chuyển và đặt hàng trực tuyến.
 
 
 
@@ -130,32 +130,40 @@ AI_Vegetable/
 │
 ├── frontend/                         # Next.js 15 App Router
 │   ├── src/app/                      # Pages (App Router)
-│   │   ├── page.tsx                  # Landing page
-│   │   ├── layout.tsx                # Root layout (metadata, fonts)
-│   │   ├── globals.css               # Global CSS (light theme)
-│   │   ├── login/page.tsx            # Đăng nhập
-│   │   ├── register/page.tsx         # Đăng ký
-│   │   └── dashboard/                # Dashboard sections
-│   ├── src/components/               # UI components & layout
-│   ├── src/features/                 # Feature modules (auth, projects)
-│   ├── src/hooks/                    # Custom React hooks
-│   ├── src/lib/                      # Shared utilities (api, validation)
-│   ├── src/services/                 # API service functions
-│   ├── src/stores/                   # Zustand stores
-│   ├── src/types/                    # TypeScript type definitions
-│   ├── src/utils/                    # Helper functions
-│   ├── public/images/                # Ảnh hero, fresh produce, QR scan
-│   ├── Dockerfile
+│   │   ├── page.tsx                  # Landing page (Hero, FAQ, Blog preview)
+│   │   ├── products/                 # Danh mục nông sản & trái cây
+│   │   ├── seasons/                  # Lịch mùa vụ & sản lượng
+│   │   ├── traceability/             # Quét mã QR truy xuất nguồn gốc
+│   │   ├── vouchers/                 # Kho mã giảm giá & freeship
+│   │   ├── loyalty/                  # Tích điểm & Hạng thành viên (4 hạng)
+│   │   ├── ai-hub/                   # 3 Giải pháp AI (Chatbot, Forecast, Risks)
+│   │   ├── farming-techniques/       # Kỹ thuật chăm sóc cây trồng (VietGAP)
+│   │   ├── knowledge/                # Chuyên đề xuất khẩu & Tips & Tricks
+│   │   ├── about/                    # Về chúng tôi (Sứ mệnh, đối tác)
+│   │   ├── blog/                     # Tin tức & bản tin nông sản sạch
+│   │   ├── guides/                   # Cẩm nang hướng dẫn 4 vai trò
+│   │   ├── faq/                      # Câu hỏi thường gặp
+│   │   ├── contact/                  # Liên hệ hợp tác nông nghiệp
+│   │   ├── chat/                     # Chat trực tuyến WebSocket
+│   │   ├── cart/                     # Giỏ hàng & thanh toán
+│   │   ├── login/ & register/        # Xác thực JWT & phân quyền
+│   │   └── dashboard/                # 5 Cổng phân quyền
+│   │       ├── admin/                # Quản trị viên (Audit, duyệt chứng chỉ)
+│   │       ├── farmer/               # Nông dân (Nông trại, lô & mã QR)
+│   │       ├── warehouse/            # Nhân viên kho (Nhập/xuất FEFO)
+│   │       ├── distributor/          # Nhà phân phối (Theo dõi vận chuyển)
+│   │       └── customer/             # Khách hàng (Đơn hàng & tích điểm)
+│   ├── src/components/               # UI components, layout & floating AI assistant
+│   ├── src/stores/                   # Zustand stores (auth, cart, toast)
+│   ├── public/images/                # Ảnh minh họa nông trại, QR, nông sản
 │   └── package.json
 │
-├── docker/
-│   └── nginx/default.conf           # Nginx reverse proxy config
-├── compose.yaml                     # Docker Compose (production)
-├── compose.override.yaml            # Docker Compose overrides (dev)
-├── Makefile                         # Make commands
-├── .env.example                     # Mẫu biến môi trường
-├── .gitignore                       # Git ignore rules
-└── README.md                        # <-- This file
+├── docker/                           # Docker setup (Nginx config)
+├── compose.yaml                      # Docker Compose
+├── start-all.ps1                     # Script khởi động tự động toàn bộ hệ thống
+├── .env.example                      # Mẫu biến môi trường
+├── .gitignore                        # Git ignore rules chuẩn
+└── README.md                         # Tài liệu hướng dẫn dự án
 ```
 
 ---

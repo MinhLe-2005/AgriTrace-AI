@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { type ReactNode } from "react";
 
 import "@/app/globals.css";
+import { PublicLayoutWrapper } from "@/components/layout/public-layout";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="vi">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <PublicLayoutWrapper>{children}</PublicLayoutWrapper>
+        </Providers>
         <Toaster />
       </body>
     </html>

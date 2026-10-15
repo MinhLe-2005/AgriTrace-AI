@@ -1,6 +1,17 @@
 "use client";
 
-import { FolderOpen, LayoutDashboard, Leaf, LogOut, Menu, Users } from "lucide-react";
+import {
+  FolderOpen,
+  LayoutDashboard,
+  Leaf,
+  LogOut,
+  Menu,
+  Shield,
+  Truck,
+  User,
+  Users,
+  Warehouse,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -10,10 +21,16 @@ import { authService } from "@/services/auth.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 
+
 const navigation = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
-  { href: "/dashboard/projects", label: "Dự án", icon: FolderOpen },
-  { href: "/dashboard/users", label: "Người dùng", icon: Users, adminOnly: true },
+  { href: "/dashboard/admin", label: "1. Quản trị (Admin)", icon: Shield },
+  { href: "/dashboard/farmer", label: "2. Nông dân (Farmer)", icon: Leaf },
+  { href: "/dashboard/warehouse", label: "3. Thủ kho (Warehouse)", icon: Warehouse },
+  { href: "/dashboard/distributor", label: "4. Vận chuyển (Distributor)", icon: Truck },
+  { href: "/dashboard/customer", label: "5. Khách hàng (Customer)", icon: User },
+  { href: "/dashboard/users", label: "Quản lý Tài khoản", icon: Users, adminOnly: true },
+  { href: "/dashboard/projects", label: "Dự án Nông sản", icon: FolderOpen },
 ];
 
 const roleLabelMap: Record<string, string> = {
