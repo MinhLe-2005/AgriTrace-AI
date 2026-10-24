@@ -58,11 +58,11 @@ export default function FarmerPortalPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold">Cổng Nông Dân & Chủ Trang Trại (Farmer Portal)</h1>
               <span className="text-[11px] bg-emerald-500/30 text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-400/30">
-                Module 2
+                VietGAP & GlobalGAP
               </span>
             </div>
             <p className="text-xs text-emerald-200/80">
-              Phụ trách: Member 2 (Quản lý Nông trại, Lô sản xuất/thu hoạch, Hồ sơ canh tác, Chứng nhận VietGAP/GlobalGAP)
+              Quản lý nông trại, ghi nhật ký mùa vụ, theo dõi lô thu hoạch và cấp mã QR truy xuất minh bạch
             </p>
           </div>
         </div>

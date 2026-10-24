@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import { type ReactNode } from "react";
 
-import { FloatingAssistant } from "./floating-assistant";
 import { MainFooter } from "./main-footer";
 import { MainNavbar } from "./main-navbar";
 
@@ -13,12 +12,7 @@ export function PublicLayoutWrapper({ children }: { children: ReactNode }) {
   const isAuth = pathname === "/login" || pathname === "/register";
 
   if (isDashboard) {
-    return (
-      <>
-        {children}
-        <FloatingAssistant />
-      </>
-    );
+    return <>{children}</>;
   }
 
   return (
@@ -26,7 +20,6 @@ export function PublicLayoutWrapper({ children }: { children: ReactNode }) {
       <MainNavbar />
       <main className="flex-1">{children}</main>
       {!isAuth && <MainFooter />}
-      <FloatingAssistant />
     </div>
   );
 }

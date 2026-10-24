@@ -10,11 +10,11 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:postgres.csduskdbkfaqftnecsjc}}
     password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:Bimdiendie1@}}
   flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 1
+    enabled: false
   jpa:
     show-sql: true
+    hibernate:
+      ddl-auto: update
 logging:
   level:
     com.example.myfullstackapp: DEBUG

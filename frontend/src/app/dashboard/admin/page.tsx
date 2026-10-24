@@ -59,11 +59,11 @@ export default function AdminPortalPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold">Cổng Quản Trị Viên (Admin Portal)</h1>
               <span className="text-[11px] bg-red-500/30 text-red-300 font-semibold px-2 py-0.5 rounded-full border border-red-400/30">
-                Module 1
+                Toàn Hệ Thống
               </span>
             </div>
             <p className="text-xs text-red-200/80">
-              Phụ trách: Member 1 (Phân quyền 5 vai trò, Quản lý tài khoản, Duyệt Nông dân/Distributor, Audit log)
+              Quản lý phân quyền 5 vai trò, xét duyệt tài khoản đối tác Nông dân / Nhà phân phối và nhật ký kiểm toán hệ thống
             </p>
           </div>
         </div>

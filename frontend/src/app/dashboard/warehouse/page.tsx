@@ -73,11 +73,11 @@ export default function WarehousePortalPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold">Cổng Thủ Kho & Quản Lý Tồn Kho (Warehouse Staff)</h1>
               <span className="text-[11px] bg-blue-500/30 text-blue-300 font-semibold px-2 py-0.5 rounded-full border border-blue-400/30">
-                Module 3 (Nguyên tắc FEFO)
+                Chuẩn Lạnh & FEFO
               </span>
             </div>
             <p className="text-xs text-blue-200/80">
-              Phụ trách: Member 3 (Phiếu nhập/xuất kho, vị trí lưu trữ, xuất kho FEFO - First Expired First Out)
+              Kiểm soát nhiệt độ kho mát 2-6°C, giám sát hạn sử dụng nông sản và xuất kho ưu tiên FEFO
             </p>
           </div>
         </div>

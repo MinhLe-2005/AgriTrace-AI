@@ -8,17 +8,17 @@ import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: {
-    default: "AgriTrace AI – Quản Lý Chuỗi Cung Ứng Nông Sản Sạch",
-    template: "%s | AgriTrace AI",
+    default: "AgriTrace – Nông Sản Sạch & Truy Xuất Nguồn Gốc",
+    template: "%s | AgriTrace",
   },
   description:
-    "Nền tảng quản lý chuỗi cung ứng nông sản sạch tích hợp trí tuệ nhân tạo. Truy xuất nguồn gốc, quản lý nông trại, kho hàng và đặt hàng trực tuyến.",
+    "Hệ thống quản lý chuỗi cung ứng nông sản sạch và truy xuất nguồn gốc bằng mã QR từ nông trại đến bàn ăn.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="vi">
-      <body>
+    <html lang="vi" suppressHydrationWarning>
+      <body suppressHydrationWarning className="antialiased text-gray-800 bg-[#fbfdfb]">
         <Providers>
           <PublicLayoutWrapper>{children}</PublicLayoutWrapper>
         </Providers>

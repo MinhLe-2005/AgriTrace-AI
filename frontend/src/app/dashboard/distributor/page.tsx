@@ -52,11 +52,11 @@ export default function DistributorPortalPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold">Cổng Nhà Phân Phối & Vận Chuyển (Distributor)</h1>
               <span className="text-[11px] bg-amber-500/30 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-400/30">
-                Module 5 (Vận Chuyển & Chuỗi Lạnh)
+                Logistics & Chuỗi Lạnh IoT
               </span>
             </div>
             <p className="text-xs text-amber-200/80">
-              Phụ trách: Member 5 (Đơn vận chuyển, cập nhật giao nhận, bàn giao lô hàng và quét mã QR bàn giao)
+              Điều phối xe thùng lạnh, giám sát cảm biến nhiệt độ hành trình và quét mã QR bàn giao lô hàng
             </p>
           </div>
         </div>
