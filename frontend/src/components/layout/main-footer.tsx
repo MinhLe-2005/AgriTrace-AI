@@ -1,25 +1,5 @@
 "use client";
 
-import {
-  Award,
-  CheckCircle2,
-  ChevronRight,
-  ExternalLink,
-  Gift,
-  Leaf,
-  Mail,
-  MapPin,
-  Package,
-  Phone,
-  QrCode,
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  Truck,
-  UserCheck,
-  Users,
-  Warehouse,
-} from "lucide-react";
 import Link from "next/link";
 
 export function MainFooter() {
@@ -28,7 +8,6 @@ export function MainFooter() {
       role: "Quản Trị Viên (Admin)",
       desc: "Quản lý hệ thống & phân quyền",
       href: "/dashboard/admin",
-      icon: "👑",
       badge: "Admin",
       badgeColor: "bg-red-500/20 text-red-300 border-red-500/30",
     },
@@ -36,7 +15,6 @@ export function MainFooter() {
       role: "Nông Dân (Farmer)",
       desc: "Quản lý nông trại, lô hái & mùa vụ",
       href: "/dashboard/farmer",
-      icon: "🌾",
       badge: "Nông trại",
       badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
     },
@@ -44,7 +22,6 @@ export function MainFooter() {
       role: "Thủ Kho (Warehouse)",
       desc: "Kho lạnh FEFO & quản lý tồn kho",
       href: "/dashboard/warehouse",
-      icon: "📦",
       badge: "Kho lạnh",
       badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/30",
     },
@@ -52,7 +29,6 @@ export function MainFooter() {
       role: "Nhà Phân Phối (Distributor)",
       desc: "Vận chuyển xe lạnh & lộ trình giao",
       href: "/dashboard/distributor",
-      icon: "🚚",
       badge: "Vận chuyển",
       badgeColor: "bg-blue-500/20 text-blue-300 border-blue-500/30",
     },
@@ -60,7 +36,6 @@ export function MainFooter() {
       role: "Khách Hàng (Customer)",
       desc: "Mua sắm, ví voucher & tích điểm",
       href: "/dashboard/customer",
-      icon: "🛒",
       badge: "Mua hàng",
       badgeColor: "bg-purple-500/20 text-purple-300 border-purple-500/30",
     },
@@ -87,7 +62,7 @@ export function MainFooter() {
               href="/login"
               className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 hover:text-white bg-emerald-900/40 hover:bg-emerald-900/70 px-3.5 py-1.5 rounded-xl border border-emerald-700/50 transition-all self-start md:self-auto"
             >
-              Trang Đăng Nhập Chung <ChevronRight size={14} />
+              Trang Đăng Nhập Chung
             </Link>
           </div>
 
@@ -100,7 +75,7 @@ export function MainFooter() {
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">{actor.icon}</span>
+
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${actor.badgeColor}`}
                     >
@@ -116,7 +91,7 @@ export function MainFooter() {
                 </div>
                 <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[11px] font-semibold text-emerald-400 group-hover:text-emerald-200">
                   <span>Truy cập</span>
-                  <ChevronRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+
                 </div>
               </Link>
             ))}
@@ -131,7 +106,7 @@ export function MainFooter() {
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-[#2e7d32] text-white flex items-center justify-center font-bold shadow-md">
-                <Leaf size={20} />
+
               </div>
               <div>
                 <span className="font-extrabold text-lg tracking-tight text-white">
@@ -150,11 +125,11 @@ export function MainFooter() {
 
             <div className="pt-1 space-y-2 text-gray-300">
               <div className="flex items-center gap-2 text-emerald-300 font-semibold">
-                <ShieldCheck size={15} />
+
                 <span>Tiêu chuẩn VietGAP & GlobalGAP</span>
               </div>
               <div className="flex items-center gap-2 text-gray-400">
-                <MapPin size={14} className="text-emerald-400 shrink-0" />
+
                 <span>Tiểu khu 112, Huyện Lạc Dương, Lâm Đồng</span>
               </div>
             </div>
@@ -163,7 +138,7 @@ export function MainFooter() {
           {/* Cột 2: Cửa Hàng & Khách Hàng */}
           <div>
             <h4 className="font-bold text-white text-xs uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <ShoppingBag size={14} className="text-emerald-400" /> Dành Cho Khách Hàng
+               Dành Cho Khách Hàng
             </h4>
             <ul className="space-y-2.5 text-gray-300">
               <li>
@@ -202,7 +177,7 @@ export function MainFooter() {
           {/* Cột 3: Nông Trại & Chuỗi Cung Ứng */}
           <div>
             <h4 className="font-bold text-white text-xs uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <QrCode size={14} className="text-emerald-400" /> Nông Nghiệp & Truy Xuất
+               Nông Nghiệp & Truy Xuất
             </h4>
             <ul className="space-y-2.5 text-gray-300">
               <li>
@@ -236,7 +211,7 @@ export function MainFooter() {
           {/* Cột 4: Liên Hệ & Hỗ Trợ Kỹ Thuật */}
           <div className="space-y-3.5">
             <h4 className="font-bold text-white text-xs uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <Phone size={14} className="text-emerald-400" /> Tổng Đài & Trợ Giúp
+               Tổng Đài & Trợ Giúp
             </h4>
 
             <div className="p-3.5 rounded-2xl bg-[#122e1e] border border-emerald-900/60 space-y-1.5">
@@ -247,11 +222,11 @@ export function MainFooter() {
 
             <div className="space-y-2 text-gray-300 text-xs">
               <div className="flex items-center gap-2">
-                <Mail size={14} className="text-emerald-400 shrink-0" />
+
                 <span>hotro@agritrace.vn</span>
               </div>
               <div className="flex items-center gap-2">
-                <Users size={14} className="text-emerald-400 shrink-0" />
+
                 <span>Hợp tác nông trại: hoptac@agritrace.vn</span>
               </div>
             </div>

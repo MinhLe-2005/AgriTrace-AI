@@ -1,18 +1,5 @@
 "use client";
 
-import {
-  Bot,
-  HelpCircle,
-  MessageCircle,
-  MessageSquare,
-  Send,
-  Sparkles,
-  User,
-  X,
-  Minimize2,
-  Maximize2,
-  CheckCircle2,
-} from "lucide-react";
 import { useState } from "react";
 
 export function FloatingAssistant() {
@@ -82,7 +69,7 @@ export function FloatingAssistant() {
           className="flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-[#156e34] to-[#25a854] text-white rounded-full shadow-2xl hover:shadow-emerald-600/40 hover:scale-105 active:scale-95 transition-all group"
         >
           <div className="relative">
-            <Bot size={22} className="group-hover:rotate-12 transition-transform" />
+
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-300 ring-2 ring-[#156e34]"></span>
           </div>
           <div className="text-left">
@@ -101,7 +88,7 @@ export function FloatingAssistant() {
           <div className="bg-[#0f2e1b] text-white p-3.5 flex items-center justify-between border-b border-emerald-950">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
-                {activeTab === "ai" ? <Bot size={18} /> : <MessageCircle size={18} />}
+                {activeTab === "ai" ? "AI" : "Hỗ trợ"}
               </div>
               <div>
                 <div className="text-[14px] font-bold leading-tight">
@@ -118,7 +105,7 @@ export function FloatingAssistant() {
               onClick={() => setIsOpen(false)}
               className="p-1 rounded-lg hover:bg-emerald-800 text-gray-300 hover:text-white transition-colors"
             >
-              <X size={18} />
+
             </button>
           </div>
 
@@ -132,7 +119,7 @@ export function FloatingAssistant() {
                   : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Sparkles size={14} className="text-emerald-600" />
+
               <span>AI Chatbot Nông Sản</span>
             </button>
             <button
@@ -143,7 +130,7 @@ export function FloatingAssistant() {
                   : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <MessageSquare size={14} className="text-blue-600" />
+
               <span>Chat Nhân Viên / Chủ Hàng</span>
             </button>
           </div>
@@ -159,7 +146,7 @@ export function FloatingAssistant() {
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs flex-shrink-0 mt-0.5 ${
                     m.sender === "bot" ? "bg-emerald-600" : "bg-blue-600"
                   }`}>
-                    {m.sender === "bot" ? <Bot size={14} /> : <User size={14} />}
+                    {m.sender === "bot" ? "Hệ thống" : "Nhân viên"}
                   </div>
                 )}
                 <div
@@ -221,7 +208,7 @@ export function FloatingAssistant() {
                 disabled={!inputVal.trim()}
                 className="p-2 rounded-xl bg-[#1a7a3a] hover:bg-[#156e34] disabled:opacity-40 text-white transition-colors"
               >
-                <Send size={16} />
+
               </button>
             </form>
           </div>
