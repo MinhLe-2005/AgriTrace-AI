@@ -59,6 +59,27 @@ public class AuthService {
         refreshTokenService.revoke(request.refreshToken());
     }
 
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        String email = normalizedEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản với email này"));
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        String email = normalizedEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản"));
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("Mật khẩu hiện tại không chính xác!");
+        }
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+    }
+
     private AuthResponse response(RefreshTokenService.TokenPair tokens) {
         return new AuthResponse(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), userMapper.toResponse(tokens.user()));
     }

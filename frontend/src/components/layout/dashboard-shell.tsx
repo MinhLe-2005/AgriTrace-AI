@@ -105,6 +105,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     );
   }
 
+  // Khách hàng xem đơn hàng: hiển thị thẳng trong trang web, giữ nguyên Navbar công khai, không dùng sidebar quản trị
+  if (pathname === "/dashboard/customer") {
+    return (
+      <div className="w-full bg-[#fbfdfb] min-h-[calc(100vh-160px)] py-6 sm:py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">{children}</div>
+      </div>
+    );
+  }
+
   async function logout() {
     try {
       await authService.logout(refreshToken);

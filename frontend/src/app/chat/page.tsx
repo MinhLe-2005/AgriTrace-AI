@@ -108,29 +108,22 @@ export default function ChatPage() {
   return (
     <div className="bg-[#f8faf8] min-h-screen py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
-        {/* Module Header */}
-        <div className="bg-emerald-900 text-white p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-sm border border-emerald-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-700/80 flex items-center justify-center text-emerald-200">
-              <MessageSquare size={22} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold">Kênh Chat Trực Tiếp Với Nhân Viên & Chủ Hàng</h1>
-                <span className="text-[11px] bg-emerald-500/30 text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-400/30">
-                  Module 5 (Mục 5.1 & 7.2)
-                </span>
-              </div>
-              <p className="text-xs text-emerald-200/80">
-                Phụ trách: Member 5 (WebSocket STOMP + SockJS, ChatRoom, ChatMessage)
-              </p>
-            </div>
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+              <MessageSquare className="text-emerald-700" size={24} />
+              <span>Hỗ Trợ & Tư Vấn Trực Tuyến</span>
+            </h1>
+            <p className="text-xs text-gray-500 mt-1">
+              Trao đổi trực tiếp với nhân viên hỗ trợ, nông trại và đội vận chuyển về đơn hàng của bạn.
+            </p>
           </div>
           <Link
             href="/ai-hub#chatbot"
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 flex items-center gap-1.5 transition-colors"
+            className="text-xs font-semibold px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 flex items-center gap-1.5 transition-colors self-start sm:self-auto"
           >
-            Chuyển Sang Trợ Lý AI Chatbot
+            Trợ lý tra cứu AI →
           </Link>
         </div>
 

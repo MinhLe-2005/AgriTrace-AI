@@ -74,7 +74,7 @@ $bPortListening = Test-NetConnection -ComputerName 127.0.0.1 -Port 8080 -Informa
 if ($bPortListening) {
     Write-Host "  -> Port 8080 da dang chay san." -ForegroundColor Green
 } else {
-    Start-Process "cmd.exe" -ArgumentList "/k title AgriTrace-Backend && `"$mvnCmd`" spring-boot:run `"-Dspring-boot.run.profiles=dev`"" -WorkingDirectory $BackendDir
+    Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'AgriTrace-Backend'; & '$mvnCmd' spring-boot:run '-Dspring-boot.run.profiles=dev'" -WorkingDirectory $BackendDir
 }
 
 # 3. Khoi dong Frontend Next.js (Port 3000)
@@ -83,7 +83,7 @@ $fPortListening = Test-NetConnection -ComputerName 127.0.0.1 -Port 3000 -Informa
 if ($fPortListening) {
     Write-Host "  -> Port 3000 da dang chay san." -ForegroundColor Green
 } else {
-    Start-Process "cmd.exe" -ArgumentList "/k title AgriTrace-Frontend && npm run dev" -WorkingDirectory $FrontendDir
+    Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'AgriTrace-Frontend'; npm run dev" -WorkingDirectory $FrontendDir
 }
 
 # Thong bao hoan tat

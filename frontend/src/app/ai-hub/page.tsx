@@ -111,11 +111,11 @@ export default function AiHubPage() {
     setTimeout(() => {
       let ans = "";
       if (userText.toLowerCase().includes("chứng nhận")) {
-        ans = "✅ Theo dữ liệu SQL Server: Lô hàng đã được cấp chứng nhận VietGAP số #VG-2024-889 do Chi cục Trồng trọt cấp, còn hạn đến tháng 12/2026. Tất cả chỉ số tồn dư thuốc BVTV = 0.";
+        ans = "Xác nhận từ hệ thống: Lô hàng đã được cấp chứng nhận VietGAP số #VG-2024-889 do Chi cục Trồng trọt cấp, còn hạn đến tháng 12/2026. Tất cả chỉ số tồn dư thuốc BVTV = 0.";
       } else if (userText.toLowerCase().includes("thu hoạch") || userText.toLowerCase().includes("ngày")) {
-        ans = "📅 Lô sản phẩm gần nhất được thu hoạch vào 05:30 sáng ngày 14/10/2026 tại Nông Trại Xanh Đà Lạt, sau đó chuyển thẳng về kho bảo quản lạnh 4°C.";
+        ans = "Lịch trình: Lô sản phẩm gần nhất được thu hoạch vào 05:30 sáng ngày 14/10/2026 tại Nông Trại Xanh Đà Lạt, sau đó chuyển thẳng về kho bảo quản lạnh 4°C.";
       } else {
-        ans = `🤖 Trợ lý AI: Yêu cầu tra cứu về "${userText}" đã được xác minh đối chiếu với hệ thống chuỗi cung ứng. Sản phẩm đạt tiêu chuẩn an toàn thực phẩm và có đầy đủ nhật ký canh tác số!`;
+        ans = `Trợ lý AI: Yêu cầu tra cứu về "${userText}" đã được xác minh đối chiếu với hệ thống chuỗi cung ứng. Sản phẩm đạt tiêu chuẩn an toàn thực phẩm và có đầy đủ nhật ký canh tác số!`;
       }
       setChatLog((prev) => [...prev, { role: "assistant", content: ans }]);
     }, 500);
@@ -124,21 +124,21 @@ export default function AiHubPage() {
   return (
     <div className="bg-[#f8faf8] min-h-screen py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
-        {/* Module Header */}
-        <div className="bg-emerald-950 text-white p-5 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-xl border border-emerald-900">
+        {/* Page Header */}
+        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white p-6 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-xl border border-emerald-900">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg">
               <Sparkles size={26} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-extrabold tracking-tight">AgriTrace AI Intelligence Hub</h1>
+                <h1 className="text-xl font-extrabold tracking-tight">Trung Tâm Trí Tuệ Nhân Tạo AgriTrace</h1>
                 <span className="text-[11px] bg-emerald-500/30 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full border border-emerald-400/30">
-                  Phần 4: Điểm Khác Biệt Của Đề Tài
+                  AI Intelligence Hub
                 </span>
               </div>
               <p className="text-xs text-emerald-200/80 mt-0.5">
-                Tích hợp 3 trụ cột AI: Chatbot Nông sản (M5), Dự đoán Nhu cầu (M2) & Cảnh báo Rủi ro (M3)
+                Giải pháp AI hỗ trợ tự động hóa chuỗi cung ứng nông sản sạch: Trợ lý tra cứu, dự báo nhu cầu & cảnh báo rủi ro kho lạnh.
               </p>
             </div>
           </div>
@@ -201,7 +201,7 @@ export default function AiHubPage() {
                   <Bot size={20} className="text-[#1a7a3a]" /> Trợ Lý AI Tư Vấn Nguồn Gốc & Thông Tin Nông Sản
                 </h3>
                 <p className="text-xs text-gray-500">
-                  (Mục 4.1 - Phụ trách: Member 5) Phân biệt dữ liệu đã xác minh vs chưa có, không hallucinate
+                  Hỏi đáp trực tiếp với cơ sở dữ liệu chuỗi cung ứng, tra cứu chứng nhận VietGAP và nhật ký canh tác số
                 </p>
               </div>
               <span className="text-xs bg-emerald-100 text-[#1a7a3a] font-semibold px-2.5 py-1 rounded-full">
@@ -261,7 +261,7 @@ export default function AiHubPage() {
                   <TrendingUp size={20} className="text-blue-700" /> Bảng Dự Đoán Nhu Cầu Tiêu Thụ Trong 7 Ngày Tới
                 </h3>
                 <p className="text-xs text-gray-500">
-                  (Mục 4.2 - Phụ trách: Member 2) Phân tích dựa trên dữ liệu bán hàng, lịch mùa vụ và thời điểm cao điểm
+                  Phân tích chuỗi thời gian dựa trên lịch sử bán hàng, xu hướng mùa vụ và sự kiện khuyến mãi
                 </p>
               </div>
               <span className="text-xs bg-blue-100 text-blue-800 font-semibold px-2.5 py-1 rounded-full">
@@ -305,7 +305,7 @@ export default function AiHubPage() {
                   <AlertTriangle size={20} className="text-amber-600" /> Hệ Thống Cảnh Báo Rủi Ro Chuỗi Cung Ứng
                 </h3>
                 <p className="text-xs text-gray-500">
-                  (Mục 4.3 - Phụ trách: Member 3) Phát hiện lô hàng sắp hết hạn, tồn kho vượt mức và đơn giao trễ
+                  Tự động phát hiện nông sản sắp cận hạn, hàng tồn kho lệch chuẩn và cảnh báo nhiệt độ xe lạnh
                 </p>
               </div>
               <span className="text-xs bg-red-100 text-red-800 font-semibold px-2.5 py-1 rounded-full">
@@ -331,7 +331,7 @@ export default function AiHubPage() {
                   <h4 className="font-bold text-sm text-gray-900">{alert.target}</h4>
                   <p className="text-xs text-gray-600">{alert.detail}</p>
                   <div className="pt-2 border-t border-gray-200 text-xs text-emerald-800 font-medium">
-                    💡 Khuyến nghị xử lý: {alert.suggestion}
+                    Khuyến nghị xử lý: {alert.suggestion}
                   </div>
                 </div>
               ))}
