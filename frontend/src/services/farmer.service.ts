@@ -17,6 +17,25 @@ export type ApiHarvestLot = {
   createdAt?: string;
 };
 
+export type ApiProductItem = {
+  id: string;
+  name: string;
+  price: number;
+  oldPrice?: number;
+  unit: string;
+  origin?: string;
+  farm?: string;
+  cert?: string;
+  rating?: number;
+  reviews?: number;
+  harvest?: string;
+  image?: string;
+  categoryCode?: string;
+  stockLeft?: number;
+  batchCode?: string;
+  description?: string;
+};
+
 export const farmerService = {
   async getBatches(): Promise<ApiHarvestLot[]> {
     const res = await api.get<ApiHarvestLot[]>("/farmer/batches");
@@ -30,5 +49,19 @@ export const farmerService = {
 
   async deleteBatch(code: string): Promise<void> {
     await api.delete(`/farmer/batches/${code}`);
+  },
+
+  async getProducts(): Promise<ApiProductItem[]> {
+    const res = await api.get<ApiProductItem[]>("/products");
+    return res.data;
+  },
+
+  async createProduct(product: Partial<ApiProductItem>): Promise<ApiProductItem> {
+    const res = await api.post<ApiProductItem>("/products", product);
+    return res.data;
+  },
+
+  async deleteProduct(id: string): Promise<void> {
+    await api.delete(`/products/${id}`);
   },
 };

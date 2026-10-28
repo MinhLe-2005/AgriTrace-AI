@@ -245,6 +245,27 @@ export default function FarmerPortalPage() {
       .catch((err) => {
         console.warn("Không thể tải lô từ API:", err);
       });
+
+    farmerService
+      .getProducts()
+      .then((data) => {
+        if (data && data.length > 0) {
+          const mapped: ProductItem[] = data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            category: p.categoryCode || "Trái Cây Đặc Sản",
+            price: Number(p.price) || 50000,
+            unit: p.unit || "kg",
+            description: p.description || p.name,
+            origin: p.origin || p.farm || "Nông trại",
+            image: p.image && p.image.length <= 4 ? p.image : "🌱",
+          }));
+          setProducts(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn("Không thể tải sản phẩm từ API:", err);
+      });
   }, []);
 
   // Form State tạo Lô mới
@@ -578,7 +599,7 @@ export default function FarmerPortalPage() {
   };
 
   // Thêm Sản phẩm mới
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdName.trim()) {
       toast.error("Vui lòng nhập tên sản phẩm!");
@@ -596,11 +617,38 @@ export default function FarmerPortalPage() {
       image: "🌱",
     };
 
+    try {
+      await farmerService.createProduct({
+        id: newProd.id,
+        name: newProd.name,
+        price: newProd.price,
+        oldPrice: newProd.price,
+        unit: newProd.unit,
+        description: newProd.description,
+        origin: newProd.origin,
+        farm: currentFarm.name,
+        image: newProd.image,
+        categoryCode: newProd.category,
+      });
+    } catch (err) {
+      console.warn("Không thể lưu sản phẩm qua API:", err);
+    }
+
     setProducts([...products, newProd]);
     setIsProductModalOpen(false);
     setNewProdName("");
     setNewProdDesc("");
     toast.success(`Đã thêm sản phẩm "${newProd.name}" vào danh mục trang trại!`);
+  };
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    try {
+      await farmerService.deleteProduct(id);
+    } catch (err) {
+      console.warn("Không thể xóa sản phẩm qua API:", err);
+    }
+    setProducts(products.filter((p) => p.id !== id));
+    toast.info(`Đã xóa sản phẩm "${name}"!`);
   };
 
   const filteredBatches =
@@ -1083,15 +1131,28 @@ export default function FarmerPortalPage() {
                   <div className="text-sm font-extrabold text-[#1a7a3a]">
                     {p.price.toLocaleString("vi-VN")} đ <span className="text-xs font-normal text-gray-400">/{p.unit}</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      handleProductSelect(p.name);
-                      setIsBatchModalOpen(true);
-                    }}
-                    className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold text-[11px] rounded-lg border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
-                  >
-                    + Tạo Lô
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        handleProductSelect(p.name);
+                        setIsBatchModalOpen(true);
+                      }}
+                      className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold text-[11px] rounded-lg border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
+                    >
+                      + Tạo Lô
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Bạn có chắc muốn xóa nông sản "${p.name}"?`)) {
+                          handleDeleteProduct(p.id, p.name);
+                        }
+                      }}
+                      className="p-1 text-gray-400 hover:text-rose-600 rounded cursor-pointer"
+                      title="Xóa nông sản"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
