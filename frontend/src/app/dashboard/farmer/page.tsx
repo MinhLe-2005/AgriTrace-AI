@@ -28,7 +28,8 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { farmerService } from "@/services/farmer.service";
 import { toast } from "@/stores/toast-store";
 
 // =========================================================================
@@ -218,6 +219,33 @@ export default function FarmerPortalPage() {
 
   const [activeFilter, setActiveFilter] = useState<string>("Tất cả");
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+
+  useEffect(() => {
+    farmerService
+      .getBatches()
+      .then((data) => {
+        if (data && data.length > 0) {
+          const mapped: BatchItem[] = data.map((b) => ({
+            code: b.code,
+            farmCode: "NT-DL-01",
+            product: b.product,
+            plantingDate: b.plantingDate || "",
+            harvestDate: b.harvestDate,
+            expiryDate: b.expiryDate || "",
+            qty: b.qty,
+            unit: b.unit || "kg",
+            status: (b.status as any) || "Chờ duyệt xuất kho",
+            statusColor: b.statusColor || "#10b981",
+            cert: b.cert || "VietGAP",
+            cultivation: b.cultivation || "Theo tiêu chuẩn",
+          }));
+          setBatches(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn("Không thể tải lô từ API:", err);
+      });
+  }, []);
 
   // Form State tạo Lô mới
   const todayStr = new Date().toISOString().split("T")[0];
@@ -450,7 +478,7 @@ export default function FarmerPortalPage() {
   };
 
   // Nộp form tạo Lô thu hoạch
-  const handleCreateBatch = (e: React.FormEvent) => {
+  const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formLotCode.trim()) {
       toast.error("Vui lòng nhập mã lô thu hoạch!");
@@ -483,9 +511,39 @@ export default function FarmerPortalPage() {
       cultivation: formCultivation,
     };
 
+    // Lưu vào database backend (bảng agri_harvest_lots & tự động sinh mã QR agri_traceability)
+    try {
+      await farmerService.createBatch({
+        code: newBatch.code,
+        product: newBatch.product,
+        plantingDate: newBatch.plantingDate,
+        harvestDate: newBatch.harvestDate,
+        expiryDate: newBatch.expiryDate,
+        qty: newBatch.qty,
+        unit: newBatch.unit,
+        status: newBatch.status,
+        statusColor: newBatch.statusColor,
+        cert: newBatch.cert,
+        cultivation: newBatch.cultivation,
+        farmName: `${currentFarm.name} (Mã: ${currentFarm.code})`,
+      });
+    } catch (err) {
+      console.warn("Không thể lưu lô qua API, lưu tại phiên:", err);
+    }
+
     setBatches([newBatch, ...batches]);
     setIsBatchModalOpen(false);
     toast.success(`Đã tạo thành công lô ${newBatch.code} cho ${currentFarm.name}!`);
+  };
+
+  const handleDeleteBatch = async (code: string) => {
+    try {
+      await farmerService.deleteBatch(code);
+    } catch (err) {
+      console.warn("Xóa lô qua API thất bại:", err);
+    }
+    setBatches(batches.filter((item) => item.code !== code));
+    toast.info(`Đã xóa lô ${code}!`);
   };
 
   // Ghi nhật ký canh tác
@@ -902,11 +960,11 @@ export default function FarmerPortalPage() {
                           <button
                             onClick={() => {
                               if (confirm(`Bạn có chắc muốn xóa lô ${b.code}?`)) {
-                                setBatches(batches.filter((item) => item.code !== b.code));
-                                toast.info(`Đã xóa lô ${b.code}`);
+                                handleDeleteBatch(b.code);
                               }
                             }}
                             className="text-gray-400 hover:text-rose-600 p-1 rounded-md cursor-pointer"
+                            title="Xóa lô thu hoạch"
                           >
                             <Trash2 size={13} />
                           </button>
