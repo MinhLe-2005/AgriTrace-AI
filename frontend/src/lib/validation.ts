@@ -6,12 +6,18 @@ export const loginSchema = z.object({
 });
 
 export const registerSchema = z.object({
-  name: z.string().trim().min(2, "Họ và tên tối thiểu 2 ký tự").max(100),
-  email: z.string().email("Vui lòng nhập email hợp lệ"),
+  name: z.string().trim().min(2, "Vui lòng nhập họ và tên (tối thiểu 2 ký tự)").max(100),
+  username: z
+    .string()
+    .trim()
+    .min(3, "Tên tài khoản tối thiểu 3 ký tự")
+    .max(30, "Tên tài khoản tối đa 30 ký tự")
+    .regex(/^[a-zA-Z0-9_.-]+$/, "Tên tài khoản không dấu, không chứa khoảng trắng (VD: minh2026)"),
+  email: z.string().min(1, "Vui lòng nhập địa chỉ email").email("Email không đúng định dạng (VD: example@gmail.com)"),
   password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
-  confirmPassword: z.string()
+  confirmPassword: z.string().min(1, "Vui lòng nhập lại mật khẩu xác nhận")
 }).refine((values) => values.password === values.confirmPassword, {
-  message: "Mật khẩu xác nhận không khớp",
+  message: "Mật khẩu xác nhận không trùng khớp",
   path: ["confirmPassword"]
 });
 

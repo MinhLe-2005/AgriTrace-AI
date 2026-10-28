@@ -126,7 +126,7 @@ export default function AboutPage() {
                 Trong khi đó, những người nông dân tâm huyết canh tác theo chuẩn VietGAP lại chật vật tìm đầu ra, thường xuyên bị thương lái ép giá và không có công cụ chứng minh độ sạch của sản phẩm.
               </p>
               <p className="text-gray-600 text-sm sm:text-base leading-relaxed font-medium text-emerald-900 bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-100">
-                🌿 AgriTrace AI ra đời để xóa bỏ rào cản đó — biến mỗi sản phẩm nông nghiệp thành một câu chuyện minh bạch, tra cứu được nguồn cội bằng một cú quét mã QR.
+                AgriTrace AI ra đời để xóa bỏ rào cản đó — biến mỗi sản phẩm nông nghiệp thành một câu chuyện minh bạch, tra cứu được nguồn cội bằng một cú quét mã QR.
               </p>
             </div>
 

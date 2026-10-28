@@ -12,6 +12,7 @@ export interface User {
   name: string;
   email: string;
   roles: UserRole[];
+  avatarUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }

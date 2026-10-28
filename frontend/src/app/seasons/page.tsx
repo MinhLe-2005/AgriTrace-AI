@@ -97,26 +97,20 @@ export default function SeasonsPage() {
     <div className="bg-[#f8faf8] min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Module Header */}
-        <div className="mb-6 bg-emerald-900 text-white p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-sm border border-emerald-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-700/80 flex items-center justify-center text-emerald-200">
-              <Calendar size={22} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold">Lịch Mùa Vụ Nông Sản & Trái Cây 2026</h1>
-                <span className="text-[11px] bg-emerald-500/30 text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-400/30">
-                  Module 2 & AI Forecasting
-                </span>
-              </div>
-              <p className="text-xs text-emerald-200/80">
-                Phụ trách: Member 2 (Quản lý Nông trại, Sản phẩm & Mùa vụ) kết hợp dự báo nhu cầu bằng AI
-              </p>
-            </div>
+        {/* Page Header */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+              <Calendar className="text-emerald-700" size={24} />
+              <span>Lịch Mùa Vụ Nông Sản 2026</span>
+            </h1>
+            <p className="text-xs text-gray-500 mt-1">
+              Theo dõi lịch thu hoạch chính vụ của các loại nông sản sạch trên toàn quốc để chọn mua đúng thời điểm tươi ngon nhất.
+            </p>
           </div>
           <Link
             href="/ai-hub#forecasting"
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 flex items-center gap-1.5 transition-colors"
+            className="text-xs font-semibold px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 flex items-center gap-1.5 transition-colors self-start sm:self-auto"
           >
             <Sparkles size={14} /> AI Dự Báo Nhu Cầu Mùa Vụ
           </Link>

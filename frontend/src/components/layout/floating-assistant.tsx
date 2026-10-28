@@ -9,7 +9,7 @@ export function FloatingAssistant() {
   const [messages, setMessages] = useState<Array<{ sender: "user" | "bot" | "support"; text: string; time: string }>>([
     {
       sender: "bot",
-      text: "Xin chào! Mình là AgriTrace AI Assistant 🌿. Bạn cần tra cứu nguồn gốc lô nông sản, mùa vụ thu hoạch hay chứng nhận chất lượng nào hôm nay?",
+      text: "Xin chào! Mình là AgriTrace AI Assistant. Bạn cần tra cứu nguồn gốc lô nông sản, mùa vụ thu hoạch hay chứng nhận chất lượng nào hôm nay?",
       time: "Vừa xong",
     },
   ]);
@@ -38,15 +38,15 @@ export function FloatingAssistant() {
     setTimeout(() => {
       let reply = "";
       if (text.includes("XL-2026-08") || text.includes("thu hoạch")) {
-        reply = "🔍 Tra cứu hệ thống AgriTrace AI: Lô Xà Lách Thủy Canh [XL-2026-08] được thu hoạch ngày 12/10/2026 tại Nông Trại Xanh Đà Lạt (Mã NT: NT-DL-01). Trạng thái kiểm định: ĐÃ DUYỆT (VietGAP #VG-2024-889). Bạn có thể quét mã QR trên bao bì để xem nhật ký vận chuyển!";
+        reply = "Tra cứu hệ thống AgriTrace AI: Lô Xà Lách Thủy Canh [XL-2026-08] được thu hoạch ngày 12/10/2026 tại Nông Trại Xanh Đà Lạt (Mã NT: NT-DL-01). Trạng thái kiểm định: ĐÃ DUYỆT (VietGAP #VG-2024-889). Bạn có thể quét mã QR trên bao bì để xem nhật ký vận chuyển.";
       } else if (text.includes("mùa vụ") || text.includes("chính vụ")) {
-        reply = "🍓 Nông sản đang vào chính vụ tháng 10: Dâu tây Đà Lạt, Bơ sáp Tây Nguyên, Cam sành Hàm Yên và Cải kale Mộc Châu. Tất cả đều có sẵn ưu đãi giảm 10% theo chương trình Voucher Mùa Vụ!";
+        reply = "Nông sản đang vào chính vụ tháng 10: Dâu tây Đà Lạt, Bơ sáp Tây Nguyên, Cam sành Hàm Yên và Cải kale Mộc Châu. Tất cả đều có sẵn ưu đãi giảm 10% theo chương trình Voucher Mùa Vụ.";
       } else if (text.includes("VietGAP") || text.includes("chứng nhận")) {
-        reply = "✅ Chứng nhận VietGAP số #VG-2024-889 của Nông Trại Xanh do Chi cục Trồng trọt & BVTV cấp, có hiệu lực đến 15/12/2026. Hồ sơ đã được xác minh toàn diện trên hệ thống AgriTrace.";
+        reply = "Chứng nhận VietGAP số #VG-2024-889 của Nông Trại Xanh do Chi cục Trồng trọt & BVTV cấp, có hiệu lực đến 15/12/2026. Hồ sơ đã được xác minh toàn diện trên hệ thống AgriTrace.";
       } else if (activeTab === "support") {
-        reply = "👨‍🌾 Chủ nông trại (Farmer Nguyễn Văn Hùng): Cảm ơn quý khách đã nhắn tin! Lô hàng rau củ của bên mình vừa thu hái sáng sớm nay, bảo quản lạnh nhiệt độ tiêu chuẩn 5°C. Bạn cần ship gấp hay giao định kỳ ạ?";
+        reply = "Chủ nông trại (Farmer Nguyễn Văn Hùng): Cảm ơn quý khách đã nhắn tin. Lô hàng rau củ của bên mình vừa thu hái sáng sớm nay, bảo quản lạnh nhiệt độ tiêu chuẩn 5°C. Bạn cần ship gấp hay giao định kỳ ạ?";
       } else {
-        reply = `🤖 [AgriTrace AI]: Đã tiếp nhận yêu cầu về "${text}". Dữ liệu được trích xuất từ cơ sở dữ liệu chuỗi cung ứng. Bạn có thể xem chi tiết tại mục 'Truy Xuất QR' hoặc chuyển qua tab 'Chat Nhân Viên' để được tư vấn trực tiếp!`;
+        reply = `[AgriTrace AI]: Đã tiếp nhận yêu cầu về "${text}". Dữ liệu được trích xuất từ cơ sở dữ liệu chuỗi cung ứng. Bạn có thể xem chi tiết tại mục 'Truy Xuất QR' hoặc chuyển qua tab 'Chat Nhân Viên' để được tư vấn trực tiếp.`;
       }
 
       setMessages((prev) => [
@@ -173,9 +173,10 @@ export function FloatingAssistant() {
                     <button
                       key={i}
                       onClick={() => handleSend(q)}
-                      className="text-left text-[12px] bg-white hover:bg-emerald-50 text-gray-700 hover:text-[#1a7a3a] p-2 rounded-xl border border-gray-200/80 transition-colors"
+                      className="text-left text-[12px] bg-white hover:bg-emerald-50 text-gray-700 hover:text-[#1a7a3a] p-2 rounded-xl border border-gray-200/80 transition-colors flex items-center gap-1.5"
                     >
-                      💡 {q}
+                      <HelpCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{q}</span>
                     </button>
                   ))}
                 </div>

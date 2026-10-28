@@ -330,7 +330,7 @@ function KnowledgeContent() {
                     <div className="space-y-2 pt-3 border-t border-gray-100 bg-emerald-50/30 p-3 rounded-xl border border-emerald-100/60">
                       {tip.tipsList.map((t, i) => (
                         <div key={i} className="flex items-start gap-2 text-xs text-gray-800">
-                          <span className="font-bold text-[#1a7a3a] shrink-0">💡</span>
+                          <Lightbulb className="w-3.5 h-3.5 text-[#1a7a3a] shrink-0 mt-0.5" />
                           <span className="leading-relaxed">{t}</span>
                         </div>
                       ))}

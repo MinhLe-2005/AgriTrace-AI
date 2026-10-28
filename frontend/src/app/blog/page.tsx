@@ -291,7 +291,7 @@ export default function BlogPage() {
 
           {subscribed ? (
             <div className="p-3 bg-emerald-50 text-[#1a7a3a] rounded-xl text-sm font-semibold">
-              🎉 Cảm ơn bạn đã đăng ký! AgriTrace AI sẽ gửi bản tin nông sản định kỳ vào email của bạn.
+              Cảm ơn bạn đã đăng ký! AgriTrace AI sẽ gửi bản tin nông sản định kỳ vào email của bạn.
             </div>
           ) : (
             <form

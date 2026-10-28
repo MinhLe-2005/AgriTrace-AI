@@ -6,8 +6,8 @@ spring:
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:aws-0-ap-south-1.pooler.supabase.com}:${DB_PORT:5432}/${POSTGRES_DB:postgres}?sslmode=require}
-    username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:postgres.csduskdbkfaqftnecsjc}}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:aws-0-ap-northeast-1.pooler.supabase.com}:${DB_PORT:5432}/${POSTGRES_DB:postgres}?sslmode=require}
+    username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:postgres.apbwidlapzntxdpjsnen}}
     password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:Bimdiendie1@}}
   flyway:
     enabled: false
