@@ -5,5 +5,9 @@ public record DistributorDashboardResponse(
         long preparingShipments,
         long deliveredToday,
         long pendingReceipts,
-        Double averageTemperatureC
+        Double averageTemperatureC,
+        long pendingDeliveryOrders,
+        long deliveredThisMonth,
+        long overdueShipments,
+        long expiringLots
 ) { }

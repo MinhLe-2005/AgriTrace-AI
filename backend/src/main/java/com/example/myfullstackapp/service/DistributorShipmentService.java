@@ -4,11 +4,14 @@ import com.example.myfullstackapp.dto.distributor.*;
 import com.example.myfullstackapp.entity.Shipment;
 import com.example.myfullstackapp.entity.ShipmentReceipt;
 import com.example.myfullstackapp.entity.ShipmentTrackingEvent;
+import com.example.myfullstackapp.entity.HarvestLot;
 import com.example.myfullstackapp.exception.ConflictException;
 import com.example.myfullstackapp.exception.ResourceNotFoundException;
 import com.example.myfullstackapp.repository.ShipmentReceiptRepository;
 import com.example.myfullstackapp.repository.ShipmentRepository;
 import com.example.myfullstackapp.repository.ShipmentTrackingEventRepository;
+import com.example.myfullstackapp.repository.OrderRepository;
+import com.example.myfullstackapp.repository.HarvestLotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -24,22 +27,32 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DistributorShipmentService {
     private static final Set<String> VALID_STATUSES = Set.of("PREPARING", "IN_TRANSIT", "DELIVERED", "RECEIVED", "CANCELLED");
+    private static final Set<String> VALID_TRACKING_STATUSES = Set.of("ON_SCHEDULE", "DELAYED", "INCIDENT");
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Bangkok");
 
     private final ShipmentRepository shipmentRepository;
     private final ShipmentTrackingEventRepository trackingEventRepository;
     private final ShipmentReceiptRepository shipmentReceiptRepository;
+    private final OrderRepository orderRepository;
+    private final HarvestLotRepository harvestLotRepository;
 
     @Transactional(readOnly = true)
     public DistributorDashboardResponse dashboard(String actorEmail, boolean isAdmin) {
         List<Shipment> shipments = visibleShipments(actorEmail, isAdmin, null);
         LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        YearMonth currentMonth = YearMonth.from(today);
         long deliveredToday = shipments.stream()
                 .filter(shipment -> shipment.getActualArrival() != null)
                 .filter(shipment -> shipment.getActualArrival().atZone(BUSINESS_ZONE).toLocalDate().equals(today))
                 .filter(shipment -> "DELIVERED".equals(shipment.getStatus()) || "RECEIVED".equals(shipment.getStatus()))
                 .count();
+        long deliveredThisMonth = shipments.stream()
+                .filter(shipment -> shipment.getActualArrival() != null)
+                .filter(shipment -> YearMonth.from(shipment.getActualArrival().atZone(BUSINESS_ZONE)).equals(currentMonth))
+                .filter(shipment -> "DELIVERED".equals(shipment.getStatus()) || "RECEIVED".equals(shipment.getStatus()))
+                .count();
         OptionalDouble calculatedAverageTemperature = shipments.stream()
+                .filter(shipment -> "IN_TRANSIT".equals(shipment.getStatus()))
                 .map(Shipment::getTemperatureC)
                 .filter(Objects::nonNull)
                 .mapToDouble(Double::doubleValue)
@@ -50,7 +63,14 @@ public class DistributorShipmentService {
                 shipments.stream().filter(shipment -> "PREPARING".equals(shipment.getStatus())).count(),
                 deliveredToday,
                 shipments.stream().filter(shipment -> "DELIVERED".equals(shipment.getStatus())).count(),
-                averageTemperature
+                averageTemperature,
+                pendingDeliveryOrders(actorEmail, isAdmin),
+                deliveredThisMonth,
+                shipments.stream()
+                        .filter(shipment -> "IN_TRANSIT".equals(shipment.getStatus()))
+                        .filter(shipment -> shipment.getEstimatedArrival() != null && shipment.getEstimatedArrival().isBefore(Instant.now()))
+                        .count(),
+                expiringLots(shipments, today)
         );
     }
 
@@ -63,6 +83,7 @@ public class DistributorShipmentService {
     public List<ShipmentResponse> history(String actorEmail, boolean isAdmin) {
         return visibleShipments(actorEmail, isAdmin, null).stream()
                 .filter(shipment -> "DELIVERED".equals(shipment.getStatus()) || "RECEIVED".equals(shipment.getStatus()))
+                .sorted(Comparator.comparing(Shipment::getActualArrival, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::toResponse)
                 .toList();
     }
@@ -89,11 +110,13 @@ public class DistributorShipmentService {
         if (shipmentRepository.findByShipmentCodeIgnoreCase(shipmentCode).isPresent()) {
             throw new ConflictException("Mã chuyến vận chuyển đã tồn tại");
         }
+        List<String> orderCodes = splitCodes(joinCodes(request.orderCodes()));
+        List<com.example.myfullstackapp.entity.Order> claimedOrders = claimOrders(orderCodes, actorEmail, shipmentCode);
 
         Shipment shipment = Shipment.builder()
                 .shipmentCode(shipmentCode)
                 .distributorEmail(actorEmail)
-                .orderCodes(joinCodes(request.orderCodes()))
+                .orderCodes(joinCodes(orderCodes))
                 .driverName(request.driverName().trim())
                 .driverPhone(optionalText(request.driverPhone()))
                 .vehicleNumber(request.vehicleNumber().trim())
@@ -107,6 +130,7 @@ public class DistributorShipmentService {
                 .estimatedArrival(parseInstant(request.estimatedArrival()))
                 .build();
         Shipment saved = shipmentRepository.save(shipment);
+        orderRepository.saveAll(claimedOrders);
         recordEvent(saved, saved.getOrigin(), saved.getTemperatureC(), null, "PREPARING", "Đã tạo phiếu vận chuyển, chờ xuất phát.", Instant.now());
         return toResponse(saved);
     }
@@ -114,7 +138,9 @@ public class DistributorShipmentService {
     @Transactional
     public ShipmentResponse update(String shipmentCode, UpdateShipmentRequest request, String actorEmail, boolean isAdmin) {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
-        if (request.orderCodes() != null) shipment.setOrderCodes(joinCodes(request.orderCodes()));
+        if (request.orderCodes() != null && !splitCodes(shipment.getOrderCodes()).equals(splitCodes(joinCodes(request.orderCodes())))) {
+            throw new IllegalArgumentException("Không thể đổi đơn hàng của shipment đã tạo");
+        }
         if (optionalText(request.driverName()) != null) shipment.setDriverName(request.driverName().trim());
         if (request.driverPhone() != null) shipment.setDriverPhone(optionalText(request.driverPhone()));
         if (optionalText(request.vehicleNumber()) != null) shipment.setVehicleNumber(request.vehicleNumber().trim());
@@ -135,24 +161,31 @@ public class DistributorShipmentService {
         assertStatusTransition(shipment.getStatus(), status);
         Instant now = Instant.now();
         shipment.setStatus(status);
+        if ("IN_TRANSIT".equals(status) && shipment.getDispatchTime() == null) shipment.setDispatchTime(now);
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
+        Instant actualArrival = parseInstant(request.actualArrival());
+        if (actualArrival != null) shipment.setActualArrival(actualArrival);
         if (("DELIVERED".equals(status) || "RECEIVED".equals(status)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
-        recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(), status, optionalText(request.note()), now);
+        recordEvent(shipment, Optional.ofNullable(optionalText(request.location())).orElse(shipment.getDestination()), request.temperatureC(), request.humidityPercent(), status, optionalText(request.note()), now);
+        synchronizeOrderStatuses(shipment, status);
         return toResponse(shipment);
     }
 
     @Transactional
     public ShipmentResponse addTrackingEvent(String shipmentCode, CreateTrackingEventRequest request, String actorEmail, boolean isAdmin) {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
-        String eventStatus = optionalText(request.status()) == null ? shipment.getStatus() : normalizeStatus(request.status());
+        String suppliedStatus = optionalText(request.status());
+        String eventStatus = suppliedStatus == null ? shipment.getStatus() : normalizeTrackingOrShipmentStatus(suppliedStatus);
         Instant now = Instant.now();
-        if (optionalText(request.status()) != null) {
+        if (suppliedStatus != null && VALID_STATUSES.contains(eventStatus)) {
             assertStatusTransition(shipment.getStatus(), eventStatus);
             shipment.setStatus(eventStatus);
+            if ("IN_TRANSIT".equals(eventStatus) && shipment.getDispatchTime() == null) shipment.setDispatchTime(now);
         }
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
         if (("DELIVERED".equals(eventStatus) || "RECEIVED".equals(eventStatus)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
         recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(), eventStatus, optionalText(request.note()), now);
+        synchronizeOrderStatuses(shipment, eventStatus);
         return toResponse(shipment);
     }
 
@@ -170,10 +203,12 @@ public class DistributorShipmentService {
         receipt.setReceivedAt(receivedAt);
         shipmentReceiptRepository.save(receipt);
 
+        assertStatusTransition(shipment.getStatus(), "RECEIVED");
         shipment.setStatus("RECEIVED");
         if (shipment.getActualArrival() == null) shipment.setActualArrival(receivedAt);
         recordEvent(shipment, shipment.getDestination(), shipment.getTemperatureC(), null, "RECEIVED",
                 "Tiếp nhận QR bởi " + receipt.getReceiverName() + (receipt.getNote() == null ? "" : ": " + receipt.getNote()), receivedAt);
+        synchronizeOrderStatuses(shipment, "RECEIVED");
         return toResponse(shipment);
     }
 
@@ -209,6 +244,91 @@ public class DistributorShipmentService {
                 .note(note)
                 .eventTime(eventTime)
                 .build());
+    }
+
+    /** Keeps the existing order table in sync without changing its schema. */
+    private void synchronizeOrderStatuses(Shipment shipment, String shipmentStatus) {
+        String orderStatus = switch (shipmentStatus) {
+            case "IN_TRANSIT" -> "SHIPPING";
+            case "DELIVERED", "RECEIVED" -> "DELIVERED";
+            default -> null;
+        };
+        if (orderStatus == null) return;
+        splitCodes(shipment.getOrderCodes()).forEach(orderCode -> orderRepository.findByOrderCode(orderCode)
+                .ifPresent(order -> {
+                    order.setStatus(orderStatus);
+                    orderRepository.save(order);
+                }));
+    }
+
+    /**
+     * Tracking health (on schedule/delayed/incident) is separate from a
+     * shipment lifecycle. Legacy clients can still send lifecycle statuses
+     * here, while the documented tracking statuses are now accepted too.
+     */
+    private String normalizeTrackingOrShipmentStatus(String status) {
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (VALID_STATUSES.contains(normalized) || VALID_TRACKING_STATUSES.contains(normalized)) return normalized;
+        throw new IllegalArgumentException("Trạng thái theo dõi không hợp lệ");
+    }
+
+    private long pendingDeliveryOrders(String actorEmail, boolean isAdmin) {
+        return isAdmin
+                ? orderRepository.countByStatusIgnoreCase("CONFIRMED")
+                : orderRepository.countByStatusIgnoreCaseAndDistributorEmailIsNull("CONFIRMED")
+                + orderRepository.countByStatusIgnoreCaseAndDistributorEmailIgnoreCase("CONFIRMED", actorEmail);
+    }
+
+    /**
+     * Lock order rows before associating them with a new shipment. This makes
+     * the first successful Distributor claim authoritative and prevents two
+     * concurrent distributors from creating shipments for the same order.
+     */
+    private List<com.example.myfullstackapp.entity.Order> claimOrders(List<String> orderCodes, String actorEmail, String shipmentCode) {
+        if (orderCodes.isEmpty()) return List.of();
+        List<com.example.myfullstackapp.entity.Order> orders = orderRepository.findAllByOrderCodeInForUpdate(orderCodes);
+        if (orders.size() != orderCodes.size()) throw new ResourceNotFoundException("Có đơn hàng không tồn tại");
+        for (com.example.myfullstackapp.entity.Order order : orders) {
+            if (!Set.of("CONFIRMED", "PENDING", "SHIPPING").contains(order.getStatus())) {
+                throw new IllegalArgumentException("Đơn hàng không còn đủ điều kiện tạo vận chuyển: " + order.getOrderCode());
+            }
+            if (order.getDistributorEmail() != null && !actorEmail.equalsIgnoreCase(order.getDistributorEmail())) {
+                throw new ConflictException("Đơn hàng đã được Distributor khác nhận: " + order.getOrderCode());
+            }
+            if (shipmentRepository.existsLegacyShipmentForOrderCode(order.getOrderCode())) {
+                throw new ConflictException("Đơn hàng đã thuộc một shipment: " + order.getOrderCode());
+            }
+            order.setDistributorEmail(actorEmail);
+            order.setShipmentCode(shipmentCode);
+        }
+        return orders;
+    }
+
+    private long expiringLots(List<Shipment> shipments, LocalDate today) {
+        return shipments.stream()
+                .map(Shipment::getLotCode)
+                .map(this::optionalText)
+                .filter(Objects::nonNull)
+                .map(code -> harvestLotRepository.findByCodeIgnoreCase(code).orElse(null))
+                .filter(Objects::nonNull)
+                .map(HarvestLot::getExpiryDate)
+                .map(this::parseDate)
+                .filter(Objects::nonNull)
+                .filter(expiryDate -> !expiryDate.isBefore(today) && !expiryDate.isAfter(today.plusDays(3)))
+                .count();
+    }
+
+    private LocalDate parseDate(String value) {
+        String text = optionalText(value);
+        if (text == null) return null;
+        for (DateTimeFormatter formatter : List.of(DateTimeFormatter.ISO_LOCAL_DATE, DateTimeFormatter.ofPattern("dd/MM/uuuu"))) {
+            try {
+                return LocalDate.parse(text, formatter);
+            } catch (DateTimeParseException ignored) {
+                // Try the next date representation retained by legacy harvest-lot data.
+            }
+        }
+        return null;
     }
 
     private ShipmentResponse toResponse(Shipment shipment) {

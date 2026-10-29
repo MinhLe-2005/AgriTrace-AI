@@ -41,6 +41,10 @@ public class AccountController {
             Authentication authentication
     ) {
         String email = actor(authentication);
+        if (request.confirmPassword() != null && !request.confirmPassword().isBlank()
+                && !request.newPassword().equals(request.confirmPassword())) {
+            throw new IllegalArgumentException("Mật khẩu xác nhận không khớp");
+        }
         authService.changePassword(email, new ChangePasswordRequest(email, request.currentPassword(), request.newPassword()));
         return ApiResponse.ok("Đổi mật khẩu thành công!", null);
     }

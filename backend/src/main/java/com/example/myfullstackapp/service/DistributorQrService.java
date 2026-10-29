@@ -2,6 +2,7 @@ package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.distributor.*;
 import com.example.myfullstackapp.entity.DistributorQrCode;
+import com.example.myfullstackapp.entity.HarvestLot;
 import com.example.myfullstackapp.exception.ResourceNotFoundException;
 import com.example.myfullstackapp.repository.DistributorQrCodeRepository;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
@@ -23,9 +24,8 @@ public class DistributorQrService {
     @Transactional
     public QrCodeResponse generate(GenerateQrCodeRequest request, String actorEmail, boolean isAdmin) {
         String batchCode = request.batchCode().trim().toUpperCase(Locale.ROOT);
-        if (!harvestLotRepository.existsByCodeIgnoreCase(batchCode)) {
-            throw new ResourceNotFoundException("Không tìm thấy lô hàng để tạo mã QR");
-        }
+        HarvestLot lot = harvestLotRepository.findByCodeIgnoreCase(batchCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lô hàng để tạo mã QR"));
         String shipmentCode = optionalText(request.shipmentCode());
         if (shipmentCode != null) {
             // Verifies the actor owns the shipment (or is an administrator).
@@ -42,7 +42,7 @@ public class DistributorQrService {
                 .productId(optionalText(request.productId()))
                 .generatedBy(actorEmail)
                 .build();
-        return toResponse(qrCodeRepository.save(qrCode));
+        return toResponse(qrCodeRepository.save(qrCode), lot);
     }
 
     @Transactional
@@ -50,7 +50,7 @@ public class DistributorQrService {
         DistributorQrCode qrCode = find(code);
         verifyOwner(qrCode, actorEmail, isAdmin);
         qrCode.setScanCount(qrCode.getScanCount() == null ? 1L : qrCode.getScanCount() + 1L);
-        return toResponse(qrCode);
+        return toResponse(qrCode, loadLot(qrCode.getBatchCode()));
     }
 
     @Transactional
@@ -90,8 +90,18 @@ public class DistributorQrService {
         return "AGRITRACE-" + batchCode.trim().toUpperCase(Locale.ROOT) + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
     }
 
-    private QrCodeResponse toResponse(DistributorQrCode qrCode) {
-        return new QrCodeResponse(qrCode.getCode(), qrCode.getBatchCode(), qrCode.getShipmentCode(), qrCode.getProductId(), qrCode.getGeneratedBy(), qrCode.getScanCount(), qrCode.getCreatedAt());
+    private HarvestLot loadLot(String batchCode) {
+        return harvestLotRepository.findByCodeIgnoreCase(batchCode).orElse(null);
+    }
+
+    private QrCodeResponse toResponse(DistributorQrCode qrCode, HarvestLot lot) {
+        return new QrCodeResponse(
+                qrCode.getCode(), qrCode.getBatchCode(), qrCode.getShipmentCode(), qrCode.getProductId(),
+                qrCode.getGeneratedBy(), qrCode.getScanCount(), qrCode.getCreatedAt(),
+                lot == null ? null : lot.getFarmName(),
+                lot == null ? null : lot.getHarvestDate(),
+                lot == null ? null : lot.getCert()
+        );
     }
 
     private String optionalText(String value) {
