@@ -95,6 +95,13 @@ public class AuthService {
         return userMapper.toResponse(userRepository.save(user));
     }
 
+    @Transactional(readOnly = true)
+    public UserResponse currentProfile(String authenticatedEmail) {
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail(authenticatedEmail))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản"));
+        return userMapper.toResponse(user);
+    }
+
     private AuthResponse response(RefreshTokenService.TokenPair tokens) {
         return new AuthResponse(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), userMapper.toResponse(tokens.user()));
     }

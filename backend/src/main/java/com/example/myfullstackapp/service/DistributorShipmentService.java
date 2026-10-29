@@ -39,14 +39,12 @@ public class DistributorShipmentService {
                 .filter(shipment -> shipment.getActualArrival().atZone(BUSINESS_ZONE).toLocalDate().equals(today))
                 .filter(shipment -> "DELIVERED".equals(shipment.getStatus()) || "RECEIVED".equals(shipment.getStatus()))
                 .count();
-        Double averageTemperature = shipments.stream()
+        OptionalDouble calculatedAverageTemperature = shipments.stream()
                 .map(Shipment::getTemperatureC)
                 .filter(Objects::nonNull)
                 .mapToDouble(Double::doubleValue)
-                .average()
-                .isPresent()
-                ? shipments.stream().map(Shipment::getTemperatureC).filter(Objects::nonNull).mapToDouble(Double::doubleValue).average().orElse(0)
-                : null;
+                .average();
+        Double averageTemperature = calculatedAverageTemperature.isPresent() ? calculatedAverageTemperature.getAsDouble() : null;
         return new DistributorDashboardResponse(
                 shipments.stream().filter(shipment -> "IN_TRANSIT".equals(shipment.getStatus())).count(),
                 shipments.stream().filter(shipment -> "PREPARING".equals(shipment.getStatus())).count(),
@@ -72,6 +70,15 @@ public class DistributorShipmentService {
     @Transactional(readOnly = true)
     public ShipmentResponse get(String shipmentCode, String actorEmail, boolean isAdmin) {
         return toResponse(findVisibleShipment(shipmentCode, actorEmail, isAdmin));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrackingEventResponse> tracking(String shipmentCode, String actorEmail, boolean isAdmin) {
+        Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
+        return trackingEventRepository.findByShipmentIdOrderByEventTimeAsc(shipment.getId()).stream()
+                .map(event -> new TrackingEventResponse(event.getId(), event.getLocation(), event.getTemperatureC(), event.getHumidityPercent(),
+                        event.getStatus(), event.getNote(), event.getEventTime()))
+                .toList();
     }
 
     @Transactional
@@ -105,9 +112,27 @@ public class DistributorShipmentService {
     }
 
     @Transactional
+    public ShipmentResponse update(String shipmentCode, UpdateShipmentRequest request, String actorEmail, boolean isAdmin) {
+        Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
+        if (request.orderCodes() != null) shipment.setOrderCodes(joinCodes(request.orderCodes()));
+        if (optionalText(request.driverName()) != null) shipment.setDriverName(request.driverName().trim());
+        if (request.driverPhone() != null) shipment.setDriverPhone(optionalText(request.driverPhone()));
+        if (optionalText(request.vehicleNumber()) != null) shipment.setVehicleNumber(request.vehicleNumber().trim());
+        if (optionalText(request.origin()) != null) shipment.setOrigin(request.origin().trim());
+        if (optionalText(request.destination()) != null) shipment.setDestination(request.destination().trim());
+        if (optionalText(request.productSummary()) != null) shipment.setProductSummary(request.productSummary().trim());
+        if (request.lotCode() != null) shipment.setLotCode(optionalText(request.lotCode()));
+        if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
+        if (request.dispatchTime() != null) shipment.setDispatchTime(parseInstant(request.dispatchTime()));
+        if (request.estimatedArrival() != null) shipment.setEstimatedArrival(parseInstant(request.estimatedArrival()));
+        return toResponse(shipment);
+    }
+
+    @Transactional
     public ShipmentResponse updateStatus(String shipmentCode, UpdateShipmentStatusRequest request, String actorEmail, boolean isAdmin) {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
         String status = normalizeStatus(request.status());
+        assertStatusTransition(shipment.getStatus(), status);
         Instant now = Instant.now();
         shipment.setStatus(status);
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
@@ -121,7 +146,10 @@ public class DistributorShipmentService {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
         String eventStatus = optionalText(request.status()) == null ? shipment.getStatus() : normalizeStatus(request.status());
         Instant now = Instant.now();
-        if (optionalText(request.status()) != null) shipment.setStatus(eventStatus);
+        if (optionalText(request.status()) != null) {
+            assertStatusTransition(shipment.getStatus(), eventStatus);
+            shipment.setStatus(eventStatus);
+        }
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
         if (("DELIVERED".equals(eventStatus) || "RECEIVED".equals(eventStatus)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
         recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(), eventStatus, optionalText(request.note()), now);
@@ -203,6 +231,20 @@ public class DistributorShipmentService {
         String normalized = status.trim().toUpperCase(Locale.ROOT);
         if (!VALID_STATUSES.contains(normalized)) throw new IllegalArgumentException("Trạng thái chuyến hàng không hợp lệ");
         return normalized;
+    }
+
+    private void assertStatusTransition(String currentStatus, String nextStatus) {
+        if (Objects.equals(currentStatus, nextStatus)) return;
+        Map<String, Set<String>> allowedTransitions = Map.of(
+                "PREPARING", Set.of("IN_TRANSIT", "CANCELLED"),
+                "IN_TRANSIT", Set.of("DELIVERED", "CANCELLED"),
+                "DELIVERED", Set.of("RECEIVED"),
+                "RECEIVED", Set.of(),
+                "CANCELLED", Set.of()
+        );
+        if (!allowedTransitions.getOrDefault(currentStatus, Set.of()).contains(nextStatus)) {
+            throw new IllegalArgumentException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + nextStatus);
+        }
     }
 
     private String generatedShipmentCode() {

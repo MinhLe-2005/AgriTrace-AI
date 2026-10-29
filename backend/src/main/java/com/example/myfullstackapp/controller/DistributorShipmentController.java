@@ -51,8 +51,27 @@ public class DistributorShipmentController {
         return ApiResponse.ok("Shipment created", distributorShipmentService.create(request, actor(authentication)));
     }
 
+    @PutMapping("/shipments/{shipmentCode}")
+    public ApiResponse<ShipmentResponse> updateShipment(
+            @PathVariable String shipmentCode,
+            @Valid @RequestBody UpdateShipmentRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok("Shipment updated", distributorShipmentService.update(shipmentCode, request, actor(authentication), isAdmin(authentication)));
+    }
+
     @PutMapping("/shipments/{shipmentCode}/status")
     public ApiResponse<ShipmentResponse> updateStatus(
+            @PathVariable String shipmentCode,
+            @Valid @RequestBody UpdateShipmentStatusRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok("Shipment status updated", distributorShipmentService.updateStatus(shipmentCode, request, actor(authentication), isAdmin(authentication)));
+    }
+
+    /** Alias matching the documented REST contract without changing current clients. */
+    @PatchMapping("/shipments/{shipmentCode}/status")
+    public ApiResponse<ShipmentResponse> patchStatus(
             @PathVariable String shipmentCode,
             @Valid @RequestBody UpdateShipmentStatusRequest request,
             Authentication authentication
@@ -67,6 +86,24 @@ public class DistributorShipmentController {
             Authentication authentication
     ) {
         return ApiResponse.ok("Tracking event created", distributorShipmentService.addTrackingEvent(shipmentCode, request, actor(authentication), isAdmin(authentication)));
+    }
+
+    /** Alias for POST /tracking in the use-case specification. */
+    @PostMapping("/shipments/{shipmentCode}/tracking")
+    public ApiResponse<ShipmentResponse> addTracking(
+            @PathVariable String shipmentCode,
+            @Valid @RequestBody CreateTrackingEventRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok("Tracking event created", distributorShipmentService.addTrackingEvent(shipmentCode, request, actor(authentication), isAdmin(authentication)));
+    }
+
+    @GetMapping("/shipments/{shipmentCode}/tracking")
+    public ApiResponse<List<TrackingEventResponse>> tracking(
+            @PathVariable String shipmentCode,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok("Shipment tracking retrieved", distributorShipmentService.tracking(shipmentCode, actor(authentication), isAdmin(authentication)));
     }
 
     @PostMapping("/shipments/{shipmentCode}/receive")
