@@ -52,25 +52,25 @@ type VoucherOption = {
 
 const availableVouchers: VoucherOption[] = [
   {
-    code: "FREESHIP25",
-    title: "Miễn Phí Giao Hàng Xe Lạnh",
+    code: "FREESHIP",
+    title: "Miễn Phí Giao Hàng Xe Lạnh (Giảm 25k)",
     discount: 25000,
     type: "freeship",
-    minOrder: 100000,
-  },
-  {
-    code: "AGRI30",
-    title: "Giảm 30.000đ Đơn Rau Củ Quả",
-    discount: 30000,
-    type: "discount",
     minOrder: 150000,
   },
   {
-    code: "VIETGAP10",
-    title: "Giảm 15.000đ Nông Sản VietGAP",
-    discount: 15000,
+    code: "AGRI30",
+    title: "Giảm 30% Đơn Hàng Nông Sản Đầu Tiên",
+    discount: 30000,
     type: "discount",
-    minOrder: 120000,
+    minOrder: 100000,
+  },
+  {
+    code: "VIPGOLD",
+    title: "Đặc Quyền Hội Viên Vàng - Giảm 50k",
+    discount: 50000,
+    type: "discount",
+    minOrder: 300000,
   },
 ];
 
@@ -112,8 +112,8 @@ function CartContent() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Voucher - Hỗ trợ áp dụng đồng thời tối đa 1 voucher giảm giá và 1 voucher freeship
-  const [selectedDiscountVoucher, setSelectedDiscountVoucher] = useState<VoucherOption | null>(availableVouchers[1]);
-  const [selectedFreeshipVoucher, setSelectedFreeshipVoucher] = useState<VoucherOption | null>(availableVouchers[0]);
+  const [selectedDiscountVoucher, setSelectedDiscountVoucher] = useState<VoucherOption | null>(null);
+  const [selectedFreeshipVoucher, setSelectedFreeshipVoucher] = useState<VoucherOption | null>(null);
   const selectedVoucher = selectedDiscountVoucher || selectedFreeshipVoucher;
   function setSelectedVoucher(v: VoucherOption | null) {
     if (!v) {
@@ -159,30 +159,80 @@ function CartContent() {
   const total = Math.max(0, subtotal + (isFreeship ? 0 : baseShippingFee) - (selectedDiscountVoucher ? selectedDiscountVoucher.discount : 0));
   const pointsEarned = Math.max(10, Math.round(total / 5000));
 
-  function handleApplyCustomVoucher(e: React.FormEvent) {
+    async function handleSelectVoucher(v: VoucherOption) {
+    if (v.type === "freeship" && selectedFreeshipVoucher?.code === v.code) {
+      setSelectedFreeshipVoucher(null);
+      toast.info(`Đã bỏ áp dụng mã ${v.code}`);
+      return;
+    }
+    if (v.type === "discount" && selectedDiscountVoucher?.code === v.code) {
+      setSelectedDiscountVoucher(null);
+      toast.info(`Đã bỏ áp dụng mã ${v.code}`);
+      return;
+    }
+
+    try {
+      const res = await catalogService.validateVoucher({
+        code: v.code,
+        subtotal,
+        email: user?.email,
+      });
+
+      if (!res.valid) {
+        toast.error(res.message);
+        return;
+      }
+
+      if (v.type === "freeship") {
+        setSelectedFreeshipVoucher(v);
+      } else {
+        setSelectedDiscountVoucher(v);
+      }
+      toast.success(res.message);
+    } catch {
+      toast.error("Không thể áp dụng mã ưu đãi.");
+    }
+  }
+
+  async function handleApplyCustomVoucher(e: React.FormEvent) {
     e.preventDefault();
     const clean = customVoucherCode.trim().toUpperCase();
     if (!clean) return;
 
-    const found = availableVouchers.find((v) => v.code === clean);
-    if (found) {
-      if (found.type === "freeship") {
-        setSelectedFreeshipVoucher(found);
-      } else {
-        setSelectedDiscountVoucher(found);
-      }
-      toast.success(`Đã áp dụng voucher [${clean}]!`);
-    } else {
-      setSelectedDiscountVoucher({
+    try {
+      const res = await catalogService.validateVoucher({
         code: clean,
-        title: `Mã Ưu Đãi ${clean}`,
-        discount: 20000,
-        type: "discount",
-        minOrder: 100000,
+        subtotal,
+        email: user?.email,
       });
-      toast.success(`Đã áp dụng mã ưu đãi [${clean}] giảm 20.000đ!`);
+
+      if (!res.valid) {
+        toast.error(res.message);
+        return;
+      }
+
+      if (res.type === "freeship") {
+        setSelectedFreeshipVoucher({
+          code: res.code,
+          title: `Miễn Phí Vận Chuyển ${res.code}`,
+          discount: res.discount || 25000,
+          type: "freeship",
+          minOrder: 150000,
+        });
+      } else {
+        setSelectedDiscountVoucher({
+          code: res.code,
+          title: `Mã Giảm Giá ${res.code}`,
+          discount: res.discount || 30000,
+          type: "discount",
+          minOrder: 100000,
+        });
+      }
+      toast.success(res.message);
+      setCustomVoucherCode("");
+    } catch {
+      toast.error("Không thể xác thực mã giảm giá. Vui lòng thử lại!");
     }
-    setCustomVoucherCode("");
   }
 
   function handleProceedToStep2() {
@@ -534,11 +584,11 @@ function CartContent() {
 
                   <div className="space-y-1.5">
                     {availableVouchers.map((v) => {
-                      const isChosen = selectedVoucher?.code === v.code;
+                      const isChosen = (v.type === "freeship" && selectedFreeshipVoucher?.code === v.code) || (v.type === "discount" && selectedDiscountVoucher?.code === v.code);
                       return (
                         <div
                           key={v.code}
-                          onClick={() => setSelectedVoucher(isChosen ? null : v)}
+                          onClick={() => handleSelectVoucher(v)}
                           className={cn(
                             "p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between",
                             isChosen

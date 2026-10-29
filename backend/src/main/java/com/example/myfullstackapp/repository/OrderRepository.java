@@ -39,6 +39,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select o from Order o where o.orderCode in :orderCodes")
     List<Order> findAllByOrderCodeInForUpdate(@Param("orderCodes") List<String> orderCodes);
 
+    @Query("select count(o) > 0 from Order o where lower(o.userEmail) = lower(:userEmail) and lower(o.voucherUsed) like lower(concat('%', :voucherCode, '%')) and o.status <> 'CANCELLED'")
+    boolean hasUserUsedVoucher(@Param("userEmail") String userEmail, @Param("voucherCode") String voucherCode);
+
+    @Query("select o.voucherUsed from Order o where lower(o.userEmail) = lower(:userEmail) and o.voucherUsed is not null and o.status <> 'CANCELLED'")
+    List<String> findUsedVoucherStringsByUser(@Param("userEmail") String userEmail);
+
     long countByStatusIgnoreCaseAndDistributorEmailIsNull(String status);
 
     long countByStatusIgnoreCaseAndDistributorEmailIgnoreCase(String status, String distributorEmail);

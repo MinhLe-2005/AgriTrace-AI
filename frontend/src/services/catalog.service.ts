@@ -136,6 +136,17 @@ export const catalogService = {
     return res.data;
   },
 
+  async validateVoucher(params: { code: string; subtotal?: number; email?: string }): Promise<{
+    valid: boolean;
+    code: string;
+    type?: "freeship" | "discount";
+    discount?: number;
+    message: string;
+  }> {
+    const res = await api.get("/vouchers/validate", { params });
+    return res.data;
+  },
+
   async getTraceabilityByBatch(batchCode: string): Promise<ApiTraceability> {
     const res = await api.get<ApiTraceability>(`/traceability/${batchCode}`);
     return res.data;

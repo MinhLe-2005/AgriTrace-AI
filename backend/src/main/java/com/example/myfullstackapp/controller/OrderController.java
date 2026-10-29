@@ -96,6 +96,16 @@ public class OrderController {
             }
         }
 
+        // Enforce 1-use per account for vouchers
+        if (req.getVoucherUsed() != null && !req.getVoucherUsed().isBlank() && email != null) {
+            String rawVoucher = req.getVoucherUsed().trim().toUpperCase();
+            for (String code : List.of("AGRI30", "FREESHIP", "FREESHIP25", "VIPGOLD", "VIETGAP10")) {
+                if (rawVoucher.contains(code) && orderRepository.hasUserUsedVoucher(email, code)) {
+                    throw new IllegalArgumentException("Mỗi tài khoản chỉ được sử dụng mã giảm giá [" + code + "] một lần. Bạn đã áp dụng mã này ở đơn trước đó.");
+                }
+            }
+        }
+
         long shippingFee = req.getShippingFee() != null ? req.getShippingFee() : 0L;
         long discount = req.getDiscount() != null ? req.getDiscount() : 0L;
         long total = (req.getTotal() != null && req.getTotal() > 0L)
