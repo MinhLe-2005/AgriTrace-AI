@@ -58,8 +58,8 @@ api.interceptors.response.use(
     }
 
     if (typeof window !== "undefined") {
-      if (status === 403) toast.error("You do not have permission to do that.");
-      else if (status && status >= 400 && status !== 401) toast.error(messageFromError(error));
+      if (status === 403) toast.error("Bạn không có quyền thực hiện thao tác này.");
+      else if (status && status >= 400 && status !== 401 && status !== 404) toast.error(messageFromError(error));
     }
     return Promise.reject(error);
   }
