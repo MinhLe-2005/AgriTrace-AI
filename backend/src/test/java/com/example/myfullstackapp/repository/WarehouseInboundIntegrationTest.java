@@ -72,10 +72,6 @@ class WarehouseInboundIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS agri_harvest_lots(id bigint primary key, product"
-                    + " varchar(255),code varchar(64),expiry_date varchar(64),qty varchar(32),unit"
-                    + " varchar(32),status varchar(64))");
-        jdbc.execute(
                 "TRUNCATE"
                     + " wh_reservation_lines,wh_reservations,wh_stock_movements,wh_stock_balances,wh_document_lines,wh_documents,storage_locations,warehouses,agri_harvest_lots"
                     + " CASCADE");
@@ -107,15 +103,8 @@ class WarehouseInboundIntegrationTest {
     }
 
     private void lot(long id, String qty, String unit, LocalDate expiry, String status) {
-        jdbc.update(
-                "INSERT INTO agri_harvest_lots VALUES(?,?,?,?,?,?,?)",
-                id,
-                "Rau test",
-                "LOT-" + id,
-                expiry.toString(),
-                qty,
-                unit,
-                status);
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc, id, "Rau test", "LOT-" + id, expiry, qty, unit, status);
     }
 
     private DocumentView draft(UUID warehouse, LineInput... lines) {

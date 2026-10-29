@@ -75,10 +75,6 @@ class WarehouseAuditIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS agri_harvest_lots(id bigint primary key,product"
-                    + " varchar(255),code varchar(64),expiry_date varchar(64),qty varchar(32),unit"
-                    + " varchar(32),status varchar(64))");
-        jdbc.execute(
                 "TRUNCATE"
                     + " wh_quality_inspections,wh_reservation_lines,wh_reservations,wh_stock_movements,wh_stock_balances,wh_document_lines,wh_documents,wh_unit_conversions,storage_locations,warehouses,agri_harvest_lots,agri_order_items,agri_orders"
                     + " CASCADE");
@@ -86,10 +82,15 @@ class WarehouseAuditIntegrationTest {
         locationId = location(warehouseId);
         other = warehouse();
         otherLocation = location(other);
-        jdbc.update(
-                "INSERT INTO agri_harvest_lots VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất"
-                        + " kho')",
-                InventoryService.today().plusDays(5).toString());
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc,
+                1L,
+                "Rau",
+                "LOT-1",
+                InventoryService.today().plusDays(5),
+                "1000",
+                "kg",
+                "Đã duyệt xuất kho");
         var receipt = create(warehouseId, Type.INBOUND, null, locationId, null, "100");
         documents.confirm(warehouseId, receipt.id(), "staff");
     }

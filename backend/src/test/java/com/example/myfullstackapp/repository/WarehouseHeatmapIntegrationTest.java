@@ -93,10 +93,6 @@ class WarehouseHeatmapIntegrationTest {
         now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         when(clock.instant()).thenReturn(now);
         jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS agri_harvest_lots(id bigint primary key,product"
-                    + " varchar(255),code varchar(64),expiry_date varchar(64),qty varchar(32),unit"
-                    + " varchar(32),status varchar(64))");
-        jdbc.execute(
                 "TRUNCATE"
                     + " wh_location_layouts,wh_monitor_rule_revisions,wh_alert_deliveries,wh_sensor_readings,wh_sensor_devices,wh_monitoring_rules,wh_monitoring_settings,wh_alert_actions,wh_risk_alerts,wh_risk_rules,wh_quality_inspections,wh_reservation_lines,wh_reservations,wh_stock_movements,wh_stock_balances,wh_document_lines,wh_documents,wh_unit_conversions,storage_locations,warehouses,agri_harvest_lots"
                     + " CASCADE");
@@ -135,12 +131,15 @@ class WarehouseHeatmapIntegrationTest {
     }
 
     private StockBalance stock(UUID location, String lot, String qty, boolean held, int days) {
-        jdbc.update(
-                "INSERT INTO agri_harvest_lots VALUES(?,'Rau',?,?,'10000','kg','Đã duyệt xuất"
-                    + " kho')",
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc,
                 Long.parseLong(lot),
+                "Rau",
                 "LOT-" + lot,
-                today().plusDays(days).toString());
+                today().plusDays(days),
+                "10000",
+                "kg",
+                "Đã duyệt xuất kho");
         var b = new StockBalance();
         b.setWarehouseId(warehouseId);
         b.setLocationId(location);

@@ -79,10 +79,6 @@ class WarehouseRiskIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS agri_harvest_lots(id bigint primary key,product"
-                    + " varchar(255),code varchar(64),expiry_date varchar(64),qty varchar(32),unit"
-                    + " varchar(32),status varchar(64))");
-        jdbc.execute(
                 "TRUNCATE"
                     + " wh_alert_actions,wh_risk_alerts,wh_risk_rules,wh_quality_inspections,wh_reservation_lines,wh_reservations,wh_stock_movements,wh_stock_balances,wh_document_lines,wh_documents,wh_unit_conversions,storage_locations,warehouses,agri_harvest_lots"
                     + " CASCADE");
@@ -108,10 +104,15 @@ class WarehouseRiskIntegrationTest {
                                         new BigDecimal("4"),
                                         new BigDecimal("85")))
                         .id();
-        jdbc.update(
-                "INSERT INTO agri_harvest_lots VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất"
-                        + " kho')",
-                InventoryService.today().plusDays(2).toString());
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc,
+                1L,
+                "Rau",
+                "LOT-1",
+                InventoryService.today().plusDays(2),
+                "1000",
+                "kg",
+                "Đã duyệt xuất kho");
         var receipt =
                 documents.create(
                         warehouseId,

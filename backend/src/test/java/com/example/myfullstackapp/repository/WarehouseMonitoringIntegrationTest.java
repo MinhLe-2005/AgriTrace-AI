@@ -115,12 +115,6 @@ class WarehouseMonitoringIntegrationTest {
         when(clock.instant()).thenAnswer(call -> now.get());
         properties.setTelegramBotToken("");
         jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS agri_harvest_lots(id bigint primary key,product"
-                    + " varchar(255),code varchar(64),expiry_date varchar(64),qty varchar(32),unit"
-                    + " varchar(32),status varchar(64))");
-        jdbc.execute(
-                "ALTER TABLE agri_harvest_lots ADD COLUMN IF NOT EXISTS harvest_date varchar(64)");
-        jdbc.execute(
                 "TRUNCATE"
                     + " wh_monitor_rule_revisions,wh_alert_deliveries,wh_sensor_readings,wh_sensor_devices,wh_monitoring_rules,wh_monitoring_settings,wh_alert_actions,wh_risk_alerts,wh_risk_rules,wh_quality_inspections,wh_reservation_lines,wh_reservations,wh_stock_movements,wh_stock_balances,wh_document_lines,wh_documents,wh_unit_conversions,storage_locations,warehouses,agri_harvest_lots"
                     + " CASCADE");
@@ -375,10 +369,15 @@ class WarehouseMonitoringIntegrationTest {
 
     @Test
     void recoveryRequiresStableHistoryAndDoesNotReleaseQualityHolds() {
-        jdbc.update(
-                "INSERT INTO agri_harvest_lots(id,product,code,expiry_date,qty,unit,status)"
-                        + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho')",
-                InventoryService.today().plusDays(2).toString());
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc,
+                1L,
+                "Rau",
+                "LOT-1",
+                InventoryService.today().plusDays(2),
+                "1000",
+                "kg",
+                "Đã duyệt xuất kho");
         var receipt =
                 documents.create(
                         warehouseId,
@@ -415,10 +414,15 @@ class WarehouseMonitoringIntegrationTest {
     @Test
     void stockRuleAggregatesLotAcrossLocationsAndResolvesAtBoundary() {
         UUID second = location(warehouseId, "B");
-        jdbc.update(
-                "INSERT INTO agri_harvest_lots(id,product,code,expiry_date,qty,unit,status)"
-                        + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho')",
-                InventoryService.today().plusDays(2).toString());
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc,
+                1L,
+                "Rau",
+                "LOT-1",
+                InventoryService.today().plusDays(2),
+                "1000",
+                "kg",
+                "Đã duyệt xuất kho");
         var receipt =
                 documents.create(
                         warehouseId,
@@ -469,11 +473,15 @@ class WarehouseMonitoringIntegrationTest {
     void shelfLifePercentUsesHarvestDateAndStrictPercentAndWeightBoundaries() {
         UUID second = location(warehouseId, "B");
         LocalDate today = LocalDate.ofInstant(now.get(), ZoneId.of("Asia/Ho_Chi_Minh"));
-        jdbc.update(
-                "INSERT INTO"
-                    + " agri_harvest_lots(id,product,code,expiry_date,qty,unit,status,harvest_date)"
-                    + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho',?)",
-                today.plusDays(2).toString(),
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc,
+                1L,
+                "Rau",
+                "LOT-1",
+                today.plusDays(2),
+                "1000",
+                "kg",
+                "Đã duyệt xuất kho",
                 today.minusDays(18).toString());
         var receipt =
                 documents.create(
@@ -531,10 +539,15 @@ class WarehouseMonitoringIntegrationTest {
 
     @Test
     void missingHarvestMetadataCreatesDataAlertWithoutLosingSensorReadings() {
-        jdbc.update(
-                "INSERT INTO agri_harvest_lots(id,product,code,expiry_date,qty,unit,status)"
-                        + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho')",
-                InventoryService.today().plusDays(2).toString());
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc,
+                1L,
+                "Rau",
+                "LOT-1",
+                InventoryService.today().plusDays(2),
+                "1000",
+                "kg",
+                "Đã duyệt xuất kho");
         var receipt =
                 documents.create(
                         warehouseId,
