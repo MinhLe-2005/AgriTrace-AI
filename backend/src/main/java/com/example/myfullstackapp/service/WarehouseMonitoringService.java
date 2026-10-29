@@ -136,15 +136,18 @@ public class WarehouseMonitoringService {
     public RuleView saveRule(UUID warehouseId, UUID id, RuleInput input, String actor) {
         inventory.lock(warehouseId, null);
         if (input.locationId() != null) inventory.location(warehouseId, input.locationId(), false);
-        boolean stock = input.kind() == RuleKind.NEAR_EXPIRY_HIGH_STOCK;
+        boolean percent = input.kind() == RuleKind.SHELF_LIFE_LOW_HIGH_STOCK;
+        boolean stock = input.kind() == RuleKind.NEAR_EXPIRY_HIGH_STOCK || percent;
         if (stock) {
-            if (input.threshold().scale() > 0 && input.threshold().stripTrailingZeros().scale() > 0)
+            if (!percent
+                    && input.threshold().scale() > 0
+                    && input.threshold().stripTrailingZeros().scale() > 0)
                 throw new IllegalArgumentException("Remaining days must be an integer");
             if (input.threshold().signum() < 0
-                    || input.threshold().compareTo(new BigDecimal("365")) > 0
+                    || input.threshold().compareTo(new BigDecimal(percent ? "100" : "365")) > 0
                     || input.minQuantityKg() == null)
                 throw new IllegalArgumentException(
-                        "Stock rule requires 0-365 remaining days and a quantity threshold");
+                        "Stock rule requires 0-365 days or 0-100 percent and a quantity threshold");
             if (input.durationMinutes() != 0 || input.recoveryMinutes() != 0)
                 throw new IllegalArgumentException(
                         "Stock rules are evaluated from current balances without sensor-duration"

@@ -14,7 +14,8 @@ public final class WarehouseMonitoring {
         TEMPERATURE_LOW,
         HUMIDITY_HIGH,
         HUMIDITY_LOW,
-        NEAR_EXPIRY_HIGH_STOCK
+        NEAR_EXPIRY_HIGH_STOCK,
+        SHELF_LIFE_LOW_HIGH_STOCK
     }
 
     public record SettingsInput(
