@@ -9,5 +9,8 @@ public record QrCodeResponse(
         String productId,
         String generatedBy,
         Long scanCount,
-        Instant createdAt
+        Instant createdAt,
+        String farmName,
+        String harvestDate,
+        String certStandard
 ) { }

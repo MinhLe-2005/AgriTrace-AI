@@ -2,6 +2,7 @@ package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.distributor.*;
 import com.example.myfullstackapp.entity.DistributorQrCode;
+import com.example.myfullstackapp.entity.HarvestLot;
 import com.example.myfullstackapp.exception.ResourceNotFoundException;
 import com.example.myfullstackapp.repository.DistributorQrCodeRepository;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
@@ -91,7 +92,14 @@ public class DistributorQrService {
     }
 
     private QrCodeResponse toResponse(DistributorQrCode qrCode) {
-        return new QrCodeResponse(qrCode.getCode(), qrCode.getBatchCode(), qrCode.getShipmentCode(), qrCode.getProductId(), qrCode.getGeneratedBy(), qrCode.getScanCount(), qrCode.getCreatedAt());
+        HarvestLot lot = harvestLotRepository.findByCodeIgnoreCase(qrCode.getBatchCode()).orElse(null);
+        return new QrCodeResponse(
+                qrCode.getCode(), qrCode.getBatchCode(), qrCode.getShipmentCode(), qrCode.getProductId(),
+                qrCode.getGeneratedBy(), qrCode.getScanCount(), qrCode.getCreatedAt(),
+                lot == null ? null : lot.getFarmName(),
+                lot == null ? null : lot.getHarvestDate(),
+                lot == null ? null : lot.getCert()
+        );
     }
 
     private String optionalText(String value) {
