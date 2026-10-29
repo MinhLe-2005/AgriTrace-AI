@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { catalogService } from "@/services/catalog.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
@@ -76,6 +76,7 @@ const availableVouchers: VoucherOption[] = [
 
 function CartContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuthStore();
   const { items, updateQty, removeItem, clearCart, getSubtotal } = useCartStore();
 
@@ -166,6 +167,11 @@ function CartContent() {
   function handleProceedToStep2() {
     if (items.length === 0) {
       toast.error("Giỏ hàng của bạn đang trống! Vui lòng chọn nông sản trước.");
+      return;
+    }
+    if (!user) {
+      toast.info("Vui lòng đăng nhập tài khoản để tiến hành đặt hàng và tích điểm!");
+      router.push("/login");
       return;
     }
     setCurrentStep(2);
