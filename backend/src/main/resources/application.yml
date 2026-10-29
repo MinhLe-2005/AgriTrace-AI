@@ -56,6 +56,10 @@ app:
     email: ${BOOTSTRAP_ADMIN_EMAIL:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
     full-name: ${BOOTSTRAP_ADMIN_NAME:Administrator}
+  payos:
+    client-id: ${PAYOS_CLIENT_ID:}
+    api-key: ${PAYOS_API_KEY:}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:}
 springdoc:
   api-docs:
     path: /api-docs

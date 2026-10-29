@@ -83,9 +83,23 @@ export type ApiOrder = {
   deliveryNote?: string;
   driverName?: string;
   driverPhone?: string;
-  status: "SHIPPING" | "COMPLETED" | "PENDING";
+  status:
+    | "PENDING_PAYMENT"
+    | "PAID"
+    | "CONFIRMED"
+    | "PREPARING"
+    | "SHIPPING"
+    | "DELIVERED"
+    | "COMPLETED"
+    | "CANCELLED"
+    | "REFUNDED"
+    | "PENDING";
   paymentMethod: string;
   voucherUsed?: string;
+  cancelReason?: string;
+  cancelledAt?: string;
+  paidAt?: string;
+  paymentRef?: string;
   subtotal: number;
   shippingFee: number;
   discount: number;
@@ -151,5 +165,17 @@ export const catalogService = {
   }): Promise<ApiOrder> {
     const res = await api.post<ApiOrder>("/orders", data);
     return res.data;
+  },
+
+  async cancelOrder(orderCode: string, reason?: string): Promise<ApiOrder> {
+    const res = await api.patch<{ data?: ApiOrder } | ApiOrder>(`/orders/${encodeURIComponent(orderCode)}/cancel`, { reason });
+    const payload = res.data as { data?: ApiOrder };
+    return payload?.data || (res.data as ApiOrder);
+  },
+
+  async updateOrderStatus(orderCode: string, status: string): Promise<ApiOrder> {
+    const res = await api.patch<{ data?: ApiOrder } | ApiOrder>(`/orders/${encodeURIComponent(orderCode)}/status`, { status });
+    const payload = res.data as { data?: ApiOrder };
+    return payload?.data || (res.data as ApiOrder);
   },
 };

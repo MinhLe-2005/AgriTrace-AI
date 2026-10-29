@@ -48,13 +48,23 @@ public class Order {
 
     @Builder.Default
     @Column(length = 32)
-    private String status = "SHIPPING";
+    private String status = "CONFIRMED";
 
     @Column(length = 32)
     private String paymentMethod;
 
     @Column(length = 64)
     private String voucherUsed;
+
+    @Column(length = 255)
+    private String cancelReason;
+
+    private LocalDateTime cancelledAt;
+
+    private LocalDateTime paidAt;
+
+    @Column(length = 128)
+    private String paymentRef;
 
     @Builder.Default
     private Long subtotal = 0L;

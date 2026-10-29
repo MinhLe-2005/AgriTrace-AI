@@ -26,6 +26,7 @@ import {
   Search,
   ShieldCheck,
   ShoppingBag,
+  Sparkles,
   Star,
   Tag,
   Trash2,
@@ -41,6 +42,8 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { getApiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
 import { catalogService } from "@/services/catalog.service";
+import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
+import { reviewService } from "@/services/review.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { toast } from "@/stores/toast-store";
@@ -59,7 +62,7 @@ type OrderItem = {
 type Order = {
   id: string;
   date: string;
-  status: "SHIPPING" | "COMPLETED";
+  status: string;
   statusText: string;
   statusColor: string;
   lotCode: string;
@@ -74,8 +77,35 @@ type Order = {
   receiverAddress: string;
   driverName?: string;
   driverPhone?: string;
+  cancelReason?: string;
+  paymentMethod?: string;
+  paymentRef?: string;
   timeline: { title: string; time: string; completed: boolean }[];
 };
+
+function getOrderStatusDetails(status: string) {
+  switch (status?.toUpperCase()) {
+    case "PENDING_PAYMENT":
+      return { text: "Chờ thanh toán (payOS)", color: "bg-amber-50 text-amber-700 border-amber-200" };
+    case "PAID":
+      return { text: "Đã thanh toán (payOS)", color: "bg-teal-50 text-teal-700 border-teal-200" };
+    case "CONFIRMED":
+      return { text: "Đã xác nhận đơn", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+    case "PREPARING":
+      return { text: "Đang đóng gói nông sản", color: "bg-purple-50 text-purple-700 border-purple-200" };
+    case "SHIPPING":
+      return { text: "Đang giao hàng xe lạnh", color: "bg-blue-50 text-blue-700 border-blue-200" };
+    case "DELIVERED":
+    case "COMPLETED":
+      return { text: "Đã giao thành công", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+    case "CANCELLED":
+      return { text: "Đã hủy đơn hàng", color: "bg-rose-50 text-rose-700 border-rose-200" };
+    case "REFUNDED":
+      return { text: "Đã hoàn tiền", color: "bg-gray-50 text-gray-700 border-gray-200" };
+    default:
+      return { text: "Đang xử lý", color: "bg-gray-50 text-gray-700 border-gray-200" };
+  }
+}
 
 const mockOrders: Order[] = [
   {
@@ -295,45 +325,48 @@ function CustomerDashboardContent() {
           catalogService.getVouchers(),
         ]);
         if (apiOrders && apiOrders.length > 0) {
-          const mapped: Order[] = apiOrders.map((o) => ({
-            id: o.orderCode,
-            date: o.createdAt ? new Date(o.createdAt).toLocaleDateString("vi-VN") : "Hôm nay",
-            status: o.status === "COMPLETED" ? "COMPLETED" : "SHIPPING",
-            statusText: o.status === "COMPLETED" ? "Đã giao thành công" : "Đang giao hàng xe lạnh",
-            statusColor:
-              o.status === "COMPLETED"
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : "bg-blue-50 text-blue-700 border-blue-200",
-            lotCode: o.lotCode || "XL-2026-08",
-            receiverName: o.receiverName,
-            receiverPhone: o.receiverPhone,
-            receiverAddress: o.receiverAddress,
-            driverName: o.driverName || "Nguyễn Văn Thắng",
-            driverPhone: o.driverPhone || "0912.888.777",
-            shippingFee: o.shippingFee || 0,
-            total: o.total,
-            pointsAwarded: o.pointsAwarded || 20,
-            voucherUsed: o.voucherUsed,
-            discount: o.discount,
-            items: o.items.map((it) => ({
-              name: it.name,
-              origin: it.origin || "Nông Trại Xanh",
-              cert: it.cert || "VietGAP",
-              qty: it.qty,
-              price: it.price,
-              image: it.image || "/images/products/xa-lach.jpg",
-            })),
-            timeline: [
-              { title: "Đặt hàng thành công", time: "Ghi nhận hệ thống", completed: true },
-              { title: "Nông trại thu hái & kiểm định VietGAP", time: "Tại kho nông trại", completed: true },
-              {
-                title: "Vận chuyển xe lạnh chuyên dụng (Nhiệt độ 4.5°C)",
-                time: "Đang lưu thông",
-                completed: o.status === "SHIPPING" || o.status === "COMPLETED",
-              },
-              { title: "Giao hàng thành công", time: "Tận tay người nhận", completed: o.status === "COMPLETED" },
-            ],
-          }));
+          const mapped: Order[] = apiOrders.map((o) => {
+            const details = getOrderStatusDetails(o.status);
+            return {
+              id: o.orderCode,
+              date: o.createdAt ? new Date(o.createdAt).toLocaleDateString("vi-VN") : "Hôm nay",
+              status: o.status,
+              statusText: details.text,
+              statusColor: details.color,
+              lotCode: o.lotCode || "XL-2026-08",
+              receiverName: o.receiverName,
+              receiverPhone: o.receiverPhone,
+              receiverAddress: o.receiverAddress,
+              driverName: o.driverName || "Nguyễn Văn Thắng",
+              driverPhone: o.driverPhone || "0912.888.777",
+              shippingFee: o.shippingFee || 0,
+              total: o.total,
+              pointsAwarded: o.pointsAwarded || 20,
+              voucherUsed: o.voucherUsed,
+              discount: o.discount,
+              cancelReason: o.cancelReason,
+              paymentMethod: o.paymentMethod,
+              paymentRef: o.paymentRef,
+              items: o.items.map((it) => ({
+                name: it.name,
+                origin: it.origin || "Nông Trại Xanh",
+                cert: it.cert || "VietGAP",
+                qty: it.qty,
+                price: it.price,
+                image: it.image || "/images/products/xa-lach.jpg",
+              })),
+              timeline: [
+                { title: "Đặt hàng thành công", time: "Ghi nhận hệ thống", completed: true },
+                { title: "Nông trại thu hái & kiểm định VietGAP", time: "Tại kho nông trại", completed: !["PENDING_PAYMENT", "CANCELLED"].includes(o.status) },
+                {
+                  title: "Vận chuyển xe lạnh chuyên dụng (Nhiệt độ 4.5°C)",
+                  time: "Đang lưu thông",
+                  completed: ["SHIPPING", "DELIVERED", "COMPLETED"].includes(o.status),
+                },
+                { title: "Giao hàng thành công", time: "Tận tay người nhận", completed: ["DELIVERED", "COMPLETED"].includes(o.status) },
+              ],
+            };
+          });
           setOrders(mapped);
         }
         if (apiVouchers && apiVouchers.length > 0) {
@@ -374,7 +407,102 @@ function CustomerDashboardContent() {
   }, [tabParam, orderParam, orders]);
 
   // Order filter
-  const [orderFilter, setOrderFilter] = useState<"ALL" | "SHIPPING" | "COMPLETED">("ALL");
+  const [orderFilter, setOrderFilter] = useState<string>("ALL");
+
+  // Review modal state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewOrderCode, setReviewOrderCode] = useState("");
+  const [reviewProductName, setReviewProductName] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Cancel order modal state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelTargetCode, setCancelTargetCode] = useState("");
+  const [cancelReason, setCancelReason] = useState("Muốn thay đổi địa chỉ hoặc danh sách món");
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  // PayOS QR modal state for re-payment
+  const [showPayosModal, setShowPayosModal] = useState(false);
+  const [payosData, setPayosData] = useState<PaymentLinkResponse | null>(null);
+  const [isProcessingPayos, setIsProcessingPayos] = useState(false);
+
+  async function handleOpenPayOS(orderCode: string) {
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+      const payLink = await paymentService.createPayOSPaymentLink(
+        orderCode,
+        `${origin}/checkout/success?orderCode=${orderCode}`,
+        `${origin}/checkout/cancel?orderCode=${orderCode}`
+      );
+      setPayosData(payLink);
+      setShowPayosModal(true);
+    } catch {
+      toast.error("Không thể mở cổng payOS. Vui lòng thử lại sau.");
+    }
+  }
+
+  async function handleConfirmPayOS() {
+    if (!payosData) return;
+    setIsProcessingPayos(true);
+    try {
+      await paymentService.simulatePaymentSuccess(payosData.orderCode);
+      toast.success("Thanh toán payOS thành công! Đơn hàng đã chuyển sang ĐÃ THANH TOÁN.");
+      setShowPayosModal(false);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === payosData.orderCode ? { ...o, status: "PAID", statusText: "Đã thanh toán (payOS)", statusColor: "bg-teal-50 text-teal-700 border-teal-200" } : o))
+      );
+    } catch {
+      toast.error("Không thể xác nhận thanh toán.");
+    } finally {
+      setIsProcessingPayos(false);
+    }
+  }
+
+  async function handleCancelOrder() {
+    if (!cancelTargetCode) return;
+    setIsSubmittingCancel(true);
+    try {
+      await catalogService.cancelOrder(cancelTargetCode, cancelReason);
+      toast.success(`Đã hủy đơn hàng #${cancelTargetCode} thành công! Tồn kho đã được hoàn lại.`);
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === cancelTargetCode
+            ? { ...o, status: "CANCELLED", statusText: "Đã hủy đơn hàng", statusColor: "bg-rose-50 text-rose-700 border-rose-200", cancelReason }
+            : o
+        )
+      );
+      setShowCancelModal(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể hủy đơn hàng.";
+      toast.error(msg);
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  }
+
+  async function handleSubmitReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reviewOrderCode || !reviewProductName) return;
+    setIsSubmittingReview(true);
+    try {
+      await reviewService.createReview({
+        orderCode: reviewOrderCode,
+        productName: reviewProductName,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+      toast.success(`Cảm ơn bạn đã đánh giá ${reviewRating} sao cho sản phẩm ${reviewProductName}!`);
+      setShowReviewModal(false);
+      setReviewComment("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể gửi đánh giá.";
+      toast.error(msg);
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  }
 
   // Voucher filter
   const [voucherFilter, setVoucherFilter] = useState<"ALL" | "ACTIVE" | "SHIPPING" | "DISCOUNT">("ALL");
@@ -459,6 +587,11 @@ function CustomerDashboardContent() {
 
   const filteredOrders = orders.filter((ord) => {
     if (orderFilter === "ALL") return true;
+    if (orderFilter === "SHIPPING") return ord.status === "SHIPPING";
+    if (orderFilter === "DELIVERED") return ord.status === "DELIVERED" || ord.status === "COMPLETED";
+    if (orderFilter === "PENDING_PAYMENT") return ord.status === "PENDING_PAYMENT";
+    if (orderFilter === "PREPARING") return ["CONFIRMED", "PREPARING", "PAID"].includes(ord.status);
+    if (orderFilter === "CANCELLED") return ord.status === "CANCELLED";
     return ord.status === orderFilter;
   });
 
@@ -679,13 +812,16 @@ function CustomerDashboardContent() {
       {activeTab === "orders" && (
         <div className="space-y-4 animate-fade-in-up">
           {/* Order Filter bar */}
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-gray-500 font-medium mr-1">Bộ lọc trạng thái:</span>
             {(
               [
                 { key: "ALL", label: "Tất cả đơn hàng" },
+                { key: "PENDING_PAYMENT", label: "Chờ thanh toán (payOS)" },
+                { key: "PREPARING", label: "Chờ đóng gói" },
                 { key: "SHIPPING", label: "Đang giao hàng xe lạnh" },
-                { key: "COMPLETED", label: "Đã hoàn thành" },
+                { key: "DELIVERED", label: "Đã hoàn thành" },
+                { key: "CANCELLED", label: "Đã hủy" },
               ] as const
             ).map((tab) => (
               <button
@@ -694,7 +830,7 @@ function CustomerDashboardContent() {
                 className={cn(
                   "px-3 py-1.5 rounded-lg font-semibold transition-colors",
                   orderFilter === tab.key
-                    ? "bg-emerald-700 text-white"
+                    ? "bg-emerald-700 text-white shadow-xs"
                     : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
                 )}
               >
@@ -780,6 +916,45 @@ function CustomerDashboardContent() {
                         {order.total.toLocaleString("vi-VN")} đ
                       </span>
                     </div>
+
+                    {/* PayOS Button if PENDING_PAYMENT */}
+                    {order.status === "PENDING_PAYMENT" && (
+                      <button
+                        onClick={() => handleOpenPayOS(order.id)}
+                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Sparkles size={13} />
+                        <span>Thanh toán payOS</span>
+                      </button>
+                    )}
+
+                    {/* Cancel Button if eligible */}
+                    {["PENDING_PAYMENT", "CONFIRMED", "PREPARING"].includes(order.status) && (
+                      <button
+                        onClick={() => {
+                          setCancelTargetCode(order.id);
+                          setShowCancelModal(true);
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold transition-colors"
+                      >
+                        Hủy đơn
+                      </button>
+                    )}
+
+                    {/* Review Button if DELIVERED or COMPLETED */}
+                    {(order.status === "DELIVERED" || order.status === "COMPLETED") && (
+                      <button
+                        onClick={() => {
+                          setReviewOrderCode(order.id);
+                          setReviewProductName(order.items[0]?.name || "Nông sản tươi");
+                          setShowReviewModal(true);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-xs font-bold transition-colors flex items-center gap-1.5"
+                      >
+                        <Star size={13} className="fill-emerald-700 text-emerald-700" />
+                        <span>Đánh giá</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => setSelectedOrder(order)}
@@ -1634,6 +1809,229 @@ function CustomerDashboardContent() {
                 <RefreshCw size={13} />
                 <span>Đặt mua lại</span>
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: HỦY ĐƠN HÀNG                                       */}
+      {/* ========================================================= */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                  ✕
+                </span>
+                Xác Nhận Hủy Đơn Hàng #{cancelTargetCode}
+              </h3>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Theo quy định, bạn có thể hủy đơn khi hàng chưa chuyển sang trạng thái <strong>Đang giao xe lạnh</strong>. Sau khi hủy, số lượng nông sản sẽ được tự động hoàn lại tồn kho và tiền đã thanh toán (nếu có) sẽ được hoàn trả.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700 block">Lý do hủy đơn:</label>
+              <select
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 outline-none"
+              >
+                <option value="Muốn thay đổi địa chỉ hoặc danh sách món">Muốn thay đổi địa chỉ hoặc danh sách món</option>
+                <option value="Đổi ý không muốn mua nữa">Đổi ý không muốn mua nữa</option>
+                <option value="Tìm thấy ưu đãi hoặc giá tốt hơn">Tìm thấy ưu đãi hoặc giá tốt hơn</option>
+                <option value="Thời gian giao không thuận tiện">Thời gian giao không thuận tiện</option>
+                <option value="Lý do khác">Lý do khác</option>
+              </select>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold"
+              >
+                Giữ đơn hàng
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                disabled={isSubmittingCancel}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md disabled:opacity-50"
+              >
+                {isSubmittingCancel ? "Đang hủy đơn..." : "Xác nhận hủy đơn"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: ĐÁNH GIÁ SẢN PHẨM SAU KHI NHẬN HÀNG                 */}
+      {/* ========================================================= */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
+          <form onSubmit={handleSubmitReview} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-emerald-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <Star size={16} className="fill-emerald-700" />
+                </span>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Đánh Giá Nông Sản</h3>
+                  <p className="text-[11px] text-gray-400">Đơn hàng #{reviewOrderCode}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+              <span className="text-[11px] text-gray-500 block">Sản phẩm:</span>
+              <span className="text-sm font-bold text-gray-900">{reviewProductName}</span>
+            </div>
+
+            <div className="space-y-1.5 text-center">
+              <span className="text-xs font-semibold text-gray-700 block">Chất lượng nông sản:</span>
+              <div className="flex justify-center gap-2 py-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setReviewRating(star)}
+                    className="p-1 transition-transform hover:scale-125"
+                  >
+                    <Star
+                      size={28}
+                      className={cn(
+                        star <= reviewRating
+                          ? "fill-amber-400 text-amber-400"
+                          : "fill-gray-200 text-gray-200"
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] font-medium text-amber-700">
+                {reviewRating === 5 && "Cực kỳ tươi ngon, chuẩn VietGAP (5 sao)"}
+                {reviewRating === 4 && "Nông sản tươi ngon, đóng gói đẹp (4 sao)"}
+                {reviewRating === 3 && "Chất lượng tạm ổn (3 sao)"}
+                {reviewRating === 2 && "Chưa tươi lắm, cần cải thiện (2 sao)"}
+                {reviewRating === 1 && "Không hài lòng (1 sao)"}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700 block">Nhận xét chi tiết:</label>
+              <textarea
+                rows={3}
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="Rau củ rất tươi giòn, giao hàng xe lạnh nhiệt độ chuẩn, bảo quản rất tốt..."
+                className="w-full text-xs p-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 outline-none"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingReview}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold shadow-md disabled:opacity-50"
+              >
+                {isSubmittingReview ? "Đang gửi..." : "Gửi Đánh Giá"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: THANH TOÁN LẠI PAYOS CHO ĐƠN CHỜ                   */}
+      {/* ========================================================= */}
+      {showPayosModal && payosData && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-emerald-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                  payOS
+                </span>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Thanh Toán Đơn #{payosData.orderCode}</h3>
+                  <p className="text-[11px] text-gray-400">Cổng VietQR Napas 247</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPayosModal(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-emerald-50/50 rounded-2xl p-4 flex flex-col items-center justify-center space-y-3 border border-emerald-100">
+              <div className="bg-white p-3 rounded-2xl shadow-sm border border-emerald-200/60">
+                {payosData.qrCode ? (
+                  <img src={payosData.qrCode} alt="payOS QR" className="w-48 h-48 object-contain rounded-xl" />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center text-xs text-gray-400">Đang tải QR...</div>
+                )}
+              </div>
+              <div className="text-center">
+                <span className="text-xs text-gray-500">Số tiền:</span>
+                <div className="text-xl font-black text-emerald-700">{payosData.amount.toLocaleString("vi-VN")}đ</div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-xs bg-gray-50 rounded-2xl p-3 border border-gray-100 text-gray-600">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Ngân hàng:</span>
+                <span className="font-semibold text-gray-900">{payosData.bankName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Số tài khoản:</span>
+                <span className="font-mono font-bold text-gray-900">{payosData.accountNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Nội dung:</span>
+                <span className="font-mono font-bold text-emerald-800">{payosData.description}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={handleConfirmPayOS}
+                disabled={isProcessingPayos}
+                className="w-full py-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles size={15} />
+                {isProcessingPayos ? "Đang xác thực giao dịch..." : "Đã Quét Mã & Thanh Toán Thành Công"}
+              </button>
+              <button
+                onClick={() => setShowPayosModal(false)}
+                className="w-full py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>
