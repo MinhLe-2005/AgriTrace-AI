@@ -13,5 +13,5 @@ public record UpdateShipmentStatusRequest(
         @DecimalMin(value = ShipmentValidation.MIN_HUMIDITY_PERCENT, message = "Độ ẩm phải từ 0 đến 100%")
         @DecimalMax(value = ShipmentValidation.MAX_HUMIDITY_PERCENT, message = "Độ ẩm phải từ 0 đến 100%") Double humidityPercent,
         @Size(max = 2000) String note,
-        String actualArrival
+        @ValidShipmentTimestamp String actualArrival
 ) { }
