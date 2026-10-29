@@ -23,7 +23,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
-@WebMvcTest({WarehouseRiskController.class, WarehouseQualityController.class})
+@WebMvcTest({
+    WarehouseRiskController.class,
+    WarehouseQualityController.class,
+    WarehouseDashboardController.class
+})
 @ActiveProfiles("warehouse-test")
 @Import({SecurityConfig.class, RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class})
 class WarehouseRiskControllerTest {
@@ -35,9 +39,28 @@ class WarehouseRiskControllerTest {
     @MockitoBean
     private WarehouseQualityService quality;
     @MockitoBean
+    private WarehouseDashboardService dashboard;
+    @MockitoBean
     private JwtTokenService jwtTokenService;
     @MockitoBean
     private CustomUserDetailsService userDetailsService;
+
+    @Test
+    void dashboardRequiresWarehouseRoleAndValidDates() throws Exception {
+        mvc.perform(
+                        get(base + "/dashboard")
+                                .param("from", "2026-10-01")
+                                .param("to", "2026-10-29")
+                                .with(user("other").roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get(base + "/dashboard")
+                                .param("from", "invalid")
+                                .param("to", "2026-10-29")
+                                .with(user("staff").roles("WAREHOUSE")))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(dashboard);
+    }
 
     @Test
     void anonymousCannotReadForecast() throws Exception {

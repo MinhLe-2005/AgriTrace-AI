@@ -88,7 +88,7 @@ class WarehouseAuditIntegrationTest {
         otherLocation = location(other);
         jdbc.update(
                 "INSERT INTO agri_harvest_lots VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất"
-                    + " kho')",
+                        + " kho')",
                 InventoryService.today().plusDays(5).toString());
         var receipt = create(warehouseId, Type.INBOUND, null, locationId, null, "100");
         documents.confirm(warehouseId, receipt.id(), "staff");
@@ -158,7 +158,7 @@ class WarehouseAuditIntegrationTest {
                         .compareTo(
                                 jdbc.queryForObject(
                                         "select delta_kg from wh_stock_movements where"
-                                            + " type='COUNT'",
+                                                + " type='COUNT'",
                                         BigDecimal.class)));
         assertEquals(
                 "1000",
