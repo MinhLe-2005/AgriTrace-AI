@@ -12,6 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { WarehouseDocumentEditor } from "./warehouse-document-editor";
+import {
+  WarehouseMonitoringPanel,
+  WarehouseLiveBadge,
+} from "./warehouse-monitoring-panel";
+import { useWarehouseLive } from "./use-warehouse-live";
 import type {
   DocumentType,
   WarehouseDocument,
@@ -35,6 +40,7 @@ const tabs = [
   "Chứng từ",
   "FEFO & giữ hàng",
   "Cảnh báo",
+  "Giám sát",
   "Nhật ký",
 ] as const;
 const quantity = (value?: number) =>
@@ -182,6 +188,7 @@ export function WarehouseManager() {
     setStockPage(0);
   }, [id, stockSearch]);
   const enabled = !!id && authorized;
+  const liveStatus = useWarehouseLive(enabled ? id : "");
   const locations = useQuery({
     queryKey: ["warehouse", id, "locations"],
     queryFn: () => service.locations(id),
@@ -498,6 +505,15 @@ export function WarehouseManager() {
               </button>
             ))}
           </nav>
+          {tab !== "Giám sát" && <WarehouseLiveBadge status={liveStatus} />}
+          {tab === "Giám sát" && (
+            <WarehouseMonitoringPanel
+              key={id}
+              warehouseId={id}
+              locations={locations.data ?? []}
+              liveStatus={liveStatus}
+            />
+          )}
           <ErrorNotice error={locations.error} />
           {tab !== "Tồn & chất lượng" && <ErrorNotice error={stock.error} />}
           {activeQuery.isFetching && (
@@ -1153,6 +1169,12 @@ export function WarehouseManager() {
                         STALE: "Tồn lâu",
                         QUALITY_HOLD: "Chất lượng",
                         LOW_STOCK: "Tồn thấp",
+                        SENSOR_OFFLINE: "Mất tín hiệu",
+                        TEMPERATURE_HIGH: "Nhiệt độ cao",
+                        TEMPERATURE_LOW: "Nhiệt độ thấp",
+                        HUMIDITY_HIGH: "Độ ẩm cao",
+                        HUMIDITY_LOW: "Độ ẩm thấp",
+                        NEAR_EXPIRY_HIGH_STOCK: "Gần hạn, tồn lớn",
                       }[a.type] ?? a.type}
                     </td>
                     <td>{a.message}</td>

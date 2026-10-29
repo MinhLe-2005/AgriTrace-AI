@@ -117,6 +117,10 @@ export interface RiskAlert {
   message: string;
   status: string;
   updatedAt: string;
+  locationId?: string | null;
+  ruleId?: string | null;
+  deviceId?: string | null;
+  lotId?: string | null;
 }
 export interface AlertAction {
   id: string;

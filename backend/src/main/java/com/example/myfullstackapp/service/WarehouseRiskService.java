@@ -7,6 +7,7 @@ import com.example.myfullstackapp.repository.*;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 
@@ -24,6 +25,7 @@ public class WarehouseRiskService {
     private final RiskAlertRepository alerts;
     private final AlertActionRepository actions;
     private final StockMovementRepository movements;
+    private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public RuleInput rule(UUID warehouseId) {
@@ -42,6 +44,9 @@ public class WarehouseRiskService {
         rule.setStaleDays(input.staleDays());
         rule.setLowStockKg(input.lowStockKg());
         rules.saveAndFlush(rule);
+        events.publishEvent(
+                new com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.Changed(
+                        warehouseId, "RULES"));
         return input;
     }
 
@@ -112,7 +117,9 @@ public class WarehouseRiskService {
                                 + kilograms(product.getValue())
                                 + " kg khả dụng");
         for (var alert : alerts.findByWarehouseIdOrderByUpdatedAtDesc(warehouseId)) {
-            if (!live.contains(alert.getFingerprint()) && !"RESOLVED".equals(alert.getStatus())) {
+            if (Set.of("EXPIRY", "STALE", "QUALITY_HOLD", "LOW_STOCK").contains(alert.getType())
+                    && !live.contains(alert.getFingerprint())
+                    && !"RESOLVED".equals(alert.getStatus())) {
                 alert.setStatus("RESOLVED");
                 alert.setUpdatedAt(Instant.now());
                 alerts.save(alert);
@@ -120,6 +127,9 @@ public class WarehouseRiskService {
             }
         }
         alerts.flush();
+        events.publishEvent(
+                new com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.Changed(
+                        warehouseId, "ALERTS"));
         return list(warehouseId);
     }
 
@@ -148,12 +158,16 @@ public class WarehouseRiskService {
         alert.setUpdatedAt(Instant.now());
         if (reopen) alert.setStatus("OPEN");
         alerts.saveAndFlush(alert);
-        if (fresh || reopen)
+        if (fresh || reopen) {
             audit(
                     alert,
                     "OPEN",
                     fresh ? "Phát hiện điều kiện cảnh báo" : "Điều kiện cảnh báo xuất hiện lại",
                     "SYSTEM");
+            events.publishEvent(
+                    new com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.AlertOpened(
+                            UUID.randomUUID(), warehouseId, alert.getId(), severity, message));
+        }
     }
 
     @Transactional
@@ -166,6 +180,9 @@ public class WarehouseRiskService {
         alert.setUpdatedAt(Instant.now());
         alerts.save(alert);
         audit(alert, input.status(), input.note().trim(), actor);
+        events.publishEvent(
+                new com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.Changed(
+                        warehouseId, "ALERTS"));
         return view(alert);
     }
 
@@ -201,7 +218,11 @@ public class WarehouseRiskService {
                 a.getSeverity(),
                 a.getMessage(),
                 a.getStatus(),
-                a.getUpdatedAt());
+                a.getUpdatedAt(),
+                a.getLocationId(),
+                a.getRuleId(),
+                a.getDeviceId(),
+                a.getLotId());
     }
 
     /** An explainable historical-rate estimate; this is not a trained AI model. */

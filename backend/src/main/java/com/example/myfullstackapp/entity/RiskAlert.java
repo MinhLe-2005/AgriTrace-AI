@@ -24,6 +24,13 @@ public class RiskAlert {
     @Column(nullable = false)
     private UUID warehouseId;
 
+    private UUID locationId;
+    private UUID ruleId;
+    private UUID deviceId;
+
+    @Column(length = 40)
+    private String lotId;
+
     @Column(nullable = false, length = 150)
     private String fingerprint;
 
