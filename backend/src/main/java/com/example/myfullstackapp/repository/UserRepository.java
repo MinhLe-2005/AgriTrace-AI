@@ -17,6 +17,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @EntityGraph(attributePaths = "roles")
     Optional<User> findByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);
+
+    @EntityGraph(attributePaths = "roles")
+    @Query("select u from User u where lower(u.email) = lower(:identifier) or lower(u.email) like lower(concat(:identifier, '@%'))")
+    List<User> findByIdentifier(@Param("identifier") String identifier);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.active = true and exists (select r from Role r where r.name = :roleName and r member of u.roles) order by u.id")
     List<User> findActiveUsersWithRoleForUpdate(@Param("roleName") RoleName roleName);

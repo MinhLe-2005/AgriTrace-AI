@@ -43,7 +43,17 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        String email = normalizedEmail(request.email());
+        String identifier = normalizedEmail(request.email());
+        String email = userRepository.findByEmailIgnoreCase(identifier)
+                .map(User::getEmail)
+                .orElseGet(() -> {
+                    if (!identifier.contains("@")) {
+                        var matches = userRepository.findByIdentifier(identifier);
+                        if (!matches.isEmpty()) return matches.get(0).getEmail();
+                    }
+                    return identifier;
+                });
+
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.password()));
         User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));

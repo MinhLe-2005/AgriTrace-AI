@@ -134,7 +134,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         } else if (roles.includes("FARMER")) {
           router.replace("/dashboard/farmer");
         } else {
-          router.replace("/dashboard/customer");
+          // Khách hàng / User thông thường -> chuyển về Trang chủ
+          router.replace("/");
         }
       } catch (error) {
         toast.error(getApiErrorMessage(error));
