@@ -31,6 +31,7 @@ export const userSchema = z.object({
   name: z.string().trim().min(2, "Họ và tên tối thiểu 2 ký tự").max(100),
   email: z.string().min(1, "Vui lòng nhập email hoặc tài khoản"),
   password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự").optional().or(z.literal("")),
+  active: z.boolean(),
   roles: z.array(z.string()).min(1, "Chọn ít nhất một vai trò")
 });
 

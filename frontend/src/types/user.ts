@@ -11,6 +11,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  active: boolean;
   roles: UserRole[];
   avatarUrl?: string;
   phone?: string;
@@ -24,5 +25,6 @@ export interface UserInput {
   name: string;
   email: string;
   password?: string;
+  active: boolean;
   roles: UserRole[];
 }

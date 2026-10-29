@@ -12,12 +12,20 @@ export const usersService = {
     return listFrom(unpack(data)).map(normalizeUser);
   },
   async create(input: UserInput) {
-    const { name, ...rest } = input;
-    const { data } = await api.post<ApiResponse<BackendUser>>("/users", { ...rest, fullName: name });
+    const { data } = await api.post<ApiResponse<BackendUser>>("/users", {
+      email: input.email,
+      fullName: input.name,
+      password: input.password,
+      roles: input.roles
+    });
     return normalizeUser(unpack(data));
   },
   async update(id: string, input: UserInput) {
-    const { data } = await api.put<ApiResponse<BackendUser>>(`/users/${id}`, { fullName: input.name, active: true, roles: input.roles });
+    const { data } = await api.put<ApiResponse<BackendUser>>(`/users/${id}`, {
+      fullName: input.name,
+      active: input.active,
+      roles: input.roles
+    });
     return normalizeUser(unpack(data));
   },
   async remove(id: string) {
