@@ -43,7 +43,8 @@ import java.util.*;
     WarehouseOrderQuery.class,
     WarehouseWeightService.class,
     WarehouseQualityService.class,
-    WarehouseRiskService.class
+    WarehouseRiskService.class,
+    WarehouseDashboardService.class
 })
 @EnabledIf("databaseAvailable")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -67,6 +68,8 @@ class WarehouseRiskIntegrationTest {
     private WarehouseQualityService quality;
     @Autowired
     private WarehouseRiskService risk;
+    @Autowired
+    private WarehouseDashboardService dashboard;
     @Autowired
     private InventoryService inventory;
     @Autowired
@@ -107,7 +110,7 @@ class WarehouseRiskIntegrationTest {
                         .id();
         jdbc.update(
                 "INSERT INTO agri_harvest_lots VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất"
-                    + " kho')",
+                        + " kho')",
                 InventoryService.today().plusDays(2).toString());
         var receipt =
                 documents.create(
@@ -122,6 +125,56 @@ class WarehouseRiskIntegrationTest {
                                                 "1", locationId, null, new BigDecimal("100")))),
                         "staff");
         documents.confirm(warehouseId, receipt.id(), "staff");
+    }
+
+    @Test
+    void dashboardUsesVietnamDayBoundariesAndRuleThreshold() {
+        var today = InventoryService.today();
+        var outbound =
+                documents.create(
+                        warehouseId,
+                        Type.OUTBOUND,
+                        new DocumentInput(
+                                null,
+                                null,
+                                "Xuất thử",
+                                List.of(new LineInput("1", locationId, null, BigDecimal.TEN))),
+                        "staff");
+        documents.confirm(warehouseId, outbound.id(), "staff");
+        var zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        jdbc.update(
+                "UPDATE wh_stock_movements SET occurred_at=? WHERE type='INBOUND'",
+                java.sql.Timestamp.from(today.atStartOfDay(zone).toInstant()));
+        jdbc.update(
+                "UPDATE wh_stock_movements SET occurred_at=? WHERE type='OUTBOUND'",
+                java.sql.Timestamp.from(today.plusDays(1).atStartOfDay(zone).toInstant()));
+        risk.updateRule(warehouseId, new RuleInput(0, 14, BigDecimal.ZERO));
+        var result = dashboard.get(warehouseId, today, today);
+        assertEquals(0, new BigDecimal("100").compareTo(result.inboundKg()));
+        assertEquals(0, result.outboundKg().signum());
+        assertEquals(0, new BigDecimal("90").compareTo(result.onHandKg()));
+        assertEquals(0, result.expiringBalances());
+        risk.updateRule(warehouseId, new RuleInput(3, 14, BigDecimal.ZERO));
+        assertEquals(1, dashboard.get(warehouseId, today, today).expiringBalances());
+    }
+
+    @Test
+    void dashboardCountsQualityHoldsAndRejectsInvalidPeriod() {
+        var balance = inventory.getBalances(warehouseId).getFirst();
+        quality.inspect(
+                warehouseId, new InspectionInput(balance.id(), true, "Cần kiểm tra"), "staff");
+        risk.refresh(warehouseId);
+        var today = InventoryService.today();
+        var result = dashboard.get(warehouseId, today, today);
+        assertEquals(1, result.heldBalances());
+        assertEquals(0, result.availableKg().signum());
+        assertTrue(result.openAlerts() > 0);
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> dashboard.get(warehouseId, today, today.minusDays(1)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> dashboard.get(warehouseId, today, today.plusYears(1).plusDays(1)));
     }
 
     @Test

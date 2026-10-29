@@ -74,7 +74,7 @@ public class WarehouseRiskService {
                                         ? ": đã quá hạn " + (-days) + " ngày"
                                         : ": còn " + days + " ngày đến hạn")
                                 + ", tồn "
-                                + b.quantityKg()
+                                + kilograms(b.quantityKg())
                                 + " kg");
             if (b.receivedAt().isBefore(Instant.now().minus(rule.staleDays(), ChronoUnit.DAYS)))
                 upsert(
@@ -107,7 +107,10 @@ public class WarehouseRiskService {
                                         product.getKey().getBytes(StandardCharsets.UTF_8)),
                         "LOW_STOCK",
                         "MEDIUM",
-                        product.getKey() + ": còn " + product.getValue() + " kg khả dụng");
+                        product.getKey()
+                                + ": còn "
+                                + kilograms(product.getValue())
+                                + " kg khả dụng");
         for (var alert : alerts.findByWarehouseIdOrderByUpdatedAtDesc(warehouseId)) {
             if (!live.contains(alert.getFingerprint()) && !"RESOLVED".equals(alert.getStatus())) {
                 alert.setStatus("RESOLVED");
@@ -118,6 +121,10 @@ public class WarehouseRiskService {
         }
         alerts.flush();
         return list(warehouseId);
+    }
+
+    private String kilograms(BigDecimal value) {
+        return value.stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
     private void upsert(
@@ -237,7 +244,7 @@ public class WarehouseRiskService {
                             String recommendation =
                                     !enough
                                             ? "Chưa đủ lịch sử: cần ít nhất 3 biến động xuất kho"
-                                                  + " trong 14 ngày"
+                                                    + " trong 14 ngày"
                                             : nearest != null
                                                             && days.compareTo(
                                                                             BigDecimal.valueOf(
@@ -248,7 +255,7 @@ public class WarehouseRiskService {
                                                                                                     nearest)))
                                                                     > 0
                                                     ? "Ưu tiên xuất FEFO và xem lại lượng dư trước"
-                                                          + " hạn dùng"
+                                                            + " hạn dùng"
                                                     : "Tiếp tục theo dõi nhu cầu và hạn dùng";
                             return new Forecast(
                                     product,
