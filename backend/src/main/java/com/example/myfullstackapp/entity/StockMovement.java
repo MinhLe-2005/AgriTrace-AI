@@ -12,8 +12,7 @@ import java.util.UUID;
 @Table(
         name = "wh_stock_movements",
         indexes =
-                @Index(name = "ix_wh_movement_scope_time", columnList = "warehouse_id,occurred_at")
-                )
+                @Index(name = "ix_wh_movement_scope_time", columnList = "warehouse_id,occurred_at"))
 @Getter
 @Setter
 @NoArgsConstructor

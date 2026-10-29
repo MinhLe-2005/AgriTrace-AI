@@ -36,9 +36,7 @@ public class WarehouseController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<WarehouseResponse>> create(
-            @Valid
-            @RequestBody
-            WarehouseCreateRequest request) {
+            @Valid @RequestBody WarehouseCreateRequest request) {
         WarehouseResponse warehouse = warehouseService.create(request);
         var location =
                 ServletUriComponentsBuilder.fromCurrentRequest()
@@ -51,15 +49,13 @@ public class WarehouseController {
 
     @PutMapping("/{id}")
     public ApiResponse<WarehouseResponse> update(
-            @PathVariable
-            UUID id, @Valid @RequestBody WarehouseUpdateRequest request) {
+            @PathVariable UUID id, @Valid @RequestBody WarehouseUpdateRequest request) {
         return ApiResponse.ok("Warehouse updated", warehouseService.update(id, request));
     }
 
     @PutMapping("/{id}/status")
     public ApiResponse<WarehouseResponse> setActive(
-            @PathVariable
-            UUID id, @Valid @RequestBody ActiveStatusRequest request) {
+            @PathVariable UUID id, @Valid @RequestBody ActiveStatusRequest request) {
         return ApiResponse.ok(
                 "Warehouse status updated", warehouseService.setActive(id, request.active()));
     }

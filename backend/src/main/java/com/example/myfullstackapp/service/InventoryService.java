@@ -78,9 +78,10 @@ public class InventoryService {
     }
 
     public List<BalanceView> views(UUID warehouseId, UUID exceptReservation, boolean eligibleOnly) {
-        requireWarehouse(warehouseId);
+        Warehouse warehouse = requireWarehouse(warehouseId);
         var reserved = reserved(warehouseId, exceptReservation);
         Map<String, LotSummary> currentLots = new HashMap<>();
+        Map<UUID, StorageLocation> currentLocations = new HashMap<>();
         return balances
                 .findByWarehouseIdOrderByExpiryDateAscLotIdAscLocationIdAsc(warehouseId)
                 .stream()
@@ -88,14 +89,21 @@ public class InventoryService {
                         b -> {
                             BigDecimal held = reserved.getOrDefault(b.getId(), BigDecimal.ZERO);
                             boolean eligible = !b.isHeld() && !b.getExpiryDate().isBefore(today());
-                            if (eligibleOnly) {
-                                var location = location(warehouseId, b.getLocationId(), false);
-                                eligible &=
-                                        location.isActive() && location.getWarehouse().isActive();
-                                var lot = currentLots.computeIfAbsent(b.getLotId(), lots::get);
-                                eligible &=
-                                        "APPROVED".equals(lot.status())
-                                                && !lot.expiryDate().isBefore(today());
+                            var location =
+                                    currentLocations.computeIfAbsent(
+                                            b.getLocationId(),
+                                            locationId -> location(warehouseId, locationId, false));
+                            eligible &= warehouse.isActive() && location.isActive();
+                            if (eligible && b.getQuantityKg().signum() > 0) {
+                                try {
+                                    var lot = currentLots.computeIfAbsent(b.getLotId(), lots::get);
+                                    eligible &=
+                                            "APPROVED".equals(lot.status())
+                                                    && b.getExpiryDate().equals(lot.expiryDate())
+                                                    && b.getProductId().equals(lot.productId());
+                                } catch (ResourceNotFoundException deletedLot) {
+                                    eligible = false;
+                                }
                             }
                             BigDecimal available =
                                     eligible
