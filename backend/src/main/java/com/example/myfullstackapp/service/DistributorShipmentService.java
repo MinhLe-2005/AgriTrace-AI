@@ -75,7 +75,7 @@ public class DistributorShipmentService {
     @Transactional(readOnly = true)
     public List<TrackingEventResponse> tracking(String shipmentCode, String actorEmail, boolean isAdmin) {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
-        return trackingEventRepository.findByShipmentIdOrderByEventTimeAsc(shipment.getId()).stream()
+        return trackingEventRepository.findByShipmentIdOrderByEventTimeDesc(shipment.getId()).stream()
                 .map(event -> new TrackingEventResponse(event.getId(), event.getLocation(), event.getTemperatureC(), event.getHumidityPercent(),
                         event.getStatus(), event.getNote(), event.getEventTime()))
                 .toList();

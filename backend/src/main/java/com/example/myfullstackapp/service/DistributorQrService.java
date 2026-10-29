@@ -4,6 +4,7 @@ import com.example.myfullstackapp.dto.distributor.*;
 import com.example.myfullstackapp.entity.DistributorQrCode;
 import com.example.myfullstackapp.exception.ResourceNotFoundException;
 import com.example.myfullstackapp.repository.DistributorQrCodeRepository;
+import com.example.myfullstackapp.repository.HarvestLotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -16,19 +17,27 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DistributorQrService {
     private final DistributorQrCodeRepository qrCodeRepository;
+    private final HarvestLotRepository harvestLotRepository;
     private final DistributorShipmentService distributorShipmentService;
 
     @Transactional
     public QrCodeResponse generate(GenerateQrCodeRequest request, String actorEmail, boolean isAdmin) {
+        String batchCode = request.batchCode().trim().toUpperCase(Locale.ROOT);
+        if (!harvestLotRepository.existsByCodeIgnoreCase(batchCode)) {
+            throw new ResourceNotFoundException("Không tìm thấy lô hàng để tạo mã QR");
+        }
         String shipmentCode = optionalText(request.shipmentCode());
         if (shipmentCode != null) {
             // Verifies the actor owns the shipment (or is an administrator).
-            distributorShipmentService.get(shipmentCode, actorEmail, isAdmin);
+            ShipmentResponse shipment = distributorShipmentService.get(shipmentCode, actorEmail, isAdmin);
+            if (optionalText(shipment.lotCode()) != null && !batchCode.equalsIgnoreCase(shipment.lotCode())) {
+                throw new IllegalArgumentException("Mã lô QR phải trùng với mã lô của chuyến vận chuyển");
+            }
             shipmentCode = shipmentCode.toUpperCase(Locale.ROOT);
         }
         DistributorQrCode qrCode = DistributorQrCode.builder()
-                .code(nextCode(request.batchCode()))
-                .batchCode(request.batchCode().trim().toUpperCase(Locale.ROOT))
+                .code(nextCode(batchCode))
+                .batchCode(batchCode)
                 .shipmentCode(shipmentCode)
                 .productId(optionalText(request.productId()))
                 .generatedBy(actorEmail)
@@ -36,10 +45,11 @@ public class DistributorQrService {
         return toResponse(qrCodeRepository.save(qrCode));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public QrCodeResponse lookup(String code, String actorEmail, boolean isAdmin) {
         DistributorQrCode qrCode = find(code);
         verifyOwner(qrCode, actorEmail, isAdmin);
+        qrCode.setScanCount(qrCode.getScanCount() == null ? 1L : qrCode.getScanCount() + 1L);
         return toResponse(qrCode);
     }
 
@@ -47,10 +57,15 @@ public class DistributorQrService {
     public ShipmentResponse receive(ReceiveGoodsRequest request, String actorEmail, boolean isAdmin) {
         String shipmentCode = optionalText(request.shipmentCode());
         String qrValue = optionalText(request.qrCode());
-        if (shipmentCode == null && qrValue != null) {
+        if (qrValue != null) {
             DistributorQrCode qrCode = find(qrValue);
             verifyOwner(qrCode, actorEmail, isAdmin);
-            shipmentCode = optionalText(qrCode.getShipmentCode());
+            String qrShipmentCode = optionalText(qrCode.getShipmentCode());
+            if (shipmentCode != null && qrShipmentCode != null && !shipmentCode.equalsIgnoreCase(qrShipmentCode)) {
+                throw new IllegalArgumentException("Mã QR không thuộc chuyến vận chuyển được chọn");
+            }
+            if (shipmentCode == null) shipmentCode = qrShipmentCode;
+            qrCode.setScanCount(qrCode.getScanCount() == null ? 1L : qrCode.getScanCount() + 1L);
         }
         if (shipmentCode == null) {
             throw new IllegalArgumentException("QR chưa được gắn với chuyến vận chuyển hoặc thiếu shipmentCode");
@@ -76,7 +91,7 @@ public class DistributorQrService {
     }
 
     private QrCodeResponse toResponse(DistributorQrCode qrCode) {
-        return new QrCodeResponse(qrCode.getCode(), qrCode.getBatchCode(), qrCode.getShipmentCode(), qrCode.getProductId(), qrCode.getGeneratedBy(), qrCode.getCreatedAt());
+        return new QrCodeResponse(qrCode.getCode(), qrCode.getBatchCode(), qrCode.getShipmentCode(), qrCode.getProductId(), qrCode.getGeneratedBy(), qrCode.getScanCount(), qrCode.getCreatedAt());
     }
 
     private String optionalText(String value) {

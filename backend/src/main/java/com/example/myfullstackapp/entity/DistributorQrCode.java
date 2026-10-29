@@ -34,6 +34,10 @@ public class DistributorQrCode {
     @Column(nullable = false, length = 254)
     private String generatedBy;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Long scanCount = 0L;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

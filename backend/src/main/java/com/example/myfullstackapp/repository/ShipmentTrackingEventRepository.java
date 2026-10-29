@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface ShipmentTrackingEventRepository extends JpaRepository<ShipmentTrackingEvent, Long> {
     List<ShipmentTrackingEvent> findByShipmentIdOrderByEventTimeAsc(Long shipmentId);
+    List<ShipmentTrackingEvent> findByShipmentIdOrderByEventTimeDesc(Long shipmentId);
 }

@@ -8,5 +8,6 @@ public record QrCodeResponse(
         String shipmentCode,
         String productId,
         String generatedBy,
+        Long scanCount,
         Instant createdAt
 ) { }
