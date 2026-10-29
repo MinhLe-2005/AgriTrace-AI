@@ -234,7 +234,7 @@ export default function FarmerPortalPage() {
             expiryDate: b.expiryDate || "",
             qty: b.qty,
             unit: b.unit || "kg",
-            status: (b.status as any) || "Chờ duyệt xuất kho",
+            status: (b.status as BatchItem["status"]) || "Chờ duyệt xuất kho",
             statusColor: b.statusColor || "#10b981",
             cert: b.cert || "VietGAP",
             cultivation: b.cultivation || "Theo tiêu chuẩn",

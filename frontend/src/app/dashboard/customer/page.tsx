@@ -267,8 +267,9 @@ function CustomerDashboardContent() {
       toast.success(
         `Đã nén tối ưu (${formatBytes(res.originalSize)} -> ${formatBytes(res.compressedSize)}, giảm ${res.savedPercent}%) và cập nhật ảnh đại diện!`
       );
-    } catch (err: any) {
-      toast.error(err?.message || "Không thể nén và cập nhật ảnh đại diện.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Không thể nén và cập nhật ảnh đại diện.";
+      toast.error(message);
     } finally {
       setIsCompressing(false);
       e.target.value = "";

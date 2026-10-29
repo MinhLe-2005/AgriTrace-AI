@@ -194,7 +194,7 @@ function CartContent() {
       setCurrentStep(4);
       toast.success(`Đặt hàng thành công! Đơn hàng #${res.orderCode} đã lưu vào Supabase.`);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Order creation fallback:", err);
       const newId = `AGRI-${Math.floor(1000 + Math.random() * 9000)}`;
       setCompletedOrderId(newId);
@@ -830,7 +830,7 @@ function CartContent() {
                     return (
                       <div
                         key={pm.key}
-                        onClick={() => setPaymentMethod(pm.key as any)}
+                        onClick={() => setPaymentMethod(pm.key as "vnpay" | "momo" | "cod" | "bank")}
                         className={cn(
                           "p-4 rounded-2xl border cursor-pointer transition-all space-y-1 relative",
                           isSelected
