@@ -10,7 +10,7 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:postgres.apbwidlapzntxdpjsnen}}
     password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:Bimdiendie1@}}
   flyway:
-    enabled: true
+    enabled: false
   jpa:
     show-sql: true
     hibernate:

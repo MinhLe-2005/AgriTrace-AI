@@ -14,7 +14,7 @@ spring:
         jdbc:
           time_zone: UTC
   flyway:
-    enabled: true
+    enabled: false
   jackson:
     default-property-inclusion: non_null
   mail:
