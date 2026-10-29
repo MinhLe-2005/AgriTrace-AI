@@ -134,7 +134,11 @@ public final class WarehouseOperations {
             String severity,
             String message,
             String status,
-            Instant updatedAt) {}
+            Instant updatedAt,
+            UUID locationId,
+            UUID ruleId,
+            UUID deviceId,
+            String lotId) {}
 
     public record AlertActionView(
             UUID id, String status, String note, String actor, Instant createdAt) {}
