@@ -25,6 +25,7 @@ public class StorageLocationService {
     private final StorageLocationRepository storageLocationRepository;
     private final StorageLocationMapper storageLocationMapper;
     private final CapacityValidationService capacityValidationService;
+    private final com.example.myfullstackapp.repository.StockBalanceRepository stockBalances;
 
     @Transactional(readOnly = true)
     public List<StorageLocationResponse> getAll(UUID warehouseId) {
@@ -71,6 +72,13 @@ public class StorageLocationService {
         requireActive(warehouse);
         StorageLocation location = findLocation(warehouseId, id);
         String code = normalizeCode(request.code());
+        if (stockBalances
+                        .sumQuantityByLocation(id)
+                        .compareTo(
+                                request.capacityTons().multiply(new java.math.BigDecimal("1000")))
+                > 0) {
+            throw new ConflictException("Location capacity cannot be reduced below actual stock");
+        }
         if (storageLocationRepository.existsByWarehouseIdAndCodeAndIdNot(warehouseId, code, id))
             throw new ConflictException("Storage location code already exists in warehouse");
         var allocated =
