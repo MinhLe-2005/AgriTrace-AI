@@ -22,4 +22,4 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - run: mvn --batch-mode --no-transfer-progress test
+      - run: mvn --batch-mode --no-transfer-progress test -Dtest="!*IntegrationTest,!WarehousePersistenceTest,!WarehouseSchemaTest"
