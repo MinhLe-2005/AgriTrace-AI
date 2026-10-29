@@ -5,6 +5,7 @@ import com.example.myfullstackapp.controller.OutboundReceiptController;
 import com.example.myfullstackapp.controller.StockReservationController;
 import com.example.myfullstackapp.controller.StorageLocationController;
 import com.example.myfullstackapp.controller.WarehouseController;
+import com.example.myfullstackapp.controller.WarehouseHeatmapController;
 import com.example.myfullstackapp.controller.WarehouseMonitoringController;
 import com.example.myfullstackapp.controller.WarehouseQualityController;
 import com.example.myfullstackapp.controller.WarehouseRiskController;
@@ -25,6 +26,7 @@ import java.util.List;
 @RestControllerAdvice(
         assignableTypes = {
             WarehouseController.class,
+            WarehouseHeatmapController.class,
             StorageLocationController.class,
             InboundReceiptController.class,
             OutboundReceiptController.class,

@@ -17,6 +17,7 @@ import {
   WarehouseLiveBadge,
 } from "./warehouse-monitoring-panel";
 import { useWarehouseLive } from "./use-warehouse-live";
+import { WarehouseHeatmapPanel } from "./warehouse-heatmap";
 import type {
   DocumentType,
   WarehouseDocument,
@@ -41,6 +42,7 @@ const tabs = [
   "FEFO & giữ hàng",
   "Cảnh báo",
   "Giám sát",
+  "Sơ đồ kho",
   "Nhật ký",
 ] as const;
 const quantity = (value?: number) =>
@@ -506,6 +508,9 @@ export function WarehouseManager() {
             ))}
           </nav>
           {tab !== "Giám sát" && <WarehouseLiveBadge status={liveStatus} />}
+          {tab === "Sơ đồ kho" && (
+            <WarehouseHeatmapPanel key={id} warehouseId={id} />
+          )}
           {tab === "Giám sát" && (
             <WarehouseMonitoringPanel
               key={id}

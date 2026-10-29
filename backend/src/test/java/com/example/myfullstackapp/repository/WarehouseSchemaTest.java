@@ -39,6 +39,8 @@ class WarehouseSchemaTest {
             statement.execute(Files.readString(Path.of("../docs/warehouse/P06_schema.sql")));
             statement.execute(
                     Files.readString(Path.of("../docs/warehouse/P08_monitoring_schema.sql")));
+            statement.execute(
+                    Files.readString(Path.of("../docs/warehouse/P09_heatmap_schema.sql")));
             try (var rows =
                     statement.executeQuery(
                             "select count(*) from information_schema.tables where"
