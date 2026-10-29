@@ -122,7 +122,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
         const session = await authService.login({ email: values.email, password: values.password });
         setSession(session);
         toast.success(`Đăng nhập thành công! Chào mừng ${session.user.name}`);
-        router.replace("/");
+        // Giữ luồng đăng nhập hiện có cho các vai trò khác, đồng thời đưa Distributor
+        // trực tiếp vào khu vực điều phối để không phải đi qua trang chủ.
+        router.replace(session.user.roles.includes("DISTRIBUTOR") ? "/dashboard/distributor" : "/");
       } catch (error) {
         toast.error(getApiErrorMessage(error));
       }

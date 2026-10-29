@@ -27,6 +27,11 @@ public class OrderController {
             @RequestParam(required = false) String email,
             Authentication authentication
     ) {
+        // Distributor/Admin need the operational order queue; preserve the
+        // customer behavior below for all other authenticated callers.
+        if (email == null && canManageDistribution(authentication)) {
+            return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
+        }
         String targetEmail = email;
         if (targetEmail == null && authentication != null) {
             targetEmail = authentication.getName();
@@ -35,6 +40,12 @@ public class OrderController {
             return ResponseEntity.ok(orderRepository.findByUserEmailOrderByCreatedAtDesc(targetEmail));
         }
         return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
+    }
+
+    private boolean canManageDistribution(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream().anyMatch(authority ->
+                "ROLE_DISTRIBUTOR".equals(authority.getAuthority()) || "ROLE_ADMIN".equals(authority.getAuthority())
+        );
     }
 
     @GetMapping("/{orderCode}")

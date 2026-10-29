@@ -1,6 +1,7 @@
 package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.auth.*;
+import com.example.myfullstackapp.dto.user.UserResponse;
 import com.example.myfullstackapp.entity.Role;
 import com.example.myfullstackapp.entity.RoleName;
 import com.example.myfullstackapp.entity.User;
@@ -69,8 +70,11 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(ChangePasswordRequest request) {
+    public void changePassword(String authenticatedEmail, ChangePasswordRequest request) {
         String email = normalizedEmail(request.email());
+        if (!email.equals(normalizedEmail(authenticatedEmail))) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn chỉ có thể đổi mật khẩu của chính mình");
+        }
         User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản"));
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
@@ -80,9 +84,22 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    @Transactional
+    public UserResponse updateProfile(String authenticatedEmail, UpdateProfileRequest request) {
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail(authenticatedEmail))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản"));
+        user.setFullName(request.fullName().trim());
+        user.setPhone(optionalText(request.phone()));
+        user.setCompanyName(optionalText(request.companyName()));
+        user.setAddress(optionalText(request.address()));
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
     private AuthResponse response(RefreshTokenService.TokenPair tokens) {
         return new AuthResponse(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), userMapper.toResponse(tokens.user()));
     }
 
     private String normalizedEmail(String email) { return email.trim().toLowerCase(Locale.ROOT); }
+
+    private String optionalText(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 }

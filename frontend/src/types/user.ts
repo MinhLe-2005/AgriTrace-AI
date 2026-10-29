@@ -13,6 +13,9 @@ export interface User {
   email: string;
   roles: UserRole[];
   avatarUrl?: string;
+  phone?: string;
+  companyName?: string;
+  address?: string;
   createdAt?: string;
   updatedAt?: string;
 }

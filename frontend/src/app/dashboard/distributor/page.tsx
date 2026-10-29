@@ -2,18 +2,23 @@
 
 import {
   CheckCircle2,
+  ClipboardList,
   Clock,
+  History,
   MapPin,
+  PackageCheck,
   QrCode,
+  Settings,
   Thermometer,
   Truck,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { distributorService } from "@/services/distributor.service";
 import { toast } from "@/stores/toast-store";
 
 export default function DistributorPortalPage() {
-  const [shipments, setShipments] = useState([
+  const [shipments] = useState([
     {
       code: "SHIP-9021",
       driver: "Lê Hoàng Long",
@@ -40,6 +45,19 @@ export default function DistributorPortalPage() {
     },
   ]);
 
+  const activeShipmentCount = shipments.filter((shipment) => shipment.status === "Đang vận chuyển").length;
+  const completedShipmentCount = shipments.filter((shipment) => shipment.status === "Đã giao thành công").length;
+  const [dashboardStats, setDashboardStats] = useState({
+    activeShipments: activeShipmentCount,
+    preparingShipments: 0,
+    deliveredToday: completedShipmentCount,
+    pendingReceipts: 1,
+  });
+
+  useEffect(() => {
+    distributorService.getDashboard().then(setDashboardStats).catch(() => undefined);
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Module Banner */}
@@ -61,12 +79,29 @@ export default function DistributorPortalPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => toast.success("Đang mở camera quét QR bàn giao đơn...")}
+        <Link
+          href="/dashboard/distributor/receive"
+          onClick={() => toast.success("Mở màn hình quét QR tiếp nhận hàng...")}
           className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-amber-950 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
         >
           <QrCode size={15} /> Quét QR Bàn Giao Hàng
-        </button>
+        </Link>
+      </div>
+
+      {/* Tổng quan nghiệp vụ Distributor - bổ sung, giữ nguyên phần danh sách chuyến cũ bên dưới */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Link href="/dashboard/distributor/orders" className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs hover:border-amber-200 hover:shadow-sm transition-all">
+          <div className="flex items-start justify-between"><div><p className="text-[10px] uppercase font-bold tracking-wide text-gray-400">Đơn cần theo dõi</p><p className="text-2xl font-extrabold text-gray-900 mt-1">{shipments.length}</p><p className="text-[11px] text-gray-500 mt-1">Danh sách đơn phân phối</p></div><span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 border border-amber-100 flex items-center justify-center"><ClipboardList size={18} /></span></div>
+        </Link>
+        <Link href="/dashboard/distributor/shipments" className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs hover:border-amber-200 hover:shadow-sm transition-all">
+          <div className="flex items-start justify-between"><div><p className="text-[10px] uppercase font-bold tracking-wide text-gray-400">Đang vận chuyển</p><p className="text-2xl font-extrabold text-gray-900 mt-1">{dashboardStats.activeShipments}</p><p className="text-[11px] text-gray-500 mt-1">Xe lạnh đang trên lộ trình</p></div><span className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center"><Truck size={18} /></span></div>
+        </Link>
+        <Link href="/dashboard/distributor/history" className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs hover:border-amber-200 hover:shadow-sm transition-all">
+          <div className="flex items-start justify-between"><div><p className="text-[10px] uppercase font-bold tracking-wide text-gray-400">Đã giao hôm nay</p><p className="text-2xl font-extrabold text-gray-900 mt-1">{dashboardStats.deliveredToday}</p><p className="text-[11px] text-gray-500 mt-1">Xem lịch sử vận chuyển</p></div><span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center"><CheckCircle2 size={18} /></span></div>
+        </Link>
+        <Link href="/dashboard/distributor/receive" className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs hover:border-amber-200 hover:shadow-sm transition-all">
+          <div className="flex items-start justify-between"><div><p className="text-[10px] uppercase font-bold tracking-wide text-gray-400">Tiếp nhận QR</p><p className="text-2xl font-extrabold text-gray-900 mt-1">{dashboardStats.pendingReceipts}</p><p className="text-[11px] text-gray-500 mt-1">Chuyến chờ xác nhận</p></div><span className="w-9 h-9 rounded-xl bg-violet-50 text-violet-700 border border-violet-100 flex items-center justify-center"><PackageCheck size={18} /></span></div>
+        </Link>
       </div>
 
       {/* Shipment Orders */}
@@ -120,6 +155,13 @@ export default function DistributorPortalPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-bold text-gray-500 mr-1">Truy cập nhanh:</span>
+        <Link href="/dashboard/distributor/shipments" className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 font-semibold hover:border-amber-300 hover:text-amber-800">Quản lý chuyến</Link>
+        <Link href="/dashboard/distributor/history" className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 font-semibold hover:border-amber-300 hover:text-amber-800 inline-flex items-center gap-1"><History size={13} /> Lịch sử</Link>
+        <Link href="/dashboard/distributor/settings" className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 font-semibold hover:border-amber-300 hover:text-amber-800 inline-flex items-center gap-1"><Settings size={13} /> Cài đặt</Link>
       </div>
     </div>
   );
