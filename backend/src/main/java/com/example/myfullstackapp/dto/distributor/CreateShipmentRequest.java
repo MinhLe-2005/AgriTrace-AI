@@ -1,5 +1,7 @@
 package com.example.myfullstackapp.dto.distributor;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -15,7 +17,8 @@ public record CreateShipmentRequest(
         @NotBlank @Size(max = 255) String destination,
         @NotBlank @Size(max = 500) String productSummary,
         @Size(max = 64) String lotCode,
-        Double temperatureC,
+        @DecimalMin(value = "-10.0", message = "Nhiệt độ phải từ -10 đến 40°C")
+        @DecimalMax(value = "40.0", message = "Nhiệt độ phải từ -10 đến 40°C") Double temperatureC,
         String dispatchTime,
         String estimatedArrival
 ) { }

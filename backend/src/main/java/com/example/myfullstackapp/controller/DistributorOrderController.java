@@ -41,8 +41,13 @@ public class DistributorOrderController {
         List<String> allowedStatuses = statuses.isEmpty() ? OPERATIONAL_STATUSES : statuses;
         boolean isAdmin = isAdmin(authentication);
         Set<String> assignedCodes = assignedOrderCodes(actor(authentication), isAdmin);
+        Set<String> allAssignedCodes = isAdmin ? Set.of() : allAssignedOrderCodes();
         List<Order> matchingOrders = orderRepository.findAllByOrderByCreatedAtDesc().stream()
-                .filter(order -> isAdmin || assignedCodes.contains(order.getOrderCode()))
+                // An unassigned operational order must be visible so a Distributor can
+                // create its first shipment. Once assigned, only that Distributor (or
+                // an Admin) can see it.
+                .filter(order -> isAdmin || assignedCodes.contains(order.getOrderCode())
+                        || !allAssignedCodes.contains(order.getOrderCode()))
                 .filter(order -> allowedStatuses.contains(order.getStatus()))
                 .toList();
         int totalElements = matchingOrders.size();
@@ -58,7 +63,9 @@ public class DistributorOrderController {
     @GetMapping("/{orderId}")
     public ApiResponse<Order> detail(@PathVariable String orderId, Authentication authentication) {
         Order order = findOrder(orderId);
-        if (!isAdmin(authentication) && !assignedOrderCodes(actor(authentication), false).contains(order.getOrderCode())) {
+        if (!isAdmin(authentication)
+                && !assignedOrderCodes(actor(authentication), false).contains(order.getOrderCode())
+                && allAssignedOrderCodes().contains(order.getOrderCode())) {
             throw new AccessDeniedException("Đơn hàng này chưa được gán cho bạn");
         }
         return ApiResponse.ok("Distributor order retrieved", order);
@@ -86,6 +93,16 @@ public class DistributorOrderController {
     private Set<String> assignedOrderCodes(String actorEmail, boolean isAdmin) {
         if (isAdmin) return Set.of();
         return shipmentRepository.findByDistributorEmailIgnoreCaseOrderByCreatedAtDesc(actorEmail).stream()
+                .map(shipment -> shipment.getOrderCodes())
+                .filter(value -> value != null && !value.isBlank())
+                .flatMap(value -> Arrays.stream(value.split(",")))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private Set<String> allAssignedOrderCodes() {
+        return shipmentRepository.findAll().stream()
                 .map(shipment -> shipment.getOrderCodes())
                 .filter(value -> value != null && !value.isBlank())
                 .flatMap(value -> Arrays.stream(value.split(",")))

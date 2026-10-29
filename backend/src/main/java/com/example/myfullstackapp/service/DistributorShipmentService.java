@@ -9,6 +9,7 @@ import com.example.myfullstackapp.exception.ResourceNotFoundException;
 import com.example.myfullstackapp.repository.ShipmentReceiptRepository;
 import com.example.myfullstackapp.repository.ShipmentRepository;
 import com.example.myfullstackapp.repository.ShipmentTrackingEventRepository;
+import com.example.myfullstackapp.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class DistributorShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final ShipmentTrackingEventRepository trackingEventRepository;
     private final ShipmentReceiptRepository shipmentReceiptRepository;
+    private final OrderRepository orderRepository;
 
     @Transactional(readOnly = true)
     public DistributorDashboardResponse dashboard(String actorEmail, boolean isAdmin) {
@@ -63,6 +65,7 @@ public class DistributorShipmentService {
     public List<ShipmentResponse> history(String actorEmail, boolean isAdmin) {
         return visibleShipments(actorEmail, isAdmin, null).stream()
                 .filter(shipment -> "DELIVERED".equals(shipment.getStatus()) || "RECEIVED".equals(shipment.getStatus()))
+                .sorted(Comparator.comparing(Shipment::getActualArrival, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::toResponse)
                 .toList();
     }
@@ -136,8 +139,11 @@ public class DistributorShipmentService {
         Instant now = Instant.now();
         shipment.setStatus(status);
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
+        Instant actualArrival = parseInstant(request.actualArrival());
+        if (actualArrival != null) shipment.setActualArrival(actualArrival);
         if (("DELIVERED".equals(status) || "RECEIVED".equals(status)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
-        recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(), status, optionalText(request.note()), now);
+        recordEvent(shipment, Optional.ofNullable(optionalText(request.location())).orElse(shipment.getDestination()), request.temperatureC(), request.humidityPercent(), status, optionalText(request.note()), now);
+        synchronizeOrderStatuses(shipment, status);
         return toResponse(shipment);
     }
 
@@ -153,6 +159,7 @@ public class DistributorShipmentService {
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
         if (("DELIVERED".equals(eventStatus) || "RECEIVED".equals(eventStatus)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
         recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(), eventStatus, optionalText(request.note()), now);
+        synchronizeOrderStatuses(shipment, eventStatus);
         return toResponse(shipment);
     }
 
@@ -170,10 +177,12 @@ public class DistributorShipmentService {
         receipt.setReceivedAt(receivedAt);
         shipmentReceiptRepository.save(receipt);
 
+        assertStatusTransition(shipment.getStatus(), "RECEIVED");
         shipment.setStatus("RECEIVED");
         if (shipment.getActualArrival() == null) shipment.setActualArrival(receivedAt);
         recordEvent(shipment, shipment.getDestination(), shipment.getTemperatureC(), null, "RECEIVED",
                 "Tiếp nhận QR bởi " + receipt.getReceiverName() + (receipt.getNote() == null ? "" : ": " + receipt.getNote()), receivedAt);
+        synchronizeOrderStatuses(shipment, "RECEIVED");
         return toResponse(shipment);
     }
 
@@ -209,6 +218,21 @@ public class DistributorShipmentService {
                 .note(note)
                 .eventTime(eventTime)
                 .build());
+    }
+
+    /** Keeps the existing order table in sync without changing its schema. */
+    private void synchronizeOrderStatuses(Shipment shipment, String shipmentStatus) {
+        String orderStatus = switch (shipmentStatus) {
+            case "IN_TRANSIT" -> "SHIPPING";
+            case "DELIVERED", "RECEIVED" -> "DELIVERED";
+            default -> null;
+        };
+        if (orderStatus == null) return;
+        splitCodes(shipment.getOrderCodes()).forEach(orderCode -> orderRepository.findByOrderCode(orderCode)
+                .ifPresent(order -> {
+                    order.setStatus(orderStatus);
+                    orderRepository.save(order);
+                }));
     }
 
     private ShipmentResponse toResponse(Shipment shipment) {
