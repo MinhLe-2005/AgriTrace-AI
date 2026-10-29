@@ -6,6 +6,7 @@ import com.example.myfullstackapp.controller.StockReservationController;
 import com.example.myfullstackapp.controller.StorageLocationController;
 import com.example.myfullstackapp.controller.WarehouseController;
 import com.example.myfullstackapp.controller.WarehouseQualityController;
+import com.example.myfullstackapp.controller.WarehouseRiskController;
 import com.example.myfullstackapp.dto.ApiError;
 
 import org.springframework.core.Ordered;
@@ -26,7 +27,8 @@ import java.util.List;
             InboundReceiptController.class,
             OutboundReceiptController.class,
             StockReservationController.class,
-            WarehouseQualityController.class
+            WarehouseQualityController.class,
+            WarehouseRiskController.class
         })
 public class WarehouseExceptionHandler {
     @ExceptionHandler(ConflictException.class)
