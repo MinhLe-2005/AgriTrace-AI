@@ -23,6 +23,7 @@ $warehouseDumpArgs = @('--format=custom', '--no-owner', '--no-privileges',
     '--table=public.wh_monitoring_settings', '--table=public.wh_sensor_devices',
     '--table=public.wh_sensor_readings', '--table=public.wh_monitoring_rules', '--table=public.wh_alert_deliveries',
     '--table=public.wh_monitor_rule_revisions',
+    '--table=public.wh_location_layouts',
     "--file=$OutputFile")
 & pg_dump @warehouseDumpArgs
 if ($LASTEXITCODE -ne 0) {
