@@ -59,6 +59,10 @@ Tạo vị trí dùng `code`, `name`, `capacityTons`, `tempTargetC` và
 
 ## Kiểm thử trên source ổ D
 
+Cập nhật khi tích hợp P02: cả 5 test PostgreSQL P01 đã chạy đạt trên PostgreSQL
+16.15 tạm. Toàn bộ suite sau P02 có 67 test đạt, 0 lỗi, 0 skipped.
+Kết quả 41 đạt/5 skipped bên dưới là lần chạy P01 trước khi chuẩn bị runtime DB.
+
 Java 21.0.10, Maven 3.9.15: clean test BUILD SUCCESS.
 46 test: **41 đạt, 5 skipped**, 0 thất bại, 0 lỗi.
 

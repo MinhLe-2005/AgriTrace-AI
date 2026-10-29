@@ -21,17 +21,20 @@ import java.util.UUID;
 class StorageLocationServiceTest {
     private final WarehouseRepository warehouses = mock(WarehouseRepository.class);
     private final StorageLocationRepository locations = mock(StorageLocationRepository.class);
+    private final StockBalanceRepository stockBalances = mock(StockBalanceRepository.class);
     private final StorageLocationService service =
             new StorageLocationService(
                     warehouses,
                     locations,
                     Mappers.getMapper(StorageLocationMapper.class),
-                    new CapacityValidationService());
+                    new CapacityValidationService(),
+                    stockBalances);
     private Warehouse warehouse;
     private StorageLocation location;
 
     @BeforeEach
     void setUp() {
+        when(stockBalances.sumQuantityByLocation(any())).thenReturn(BigDecimal.ZERO);
         warehouse = Warehouse.builder().capacityTons(new BigDecimal("10.00")).build();
         location =
                 StorageLocation.builder()
@@ -82,6 +85,16 @@ class StorageLocationServiceTest {
     void replacementCapacityExcludesOldAllocation() {
         var response = service.update(warehouse.getId(), location.getId(), updateRequest("5.00"));
         assertEquals(new BigDecimal("5.00"), response.capacityTons());
+    }
+
+    @Test
+    void rejectsCapacityBelowPhysicalStock() {
+        when(stockBalances.sumQuantityByLocation(location.getId()))
+                .thenReturn(new BigDecimal("2000"));
+        assertThrows(
+                ConflictException.class,
+                () -> service.update(warehouse.getId(), location.getId(), updateRequest("1.00")));
+        verify(locations, never()).saveAndFlush(any());
     }
 
     @Test
