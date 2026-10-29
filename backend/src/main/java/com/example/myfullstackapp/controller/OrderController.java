@@ -87,26 +87,20 @@ public class OrderController {
             initialStatus = "PENDING_PAYMENT";
         }
 
-        // Recalculate subtotal
-        long subtotal = 0L;
-        List<OrderItem> items = new ArrayList<>();
-        if (req.getItems() != null) {
+        // Subtotal calculation: prioritize accurate subtotal from request
+        long subtotal = req.getSubtotal() != null ? req.getSubtotal() : 0L;
+        if (subtotal <= 0L && req.getItems() != null) {
             for (var itemDto : req.getItems()) {
                 long itemPrice = itemDto.getPrice() != null ? itemDto.getPrice() : 0L;
-                int qtyNum = 1;
-                try {
-                    qtyNum = Integer.parseInt(itemDto.getQty().replaceAll("[^0-9]", ""));
-                } catch (Exception ignored) {}
-                subtotal += (itemPrice * qtyNum);
+                subtotal += itemPrice;
             }
         }
-        if (subtotal == 0L && req.getSubtotal() != null) {
-            subtotal = req.getSubtotal();
-        }
 
-        long shippingFee = req.getShippingFee() != null ? req.getShippingFee() : 25000L;
+        long shippingFee = req.getShippingFee() != null ? req.getShippingFee() : 0L;
         long discount = req.getDiscount() != null ? req.getDiscount() : 0L;
-        long total = Math.max(0L, subtotal + shippingFee - discount);
+        long total = (req.getTotal() != null && req.getTotal() > 0L)
+                ? req.getTotal()
+                : Math.max(0L, subtotal + shippingFee - discount);
         int points = (int) (total / 10000L); // 1 point for every 10k VND
 
         Order order = Order.builder()
@@ -203,11 +197,7 @@ public class OrderController {
     private void deductProductStock(String productName, String qtyStr) {
         if (productName == null) return;
         try {
-            int qty = 1;
-            try {
-                qty = Integer.parseInt(qtyStr.replaceAll("[^0-9]", ""));
-            } catch (Exception ignored) {}
-
+            int qty = parseQuantity(qtyStr);
             List<Product> products = productRepository.findAll();
             for (Product p : products) {
                 if (productName.equalsIgnoreCase(p.getName()) && p.getStockLeft() != null) {
@@ -224,11 +214,7 @@ public class OrderController {
     private void restoreProductStock(String productName, String qtyStr) {
         if (productName == null) return;
         try {
-            int qty = 1;
-            try {
-                qty = Integer.parseInt(qtyStr.replaceAll("[^0-9]", ""));
-            } catch (Exception ignored) {}
-
+            int qty = parseQuantity(qtyStr);
             List<Product> products = productRepository.findAll();
             for (Product p : products) {
                 if (productName.equalsIgnoreCase(p.getName()) && p.getStockLeft() != null) {
@@ -239,6 +225,16 @@ public class OrderController {
             }
         } catch (Exception e) {
             log.warn("Could not restore stock for {}: {}", productName, e.getMessage());
+        }
+    }
+
+    private int parseQuantity(String qtyStr) {
+        if (qtyStr == null || qtyStr.isBlank()) return 1;
+        try {
+            String firstToken = qtyStr.trim().split("\\s+")[0];
+            return Math.max(1, Integer.parseInt(firstToken.replaceAll("[^0-9]", "")));
+        } catch (Exception e) {
+            return 1;
         }
     }
 }
