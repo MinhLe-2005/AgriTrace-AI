@@ -125,11 +125,14 @@ function ProductsContent() {
   const filteredAndSorted = useMemo(() => {
     const result = products.filter((p) => {
       // 1. Category
+      const pCat = (p.categoryCode || "").toLowerCase().replace(/_/g, "-");
+      const fCat = (filterCategory || "").toLowerCase().replace(/_/g, "-");
       const matchCat =
         filterCategory === "all" ||
         p.categoryCode === filterCategory ||
-        (filterCategory === "seasonal" && p.categoryCode === "trai-cay") ||
-        (filterCategory === "daily" && (p.categoryCode === "rau" || p.categoryCode === "cu-qua"));
+        pCat === fCat ||
+        (filterCategory === "seasonal" && (pCat.includes("trai") || pCat.includes("cay"))) ||
+        (filterCategory === "daily" && (pCat.includes("rau") || pCat.includes("cu")));
       if (!matchCat) return false;
 
       // 2. Search query
