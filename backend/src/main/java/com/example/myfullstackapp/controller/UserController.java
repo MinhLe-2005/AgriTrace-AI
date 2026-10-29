@@ -4,11 +4,13 @@ import com.example.myfullstackapp.dto.ApiResponse;
 import com.example.myfullstackapp.dto.user.UserCreateRequest;
 import com.example.myfullstackapp.dto.user.UserResponse;
 import com.example.myfullstackapp.dto.user.UserUpdateRequest;
+import com.example.myfullstackapp.security.AppUserDetails;
 import com.example.myfullstackapp.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -38,11 +40,14 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<UserResponse> update(@PathVariable UUID id, @Valid @RequestBody UserUpdateRequest request) {
-        return ApiResponse.ok("User updated", userService.update(id, request));
+    public ApiResponse<UserResponse> update(@PathVariable UUID id, @Valid @RequestBody UserUpdateRequest request,
+                                             @AuthenticationPrincipal AppUserDetails principal) {
+        return ApiResponse.ok("User updated", userService.update(id, request, principal.getId()));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID id) { userService.delete(id); }
+    public void delete(@PathVariable UUID id, @AuthenticationPrincipal AppUserDetails principal) {
+        userService.delete(id, principal.getId());
+    }
 }
