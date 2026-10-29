@@ -1,4 +1,4 @@
-﻿package com.example.myfullstackapp.service;
+package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.verification.*;
 import com.example.myfullstackapp.entity.*;
@@ -65,4 +65,3 @@ public class VerificationService {
         return new VerificationResponse(request.getId(), subject.getId(), subject.getEmail(), subject.getFullName(), request.getType(), request.getStatus(), request.getOrganizationName(), request.getDocumentType(), request.getDocumentUrl(), request.getNote(), request.getDecisionReason(), request.getCreatedAt(), request.getReviewedAt());
     }
 }
-

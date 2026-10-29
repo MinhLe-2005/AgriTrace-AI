@@ -1,4 +1,4 @@
-﻿package com.example.myfullstackapp.service;
+package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.entity.VerificationStatus;
 import com.example.myfullstackapp.entity.VerificationType;
