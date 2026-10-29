@@ -261,7 +261,7 @@ function ProductsContent() {
       },
       qty
     );
-    router.push("/cart?step=2");
+    router.push("/cart");
   }
 
   // Sidebar Filter Component

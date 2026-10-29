@@ -157,7 +157,7 @@ function CartContent() {
   const voucherDiscount = (selectedDiscountVoucher ? selectedDiscountVoucher.discount : 0) + (isFreeship ? baseShippingFee : 0);
   const shippingFee = isFreeship ? 0 : baseShippingFee;
   const total = Math.max(0, subtotal + (isFreeship ? 0 : baseShippingFee) - (selectedDiscountVoucher ? selectedDiscountVoucher.discount : 0));
-  const pointsEarned = Math.floor(total / 10000) * 1.5;
+  const pointsEarned = Math.max(10, Math.round(total / 5000));
 
   function handleApplyCustomVoucher(e: React.FormEvent) {
     e.preventDefault();
@@ -1054,7 +1054,7 @@ function CartContent() {
               {/* Action buttons */}
               <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
-                  href={`/dashboard/customer?tab=orders&order=AGRI-8841`}
+                  href={`/dashboard/customer?tab=orders&order=${completedOrderId || ""}`}
                   className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors shadow-xs"
                 >
                   Xem đơn hàng trong tài khoản →

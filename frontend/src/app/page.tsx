@@ -130,7 +130,7 @@ export default function HomePage() {
       },
       modalQty || 1
     );
-    router.push("/cart?step=2");
+    router.push("/cart");
   }
 
   function handleCopyVoucher(code: string) {
@@ -918,7 +918,7 @@ export default function HomePage() {
                       },
                       modalQty
                     );
-                    router.push("/cart?step=2");
+                    router.push("/cart");
                   }}
                   className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-colors flex items-center gap-1"
                 >

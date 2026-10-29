@@ -33,11 +33,33 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         String email = normalizedEmail(request.email());
-        if (userRepository.existsByEmailIgnoreCase(email)) throw new ConflictException("An account with this email already exists");
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new ConflictException("Email này đã được đăng ký tài khoản");
+        }
+
+        String username = request.username() != null && !request.username().isBlank()
+                ? request.username().trim().toLowerCase(Locale.ROOT)
+                : null;
+        if (username != null && userRepository.existsByUsernameIgnoreCase(username)) {
+            throw new ConflictException("Tên người dùng @" + username + " đã được sử dụng");
+        }
+
+        String phone = request.phone() != null && !request.phone().isBlank()
+                ? request.phone().trim()
+                : null;
+
         Role userRole = roleRepository.findByName(RoleName.USER)
                 .orElseThrow(() -> new ResourceNotFoundException("Default USER role is missing"));
-        User user = userRepository.save(User.builder().email(email).fullName(request.fullName().trim())
-                .passwordHash(passwordEncoder.encode(request.password())).roles(Set.of(userRole)).build());
+
+        User user = userRepository.save(User.builder()
+                .email(email)
+                .username(username)
+                .phone(phone)
+                .fullName(request.fullName().trim())
+                .passwordHash(passwordEncoder.encode(request.password()))
+                .roles(Set.of(userRole))
+                .build());
+
         return response(refreshTokenService.issue(user));
     }
 
@@ -47,10 +69,8 @@ public class AuthService {
         String email = userRepository.findByEmailIgnoreCase(identifier)
                 .map(User::getEmail)
                 .orElseGet(() -> {
-                    if (!identifier.contains("@")) {
-                        var matches = userRepository.findByIdentifier(identifier);
-                        if (!matches.isEmpty()) return matches.get(0).getEmail();
-                    }
+                    var matches = userRepository.findByIdentifier(identifier);
+                    if (!matches.isEmpty()) return matches.get(0).getEmail();
                     return identifier;
                 });
 
@@ -88,7 +108,7 @@ public class AuthService {
         User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản"));
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Mật khẩu hiện tại không chính xác!");
+            throw new IllegalArgumentException("Mật khẩu hiện tại không chính xác");
         }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
@@ -112,11 +132,21 @@ public class AuthService {
         return userMapper.toResponse(user);
     }
 
-    private AuthResponse response(RefreshTokenService.TokenPair tokens) {
-        return new AuthResponse(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), userMapper.toResponse(tokens.user()));
+    private String normalizedEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private String normalizedEmail(String email) { return email.trim().toLowerCase(Locale.ROOT); }
+    private String optionalText(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
 
-    private String optionalText(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+    private AuthResponse response(RefreshTokenService.TokenPair tokens) {
+        return new AuthResponse(
+                tokens.accessToken(),
+                tokens.refreshToken(),
+                "Bearer",
+                tokens.expiresIn(),
+                userMapper.toResponse(tokens.user())
+        );
+    }
 }

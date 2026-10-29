@@ -316,6 +316,7 @@ function CustomerDashboardContent() {
   // Live Supabase data
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [savedVouchers, setSavedVouchers] = useState<SavedVoucher[]>(mockSavedVouchers);
+  const totalLoyaltyPoints = orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
 
   useEffect(() => {
     async function loadSupabaseCustomerData() {
@@ -347,7 +348,7 @@ function CustomerDashboardContent() {
               cancelReason: o.cancelReason,
               paymentMethod: o.paymentMethod,
               paymentRef: o.paymentRef,
-              items: o.items.map((it) => ({
+              items: (o.items || []).map((it) => ({
                 name: it.name,
                 origin: it.origin || "Nông Trại Xanh",
                 cert: it.cert || "VietGAP",
@@ -730,7 +731,7 @@ function CustomerDashboardContent() {
             className="text-center group transition-transform hover:-translate-y-0.5"
           >
             <div className="text-lg sm:text-xl font-extrabold text-amber-600 group-hover:text-amber-500">
-              248
+              {totalLoyaltyPoints}
             </div>
             <div className="text-xs text-gray-500">Điểm tích lũy</div>
           </button>
@@ -890,7 +891,7 @@ function CustomerDashboardContent() {
 
                 {/* Items */}
                 <div className="divide-y divide-gray-100 py-1 space-y-3">
-                  {order.items.map((item, idx) => (
+                  {(order.items || []).map((item, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between gap-4 pt-3 first:pt-0"
@@ -918,7 +919,7 @@ function CustomerDashboardContent() {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold text-gray-900">
-                          {item.price.toLocaleString("vi-VN")} đ
+                          {(item.price || 0).toLocaleString("vi-VN")} đ
                         </div>
                       </div>
                     </div>
@@ -936,7 +937,7 @@ function CustomerDashboardContent() {
                     <div className="text-right mr-2">
                       <span className="text-xs text-gray-400 mr-2">Tổng thanh toán:</span>
                       <span className="text-base font-extrabold text-emerald-800">
-                        {order.total.toLocaleString("vi-VN")} đ
+                        {(order.total || 0).toLocaleString("vi-VN")} đ
                       </span>
                     </div>
 
@@ -1599,7 +1600,7 @@ function CustomerDashboardContent() {
               </p>
             </div>
             <div className="text-right sm:text-right">
-              <div className="text-3xl font-black">248</div>
+              <div className="text-3xl font-black">{totalLoyaltyPoints}</div>
               <div className="text-xs text-amber-100 font-medium">Điểm khả dụng</div>
             </div>
           </div>
@@ -1724,10 +1725,10 @@ function CustomerDashboardContent() {
             {/* Items in order */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
-                Sản Phẩm Trong Đơn ({selectedOrder.items.length})
+                Sản Phẩm Trong Đơn ({(selectedOrder.items || []).length})
               </h4>
               <div className="divide-y divide-gray-100 border-t border-b border-gray-100 py-1">
-                {selectedOrder.items.map((it, i) => (
+                {(selectedOrder.items || []).map((it, i) => (
                   <div key={i} className="py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-100 shrink-0">
@@ -1751,7 +1752,7 @@ function CustomerDashboardContent() {
                       </div>
                     </div>
                     <div className="text-right text-xs font-bold text-gray-900">
-                      {it.price.toLocaleString("vi-VN")} đ
+                      {(it.price || 0).toLocaleString("vi-VN")} đ
                     </div>
                   </div>
                 ))}
@@ -1812,7 +1813,7 @@ function CustomerDashboardContent() {
               <div className="pt-2 border-t border-gray-200 flex items-center justify-between text-sm">
                 <span className="font-bold text-gray-900">Tổng thanh toán:</span>
                 <span className="text-base font-extrabold text-emerald-800">
-                  {selectedOrder.total.toLocaleString("vi-VN")} đ
+                  {(selectedOrder.total || 0).toLocaleString("vi-VN")} đ
                 </span>
               </div>
             </div>
