@@ -2,13 +2,18 @@
 
 import {
   Award,
+  ClipboardList,
   ChevronRight,
   Gift,
+  History,
   Home,
   Leaf,
   LogOut,
   Menu,
+  PackageCheck,
+  PackageSearch,
   QrCode,
+  Settings,
   Shield,
   ShoppingBag,
   ShoppingCart,
@@ -18,6 +23,7 @@ import {
   Users,
   Warehouse,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -31,8 +37,9 @@ import { toast } from "@/stores/toast-store";
 type NavItem = {
   href: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
   badge?: string;
+  matchPrefixes?: string[];
 };
 
 const customerNavigation: NavItem[] = [
@@ -56,8 +63,14 @@ const warehouseNavigation: NavItem[] = [
 ];
 
 const distributorNavigation: NavItem[] = [
-  { href: "/dashboard/distributor", label: "Đơn Hàng Vận Chuyển", icon: Truck },
-  { href: "/traceability", label: "Quét Mã Bàn Giao", icon: QrCode },
+  { href: "/dashboard/distributor", label: "Tổng Quan Vận Chuyển", icon: Truck },
+  { href: "/dashboard/distributor/orders", label: "Quản Lý Đơn Hàng", icon: ClipboardList, matchPrefixes: ["/dashboard/distributor/orders/"] },
+  { href: "/dashboard/distributor/shipments", label: "Quản Lý Vận Chuyển", icon: Truck, matchPrefixes: ["/dashboard/distributor/shipments/"] },
+  { href: "/dashboard/distributor/history", label: "Lịch Sử Vận Chuyển", icon: History },
+  { href: "/dashboard/distributor/receive", label: "Tiếp Nhận Hàng & QR", icon: PackageCheck },
+  { href: "/dashboard/distributor/products", label: "Sản Phẩm & Truy Xuất", icon: PackageSearch },
+  { href: "/dashboard/distributor/settings", label: "Cài Đặt Tài Khoản", icon: Settings },
+  { href: "/traceability", label: "Truy Xuất Mã QR Chung", icon: QrCode },
 ];
 
 const adminNavigation: NavItem[] = [
@@ -207,7 +220,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
 
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || item.matchPrefixes?.some((prefix) => pathname.startsWith(prefix));
             const Icon = item.icon;
             return (
               <Link

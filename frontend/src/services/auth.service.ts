@@ -6,8 +6,12 @@ import type { User } from "@/types/user";
 type BackendUser = Omit<User, "name"> & { fullName?: string; name?: string };
 type BackendAuthPayload = Omit<AuthPayload, "user"> & { user: BackendUser };
 
+function normalizeUser(user: BackendUser): User {
+  return { ...user, name: user.name ?? user.fullName ?? user.email };
+}
+
 function normalizeAuth(payload: BackendAuthPayload): AuthPayload {
-  return { ...payload, user: { ...payload.user, name: payload.user.name ?? payload.user.fullName ?? payload.user.email } };
+  return { ...payload, user: normalizeUser(payload.user) };
 }
 
 export const authService = {
@@ -43,5 +47,9 @@ export const authService = {
   async changePassword(payload: { email: string; currentPassword: string; newPassword: string }) {
     const { data } = await api.post<ApiResponse<void>>("/auth/change-password", payload);
     return unpack(data);
+  },
+  async updateProfile(payload: { fullName: string; phone?: string; companyName?: string; address?: string }) {
+    const { data } = await api.patch<ApiResponse<BackendUser>>("/auth/profile", payload);
+    return normalizeUser(unpack(data));
   }
 };

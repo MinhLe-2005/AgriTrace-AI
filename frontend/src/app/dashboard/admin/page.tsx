@@ -1,164 +1,183 @@
 "use client";
 
-import {
-  Activity,
-  AlertCircle,
-  CheckCircle2,
-  Lock,
-  Shield,
-  Unlock,
-  UserCheck,
-  Users,
-} from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
+import { Activity, Shield, UserCheck } from "lucide-react";
+import { useMemo } from "react";
+
+import { ErrorState, LoadingSkeleton } from "@/components/ui/states";
+import { useUsers } from "@/hooks/use-users";
+import { useVerificationMutations, useVerifications } from "@/hooks/use-verifications";
+import { getApiErrorMessage } from "@/lib/api";
 import { toast } from "@/stores/toast-store";
+import type { VerificationRequest } from "@/types/verification";
+
+function documentHref(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function submittedAt(value: string) {
+  return new Date(value).toLocaleString("vi-VN");
+}
 
 export default function AdminPortalPage() {
-  const [pendingAccounts, setPendingAccounts] = useState([
-    {
-      id: "usr-01",
-      name: "Nguyễn Văn Hùng",
-      email: "hung.dalat@farm.vn",
-      role: "FARMER",
-      farmName: "Nông Trại Xanh Đà Lạt",
-      certFile: "VietGAP_NTX_2024.pdf",
-      date: "14/10/2026",
-    },
-    {
-      id: "usr-02",
-      name: "Lê Hoàng Long",
-      email: "long.logistics@trans.vn",
-      role: "DISTRIBUTOR",
-      farmName: "Vận Tải Xanh Express",
-      certFile: "GiayPhep_VanTaiLanh.pdf",
-      date: "13/10/2026",
-    },
-  ]);
+  const users = useUsers();
+  const verifications = useVerifications();
+  const verificationMutations = useVerificationMutations();
+  const pendingRequests = useMemo(
+    () => verifications.data?.filter((request) => request.status === "PENDING" || request.status === "UNDER_REVIEW") ?? [],
+    [verifications.data]
+  );
+  const busy = verificationMutations.approve.isPending || verificationMutations.reject.isPending;
 
-  const auditLogs = [
-    { time: "14/10 16:45", user: "admin@agritrace.vn", action: "Cập nhật chính sách Voucher Hạng Vàng (-5%)" },
-    { time: "14/10 14:20", user: "admin@agritrace.vn", action: "Duyệt tài khoản Nông dân [FM-104]" },
-    { time: "14/10 11:05", user: "system_scheduler", action: "Xét hạng thành viên định kỳ (32 users thăng hạng)" },
-  ];
+  async function decide(request: VerificationRequest, decision: "approve" | "reject") {
+    const defaultReason = decision === "approve" ? "Hồ sơ hợp lệ." : "";
+    const reason = window.prompt(
+      decision === "approve" ? "Lý do phê duyệt:" : "Nhập lý do từ chối:",
+      defaultReason
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      toast.error("Vui lòng nhập lý do xử lý hồ sơ.");
+      return;
+    }
 
-  function approve(id: string, name: string) {
-    setPendingAccounts((prev) => prev.filter((a) => a.id !== id));
-    toast.success(`Đã phê duyệt và kích hoạt tài khoản "${name}" thành công!`);
+    try {
+      const input = { id: request.id, reason: reason.trim() };
+      if (decision === "approve") {
+        await verificationMutations.approve.mutateAsync(input);
+        toast.success(`Đã phê duyệt hồ sơ của ${request.subjectName}.`);
+      } else {
+        await verificationMutations.reject.mutateAsync(input);
+        toast.success(`Đã từ chối hồ sơ của ${request.subjectName}.`);
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
   }
+
+  const totalUsers = users.isPending ? "…" : users.isError ? "—" : (users.data?.length ?? 0).toLocaleString("vi-VN");
+  const lockedUsers = users.isPending ? "…" : users.isError ? "—" : (users.data?.filter((user) => !user.active).length ?? 0).toLocaleString("vi-VN");
+  const pendingCount = verifications.isPending ? "…" : verifications.isError ? "—" : pendingRequests.length.toLocaleString("vi-VN");
 
   return (
     <div className="space-y-6">
-      {/* Module Title Banner */}
-      <div className="bg-red-950 text-white p-5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-sm border border-red-900">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-800 flex items-center justify-center text-white">
-            <Shield size={22} />
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-red-900 bg-red-950 p-5 text-white shadow-sm">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-800">
+          <Shield size={22} />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold">Cổng Quản Trị Viên (Admin Portal)</h1>
+            <span className="rounded-full border border-red-400/30 bg-red-500/30 px-2 py-0.5 text-[11px] font-semibold text-red-300">
+              Toàn Hệ Thống
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold">Cổng Quản Trị Viên (Admin Portal)</h1>
-              <span className="text-[11px] bg-red-500/30 text-red-300 font-semibold px-2 py-0.5 rounded-full border border-red-400/30">
-                Toàn Hệ Thống
-              </span>
-            </div>
-            <p className="text-xs text-red-200/80">
-              Quản lý phân quyền 5 vai trò, xét duyệt tài khoản đối tác Nông dân / Nhà phân phối và nhật ký kiểm toán hệ thống
-            </p>
-          </div>
+          <p className="text-xs text-red-200/80">
+            Quản lý người dùng và xét duyệt hồ sơ xác minh đối tác.
+          </p>
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
           <div className="text-xs text-gray-500">Tổng tài khoản</div>
-          <div className="text-2xl font-black text-gray-900">1,248</div>
-          <div className="text-[11px] text-emerald-600 mt-1 font-semibold">+14 hôm nay</div>
+          <div className="text-2xl font-black text-gray-900">{totalUsers}</div>
+          {users.isError && <p className="mt-1 text-[11px] text-red-600">Không tải được dữ liệu người dùng.</p>}
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
           <div className="text-xs text-gray-500">Chờ duyệt xác minh</div>
-          <div className="text-2xl font-black text-amber-600">{pendingAccounts.length}</div>
-          <div className="text-[11px] text-amber-600 mt-1 font-semibold">Cần xử lý</div>
+          <div className="text-2xl font-black text-amber-600">{pendingCount}</div>
+          {verifications.isError && <p className="mt-1 text-[11px] text-red-600">Không tải được hồ sơ xác minh.</p>}
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
           <div className="text-xs text-gray-500">Tài khoản bị khóa</div>
-          <div className="text-2xl font-black text-red-600">3</div>
-          <div className="text-[11px] text-gray-400 mt-1">Vi phạm quy chế</div>
+          <div className="text-2xl font-black text-red-600">{lockedUsers}</div>
+          {users.isError && <p className="mt-1 text-[11px] text-red-600">Không tải được dữ liệu người dùng.</p>}
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
           <div className="text-xs text-gray-500">Nhật ký Audit 24h</div>
-          <div className="text-2xl font-black text-blue-600">89</div>
-          <div className="text-[11px] text-gray-400 mt-1">Ghi nhận đầy đủ</div>
+          <div className="text-2xl font-black text-blue-600">—</div>
+          <div className="mt-1 text-[11px] text-gray-400">Backend chưa có API audit log.</div>
         </div>
       </div>
 
-      {/* Pending Verifications */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
+        <div className="flex items-center justify-between border-b border-gray-100 p-4">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
             <UserCheck size={18} className="text-[#1a7a3a]" />
-            Duyệt Xác Minh Tài Khoản Nông Dân & Nhà Phân Phối ({pendingAccounts.length})
+            Hồ sơ xác minh đang chờ xử lý ({pendingCount})
           </h2>
-          <span className="text-xs text-gray-400">Yêu cầu xác thực giấy phép</span>
+          <span className="text-xs text-gray-400">Nông dân & Nhà phân phối</span>
         </div>
 
-        {pendingAccounts.length === 0 ? (
-          <div className="p-8 text-center text-xs text-gray-400">
-            Không còn tài khoản nào đang chờ phê duyệt.
-          </div>
+        {verifications.isPending ? (
+          <div className="p-4"><LoadingSkeleton rows={3} /></div>
+        ) : verifications.isError ? (
+          <div className="p-4"><ErrorState onRetry={() => verifications.refetch()} /></div>
+        ) : pendingRequests.length === 0 ? (
+          <div className="p-8 text-center text-xs text-gray-400">Không còn hồ sơ xác minh nào đang chờ xử lý.</div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {pendingAccounts.map((acc) => (
-              <div key={acc.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="font-bold text-sm text-gray-900">{acc.name}</div>
-                  <div className="text-xs text-gray-500">{acc.email} • {acc.farmName}</div>
-                  <div className="text-[11px] text-emerald-700 mt-1 flex items-center gap-2">
-                    <span>Hồ sơ đính kèm: <strong className="underline">{acc.certFile}</strong></span>
-                    <span>• Ngày gửi: {acc.date}</span>
+            {pendingRequests.map((request) => {
+              const href = documentHref(request.documentUrl);
+              return (
+                <article key={request.id} className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
+                  <div className="min-w-0">
+                    <div className="font-bold text-sm text-gray-900">{request.subjectName}</div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      {request.subjectEmail} · {request.organizationName} · {request.type}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600">
+                      Loại giấy tờ: {request.documentType} · Gửi lúc: {submittedAt(request.createdAt)}
+                    </div>
+                    {request.note && <p className="mt-1 break-words text-xs text-gray-600">Ghi chú: {request.note}</p>}
+                    <div className="mt-1 text-xs">
+                      Hồ sơ:{" "}
+                      {href ? (
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-emerald-700 underline">
+                          Mở tài liệu
+                        </a>
+                      ) : (
+                        <span className="break-all text-gray-500">{request.documentUrl}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => approve(acc.id, acc.name)}
-                    className="px-3 py-1.5 bg-[#1a7a3a] hover:bg-[#156e34] text-white text-xs font-semibold rounded-lg shadow-xs"
-                  >
-                    Duyệt Tài Khoản
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPendingAccounts((prev) => prev.filter((a) => a.id !== acc.id));
-                      toast.info(`Đã từ chối xác minh tài khoản ${acc.name}.`);
-                    }}
-                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg"
-                  >
-                    Từ Chối
-                  </button>
-                </div>
-              </div>
-            ))}
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void decide(request, "approve")}
+                      className="rounded-lg bg-[#1a7a3a] px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#156e34] disabled:opacity-50"
+                    >
+                      Duyệt
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void decide(request, "reject")}
+                      className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                    >
+                      Từ chối
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Audit Logs */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs p-4 space-y-3">
-        <h2 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+      <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
           <Activity size={18} className="text-blue-600" />
           Nhật Ký Thay Đổi Quan Trọng (Audit Log)
         </h2>
-        <div className="space-y-2">
-          {auditLogs.map((log, i) => (
-            <div key={i} className="p-2.5 rounded-xl bg-gray-50 flex items-center justify-between text-xs">
-              <span className="font-mono text-gray-500">{log.time}</span>
-              <span className="font-semibold text-gray-800">{log.action}</span>
-              <span className="text-gray-400 font-mono">{log.user}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+        <p className="text-xs text-gray-500">Chức năng nhật ký kiểm toán chưa được kết nối với backend; dữ liệu chưa khả dụng.</p>
+      </section>
     </div>
   );
 }

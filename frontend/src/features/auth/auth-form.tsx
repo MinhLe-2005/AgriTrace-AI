@@ -23,7 +23,8 @@ import {
   ArrowLeft,
   MailCheck,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Phone
 } from "lucide-react";
 
 import { getApiErrorMessage } from "@/lib/api";
@@ -37,6 +38,7 @@ type Mode = "login" | "register";
 type FormValues = {
   name: string;
   username: string;
+  phone: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -80,7 +82,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { name: "", username: "", email: "", password: "", confirmPassword: "" }
+    defaultValues: { name: "", username: "", phone: "", email: "", password: "", confirmPassword: "" }
   });
 
   const isLogin = mode === "login";
@@ -122,7 +124,21 @@ export function AuthForm({ mode }: { mode: Mode }) {
         const session = await authService.login({ email: values.email, password: values.password });
         setSession(session);
         toast.success(`Đăng nhập thành công! Chào mừng ${session.user.name}`);
-        router.replace("/");
+        // Giữ luồng đăng nhập hiện có cho các vai trò khác, đồng thời đưa Distributor
+        // trực tiếp vào khu vực điều phối để không phải đi qua trang chủ.
+        const roles = session.user.roles || [];
+        if (roles.includes("ADMIN")) {
+          router.replace("/dashboard/admin");
+        } else if (roles.includes("WAREHOUSE") || roles.includes("WAREHOUSE_STAFF")) {
+          router.replace("/dashboard/warehouse");
+        } else if (roles.includes("DISTRIBUTOR")) {
+          router.replace("/dashboard/distributor");
+        } else if (roles.includes("FARMER")) {
+          router.replace("/dashboard/farmer");
+        } else {
+          // Khách hàng / User thông thường -> chuyển về Trang chủ
+          router.replace("/");
+        }
       } catch (error) {
         toast.error(getApiErrorMessage(error));
       }
@@ -230,6 +246,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       const session = await authService.register({
         name: pendingData.name,
         username: pendingData.username,
+        phone: pendingData.phone,
         email: pendingData.email,
         password: pendingData.password,
         confirmPassword: pendingData.confirmPassword
@@ -436,6 +453,28 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 errors.username ? "border-rose-400 bg-rose-50/20" : "border-gray-200 hover:border-gray-300"
               )}
               {...register("username")}
+            />
+          </div>
+        </Field>
+      )}
+
+            {/* 2.5. Số điện thoại (Register only) */}
+      {!isLogin && (
+        <Field label="Số điện thoại liên hệ" error={errors.phone?.message}>
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
+              <Phone className="h-4 w-4" />
+            </div>
+            <input
+              type="tel"
+              autoComplete="tel"
+              placeholder="Ví dụ: 0988776655"
+              className={cn(
+                "w-full h-11 pl-10 pr-3.5 text-sm rounded-xl border bg-gray-50/60 text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200",
+                "focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10",
+                errors.phone ? "border-rose-400 bg-rose-50/20" : "border-gray-200 hover:border-gray-300"
+              )}
+              {...register("phone")}
             />
           </div>
         </Field>

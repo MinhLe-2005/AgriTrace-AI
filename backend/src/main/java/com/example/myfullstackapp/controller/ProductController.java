@@ -42,4 +42,22 @@ public class ProductController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PostMapping
+    public ResponseEntity<Product> createProduct(@RequestBody Product req) {
+        if (req.getId() == null || req.getId().isBlank()) {
+            req.setId("p_" + System.currentTimeMillis());
+        }
+        if (req.getOldPrice() == null) {
+            req.setOldPrice(req.getPrice());
+        }
+        Product saved = productRepository.save(req);
+        return ResponseEntity.ok(saved);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable String id) {
+        productRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
 }
