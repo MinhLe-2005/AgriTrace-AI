@@ -32,19 +32,15 @@ public class StorageLocationController {
 
     @GetMapping("/{id}")
     public ApiResponse<StorageLocationResponse> getById(
-            @PathVariable
-            UUID warehouseId, @PathVariable UUID id) {
+            @PathVariable UUID warehouseId, @PathVariable UUID id) {
         return ApiResponse.ok(
                 "Storage location retrieved", storageLocationService.getById(warehouseId, id));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<StorageLocationResponse>> create(
-            @PathVariable
-            UUID warehouseId,
-            @Valid
-            @RequestBody
-            StorageLocationCreateRequest request) {
+            @PathVariable UUID warehouseId,
+            @Valid @RequestBody StorageLocationCreateRequest request) {
         StorageLocationResponse location = storageLocationService.create(warehouseId, request);
         var uri =
                 ServletUriComponentsBuilder.fromCurrentRequest()
@@ -57,13 +53,9 @@ public class StorageLocationController {
 
     @PutMapping("/{id}")
     public ApiResponse<StorageLocationResponse> update(
-            @PathVariable
-            UUID warehouseId,
-            @PathVariable
-            UUID id,
-            @Valid
-            @RequestBody
-            StorageLocationUpdateRequest request) {
+            @PathVariable UUID warehouseId,
+            @PathVariable UUID id,
+            @Valid @RequestBody StorageLocationUpdateRequest request) {
         return ApiResponse.ok(
                 "Storage location updated",
                 storageLocationService.update(warehouseId, id, request));
@@ -71,13 +63,9 @@ public class StorageLocationController {
 
     @PutMapping("/{id}/status")
     public ApiResponse<StorageLocationResponse> setActive(
-            @PathVariable
-            UUID warehouseId,
-            @PathVariable
-            UUID id,
-            @Valid
-            @RequestBody
-            ActiveStatusRequest request) {
+            @PathVariable UUID warehouseId,
+            @PathVariable UUID id,
+            @Valid @RequestBody ActiveStatusRequest request) {
         return ApiResponse.ok(
                 "Storage location status updated",
                 storageLocationService.setActive(warehouseId, id, request.active()));

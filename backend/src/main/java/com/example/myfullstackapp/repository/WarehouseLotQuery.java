@@ -57,8 +57,8 @@ public class WarehouseLotQuery {
         } catch (DataAccessException ex) {
             throw new WarehouseIntegrationException(
                     "Farmer integration requires"
-                        + " agri_harvest_lots(id,product,code,expiry_date,qty,unit,status). No"
-                        + " Farmer table was created or changed.");
+                            + " agri_harvest_lots(id,product,code,expiry_date,qty,unit,status). No"
+                            + " Farmer table was created or changed.");
         }
     }
 
@@ -89,7 +89,7 @@ public class WarehouseLotQuery {
         } catch (DataAccessException ex) {
             throw new WarehouseIntegrationException(
                     "Farmer lot schema is not available. Integrate the Farmer module before"
-                        + " receiving stock.");
+                            + " receiving stock.");
         }
     }
 

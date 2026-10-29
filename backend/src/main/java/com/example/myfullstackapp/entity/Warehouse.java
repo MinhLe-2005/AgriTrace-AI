@@ -16,7 +16,7 @@ import java.util.UUID;
 @Check(
         constraints =
                 "capacity_tons > 0 AND temp_target_c BETWEEN -999.9 AND 999.9 AND humidity_target"
-                    + " BETWEEN 0 AND 100")
+                        + " BETWEEN 0 AND 100")
 @Getter
 @Setter
 @NoArgsConstructor

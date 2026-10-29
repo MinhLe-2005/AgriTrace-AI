@@ -26,7 +26,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
-@WebMvcTest(InboundReceiptController.class)
+@WebMvcTest({
+    InboundReceiptController.class,
+    InventoryController.class,
+    StockMovementController.class
+})
 @ActiveProfiles("warehouse-test")
 @Import({SecurityConfig.class, RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class})
 class InboundReceiptControllerTest {
@@ -40,6 +44,8 @@ class InboundReceiptControllerTest {
     @MockitoBean
     private WarehouseLotQuery lots;
     @MockitoBean
+    private StockMovementService stockMovements;
+    @MockitoBean
     private JwtTokenService jwtTokenService;
     @MockitoBean
     private CustomUserDetailsService userDetailsService;
@@ -48,6 +54,31 @@ class InboundReceiptControllerTest {
     void anonymousCannotReadReceipts() throws Exception {
         mvc.perform(get(base)).andExpect(status().isUnauthorized());
         verifyNoInteractions(receipts);
+    }
+
+    @Test
+    void inventoryAndLedgerUseWarehouseAuthorization() throws Exception {
+        String warehouseBase = base.substring(0, base.lastIndexOf('/'));
+        mvc.perform(get(warehouseBase + "/inventory").with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get(warehouseBase + "/movements")
+                                .param("from", "2026-10-01")
+                                .param("to", "2026-10-29")
+                                .with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(inventory, stockMovements);
+    }
+
+    @Test
+    void inventoryRejectsInvalidPagination() throws Exception {
+        String warehouseBase = base.substring(0, base.lastIndexOf('/'));
+        mvc.perform(
+                        get(warehouseBase + "/inventory")
+                                .param("page", "-1")
+                                .with(user("staff").roles("WAREHOUSE")))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(inventory);
     }
 
     @ParameterizedTest

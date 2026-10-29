@@ -31,7 +31,7 @@ class WarehouseSchemaTest {
             assertTrue(connection.getCatalog().startsWith("warehouse_test_"));
             statement.execute(
                     "DROP SCHEMA public CASCADE; CREATE SCHEMA public; CREATE TABLE users(id UUID"
-                        + " PRIMARY KEY)");
+                            + " PRIMARY KEY)");
             statement.execute(Files.readString(Path.of("../docs/warehouse/P01_schema.sql")));
             statement.execute(Files.readString(Path.of("../docs/warehouse/P02_schema.sql")));
             try (var rows =
@@ -52,7 +52,7 @@ class WarehouseSchemaTest {
                     () ->
                             statement.execute(
                                     "INSERT INTO warehouses(id,name,location,capacity_tons)"
-                                        + " VALUES(gen_random_uuid(),'Invalid','HCM',-1)"));
+                                            + " VALUES(gen_random_uuid(),'Invalid','HCM',-1)"));
             assertThrows(
                     SQLException.class,
                     () ->

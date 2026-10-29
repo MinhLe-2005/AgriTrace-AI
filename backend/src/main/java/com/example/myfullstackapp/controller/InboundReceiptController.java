@@ -32,11 +32,8 @@ public class InboundReceiptController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<DocumentView> create(
-            @PathVariable
-            UUID warehouseId,
-            @Valid
-            @RequestBody
-            DocumentInput input,
+            @PathVariable UUID warehouseId,
+            @Valid @RequestBody DocumentInput input,
             Principal actor) {
         return ApiResponse.ok(
                 "Receipt drafted",
@@ -46,8 +43,7 @@ public class InboundReceiptController {
 
     @GetMapping
     public ApiResponse<List<DocumentView>> list(
-            @PathVariable
-            UUID warehouseId, @RequestParam(defaultValue = "0") @Min(0) int page) {
+            @PathVariable UUID warehouseId, @RequestParam(defaultValue = "0") @Min(0) int page) {
         return ApiResponse.ok("Receipts retrieved", receipts.list(warehouseId, page));
     }
 
@@ -58,8 +54,7 @@ public class InboundReceiptController {
 
     @PutMapping("/{id}/confirm")
     public ApiResponse<DocumentView> confirm(
-            @PathVariable
-            UUID warehouseId, @PathVariable UUID id, Principal actor) {
+            @PathVariable UUID warehouseId, @PathVariable UUID id, Principal actor) {
         return ApiResponse.ok(
                 "Receipt confirmed", receipts.confirm(warehouseId, id, actor.getName()));
     }

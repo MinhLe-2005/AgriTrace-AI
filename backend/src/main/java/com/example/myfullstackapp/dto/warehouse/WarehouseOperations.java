@@ -13,24 +13,16 @@ public final class WarehouseOperations {
     private WarehouseOperations() {}
 
     public record LineInput(
-            @NotNull
-            String lotId,
-            @NotNull
-            UUID locationId,
+            @NotNull String lotId,
+            @NotNull UUID locationId,
             UUID targetLocationId,
-            @NotNull
-            @DecimalMin("0")
-            @Digits(integer = 11, fraction = 3)
-            BigDecimal quantityKg) {}
+            @NotNull @DecimalMin("0") @Digits(integer = 11, fraction = 3) BigDecimal quantityKg) {}
 
     public record DocumentInput(
             UUID targetWarehouseId,
             UUID reservationId,
-            @Size(max = 500)
-            String note,
-            @NotEmpty
-            @Size(max = 100)
-            List<@Valid LineInput> lines) {}
+            @Size(max = 500) String note,
+            @NotEmpty @Size(max = 100) List<@Valid LineInput> lines) {}
 
     public record LineView(
             UUID id,
@@ -81,18 +73,10 @@ public final class WarehouseOperations {
             Instant occurredAt) {}
 
     public record ReserveInput(
-            @NotNull
-            @Positive
-            Long orderId,
-            @NotNull
-            String productId,
-            @NotNull
-            @DecimalMin("0.001")
-            @Digits(integer = 11, fraction = 3)
-            BigDecimal quantityKg,
-            @Min(1)
-            @Max(1440)
-            int ttlMinutes) {}
+            @NotNull @Positive Long orderId,
+            @NotNull String productId,
+            @NotNull @DecimalMin("0.001") @Digits(integer = 11, fraction = 3) BigDecimal quantityKg,
+            @Min(1) @Max(1440) int ttlMinutes) {}
 
     public record AllocationView(
             UUID balanceId,
@@ -106,16 +90,12 @@ public final class WarehouseOperations {
             UUID id, Long orderId, String status, Instant expiresAt, List<AllocationView> lines) {}
 
     public record FefoInput(
-            @NotNull
-            String productId,
-            @NotNull
-            @DecimalMin("0.001")
-            @Digits(integer = 11, fraction = 3)
+            @NotNull String productId,
+            @NotNull @DecimalMin("0.001") @Digits(integer = 11, fraction = 3)
                     BigDecimal quantityKg) {}
 
     public record InspectionInput(
-            @NotNull
-            UUID balanceId, boolean held, @NotBlank @Size(max = 500) String note) {}
+            @NotNull UUID balanceId, boolean held, @NotBlank @Size(max = 500) String note) {}
 
     public record InspectionView(
             UUID id, UUID balanceId, boolean held, String note, String actor, Instant createdAt) {}
@@ -123,24 +103,13 @@ public final class WarehouseOperations {
     public record HandoverInput(@NotBlank @Size(max = 150) String reference) {}
 
     public record RuleInput(
-            @Min(0)
-            @Max(365)
-            int expiryWarningDays,
-            @Min(1)
-            @Max(3650)
-            int staleDays,
-            @NotNull
-            @DecimalMin("0")
-            @Digits(integer = 11, fraction = 3)
-            BigDecimal lowStockKg) {}
+            @Min(0) @Max(365) int expiryWarningDays,
+            @Min(1) @Max(3650) int staleDays,
+            @NotNull @DecimalMin("0") @Digits(integer = 11, fraction = 3) BigDecimal lowStockKg) {}
 
     public record AlertInput(
-            @NotBlank
-            @Pattern(regexp = "ACKNOWLEDGED|RESOLVED")
-            String status,
-            @NotBlank
-            @Size(max = 500)
-            String note) {}
+            @NotBlank @Pattern(regexp = "ACKNOWLEDGED|RESOLVED") String status,
+            @NotBlank @Size(max = 500) String note) {}
 
     public record AlertView(
             UUID id,

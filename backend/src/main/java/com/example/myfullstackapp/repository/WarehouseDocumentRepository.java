@@ -24,8 +24,7 @@ public interface WarehouseDocumentRepository extends JpaRepository<WarehouseDocu
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from WarehouseDocument d where d.id=:id and d.warehouseId=:warehouseId")
     Optional<WarehouseDocument> findScopedForUpdate(
-            @Param("id")
-            UUID id, @Param("warehouseId") UUID warehouseId);
+            @Param("id") UUID id, @Param("warehouseId") UUID warehouseId);
 
     Optional<WarehouseDocument> findByIdAndWarehouseId(UUID id, UUID warehouseId);
 

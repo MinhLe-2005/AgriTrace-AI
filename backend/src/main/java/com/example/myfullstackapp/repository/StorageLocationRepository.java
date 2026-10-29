@@ -22,6 +22,6 @@ public interface StorageLocationRepository extends JpaRepository<StorageLocation
 
     @Query(
             "select coalesce(sum(s.capacityTons), 0) from StorageLocation s where s.warehouse.id ="
-                + " :warehouseId")
+                    + " :warehouseId")
     BigDecimal sumCapacityTonsByWarehouseId(@Param("warehouseId") UUID warehouseId);
 }
