@@ -110,7 +110,9 @@ public final class WarehouseOperations {
                     BigDecimal quantityKg) {}
 
     public record InspectionInput(
-            @NotNull UUID balanceId, boolean held, @NotBlank @Size(max = 500) String note) {}
+            @NotNull UUID balanceId,
+            @NotNull Boolean held,
+            @NotBlank @Size(max = 500) String note) {}
 
     public record InspectionView(
             UUID id, UUID balanceId, boolean held, String note, String actor, Instant createdAt) {}

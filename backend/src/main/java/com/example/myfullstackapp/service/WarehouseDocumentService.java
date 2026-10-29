@@ -52,7 +52,10 @@ public class WarehouseDocumentService {
             if (!count && inputLine.quantityKg().signum() <= 0)
                 throw new IllegalArgumentException("Movement quantity must be positive");
             inventory.location(warehouseId, inputLine.locationId(), !count);
-            var lot = lots.get(inputLine.lotId());
+            var lot =
+                    count
+                            ? countLot(warehouseId, inputLine.locationId(), inputLine.lotId())
+                            : lots.get(inputLine.lotId());
             if (!keys.add(key(inputLine.locationId(), lot.id())))
                 throw new IllegalArgumentException("Duplicate lot/location line");
             if (!count) requireEligible(lot);
@@ -114,8 +117,12 @@ public class WarehouseDocumentService {
                         .map(WarehouseDocumentLine::getLotId)
                         .distinct()
                         .sorted()
-                        .toList())
-            lotData.put(lotId, type == Type.INBOUND ? lots.lockForReceipt(lotId) : lots.get(lotId));
+                        .toList()) {
+            if (type != Type.COUNT && type != Type.ADJUSTMENT) {
+                lotData.put(
+                        lotId, type == Type.INBOUND ? lots.lockForReceipt(lotId) : lots.get(lotId));
+            }
+        }
         if (type == Type.OUTBOUND) validateOutbound(document, lotData);
         for (var line : document.getLines()) {
             var lot = lotData.get(line.getLotId());
@@ -183,7 +190,10 @@ public class WarehouseDocumentService {
                             quantity.subtract(
                                     current.map(StockBalance::getQuantityKg)
                                             .orElse(BigDecimal.ZERO));
-                    if (delta.signum() != 0)
+                    if (delta.signum() != 0) {
+                        lot =
+                                current.map(this::lotSnapshot)
+                                        .orElseGet(() -> lots.get(line.getLotId()));
                         inventory.change(
                                 warehouseId,
                                 line.getLocationId(),
@@ -193,6 +203,7 @@ public class WarehouseDocumentService {
                                 type.name(),
                                 actor,
                                 null);
+                    }
                 }
             }
         }
@@ -319,6 +330,25 @@ public class WarehouseDocumentService {
         if (!"APPROVED".equals(lot.status()) || lot.expiryDate().isBefore(InventoryService.today()))
             throw new ConflictException("Lot must be approved and unexpired");
         initialKg(lot);
+    }
+
+    private LotSummary countLot(UUID warehouseId, UUID locationId, String lotId) {
+        String canonicalId = Long.toString(Long.parseLong(lotId));
+        return inventory
+                .find(warehouseId, locationId, canonicalId)
+                .map(this::lotSnapshot)
+                .orElseGet(() -> lots.get(canonicalId));
+    }
+
+    private LotSummary lotSnapshot(StockBalance balance) {
+        return new LotSummary(
+                balance.getLotId(),
+                balance.getProductId(),
+                balance.getLotCode(),
+                balance.getExpiryDate(),
+                balance.getQuantityKg(),
+                "KG",
+                "STOCK_SNAPSHOT");
     }
 
     private BigDecimal initialKg(LotSummary lot) {
