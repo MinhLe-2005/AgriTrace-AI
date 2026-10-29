@@ -428,6 +428,29 @@ function CustomerDashboardContent() {
   const [payosData, setPayosData] = useState<PaymentLinkResponse | null>(null);
   const [isProcessingPayos, setIsProcessingPayos] = useState(false);
 
+  // Real-time automatic payment polling
+  useEffect(() => {
+    if (!showPayosModal || !payosData?.orderCode) return;
+    const targetCode = payosData.orderCode;
+    const interval = setInterval(async () => {
+      try {
+        const res = await paymentService.checkPaymentStatus(targetCode);
+        if (res && res.status === "PAID") {
+          clearInterval(interval);
+          toast.success(`Ting ting! Đơn hàng #${targetCode} đã nhận được tiền chuyển khoản thành công!`);
+          setShowPayosModal(false);
+          setOrders((prev) =>
+            prev.map((o) => (o.id === targetCode ? { ...o, status: "PAID", statusText: "Đã thanh toán (payOS)", statusColor: "bg-teal-50 text-teal-700 border-teal-200" } : o))
+          );
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [showPayosModal, payosData?.orderCode]);
+
   async function handleOpenPayOS(orderCode: string) {
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";

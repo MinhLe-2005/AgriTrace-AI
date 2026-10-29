@@ -66,6 +66,11 @@ public class Order {
     @Column(length = 128)
     private String paymentRef;
 
+    @Column(length = 128)
+    private String paymentLinkId;
+
+    private Long payosOrderCode;
+
     @Builder.Default
     private Long subtotal = 0L;
 

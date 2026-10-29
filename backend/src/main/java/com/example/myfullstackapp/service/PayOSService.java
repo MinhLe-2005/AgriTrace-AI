@@ -94,12 +94,17 @@ public class PayOSService {
                     JsonNode root = objectMapper.readTree(response.body());
                     if ("00".equals(root.path("code").asText())) {
                         JsonNode data = root.path("data");
+                        String paymentLinkId = data.path("paymentLinkId").asText();
+                        order.setPayosOrderCode(numericOrderCode);
+                        order.setPaymentLinkId(paymentLinkId);
+                        orderRepository.save(order);
+
                         return PaymentLinkResponse.builder()
                                 .orderCode(orderCode)
                                 .amount(amount)
                                 .checkoutUrl(data.path("checkoutUrl").asText())
                                 .qrCode(data.path("qrCode").asText())
-                                .paymentLinkId(data.path("paymentLinkId").asText())
+                                .paymentLinkId(paymentLinkId)
                                 .status(data.path("status").asText("PENDING"))
                                 .accountNumber(data.path("accountNumber").asText())
                                 .accountName(data.path("accountName").asText())
@@ -184,10 +189,53 @@ public class PayOSService {
         return orderRepository.save(order);
     }
 
+    @Transactional
     public String checkStatus(String orderCode) {
-        return orderRepository.findByOrderCode(orderCode)
-                .map(Order::getStatus)
-                .orElse("NOT_FOUND");
+        Optional<Order> orderOpt = orderRepository.findByOrderCode(orderCode);
+        if (orderOpt.isEmpty()) {
+            return "NOT_FOUND";
+        }
+        Order order = orderOpt.get();
+        if ("PAID".equalsIgnoreCase(order.getStatus())) {
+            return "PAID";
+        }
+
+        String clientId = appProperties.getPayos().getClientId();
+        String apiKey = appProperties.getPayos().getApiKey();
+
+        if (clientId != null && !clientId.isBlank() && apiKey != null && !apiKey.isBlank()) {
+            String queryId = order.getPayosOrderCode() != null ? String.valueOf(order.getPayosOrderCode()) : order.getPaymentLinkId();
+            if (queryId != null && !queryId.isBlank()) {
+                try {
+                    HttpRequest request = HttpRequest.newBuilder()
+                            .uri(URI.create("https://api-merchant.payos.vn/v2/payment-requests/" + queryId))
+                            .header("x-client-id", clientId)
+                            .header("x-api-key", apiKey)
+                            .GET()
+                            .build();
+
+                    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                    if (response.statusCode() == 200) {
+                        JsonNode root = objectMapper.readTree(response.body());
+                        if ("00".equals(root.path("code").asText())) {
+                            String payosStatus = root.path("data").path("status").asText();
+                            if ("PAID".equalsIgnoreCase(payosStatus)) {
+                                order.setStatus("PAID");
+                                order.setPaidAt(LocalDateTime.now());
+                                order.setPaymentRef("PAYOS-" + queryId);
+                                orderRepository.save(order);
+                                log.info("Order #{} confirmed PAID via live payOS status check!", orderCode);
+                                return "PAID";
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Live payOS status check error for #{}: {}", orderCode, e.getMessage());
+                }
+            }
+        }
+
+        return order.getStatus();
     }
 
     private String computeWebhookSignature(PayOSWebhookRequest.PayOSWebhookData data, String checksumKey) {

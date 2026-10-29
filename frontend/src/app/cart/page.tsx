@@ -130,6 +130,27 @@ function CartContent() {
   // Completed order info
   const [completedOrderId, setCompletedOrderId] = useState("AGRI-8849");
 
+  // Real-time automatic payment confirmation polling (Auto detect when money arrives)
+  useEffect(() => {
+    if (!showPayosModal || !completedOrderId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await paymentService.checkPaymentStatus(completedOrderId);
+        if (res && res.status === "PAID") {
+          clearInterval(interval);
+          toast.success("Ting ting! Hệ thống đã nhận được tiền chuyển khoản payOS thành công!");
+          setShowPayosModal(false);
+          clearCart();
+          router.push(`/checkout/success?orderCode=${completedOrderId}`);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [showPayosModal, completedOrderId, clearCart, router]);
+
   const subtotal = getSubtotal();
   const baseShippingFee = items.length > 0 ? 25000 : 0;
   const isFreeship = !!selectedFreeshipVoucher;
