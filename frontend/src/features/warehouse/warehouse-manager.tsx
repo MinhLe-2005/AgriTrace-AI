@@ -1175,6 +1175,8 @@ export function WarehouseManager() {
                         HUMIDITY_HIGH: "Độ ẩm cao",
                         HUMIDITY_LOW: "Độ ẩm thấp",
                         NEAR_EXPIRY_HIGH_STOCK: "Gần hạn, tồn lớn",
+                        SHELF_LIFE_LOW_HIGH_STOCK: "Hạn dùng còn ít, tồn lớn",
+                        SHELF_LIFE_DATA_MISSING: "Thiếu dữ liệu ngày thu hoạch",
                       }[a.type] ?? a.type}
                     </td>
                     <td>{a.message}</td>

@@ -119,6 +119,8 @@ class WarehouseMonitoringIntegrationTest {
                     + " varchar(255),code varchar(64),expiry_date varchar(64),qty varchar(32),unit"
                     + " varchar(32),status varchar(64))");
         jdbc.execute(
+                "ALTER TABLE agri_harvest_lots ADD COLUMN IF NOT EXISTS harvest_date varchar(64)");
+        jdbc.execute(
                 "TRUNCATE"
                     + " wh_monitor_rule_revisions,wh_alert_deliveries,wh_sensor_readings,wh_sensor_devices,wh_monitoring_rules,wh_monitoring_settings,wh_alert_actions,wh_risk_alerts,wh_risk_rules,wh_quality_inspections,wh_reservation_lines,wh_reservations,wh_stock_movements,wh_stock_balances,wh_document_lines,wh_documents,wh_unit_conversions,storage_locations,warehouses,agri_harvest_lots"
                     + " CASCADE");
@@ -374,8 +376,8 @@ class WarehouseMonitoringIntegrationTest {
     @Test
     void recoveryRequiresStableHistoryAndDoesNotReleaseQualityHolds() {
         jdbc.update(
-                "INSERT INTO agri_harvest_lots VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất"
-                        + " kho')",
+                "INSERT INTO agri_harvest_lots(id,product,code,expiry_date,qty,unit,status)"
+                        + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho')",
                 InventoryService.today().plusDays(2).toString());
         var receipt =
                 documents.create(
@@ -414,8 +416,8 @@ class WarehouseMonitoringIntegrationTest {
     void stockRuleAggregatesLotAcrossLocationsAndResolvesAtBoundary() {
         UUID second = location(warehouseId, "B");
         jdbc.update(
-                "INSERT INTO agri_harvest_lots VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất"
-                        + " kho')",
+                "INSERT INTO agri_harvest_lots(id,product,code,expiry_date,qty,unit,status)"
+                        + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho')",
                 InventoryService.today().plusDays(2).toString());
         var receipt =
                 documents.create(
@@ -458,6 +460,131 @@ class WarehouseMonitoringIntegrationTest {
                 "RESOLVED",
                 legacy.list(warehouseId).stream()
                         .filter(a -> a.id().equals(alert.id()))
+                        .findFirst()
+                        .orElseThrow()
+                        .status());
+    }
+
+    @Test
+    void shelfLifePercentUsesHarvestDateAndStrictPercentAndWeightBoundaries() {
+        UUID second = location(warehouseId, "B");
+        LocalDate today = LocalDate.ofInstant(now.get(), ZoneId.of("Asia/Ho_Chi_Minh"));
+        jdbc.update(
+                "INSERT INTO"
+                    + " agri_harvest_lots(id,product,code,expiry_date,qty,unit,status,harvest_date)"
+                    + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho',?)",
+                today.plusDays(2).toString(),
+                today.minusDays(18).toString());
+        var receipt =
+                documents.create(
+                        warehouseId,
+                        WarehouseDocument.Type.INBOUND,
+                        new DocumentInput(
+                                null,
+                                null,
+                                "Test",
+                                List.of(
+                                        new LineInput("1", locationId, null, new BigDecimal("300")),
+                                        new LineInput("1", second, null, new BigDecimal("300")))),
+                        "staff");
+        documents.confirm(warehouseId, receipt.id(), "staff");
+        monitoring.saveRule(
+                warehouseId,
+                null,
+                new RuleInput(
+                        "Dưới 10%, trên 500kg",
+                        RuleKind.SHELF_LIFE_LOW_HIGH_STOCK,
+                        null,
+                        new BigDecimal("10"),
+                        0,
+                        0,
+                        new BigDecimal("500"),
+                        "HIGH",
+                        true),
+                "manager");
+        evaluator.evaluateWarehouse(warehouseId);
+        assertTrue(
+                legacy.list(warehouseId).stream()
+                        .noneMatch(a -> a.type().equals("SHELF_LIFE_LOW_HIGH_STOCK")));
+        jdbc.update(
+                "UPDATE agri_harvest_lots SET harvest_date=? WHERE id=1",
+                today.minusDays(19)
+                        .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu")));
+        evaluator.evaluateWarehouse(warehouseId);
+        var incident =
+                legacy.list(warehouseId).stream()
+                        .filter(a -> a.type().equals("SHELF_LIFE_LOW_HIGH_STOCK"))
+                        .findFirst()
+                        .orElseThrow();
+        assertEquals("OPEN", incident.status());
+        assertTrue(incident.message().contains("9,5%"));
+        jdbc.update("UPDATE wh_stock_balances SET quantity_kg=200 WHERE location_id=?", second);
+        evaluator.evaluateWarehouse(warehouseId);
+        assertEquals(
+                "RESOLVED",
+                legacy.list(warehouseId).stream()
+                        .filter(a -> a.id().equals(incident.id()))
+                        .findFirst()
+                        .orElseThrow()
+                        .status());
+    }
+
+    @Test
+    void missingHarvestMetadataCreatesDataAlertWithoutLosingSensorReadings() {
+        jdbc.update(
+                "INSERT INTO agri_harvest_lots(id,product,code,expiry_date,qty,unit,status)"
+                        + " VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất kho')",
+                InventoryService.today().plusDays(2).toString());
+        var receipt =
+                documents.create(
+                        warehouseId,
+                        WarehouseDocument.Type.INBOUND,
+                        new DocumentInput(
+                                null,
+                                null,
+                                "Test",
+                                List.of(
+                                        new LineInput(
+                                                "1", locationId, null, new BigDecimal("600")))),
+                        "staff");
+        documents.confirm(warehouseId, receipt.id(), "staff");
+        monitoring.saveRule(
+                warehouseId,
+                null,
+                new RuleInput(
+                        "Thiếu dữ liệu",
+                        RuleKind.SHELF_LIFE_LOW_HIGH_STOCK,
+                        null,
+                        new BigDecimal("10"),
+                        0,
+                        0,
+                        new BigDecimal("500"),
+                        "HIGH",
+                        true),
+                "manager");
+        var sensor = sensor();
+        ingest(sensor, UUID.randomUUID(), now.get(), "4");
+        assertEquals(1, monitoring.latest(warehouseId).size());
+        var data =
+                legacy.list(warehouseId).stream()
+                        .filter(a -> a.type().equals("SHELF_LIFE_DATA_MISSING"))
+                        .findFirst()
+                        .orElseThrow();
+        assertEquals("OPEN", data.status());
+        jdbc.update(
+                "UPDATE agri_harvest_lots SET harvest_date=? WHERE id=1",
+                InventoryService.today().minusDays(30).toString());
+        evaluator.evaluateWarehouse(warehouseId);
+        assertTrue(
+                legacy.list(warehouseId).stream()
+                        .anyMatch(
+                                a ->
+                                        a.type().equals("SHELF_LIFE_LOW_HIGH_STOCK")
+                                                && a.status().equals("OPEN")));
+        assertEquals(
+                "RESOLVED",
+                legacy.list(warehouseId).stream()
+                        .filter(a -> a.id().equals(data.id()))
                         .findFirst()
                         .orElseThrow()
                         .status());

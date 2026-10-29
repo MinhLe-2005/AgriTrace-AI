@@ -43,7 +43,7 @@ CREATE TABLE wh_monitoring_rules (
     warehouse_id UUID NOT NULL REFERENCES warehouses(id),
     location_id UUID,
     name VARCHAR(100) NOT NULL,
-    kind VARCHAR(30) NOT NULL CHECK(kind IN ('TEMPERATURE_HIGH','TEMPERATURE_LOW','HUMIDITY_HIGH','HUMIDITY_LOW','NEAR_EXPIRY_HIGH_STOCK')),
+    kind VARCHAR(30) NOT NULL CHECK(kind IN ('TEMPERATURE_HIGH','TEMPERATURE_LOW','HUMIDITY_HIGH','HUMIDITY_LOW','NEAR_EXPIRY_HIGH_STOCK','SHELF_LIFE_LOW_HIGH_STOCK')),
     threshold_value NUMERIC(5,1) NOT NULL,
     duration_minutes INTEGER NOT NULL CHECK(duration_minutes BETWEEN 0 AND 1440),
     recovery_minutes INTEGER NOT NULL CHECK(recovery_minutes BETWEEN 0 AND 1440),
@@ -55,6 +55,7 @@ CREATE TABLE wh_monitoring_rules (
     CONSTRAINT uk_wh_monitor_rule_identity UNIQUE(id,warehouse_id),
     FOREIGN KEY(location_id,warehouse_id) REFERENCES storage_locations(id,warehouse_id),
     CHECK((kind='NEAR_EXPIRY_HIGH_STOCK' AND threshold_value BETWEEN 0 AND 365 AND threshold_value=trunc(threshold_value) AND min_quantity_kg IS NOT NULL AND duration_minutes=0 AND recovery_minutes=0)
+       OR (kind='SHELF_LIFE_LOW_HIGH_STOCK' AND threshold_value BETWEEN 0 AND 100 AND min_quantity_kg IS NOT NULL AND duration_minutes=0 AND recovery_minutes=0)
        OR (kind IN ('TEMPERATURE_HIGH','TEMPERATURE_LOW') AND threshold_value BETWEEN -100 AND 100)
        OR (kind IN ('HUMIDITY_HIGH','HUMIDITY_LOW') AND threshold_value BETWEEN 0 AND 100))
 );
@@ -77,7 +78,7 @@ ALTER TABLE wh_risk_alerts ADD FOREIGN KEY(location_id,warehouse_id) REFERENCES 
 ALTER TABLE wh_risk_alerts ADD FOREIGN KEY(rule_id,warehouse_id) REFERENCES wh_monitoring_rules(id,warehouse_id);
 ALTER TABLE wh_risk_alerts ADD FOREIGN KEY(device_id,warehouse_id) REFERENCES wh_sensor_devices(id,warehouse_id);
 ALTER TABLE wh_risk_alerts DROP CONSTRAINT wh_risk_alerts_type_check;
-ALTER TABLE wh_risk_alerts ADD CONSTRAINT wh_risk_alerts_type_check CHECK(type IN ('EXPIRY','STALE','QUALITY_HOLD','LOW_STOCK','SENSOR_OFFLINE','TEMPERATURE_HIGH','TEMPERATURE_LOW','HUMIDITY_HIGH','HUMIDITY_LOW','NEAR_EXPIRY_HIGH_STOCK'));
+ALTER TABLE wh_risk_alerts ADD CONSTRAINT wh_risk_alerts_type_check CHECK(type IN ('EXPIRY','STALE','QUALITY_HOLD','LOW_STOCK','SENSOR_OFFLINE','TEMPERATURE_HIGH','TEMPERATURE_LOW','HUMIDITY_HIGH','HUMIDITY_LOW','NEAR_EXPIRY_HIGH_STOCK','SHELF_LIFE_LOW_HIGH_STOCK','SHELF_LIFE_DATA_MISSING'));
 CREATE TABLE wh_alert_deliveries (
     id UUID PRIMARY KEY,
     warehouse_id UUID NOT NULL REFERENCES warehouses(id),

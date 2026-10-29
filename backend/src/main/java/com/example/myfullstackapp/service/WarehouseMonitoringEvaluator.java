@@ -24,6 +24,7 @@ public class WarehouseMonitoringEvaluator {
     private final WarehouseSensorReadingRepository readings;
     private final WarehouseMonitoringRuleRepository rules;
     private final StockBalanceRepository balances;
+    private final WarehouseLotQuery lots;
     private final RiskAlertRepository alerts;
     private final WarehouseMonitoringAlerts alertOperations;
     private final Clock clock;
@@ -79,7 +80,8 @@ public class WarehouseMonitoringEvaluator {
                         .max()
                         .orElse(0);
         for (var rule : definitions) {
-            if (rule.getKind() == RuleKind.NEAR_EXPIRY_HIGH_STOCK) {
+            if (rule.getKind() == RuleKind.NEAR_EXPIRY_HIGH_STOCK
+                    || rule.getKind() == RuleKind.SHELF_LIFE_LOW_HIGH_STOCK) {
                 evaluateStock(warehouseId, rule);
                 continue;
             }
@@ -193,11 +195,57 @@ public class WarehouseMonitoringEvaluator {
         }
         Set<String> live = new HashSet<>();
         var today = LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Ho_Chi_Minh"));
+        boolean percent = rule.getKind() == RuleKind.SHELF_LIFE_LOW_HIGH_STOCK;
+        var harvested =
+                percent ? lots.harvestDates(quantity.keySet()) : Map.<String, LocalDate>of();
         for (var entry : quantity.entrySet()) {
             long days = ChronoUnit.DAYS.between(today, expiry.get(entry.getKey()));
-            if (days <= rule.getThreshold().intValueExact()
-                    && entry.getValue().compareTo(rule.getMinQuantityKg()) > 0) {
-                String fingerprint = "RULE:" + rule.getId() + ":LOT:" + entry.getKey();
+            String fingerprint = "RULE:" + rule.getId() + ":LOT:" + entry.getKey();
+            if (entry.getValue().compareTo(rule.getMinQuantityKg()) <= 0) continue;
+            String remaining = days + " ngày";
+            boolean near = days <= rule.getThreshold().intValue();
+            if (percent) {
+                var harvest = harvested.get(entry.getKey());
+                long life =
+                        harvest == null
+                                ? 0
+                                : ChronoUnit.DAYS.between(harvest, expiry.get(entry.getKey()));
+                if (life <= 0 || harvest.isAfter(today)) {
+                    // Unknown metadata cannot prove recovery of an existing stock incident.
+                    live.add(fingerprint);
+                    String missing = "RULE:" + rule.getId() + ":SOURCE:" + entry.getKey();
+                    live.add(missing);
+                    alertOperations.raise(
+                            warehouseId,
+                            missing,
+                            "SHELF_LIFE_DATA_MISSING",
+                            "HIGH",
+                            rule.getName()
+                                    + " · "
+                                    + codes.get(entry.getKey())
+                                    + ": thiếu ngày thu hoạch hợp lệ; chưa thể đánh giá % hạn dùng",
+                            rule.getLocationId(),
+                            rule.getId(),
+                            null,
+                            entry.getKey());
+                    continue;
+                }
+                var remainingTimes100 = BigDecimal.valueOf(days).multiply(new BigDecimal("100"));
+                near =
+                        remainingTimes100.compareTo(
+                                        rule.getThreshold().multiply(BigDecimal.valueOf(life)))
+                                < 0;
+                remaining =
+                        plain(
+                                        remainingTimes100.divide(
+                                                BigDecimal.valueOf(life),
+                                                1,
+                                                java.math.RoundingMode.HALF_UP))
+                                + "% hạn dùng ("
+                                + days
+                                + " ngày)";
+            }
+            if (near) {
                 live.add(fingerprint);
                 alertOperations.raise(
                         warehouseId,
@@ -208,8 +256,8 @@ public class WarehouseMonitoringEvaluator {
                                 + " · "
                                 + codes.get(entry.getKey())
                                 + ": còn "
-                                + days
-                                + " ngày, tồn thực tế "
+                                + remaining
+                                + ", tồn thực tế "
                                 + plain(entry.getValue())
                                 + " kg",
                         rule.getLocationId(),

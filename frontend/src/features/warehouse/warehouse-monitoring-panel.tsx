@@ -26,6 +26,7 @@ const kinds: Record<MonitoringRuleKind, string> = {
   HUMIDITY_HIGH: "Độ ẩm cao hơn ngưỡng",
   HUMIDITY_LOW: "Độ ẩm thấp hơn ngưỡng",
   NEAR_EXPIRY_HIGH_STOCK: "Gần hết hạn và tồn lớn",
+  SHELF_LIFE_LOW_HIGH_STOCK: "Phần trăm hạn dùng thấp và tồn lớn",
 };
 const formatTime = (value?: string | null) =>
   value
@@ -154,7 +155,8 @@ function RuleForm({
   const [kind, setKind] = useState<MonitoringRuleKind>(
     initial?.kind ?? "TEMPERATURE_HIGH"
   );
-  const stock = kind === "NEAR_EXPIRY_HIGH_STOCK";
+  const percent = kind === "SHELF_LIFE_LOW_HIGH_STOCK";
+  const stock = kind === "NEAR_EXPIRY_HIGH_STOCK" || percent;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -210,21 +212,30 @@ function RuleForm({
       </Field>
       <Field
         label={
-          stock
-            ? "Hạn dùng còn tối đa (ngày)"
-            : kind.startsWith("TEMPERATURE")
-              ? "Ngưỡng nhiệt độ (°C)"
-              : "Ngưỡng độ ẩm (%)"
+          percent
+            ? "Hạn dùng còn dưới (%)"
+            : stock
+              ? "Hạn dùng còn tối đa (ngày)"
+              : kind.startsWith("TEMPERATURE")
+                ? "Ngưỡng nhiệt độ (°C)"
+                : "Ngưỡng độ ẩm (%)"
         }
       >
         <Input
+          key={kind}
           name="threshold"
           type="number"
           required
-          step={stock ? 1 : 0.1}
+          step={stock && !percent ? 1 : 0.1}
           min={stock ? 0 : kind.startsWith("HUMIDITY") ? 0 : -100}
-          max={stock ? 365 : 100}
-          defaultValue={initial?.threshold ?? (stock ? 3 : 10)}
+          max={stock && !percent ? 365 : 100}
+          defaultValue={
+            initial?.kind === kind
+              ? initial.threshold
+              : stock && !percent
+                ? 3
+                : 10
+          }
         />
       </Field>
       {stock ? (
@@ -241,8 +252,10 @@ function RuleForm({
           </Field>
           <p className="text-xs text-slate-500">
             Cộng tồn của cùng lô trong phạm vi chọn, gồm hàng đang giữ và cách
-            ly. Điều kiện dùng số ngày; chưa quy đổi thành phần trăm vòng đời
-            lô.
+            ly.{" "}
+            {percent
+              ? "% còn lại = (ngày hết hạn − hôm nay) / (ngày hết hạn − ngày thu hoạch) × 100. Thiếu ngày thu hoạch hợp lệ sẽ tạo cảnh báo dữ liệu, không tự suy đoán."
+              : "Điều kiện tính theo số ngày còn đến hạn."}
           </p>
         </>
       ) : (
@@ -567,17 +580,20 @@ export function WarehouseMonitoringPanel({
                 {kinds[rule.kind]} · {rule.threshold}
                 {rule.kind === "NEAR_EXPIRY_HIGH_STOCK"
                   ? ` ngày và tồn > ${rule.minQuantityKg} kg`
-                  : rule.kind.startsWith("TEMPERATURE")
-                    ? " °C"
-                    : " %"}{" "}
+                  : rule.kind === "SHELF_LIFE_LOW_HIGH_STOCK"
+                    ? `% hạn dùng và tồn > ${rule.minQuantityKg} kg`
+                    : rule.kind.startsWith("TEMPERATURE")
+                      ? " °C"
+                      : " %"}{" "}
                 · {locationName(rule.locationId)}
               </p>
-              {rule.kind !== "NEAR_EXPIRY_HIGH_STOCK" && (
-                <p className="text-xs text-slate-500">
-                  Duy trì {rule.durationMinutes} phút · phục hồi{" "}
-                  {rule.recoveryMinutes} phút
-                </p>
-              )}
+              {rule.kind !== "NEAR_EXPIRY_HIGH_STOCK" &&
+                rule.kind !== "SHELF_LIFE_LOW_HIGH_STOCK" && (
+                  <p className="text-xs text-slate-500">
+                    Duy trì {rule.durationMinutes} phút · phục hồi{" "}
+                    {rule.recoveryMinutes} phút
+                  </p>
+                )}
               <p className="text-xs text-slate-500">
                 Cập nhật: {rule.updatedBy} · {formatTime(rule.updatedAt)}
               </p>
@@ -804,9 +820,11 @@ export function WarehouseMonitoringPanel({
                   {kinds[r.definition.kind]}: {r.definition.threshold}
                   {r.definition.kind === "NEAR_EXPIRY_HIGH_STOCK"
                     ? ` ngày; tồn trên ${r.definition.minQuantityKg} kg`
-                    : r.definition.kind.startsWith("TEMPERATURE")
-                      ? " °C"
-                      : " %"}
+                    : r.definition.kind === "SHELF_LIFE_LOW_HIGH_STOCK"
+                      ? `% hạn dùng; tồn trên ${r.definition.minQuantityKg} kg`
+                      : r.definition.kind.startsWith("TEMPERATURE")
+                        ? " °C"
+                        : " %"}
                 </p>
                 <p>
                   {locationName(r.definition.locationId)} ·{" "}
