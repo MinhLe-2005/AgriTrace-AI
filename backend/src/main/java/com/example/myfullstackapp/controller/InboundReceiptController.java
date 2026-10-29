@@ -44,24 +44,24 @@ public class InboundReceiptController {
     @GetMapping
     public ApiResponse<List<DocumentView>> list(
             @PathVariable UUID warehouseId, @RequestParam(defaultValue = "0") @Min(0) int page) {
-        return ApiResponse.ok("Receipts retrieved", receipts.list(warehouseId, page));
+        return ApiResponse.ok("Receipts retrieved", receipts.listInbound(warehouseId, page));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<DocumentView> get(@PathVariable UUID warehouseId, @PathVariable UUID id) {
-        return ApiResponse.ok("Receipt retrieved", receipts.get(warehouseId, id));
+        return ApiResponse.ok("Receipt retrieved", receipts.getInbound(warehouseId, id));
     }
 
     @PutMapping("/{id}/confirm")
     public ApiResponse<DocumentView> confirm(
             @PathVariable UUID warehouseId, @PathVariable UUID id, Principal actor) {
         return ApiResponse.ok(
-                "Receipt confirmed", receipts.confirm(warehouseId, id, actor.getName()));
+                "Receipt confirmed", receipts.confirmInbound(warehouseId, id, actor.getName()));
     }
 
     @PutMapping("/{id}/cancel")
     public ApiResponse<DocumentView> cancel(@PathVariable UUID warehouseId, @PathVariable UUID id) {
-        return ApiResponse.ok("Receipt cancelled", receipts.cancel(warehouseId, id));
+        return ApiResponse.ok("Receipt cancelled", receipts.cancelInbound(warehouseId, id));
     }
 
     @GetMapping("/eligible-lots")

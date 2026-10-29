@@ -10,6 +10,19 @@ import java.time.*;
 import java.util.*;
 
 public final class WarehouseOperations {
+    public record UnitConversionInput(
+            @NotBlank @Size(max = 255) String productId,
+            @NotBlank @Size(max = 32) String unit,
+            @NotNull @DecimalMin("0.000001") @Digits(integer = 8, fraction = 6)
+                    BigDecimal kgPerUnit) {}
+
+    public record UnitConversionView(
+            String productId,
+            String unit,
+            BigDecimal kgPerUnit,
+            String updatedBy,
+            Instant updatedAt) {}
+
     private WarehouseOperations() {}
 
     public record LineInput(
@@ -45,7 +58,9 @@ public final class WarehouseOperations {
             String confirmedBy,
             Instant createdAt,
             Instant confirmedAt,
-            List<LineView> lines) {}
+            List<LineView> lines,
+            String handoverBy,
+            Instant handedOverAt) {}
 
     public record BalanceView(
             UUID id,

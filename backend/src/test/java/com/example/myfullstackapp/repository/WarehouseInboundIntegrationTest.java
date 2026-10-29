@@ -38,7 +38,11 @@ import java.util.concurrent.*;
     StorageLocationMapperImpl.class,
     InventoryService.class,
     WarehouseDocumentService.class,
-    WarehouseLotQuery.class
+    WarehouseLotQuery.class,
+    FefoAllocationService.class,
+    StockReservationService.class,
+    WarehouseOrderQuery.class,
+    WarehouseWeightService.class
 })
 @EnabledIf("databaseAvailable")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)

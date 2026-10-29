@@ -1,6 +1,8 @@
 package com.example.myfullstackapp.exception;
 
 import com.example.myfullstackapp.controller.InboundReceiptController;
+import com.example.myfullstackapp.controller.OutboundReceiptController;
+import com.example.myfullstackapp.controller.StockReservationController;
 import com.example.myfullstackapp.controller.StorageLocationController;
 import com.example.myfullstackapp.controller.WarehouseController;
 import com.example.myfullstackapp.dto.ApiError;
@@ -20,7 +22,9 @@ import java.util.List;
         assignableTypes = {
             WarehouseController.class,
             StorageLocationController.class,
-            InboundReceiptController.class
+            InboundReceiptController.class,
+            OutboundReceiptController.class,
+            StockReservationController.class
         })
 public class WarehouseExceptionHandler {
     @ExceptionHandler(WarehouseIntegrationException.class)
