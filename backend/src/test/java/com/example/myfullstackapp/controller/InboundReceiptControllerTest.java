@@ -29,7 +29,9 @@ import java.util.UUID;
 @WebMvcTest({
     InboundReceiptController.class,
     InventoryController.class,
-    StockMovementController.class
+    StockMovementController.class,
+    OutboundReceiptController.class,
+    StockReservationController.class
 })
 @ActiveProfiles("warehouse-test")
 @Import({SecurityConfig.class, RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class})
@@ -46,6 +48,10 @@ class InboundReceiptControllerTest {
     @MockitoBean
     private StockMovementService stockMovements;
     @MockitoBean
+    private StockReservationService reservations;
+    @MockitoBean
+    private WarehouseWeightService weights;
+    @MockitoBean
     private JwtTokenService jwtTokenService;
     @MockitoBean
     private CustomUserDetailsService userDetailsService;
@@ -54,6 +60,36 @@ class InboundReceiptControllerTest {
     void anonymousCannotReadReceipts() throws Exception {
         mvc.perform(get(base)).andExpect(status().isUnauthorized());
         verifyNoInteractions(receipts);
+    }
+
+    @Test
+    void customerCannotReserveOrConfigureWeight() throws Exception {
+        String warehouseBase = base.substring(0, base.lastIndexOf('/'));
+        mvc.perform(
+                        post(warehouseBase + "/reservations")
+                                .with(user("customer").roles("CUSTOMER"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"orderId\":1,\"productId\":\"Rau\",\"quantityKg\":1,\"ttlMinutes\":30}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get(warehouseBase + "/unit-conversions")
+                                .with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(reservations, weights);
+    }
+
+    @Test
+    void handoverActorComesFromAuthenticatedPrincipal() throws Exception {
+        String warehouseBase = base.substring(0, base.lastIndexOf('/'));
+        UUID documentId = UUID.randomUUID();
+        mvc.perform(
+                        put(warehouseBase + "/documents/" + documentId + "/handover")
+                                .with(user("handover-staff").roles("WAREHOUSE"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reference\":\"REF-001\"}"))
+                .andExpect(status().isOk());
+        verify(receipts).handover(any(), eq(documentId), any(), eq("handover-staff"));
     }
 
     @Test

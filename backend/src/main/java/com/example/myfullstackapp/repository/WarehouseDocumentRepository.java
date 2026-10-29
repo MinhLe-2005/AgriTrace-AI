@@ -13,6 +13,9 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface WarehouseDocumentRepository extends JpaRepository<WarehouseDocument, UUID> {
+    List<WarehouseDocument> findByWarehouseIdAndTypeOrderByCreatedAtDesc(
+            UUID warehouseId, WarehouseDocument.Type type, Pageable page);
+
     interface LockScope {
         UUID getId();
 

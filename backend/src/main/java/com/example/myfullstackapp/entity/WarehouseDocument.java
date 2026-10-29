@@ -54,6 +54,11 @@ public class WarehouseDocument {
     @Column(length = 150)
     private String handoverReference;
 
+    @Column(length = 254)
+    private String handoverBy;
+
+    private Instant handedOverAt;
+
     @Column(nullable = false, length = 254)
     private String createdBy;
 

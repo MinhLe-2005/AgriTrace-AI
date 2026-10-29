@@ -99,7 +99,7 @@ class WarehouseInventoryIntegrationTest {
                         .id();
         jdbc.update(
                 "INSERT INTO agri_harvest_lots VALUES(1,'Rau','LOT-1',?,'1000','kg','Đã duyệt xuất"
-                    + " kho')",
+                        + " kho')",
                 InventoryService.today().plusDays(5).toString());
         stock = new StockBalance();
         stock.setWarehouseId(warehouseId);
