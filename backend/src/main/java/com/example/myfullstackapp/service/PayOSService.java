@@ -51,7 +51,11 @@ public class PayOSService {
         }
 
         long amount = order.getTotal() > 0 ? order.getTotal() : 50000L;
-        String description = ("AGRI " + orderCode).length() > 25 ? ("AGRI " + orderCode).substring(0, 25) : ("AGRI " + orderCode);
+        String cleanOrderCode = orderCode.replaceAll("[^a-zA-Z0-9]", "");
+        String description = "AGRI " + cleanOrderCode;
+        if (description.length() > 25) {
+            description = description.substring(0, 25);
+        }
 
         String effectiveReturnUrl = (returnUrl != null && !returnUrl.isBlank()) 
                 ? returnUrl 
@@ -95,6 +99,21 @@ public class PayOSService {
                     if ("00".equals(root.path("code").asText())) {
                         JsonNode data = root.path("data");
                         String paymentLinkId = data.path("paymentLinkId").asText();
+                        String rawQr = data.path("qrCode").asText();
+                        String bin = data.path("bin").asText();
+                        String accNo = data.path("accountNumber").asText();
+                        String accName = data.path("accountName").asText();
+
+                        String qrImageUrl = rawQr;
+                        if (rawQr != null && !rawQr.startsWith("http")) {
+                            qrImageUrl = String.format("https://img.vietqr.io/image/%s-%s-compact2.png?amount=%d&addInfo=%s&accountName=%s",
+                                    bin, accNo, amount,
+                                    java.net.URLEncoder.encode(description, StandardCharsets.UTF_8),
+                                    java.net.URLEncoder.encode(accName, StandardCharsets.UTF_8));
+                        }
+
+                        String bankName = "970422".equals(bin) ? "MB Bank (Ngân Hàng Quân Đội)" : "Napas 247";
+
                         order.setPayosOrderCode(numericOrderCode);
                         order.setPaymentLinkId(paymentLinkId);
                         orderRepository.save(order);
@@ -103,13 +122,13 @@ public class PayOSService {
                                 .orderCode(orderCode)
                                 .amount(amount)
                                 .checkoutUrl(data.path("checkoutUrl").asText())
-                                .qrCode(data.path("qrCode").asText())
+                                .qrCode(qrImageUrl)
                                 .paymentLinkId(paymentLinkId)
                                 .status(data.path("status").asText("PENDING"))
-                                .accountNumber(data.path("accountNumber").asText())
-                                .accountName(data.path("accountName").asText())
-                                .bankName("Napas 247")
-                                .bin(data.path("bin").asText())
+                                .accountNumber(accNo)
+                                .accountName(accName)
+                                .bankName(bankName)
+                                .bin(bin)
                                 .description(description)
                                 .build();
                     }
