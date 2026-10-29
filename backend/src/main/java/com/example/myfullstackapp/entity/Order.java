@@ -25,6 +25,16 @@ public class Order {
     @Column(length = 255)
     private String userEmail;
 
+    /**
+     * Additive ownership fields used by the Distributor queue. Legacy
+     * Shipment.orderCodes remains intact for existing clients and records.
+     */
+    @Column(length = 254)
+    private String distributorEmail;
+
+    @Column(length = 64)
+    private String shipmentCode;
+
     @Column(nullable = false, length = 128)
     private String receiverName;
 

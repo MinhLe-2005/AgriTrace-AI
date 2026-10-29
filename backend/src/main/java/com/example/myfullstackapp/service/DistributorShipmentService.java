@@ -64,7 +64,7 @@ public class DistributorShipmentService {
                 deliveredToday,
                 shipments.stream().filter(shipment -> "DELIVERED".equals(shipment.getStatus())).count(),
                 averageTemperature,
-                pendingDeliveryOrders(actorEmail, isAdmin, shipments),
+                pendingDeliveryOrders(actorEmail, isAdmin),
                 deliveredThisMonth,
                 shipments.stream()
                         .filter(shipment -> "IN_TRANSIT".equals(shipment.getStatus()))
@@ -110,11 +110,13 @@ public class DistributorShipmentService {
         if (shipmentRepository.findByShipmentCodeIgnoreCase(shipmentCode).isPresent()) {
             throw new ConflictException("Mã chuyến vận chuyển đã tồn tại");
         }
+        List<String> orderCodes = splitCodes(joinCodes(request.orderCodes()));
+        List<com.example.myfullstackapp.entity.Order> claimedOrders = claimOrders(orderCodes, actorEmail, shipmentCode);
 
         Shipment shipment = Shipment.builder()
                 .shipmentCode(shipmentCode)
                 .distributorEmail(actorEmail)
-                .orderCodes(joinCodes(request.orderCodes()))
+                .orderCodes(joinCodes(orderCodes))
                 .driverName(request.driverName().trim())
                 .driverPhone(optionalText(request.driverPhone()))
                 .vehicleNumber(request.vehicleNumber().trim())
@@ -128,6 +130,7 @@ public class DistributorShipmentService {
                 .estimatedArrival(parseInstant(request.estimatedArrival()))
                 .build();
         Shipment saved = shipmentRepository.save(shipment);
+        orderRepository.saveAll(claimedOrders);
         recordEvent(saved, saved.getOrigin(), saved.getTemperatureC(), null, "PREPARING", "Đã tạo phiếu vận chuyển, chờ xuất phát.", Instant.now());
         return toResponse(saved);
     }
@@ -135,7 +138,9 @@ public class DistributorShipmentService {
     @Transactional
     public ShipmentResponse update(String shipmentCode, UpdateShipmentRequest request, String actorEmail, boolean isAdmin) {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
-        if (request.orderCodes() != null) shipment.setOrderCodes(joinCodes(request.orderCodes()));
+        if (request.orderCodes() != null && !splitCodes(shipment.getOrderCodes()).equals(splitCodes(joinCodes(request.orderCodes())))) {
+            throw new IllegalArgumentException("Không thể đổi đơn hàng của shipment đã tạo");
+        }
         if (optionalText(request.driverName()) != null) shipment.setDriverName(request.driverName().trim());
         if (request.driverPhone() != null) shipment.setDriverPhone(optionalText(request.driverPhone()));
         if (optionalText(request.vehicleNumber()) != null) shipment.setVehicleNumber(request.vehicleNumber().trim());
@@ -267,22 +272,36 @@ public class DistributorShipmentService {
         throw new IllegalArgumentException("Trạng thái theo dõi không hợp lệ");
     }
 
-    private long pendingDeliveryOrders(String actorEmail, boolean isAdmin, List<Shipment> visibleShipments) {
-        if (isAdmin) {
-            return orderRepository.findAllByOrderByCreatedAtDesc().stream()
-                    .filter(order -> "CONFIRMED".equalsIgnoreCase(order.getStatus()))
-                    .count();
+    private long pendingDeliveryOrders(String actorEmail, boolean isAdmin) {
+        return isAdmin
+                ? orderRepository.countByStatusIgnoreCase("CONFIRMED")
+                : orderRepository.countByStatusIgnoreCaseAndDistributorEmailIsNull("CONFIRMED")
+                + orderRepository.countByStatusIgnoreCaseAndDistributorEmailIgnoreCase("CONFIRMED", actorEmail);
+    }
+
+    /**
+     * Lock order rows before associating them with a new shipment. This makes
+     * the first successful Distributor claim authoritative and prevents two
+     * concurrent distributors from creating shipments for the same order.
+     */
+    private List<com.example.myfullstackapp.entity.Order> claimOrders(List<String> orderCodes, String actorEmail, String shipmentCode) {
+        if (orderCodes.isEmpty()) return List.of();
+        List<com.example.myfullstackapp.entity.Order> orders = orderRepository.findAllByOrderCodeInForUpdate(orderCodes);
+        if (orders.size() != orderCodes.size()) throw new ResourceNotFoundException("Có đơn hàng không tồn tại");
+        for (com.example.myfullstackapp.entity.Order order : orders) {
+            if (!Set.of("CONFIRMED", "PENDING", "SHIPPING").contains(order.getStatus())) {
+                throw new IllegalArgumentException("Đơn hàng không còn đủ điều kiện tạo vận chuyển: " + order.getOrderCode());
+            }
+            if (order.getDistributorEmail() != null && !actorEmail.equalsIgnoreCase(order.getDistributorEmail())) {
+                throw new ConflictException("Đơn hàng đã được Distributor khác nhận: " + order.getOrderCode());
+            }
+            if (shipmentRepository.existsLegacyShipmentForOrderCode(order.getOrderCode())) {
+                throw new ConflictException("Đơn hàng đã thuộc một shipment: " + order.getOrderCode());
+            }
+            order.setDistributorEmail(actorEmail);
+            order.setShipmentCode(shipmentCode);
         }
-        Set<String> ownOrderCodes = visibleShipments.stream()
-                .flatMap(shipment -> splitCodes(shipment.getOrderCodes()).stream())
-                .collect(Collectors.toSet());
-        Set<String> assignedToAnyDistributor = shipmentRepository.findAll().stream()
-                .flatMap(shipment -> splitCodes(shipment.getOrderCodes()).stream())
-                .collect(Collectors.toSet());
-        return orderRepository.findAllByOrderByCreatedAtDesc().stream()
-                .filter(order -> "CONFIRMED".equalsIgnoreCase(order.getStatus()))
-                .filter(order -> ownOrderCodes.contains(order.getOrderCode()) || !assignedToAnyDistributor.contains(order.getOrderCode()))
-                .count();
+        return orders;
     }
 
     private long expiringLots(List<Shipment> shipments, LocalDate today) {

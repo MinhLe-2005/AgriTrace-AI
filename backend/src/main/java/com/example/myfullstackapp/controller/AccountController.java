@@ -41,7 +41,8 @@ public class AccountController {
             Authentication authentication
     ) {
         String email = actor(authentication);
-        if (!request.newPassword().equals(request.confirmPassword())) {
+        if (request.confirmPassword() != null && !request.confirmPassword().isBlank()
+                && !request.newPassword().equals(request.confirmPassword())) {
             throw new IllegalArgumentException("Mật khẩu xác nhận không khớp");
         }
         authService.changePassword(email, new ChangePasswordRequest(email, request.currentPassword(), request.newPassword()));
