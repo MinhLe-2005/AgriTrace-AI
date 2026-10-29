@@ -124,7 +124,18 @@ export function AuthForm({ mode }: { mode: Mode }) {
         toast.success(`Đăng nhập thành công! Chào mừng ${session.user.name}`);
         // Giữ luồng đăng nhập hiện có cho các vai trò khác, đồng thời đưa Distributor
         // trực tiếp vào khu vực điều phối để không phải đi qua trang chủ.
-        router.replace(session.user.roles.includes("DISTRIBUTOR") ? "/dashboard/distributor" : "/");
+        const roles = session.user.roles || [];
+        if (roles.includes("ADMIN")) {
+          router.replace("/dashboard/admin");
+        } else if (roles.includes("WAREHOUSE") || roles.includes("WAREHOUSE_STAFF")) {
+          router.replace("/dashboard/warehouse");
+        } else if (roles.includes("DISTRIBUTOR")) {
+          router.replace("/dashboard/distributor");
+        } else if (roles.includes("FARMER")) {
+          router.replace("/dashboard/farmer");
+        } else {
+          router.replace("/dashboard/customer");
+        }
       } catch (error) {
         toast.error(getApiErrorMessage(error));
       }

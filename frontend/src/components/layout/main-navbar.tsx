@@ -105,6 +105,7 @@ export function MainNavbar() {
         {/* Right Section */}
         <div className="flex items-center gap-2.5">
           {/* Notifications Bell */}
+          {user && (
           <div className="relative">
             <button
               onClick={() => {
@@ -209,6 +210,7 @@ export function MainNavbar() {
               </div>
             )}
           </div>
+          )}
 
           <Link
             href="/cart"
