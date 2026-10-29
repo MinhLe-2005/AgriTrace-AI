@@ -10,5 +10,5 @@ public record ReceiveGoodsRequest(
         @NotBlank @Size(max = 128) String receiverName,
         @Size(max = 32) String receiverPhone,
         @Size(max = 2000) String note,
-        String receivedAt
+        @ValidShipmentTimestamp String receivedAt
 ) { }

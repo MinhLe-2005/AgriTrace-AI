@@ -25,4 +25,13 @@ class ShipmentValidationTest {
 
         assertEquals(3, validator.validate(request).size());
     }
+
+    @Test
+    void rejectsInvalidShipmentTimestampBeforeItReachesTheService() {
+        CreateShipmentRequest request = new CreateShipmentRequest(
+                "SHIP-1", null, "Driver", null, "51A-123.45", "Warehouse", "Customer",
+                "Produce", null, 4.0, "not-a-timestamp", "2026-10-27T15:00:00+07:00");
+
+        assertEquals(1, validator.validate(request).size());
+    }
 }

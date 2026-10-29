@@ -19,6 +19,6 @@ public record CreateShipmentRequest(
         @Size(max = 64) String lotCode,
         @DecimalMin(value = ShipmentValidation.MIN_TEMPERATURE_C, message = "Nhiệt độ phải từ -30 đến 40°C")
         @DecimalMax(value = ShipmentValidation.MAX_TEMPERATURE_C, message = "Nhiệt độ phải từ -30 đến 40°C") Double temperatureC,
-        String dispatchTime,
-        String estimatedArrival
+        @ValidShipmentTimestamp String dispatchTime,
+        @ValidShipmentTimestamp String estimatedArrival
 ) { }

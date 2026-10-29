@@ -8,5 +8,5 @@ public record ReceiveShipmentRequest(
         @Size(max = 32) String receiverPhone,
         @Size(max = 2000) String note,
         @Size(max = 255) String qrValue,
-        String receivedAt
+        @ValidShipmentTimestamp String receivedAt
 ) { }
