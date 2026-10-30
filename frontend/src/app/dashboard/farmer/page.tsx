@@ -266,16 +266,23 @@ export default function FarmerPortalPage() {
       .getProducts()
       .then((data) => {
         if (data && data.length > 0) {
-          const mapped: ProductItem[] = data.map((p) => ({
-            id: p.id,
-            name: p.name,
-            category: p.categoryCode || "Trái Cây Đặc Sản",
-            price: Number(p.price) || 50000,
-            unit: p.unit || "kg",
-            description: p.description || p.name,
-            origin: p.origin || p.farm || "Nông trại",
-            image: p.image && p.image.length <= 4 ? p.image : "🌱",
-          }));
+          const mapped: ProductItem[] = data.map((p) => {
+            const isCaoLanh =
+              (p.farm && p.farm.includes("Cao Lãnh")) ||
+              (p.origin && p.origin.includes("Cao Lãnh")) ||
+              (p.origin && p.origin.includes("Đồng Tháp"));
+            return {
+              id: p.id,
+              farmCode: isCaoLanh ? "NT-DT-02" : "NT-DL-01",
+              name: p.name,
+              category: p.categoryCode || "Trái Cây Đặc Sản",
+              price: Number(p.price) || 50000,
+              unit: p.unit || "kg",
+              description: p.description || p.name,
+              origin: p.origin || p.farm || (isCaoLanh ? "Vườn Cây Ăn Trái Cao Lãnh" : "Nông Trại Xanh Đà Lạt"),
+              image: p.image || "🌱",
+            };
+          });
           setProducts(mapped);
         }
       })
