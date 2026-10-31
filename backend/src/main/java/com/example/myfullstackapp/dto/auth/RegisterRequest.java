@@ -9,5 +9,7 @@ import jakarta.validation.constraints.Size;
 public record RegisterRequest(
         @NotBlank @Email @Size(max = 254) String email,
         @NotBlank @Size(max = 120) String fullName,
+        @Size(max = 64) String username,
+        @Size(max = 32) String phone,
         @NotBlank @Pattern(regexp = ValidationPatterns.PASSWORD, message = ValidationPatterns.PASSWORD_MESSAGE) String password
 ) { }

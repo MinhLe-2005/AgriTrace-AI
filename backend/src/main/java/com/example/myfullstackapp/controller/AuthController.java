@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -55,9 +56,24 @@ public class AuthController {
 
     @PostMapping("/change-password")
     @Operation(summary = "Change password for logged-in user")
-    public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        authService.changePassword(request);
+    public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new org.springframework.security.access.AccessDeniedException("Vui lòng đăng nhập để đổi mật khẩu");
+        }
+        authService.changePassword(authentication.getName(), request);
         return ApiResponse.ok("Đổi mật khẩu thành công!", null);
+    }
+
+    @PatchMapping("/profile")
+    @Operation(summary = "Update the authenticated user's profile")
+    public ApiResponse<com.example.myfullstackapp.dto.user.UserResponse> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request,
+            Authentication authentication
+    ) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new org.springframework.security.access.AccessDeniedException("Vui lòng đăng nhập để cập nhật thông tin");
+        }
+        return ApiResponse.ok("Cập nhật thông tin thành công", authService.updateProfile(authentication.getName(), request));
     }
 
     @PostMapping("/register")

@@ -21,7 +21,8 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { catalogService } from "@/services/catalog.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -137,7 +138,25 @@ const redeemOptions = [
 export default function LoyaltyPage() {
   const { user } = useAuthStore();
   const [points, setPoints] = useState(248);
-  const [spent12m, setSpent12m] = useState(2748000); // Needs 252k to Gold
+  const [spent12m, setSpent12m] = useState(2748000);
+
+  useEffect(() => {
+    async function fetchUserLoyalty() {
+      if (!user?.email) return;
+      try {
+        const orders = await catalogService.getOrders(user.email);
+        if (orders && orders.length > 0) {
+          const totalPoints = orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
+          const totalSpent = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+          setPoints(totalPoints);
+          if (totalSpent > 0) setSpent12m(totalSpent);
+        }
+      } catch (err) {
+        console.error("Failed to load loyalty points:", err);
+      }
+    }
+    fetchUserLoyalty();
+  }, [user?.email]); // Needs 252k to Gold
   const targetGold = 3000000;
   const progressPercent = Math.min(100, Math.round((spent12m / targetGold) * 100));
 
