@@ -62,7 +62,18 @@ export function MainNavbar() {
     setNotifOpen(false);
   }, [pathname]);
 
-  const primaryRole = user?.roles[0] || "CUSTOMER";
+  const hasRole = (role: string) =>
+    Boolean(user?.roles?.some((r) => r === role || r === `ROLE_${role}`));
+
+  const primaryRole = hasRole("ADMIN")
+    ? "ADMIN"
+    : hasRole("FARMER")
+    ? "FARMER"
+    : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF")
+    ? "WAREHOUSE"
+    : hasRole("DISTRIBUTOR")
+    ? "DISTRIBUTOR"
+    : "CUSTOMER";
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-xs">
