@@ -25,6 +25,16 @@ public class Order {
     @Column(length = 255)
     private String userEmail;
 
+    /**
+     * Additive ownership fields used by the Distributor queue. Legacy
+     * Shipment.orderCodes remains intact for existing clients and records.
+     */
+    @Column(length = 254)
+    private String distributorEmail;
+
+    @Column(length = 64)
+    private String shipmentCode;
+
     @Column(nullable = false, length = 128)
     private String receiverName;
 
@@ -48,13 +58,28 @@ public class Order {
 
     @Builder.Default
     @Column(length = 32)
-    private String status = "SHIPPING";
+    private String status = "CONFIRMED";
 
     @Column(length = 32)
     private String paymentMethod;
 
     @Column(length = 64)
     private String voucherUsed;
+
+    @Column(length = 255)
+    private String cancelReason;
+
+    private LocalDateTime cancelledAt;
+
+    private LocalDateTime paidAt;
+
+    @Column(length = 128)
+    private String paymentRef;
+
+    @Column(length = 128)
+    private String paymentLinkId;
+
+    private Long payosOrderCode;
 
     @Builder.Default
     private Long subtotal = 0L;

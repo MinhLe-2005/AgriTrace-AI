@@ -9,6 +9,7 @@ public class AppProperties {
     private Jwt jwt = new Jwt();
     private Cors cors = new Cors();
     private BootstrapAdmin bootstrapAdmin = new BootstrapAdmin();
+    private Payos payos = new Payos();
 
     @Data
     public static class Jwt {
@@ -27,5 +28,12 @@ public class AppProperties {
         private String email = "";
         private String password = "";
         private String fullName = "Administrator";
+    }
+
+    @Data
+    public static class Payos {
+        private String clientId = "";
+        private String apiKey = "";
+        private String checksumKey = "";
     }
 }

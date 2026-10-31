@@ -34,6 +34,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { QuickBuyModal } from "@/components/cart/quick-buy-modal";
 import { useEffect, useState, useMemo, Suspense } from "react";
 import {
   catalogService,
@@ -72,6 +73,8 @@ function ProductsContent() {
 
   // Modal Product Detail
   const [selectedProduct, setSelectedProduct] = useState<ApiProduct | null>(null);
+  const [quickBuyProduct, setQuickBuyProduct] = useState<ApiProduct | null>(null);
+  const [quickBuyQty, setQuickBuyQty] = useState(1);
   const [modalQty, setModalQty] = useState(1);
 
   useEffect(() => {
@@ -125,11 +128,14 @@ function ProductsContent() {
   const filteredAndSorted = useMemo(() => {
     const result = products.filter((p) => {
       // 1. Category
+      const pCat = (p.categoryCode || "").toLowerCase().replace(/_/g, "-");
+      const fCat = (filterCategory || "").toLowerCase().replace(/_/g, "-");
       const matchCat =
         filterCategory === "all" ||
         p.categoryCode === filterCategory ||
-        (filterCategory === "seasonal" && p.categoryCode === "trai-cay") ||
-        (filterCategory === "daily" && (p.categoryCode === "rau" || p.categoryCode === "cu-qua"));
+        pCat === fCat ||
+        (filterCategory === "seasonal" && (pCat.includes("trai") || pCat.includes("cay"))) ||
+        (filterCategory === "daily" && (pCat.includes("rau") || pCat.includes("cu")));
       if (!matchCat) return false;
 
       // 2. Search query
@@ -245,20 +251,9 @@ function ProductsContent() {
   }
 
   function handleBuyNow(p: ApiProduct, qty = 1) {
-    addItem(
-      {
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        unit: p.unit,
-        farm: p.farm || p.origin,
-        cert: p.cert,
-        batchCode: p.batchCode,
-        image: p.image,
-      },
-      qty
-    );
-    router.push("/cart?step=2");
+    setQuickBuyProduct(p);
+    setQuickBuyQty(qty);
+    setSelectedProduct(null);
   }
 
   // Sidebar Filter Component
@@ -1091,6 +1086,13 @@ function ProductsContent() {
           </div>
         </div>
       )}
+      {/* Mua Ngay Siêu Tốc Modal */}
+      <QuickBuyModal
+        isOpen={!!quickBuyProduct}
+        onClose={() => setQuickBuyProduct(null)}
+        product={quickBuyProduct}
+        initialQty={quickBuyQty}
+      />
     </div>
   );
 }

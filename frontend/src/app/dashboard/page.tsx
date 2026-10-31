@@ -26,8 +26,8 @@ export default function DashboardRedirectPage() {
     } else if (roles.includes("DISTRIBUTOR")) {
       router.replace("/dashboard/distributor");
     } else {
-      // Customer / User bình thường
-      router.replace("/dashboard/customer");
+      // Customer / User bình thường -> về Trang chủ
+      router.replace("/");
     }
   }, [hasHydrated, user, router]);
 

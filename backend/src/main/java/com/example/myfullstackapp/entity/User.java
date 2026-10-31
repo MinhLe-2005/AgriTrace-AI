@@ -22,11 +22,23 @@ public class User {
     @Column(nullable = false, unique = true, length = 254)
     private String email;
 
+    @Column(length = 64)
+    private String username;
+
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
+
+    @Column(length = 32)
+    private String phone;
+
+    @Column(name = "company_name", length = 160)
+    private String companyName;
+
+    @Column(length = 500)
+    private String address;
 
     @Builder.Default
     @Column(nullable = false)
