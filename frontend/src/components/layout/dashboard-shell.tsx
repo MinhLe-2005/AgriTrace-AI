@@ -138,7 +138,18 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     router.replace("/login");
   }
 
-  const primaryRole = user.roles[0] ?? "CUSTOMER";
+  const hasRole = (role: string) =>
+    Boolean(user.roles?.some((r) => r === role || r === `ROLE_${role}`));
+
+  const primaryRole = hasRole("ADMIN")
+    ? "ADMIN"
+    : hasRole("FARMER")
+    ? "FARMER"
+    : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF")
+    ? "WAREHOUSE"
+    : hasRole("DISTRIBUTOR")
+    ? "DISTRIBUTOR"
+    : "CUSTOMER";
   const roleLabel = roleLabelMap[primaryRole] ?? "Khách hàng";
   const badgeStyle = roleBadgeColor[primaryRole] ?? roleBadgeColor.CUSTOMER;
 
@@ -289,7 +300,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               <Menu size={20} />
             </button>
             <h2 className="text-sm sm:text-base font-bold text-gray-800 truncate">
-              {primaryRole === "CUSTOMER" ? "Tài Khoản & Đơn Mua" : "Khu Vực Quản Lý"}
+              {primaryRole === "FARMER"
+                ? "Khu Vực Quản Lý Nông Trại"
+                : primaryRole === "ADMIN"
+                ? "Khu Vực Quản Trị Hệ Thống"
+                : primaryRole === "WAREHOUSE"
+                ? "Khu Vực Quản Lý Kho Bãi"
+                : primaryRole === "DISTRIBUTOR"
+                ? "Khu Vực Quản Lý Vận Chuyển"
+                : "Tài Khoản & Đơn Mua"}
             </h2>
           </div>
 
