@@ -43,9 +43,11 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint).accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/actuator/health", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/products/**", "/api/v1/vouchers/**", "/api/v1/traceability/**", "/api/v1/orders/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/orders/**", "/api/v1/farmer/**").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/farmer/**").permitAll()
+                        .requestMatchers("/api/v1/payment/payos/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/products/**", "/api/v1/vouchers/**", "/api/v1/traceability/**", "/api/v1/orders/**", "/api/v1/reviews/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/orders/**", "/api/v1/farmer/**", "/api/v1/products/**", "/api/v1/reviews/**").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/**").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/farmer/**", "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/farmer/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
@@ -73,7 +75,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.stream(properties.getCors().getAllowedOrigins().split(",")).map(String::trim).toList());
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);

@@ -45,8 +45,15 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse update(UUID id, UserUpdateRequest request) {
+    public UserResponse update(UUID id, UserUpdateRequest request, UUID actorId) {
         User user = findUser(id);
+        boolean remainsActiveAdmin = request.active() && request.roles().contains(RoleName.ADMIN);
+        if (id.equals(actorId) && !remainsActiveAdmin) {
+            throw new ConflictException("You cannot deactivate or remove the administrator role from your own account");
+        }
+        if (isActiveAdmin(user) && !remainsActiveAdmin) {
+            ensureAnotherActiveAdminExists();
+        }
         user.setFullName(request.fullName().trim());
         user.setActive(request.active());
         user.setRoles(resolveRoles(request.roles()));
@@ -54,7 +61,12 @@ public class UserService {
     }
 
     @Transactional
-    public void delete(UUID id) { userRepository.delete(findUser(id)); }
+    public void delete(UUID id, UUID actorId) {
+        if (id.equals(actorId)) throw new ConflictException("You cannot delete your own account");
+        User user = findUser(id);
+        if (isActiveAdmin(user)) ensureAnotherActiveAdminExists();
+        userRepository.delete(user);
+    }
 
     @Transactional(readOnly = true)
     public User getEntity(UUID id) { return findUser(id); }
@@ -67,5 +79,16 @@ public class UserService {
         List<Role> roles = roleRepository.findByNameIn(roleNames);
         if (roles.size() != roleNames.size()) throw new ResourceNotFoundException("One or more roles do not exist");
         return Set.copyOf(roles);
+    }
+
+    private boolean isActiveAdmin(User user) {
+        return user.isActive() && user.getRoles().stream().anyMatch(role -> role.getName() == RoleName.ADMIN);
+    }
+
+    private void ensureAnotherActiveAdminExists() {
+        userRepository.findActiveUsersWithRoleForUpdate(RoleName.ADMIN);
+        if (userRepository.countActiveUsersWithRole(RoleName.ADMIN) <= 1) {
+            throw new ConflictException("The last active administrator cannot be removed or deactivated");
+        }
     }
 }

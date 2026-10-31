@@ -32,7 +32,7 @@ const initialCartItems: CartItem[] = [
     farm: "Nông Trại Dâu Mộc Châu",
     cert: "VietGAP",
     batchCode: "DT-MC-2026-11",
-    image: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=400&auto=format&fit=crop&q=80",
+    image: "/images/products/dau-tay.jpg",
   },
   {
     id: "sp-02",
@@ -43,7 +43,7 @@ const initialCartItems: CartItem[] = [
     farm: "Nông Trại Xanh Đà Lạt",
     cert: "GlobalGAP",
     batchCode: "XL-2026-08",
-    image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&auto=format&fit=crop&q=80",
+    image: "/images/products/xa-lach.jpg",
   },
 ];
 

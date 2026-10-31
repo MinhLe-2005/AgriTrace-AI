@@ -15,9 +15,17 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String email) {
-        return userRepository.findByEmailIgnoreCase(email)
+    public UserDetails loadUserByUsername(String identifier) {
+        String clean = identifier != null ? identifier.trim() : "";
+        return userRepository.findByEmailIgnoreCase(clean)
+                .or(() -> {
+                    if (!clean.contains("@")) {
+                        var matches = userRepository.findByIdentifier(clean);
+                        return matches.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(matches.get(0));
+                    }
+                    return java.util.Optional.empty();
+                })
                 .map(AppUserDetails::new)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + identifier));
     }
 }

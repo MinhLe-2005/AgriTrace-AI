@@ -116,6 +116,7 @@ export function MainNavbar() {
         {/* Right Section */}
         <div className="flex items-center gap-2.5">
           {/* Notifications Bell */}
+          {user && (
           <div className="relative">
             <button
               onClick={() => {
@@ -220,6 +221,7 @@ export function MainNavbar() {
               </div>
             )}
           </div>
+          )}
 
           <Link
             href="/cart"
@@ -403,7 +405,7 @@ export function MainNavbar() {
                           <span>Đơn vận chuyển xe lạnh</span>
                         </Link>
                         <Link
-                          href="/traceability"
+                          href="/dashboard/distributor/receive"
                           onClick={() => setUserOpen(false)}
                           className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-amber-50 hover:text-amber-800 font-medium"
                         >
