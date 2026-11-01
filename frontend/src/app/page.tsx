@@ -29,6 +29,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { QuickBuyModal } from "@/components/cart/quick-buy-modal";
 import { useEffect, useState } from "react";
 import {
   catalogService,
@@ -58,6 +59,8 @@ export default function HomePage() {
   const [tab, setTab] = useState<string>("all");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ApiProduct | null>(null);
+  const [quickBuyProduct, setQuickBuyProduct] = useState<ApiProduct | null>(null);
+  const [quickBuyQty, setQuickBuyQty] = useState(1);
   const [modalQty, setModalQty] = useState(1);
 
   // Live data states loaded from Supabase
@@ -115,22 +118,14 @@ export default function HomePage() {
     toast.success(`Đã thêm "${p.name}" vào giỏ hàng!`);
   }
 
-  function handleBuyNow(p: ApiProduct, e?: React.MouseEvent) {
-    if (e) e.stopPropagation();
-    addItem(
-      {
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        unit: p.unit,
-        farm: p.origin || p.farm,
-        cert: p.cert,
-        batchCode: p.batchCode,
-        image: p.image,
-      },
-      modalQty || 1
-    );
-    router.push("/cart?step=2");
+  function handleBuyNow(p: ApiProduct, qtyOrEvent?: number | React.MouseEvent) {
+    if (qtyOrEvent && typeof qtyOrEvent === "object" && "stopPropagation" in qtyOrEvent) {
+      qtyOrEvent.stopPropagation();
+    }
+    const quantity = typeof qtyOrEvent === "number" ? qtyOrEvent : 1;
+    setQuickBuyProduct(p);
+    setQuickBuyQty(quantity);
+    setSelectedProduct(null);
   }
 
   function handleCopyVoucher(code: string) {
@@ -904,22 +899,7 @@ export default function HomePage() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    addItem(
-                      {
-                        id: selectedProduct.id,
-                        name: selectedProduct.name,
-                        price: selectedProduct.price,
-                        unit: selectedProduct.unit,
-                        farm: selectedProduct.origin || selectedProduct.farm,
-                        cert: selectedProduct.cert,
-                        batchCode: selectedProduct.batchCode,
-                        image: selectedProduct.image,
-                      },
-                      modalQty
-                    );
-                    router.push("/cart?step=2");
-                  }}
+                  onClick={() => handleBuyNow(selectedProduct, modalQty)}
                   className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-colors flex items-center gap-1"
                 >
                   <span>Mua ngay</span>
@@ -930,6 +910,13 @@ export default function HomePage() {
           </div>
         </div>
       )}
+      {/* Mua Ngay Siêu Tốc Modal */}
+      <QuickBuyModal
+        isOpen={!!quickBuyProduct}
+        onClose={() => setQuickBuyProduct(null)}
+        product={quickBuyProduct}
+        initialQty={quickBuyQty}
+      />
     </div>
   );
 }

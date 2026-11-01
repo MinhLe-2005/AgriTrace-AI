@@ -5,6 +5,9 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${POSTGRES_DB:my_fullstack_app}}
     username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:admin}}
     password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:}}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
   jpa:
     hibernate:
       ddl-auto: update
@@ -56,6 +59,10 @@ app:
     email: ${BOOTSTRAP_ADMIN_EMAIL:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
     full-name: ${BOOTSTRAP_ADMIN_NAME:Administrator}
+  payos:
+    client-id: ${PAYOS_CLIENT_ID:c0f6fe6f-53f7-40f5-9783-edee658139d7}
+    api-key: ${PAYOS_API_KEY:4abd8dbe-749b-43e9-971b-795f28b1023d}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:ec5acbd6a06b69bfb85e60dac76d35148291c4eca8e24f17b39aff4c6c5d3b7e}
 springdoc:
   api-docs:
     path: /api-docs
