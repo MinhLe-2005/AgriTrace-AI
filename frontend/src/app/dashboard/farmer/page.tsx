@@ -3,15 +3,10 @@
 import {
   AlertTriangle,
   Award,
-  Calendar,
   CheckCircle2,
   Clock,
-  Compass,
   Edit3,
-  FileCheck,
   FileText,
-  Filter,
-  Globe,
   Home,
   Leaf,
   MapPin,
@@ -20,7 +15,6 @@ import {
   Plus,
   QrCode,
   Save,
-  ShieldCheck,
   Sparkles,
   Sprout,
   Trash2,
@@ -303,9 +297,7 @@ export default function FarmerPortalPage() {
   const [formUnit, setFormUnit] = useState("kg");
   const [formCert, setFormCert] = useState("VietGAP");
   const [formCultivation, setFormCultivation] = useState("Quy trình an toàn VietGAP");
-  const [formStatus, setFormStatus] = useState<BatchItem["status"]>("Chờ duyệt xuất kho");
   const [formTransportDest, setFormTransportDest] = useState("Kho Tổng Logistics TP.HCM");
-  const [formTransportStatus, setFormTransportStatus] = useState<BatchItem["transportStatus"]>("Chưa vận chuyển");
 
   // =========================================================================
   // 3. DỮ LIỆU NHẬT KÝ CANH TÁC
@@ -556,11 +548,6 @@ export default function FarmerPortalPage() {
       return;
     }
 
-    let color = "#10b981";
-    if (formStatus === "Chờ duyệt xuất kho") color = "#f97316";
-    if (formStatus === "Đang chăm sóc") color = "#f59e0b";
-    if (formStatus === "Đang lưu kho lạnh") color = "#3b82f6";
-
     const formatDisplayDate = (dStr: string) => {
       if (!dStr) return "";
       const p = dStr.split("-");
@@ -576,12 +563,12 @@ export default function FarmerPortalPage() {
       expiryDate: formatDisplayDate(formExpiryDate),
       qty: formQty,
       unit: formUnit,
-      status: formStatus,
-      statusColor: color,
+      status: "Chờ duyệt xuất kho",
+      statusColor: "#f97316",
       cert: formCert,
       cultivation: formCultivation,
       transportDestination: formTransportDest,
-      transportStatus: formTransportStatus,
+      transportStatus: "Chưa vận chuyển",
     };
 
     // Lưu vào database backend (bảng agri_harvest_lots & tự động sinh mã QR agri_traceability)
@@ -1331,7 +1318,7 @@ export default function FarmerPortalPage() {
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
             {displayedLogs.length === 0 ? (
               <div className="text-center py-10 text-gray-400 text-xs">
-                Chưa có ghi chép nhật ký nào cho nông trại này. Hãy bấm <strong>"Thêm Ghi Chép Mới"</strong> để ghi nhận!
+                Chưa có ghi chép nhật ký nào cho nông trại này. Hãy bấm <strong>&quot;Thêm Ghi Chép Mới&quot;</strong> để ghi nhận!
               </div>
             ) : (
               displayedLogs.map((log) => {
@@ -1495,7 +1482,7 @@ export default function FarmerPortalPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {displayedProducts.length === 0 ? (
               <div className="col-span-full bg-white p-8 rounded-2xl border border-gray-200 text-center text-gray-400 text-xs">
-                Chưa có sản phẩm nông nghiệp nào thuộc nông trại này. Hãy bấm <strong>"Thêm Sản Phẩm Mới"</strong>!
+                Chưa có sản phẩm nông nghiệp nào thuộc nông trại này. Hãy bấm <strong>&quot;Thêm Sản Phẩm Mới&quot;</strong>!
               </div>
             ) : (
               displayedProducts.map((p) => {
@@ -2072,38 +2059,21 @@ export default function FarmerPortalPage() {
                 </div>
               </div>
 
-              {/* Bước 5: Kế hoạch Vận Chuyển & Điểm Đến */}
-              <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
-                    <Truck size={12} className="text-emerald-700" /> Tình trạng vận chuyển *
-                  </label>
-                  <select
-                    value={formTransportStatus}
-                    onChange={(e) => setFormTransportStatus(e.target.value as any)}
-                    className="w-full px-2.5 py-2 border border-gray-300 rounded-xl bg-white font-semibold"
-                  >
-                    <option value="Chưa vận chuyển">🏡 Chưa vận chuyển (Lưu tại kho vườn)</option>
-                    <option value="Đang vận chuyển">🚚 Đang vận chuyển đến kho</option>
-                    <option value="Đã nhập kho đích">🏢 Đã giao đến kho lưu trữ đích</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1">
-                    Điểm đến / Kho nhận hàng *
-                  </label>
-                  <select
-                    value={formTransportDest}
-                    onChange={(e) => setFormTransportDest(e.target.value)}
-                    className="w-full px-2.5 py-2 border border-gray-300 rounded-xl bg-white font-medium"
-                  >
-                    <option value="Kho Tổng Logistics TP.HCM">Kho Tổng Logistics TP.HCM</option>
-                    <option value="Kho Lạnh Phân Phối Hà Nội">Kho Lạnh Phân Phối Hà Nội</option>
-                    <option value="Kho Phân Phối Đà Nẵng">Kho Phân Phối Đà Nẵng</option>
-                    <option value="Lưu tại kho bảo quản nông trại">Lưu tại kho bảo quản nông trại</option>
-                  </select>
-                </div>
+              {/* Bước 5: Điểm Đến & Phương Pháp Canh Tác */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1.5">
+                  <MapPin size={13} className="text-emerald-700" /> Điểm đến / Kho nhận hàng dự kiến *
+                </label>
+                <select
+                  value={formTransportDest}
+                  onChange={(e) => setFormTransportDest(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-medium"
+                >
+                  <option value="Kho Tổng Logistics TP.HCM">Kho Tổng Logistics TP.HCM</option>
+                  <option value="Kho Lạnh Phân Phối Hà Nội">Kho Lạnh Phân Phối Hà Nội</option>
+                  <option value="Kho Phân Phối Đà Nẵng">Kho Phân Phối Đà Nẵng</option>
+                  <option value="Lưu tại kho bảo quản nông trại">Lưu tại kho bảo quản nông trại</option>
+                </select>
               </div>
 
               <div>
@@ -2117,17 +2087,27 @@ export default function FarmerPortalPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-gray-700 font-bold mb-1">Trạng thái gửi lên hệ thống</label>
-                <select
-                  value={formStatus}
-                  onChange={(e) => setFormStatus(e.target.value as BatchItem["status"])}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-medium"
-                >
-                  <option value="Chờ duyệt xuất kho">Chờ duyệt xuất kho (Gửi Admin thẩm định)</option>
-                  <option value="Đang chăm sóc">Đang chăm sóc tại vườn</option>
-                  <option value="Đã duyệt xuất kho">Đã duyệt xuất kho</option>
-                </select>
+              {/* Thông tin trạng thái hệ thống tự động theo quy trình */}
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3.5 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+                  <span className="font-bold text-gray-700 flex items-center gap-1.5">
+                    <Truck size={13} className="text-emerald-700" /> Tình trạng vận chuyển ban đầu:
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white text-gray-700 border border-gray-200 shadow-2xs">
+                    🏡 Chưa vận chuyển (Lưu tại kho vườn)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-700 flex items-center gap-1.5">
+                    <Clock size={13} className="text-amber-600" /> Trạng thái thẩm định hệ thống:
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    ⏳ Chờ duyệt xuất kho
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 pt-1 leading-relaxed">
+                  ℹ️ <em>Quy trình:</em> Trạng thái xuất kho sẽ do <strong>Admin</strong> thẩm định; Trạng thái vận chuyển sẽ do <strong>Nhà phân phối</strong> &amp; <strong>Thủ kho</strong> cập nhật khi quét mã QR bàn giao hàng.
+                </p>
               </div>
 
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
