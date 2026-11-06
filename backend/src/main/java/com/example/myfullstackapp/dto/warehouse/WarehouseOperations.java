@@ -35,7 +35,16 @@ public final class WarehouseOperations {
             UUID targetWarehouseId,
             UUID reservationId,
             @Size(max = 500) String note,
-            @NotEmpty @Size(max = 100) List<@Valid LineInput> lines) {}
+            @NotEmpty @Size(max = 100) List<@Valid LineInput> lines,
+            Boolean inTransit) {
+        public DocumentInput(
+                UUID targetWarehouseId,
+                UUID reservationId,
+                String note,
+                List<@Valid LineInput> lines) {
+            this(targetWarehouseId, reservationId, note, lines, false);
+        }
+    }
 
     public record LineView(
             UUID id,
@@ -89,7 +98,7 @@ public final class WarehouseOperations {
 
     public record ReserveInput(
             @NotNull @Positive Long orderId,
-            @NotNull String productId,
+            @NotNull @NotBlank String productId,
             @NotNull @DecimalMin("0.001") @Digits(integer = 11, fraction = 3) BigDecimal quantityKg,
             @Min(1) @Max(1440) int ttlMinutes) {}
 

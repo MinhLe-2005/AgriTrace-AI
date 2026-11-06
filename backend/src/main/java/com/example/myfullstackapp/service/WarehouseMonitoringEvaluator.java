@@ -204,6 +204,7 @@ public class WarehouseMonitoringEvaluator {
             if (entry.getValue().compareTo(rule.getMinQuantityKg()) <= 0) continue;
             String remaining = days + " ngày";
             boolean near = days <= rule.getThreshold().intValue();
+            String severity = rule.getSeverity();
             if (percent) {
                 var harvest = harvested.get(entry.getKey());
                 long life =
@@ -230,20 +231,28 @@ public class WarehouseMonitoringEvaluator {
                             entry.getKey());
                     continue;
                 }
-                var remainingTimes100 = BigDecimal.valueOf(days).multiply(new BigDecimal("100"));
-                near =
-                        remainingTimes100.compareTo(
-                                        rule.getThreshold().multiply(BigDecimal.valueOf(life)))
-                                < 0;
-                remaining =
-                        plain(
-                                        remainingTimes100.divide(
-                                                BigDecimal.valueOf(life),
-                                                1,
-                                                java.math.RoundingMode.HALF_UP))
-                                + "% hạn dùng ("
-                                + days
-                                + " ngày)";
+                if (days <= 0) {
+                    near = true;
+                    remaining = "0% (ĐÃ HẾT HẠN) (" + days + " ngày)";
+                    severity = "CRITICAL";
+                } else {
+                    var remainingTimes100 = BigDecimal.valueOf(days).multiply(new BigDecimal("100"));
+                    near =
+                            remainingTimes100.compareTo(
+                                            rule.getThreshold().multiply(BigDecimal.valueOf(life)))
+                                    < 0;
+                    remaining =
+                            plain(
+                                            remainingTimes100.divide(
+                                                    BigDecimal.valueOf(life),
+                                                    1,
+                                                    java.math.RoundingMode.HALF_UP))
+                                    + "% hạn dùng ("
+                                    + days
+                                    + " ngày)";
+                }
+            } else if (days <= 0) {
+                severity = "CRITICAL";
             }
             if (near) {
                 live.add(fingerprint);
@@ -251,7 +260,7 @@ public class WarehouseMonitoringEvaluator {
                         warehouseId,
                         fingerprint,
                         rule.getKind().name(),
-                        rule.getSeverity(),
+                        severity,
                         rule.getName()
                                 + " · "
                                 + codes.get(entry.getKey())
