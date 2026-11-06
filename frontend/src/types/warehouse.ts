@@ -65,7 +65,8 @@ export interface WarehouseDocument {
   targetWarehouseId?: string;
   reservationId?: string;
   type: DocumentType;
-  status: "DRAFT" | "CONFIRMED" | "CANCELLED" | "HANDED_OVER";
+  status: "DRAFT" | "CONFIRMED" | "CANCELLED" | "HANDED_OVER" | "IN_TRANSIT";
+  inTransit?: boolean;
   note?: string;
   handoverReference?: string;
   createdBy: string;

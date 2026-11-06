@@ -137,6 +137,7 @@ function Status({ value }: { value: string }) {
     CONFIRMED: "Đã xác nhận",
     CANCELLED: "Đã hủy",
     HANDED_OVER: "Đã bàn giao",
+    IN_TRANSIT: "Đang vận chuyển",
     ACTIVE: "Đang giữ",
     EXPIRED: "Hết hạn giữ",
     CONSUMED: "Đã xuất",
@@ -160,6 +161,7 @@ export function WarehouseManager() {
   const [id, setId] = useState("");
   const [tab, setTab] = useState<(typeof tabs)[number]>("Tổng quan");
   const [busy, setBusy] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [action, setAction] = useState<Action | null>(null);
   const [documentType, setDocumentType] = useState<DocumentType | null>(null);
   const [detail, setDetail] = useState<WarehouseDocument | null>(null);
@@ -171,6 +173,10 @@ export function WarehouseManager() {
   const [page, setPage] = useState(0);
   const [stockPage, setStockPage] = useState(0);
   const [stockSearch, setStockSearch] = useState("");
+  useEffect(() => {
+    setPage(0);
+    setStockPage(0);
+  }, [tab]);
   const [from, setFrom] = useState(date(new Date(Date.now() - 30 * 86400000)));
   const [to, setTo] = useState(date(new Date()));
   const warehouses = useQuery({
@@ -260,8 +266,13 @@ export function WarehouseManager() {
   const warehouse = warehouses.data?.find((w) => w.id === id);
   const locationLabel = (value: string) =>
     locations.data?.find((l) => l.id === value)?.code ?? value.slice(0, 8);
-  async function run(fn: () => Promise<unknown>, message = "Đã lưu thay đổi.") {
-    if (busy) return false;
+  async function run(
+    fn: () => Promise<unknown>,
+    message = "Đã lưu thay đổi.",
+    actionId?: string
+  ) {
+    if (actionId ? actionLoadingId === actionId : busy) return false;
+    if (actionId) setActionLoadingId(actionId);
     setBusy(true);
     try {
       await fn();
@@ -272,6 +283,7 @@ export function WarehouseManager() {
       toast.error(getApiErrorMessage(e));
       return false;
     } finally {
+      if (actionId) setActionLoadingId(null);
       setBusy(false);
     }
   }
@@ -472,20 +484,24 @@ export function WarehouseManager() {
                 onChange={(e) => setTo(e.target.value)}
               />
             </label>
-            <Button
-              className="ml-auto"
-              disabled={!warehouse?.active}
-              onClick={() => setDocumentType("INBOUND")}
-            >
-              Nhập kho
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={!warehouse?.active}
-              onClick={() => setDocumentType("OUTBOUND")}
-            >
-              Xuất kho
-            </Button>
+            {(["Tổng quan", "Chứng từ", "Tồn & chất lượng", "FEFO & giữ hàng"] as string[]).includes(tab) && (
+              <>
+                <Button
+                  className="ml-auto"
+                  disabled={!warehouse?.active}
+                  onClick={() => setDocumentType("INBOUND")}
+                >
+                  Nhập kho
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!warehouse?.active}
+                  onClick={() => setDocumentType("OUTBOUND")}
+                >
+                  Xuất kho
+                </Button>
+              </>
+            )}
           </div>
           <nav
             aria-label="Chức năng kho"
@@ -897,7 +913,7 @@ export function WarehouseManager() {
                           <>
                             <Button
                               size="sm"
-                              disabled={busy}
+                              disabled={actionLoadingId === `confirm-${d.id}` || actionLoadingId === `cancel-${d.id}`}
                               onClick={() => setConfirmation(d)}
                             >
                               Xác nhận
@@ -905,19 +921,35 @@ export function WarehouseManager() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              disabled={busy}
+                              disabled={actionLoadingId === `confirm-${d.id}` || actionLoadingId === `cancel-${d.id}`}
                               onClick={() =>
-                                run(() => service.cancel(id, d.id))
+                                run(() => service.cancel(id, d.id), "Đã hủy phiếu.", `cancel-${d.id}`)
                               }
                             >
-                              Hủy
+                              {actionLoadingId === `cancel-${d.id}` ? "Đang hủy..." : "Hủy"}
                             </Button>
                           </>
                         )}
-                        {d.type === "OUTBOUND" && d.status === "CONFIRMED" && (
+                        {d.status === "IN_TRANSIT" && d.targetWarehouseId === id && (
+                          <Button
+                            size="sm"
+                            disabled={actionLoadingId === `receive-${d.id}`}
+                            onClick={() =>
+                              run(
+                                () => service.confirm(id, d.id),
+                                "Đã nhận hàng chuyển kho thành công.",
+                                `receive-${d.id}`
+                              )
+                            }
+                          >
+                            {actionLoadingId === `receive-${d.id}` ? "Đang nhận..." : "Nhận hàng"}
+                          </Button>
+                        )}
+                        {(d.type === "OUTBOUND" || d.type === "TRANSFER") && d.status === "CONFIRMED" && (
                           <Button
                             size="sm"
                             variant="secondary"
+                            disabled={busy}
                             onClick={() =>
                               setAction({
                                 title: "Ghi nhận bàn giao",
@@ -1365,35 +1397,95 @@ export function WarehouseManager() {
       )}
       {confirmation && (
         <Modal
-          title="Xác nhận chứng từ"
+          title={`Xác nhận phiếu ${labels[confirmation.type].toLowerCase()}`}
           onClose={() => !busy && setConfirmation(null)}
         >
-          <p className="mb-4 text-sm">
-            Xác nhận phiếu {labels[confirmation.type].toLowerCase()}{" "}
-            {confirmation.id.slice(0, 8)} và ghi nhận thay đổi tồn kho?
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => setConfirmation(null)}
-            >
-              Đóng
-            </Button>
-            <Button
-              disabled={busy}
-              onClick={async () => {
-                if (
-                  await run(
-                    () => service.confirm(id, confirmation.id),
-                    "Đã xác nhận phiếu."
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Bạn có chắc chắn muốn xác nhận phiếu{" "}
+              <strong className="text-slate-900">{labels[confirmation.type]}</strong>{" "}
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-700">
+                {confirmation.id.slice(0, 8)}
+              </code>{" "}
+              và ghi nhận thay đổi tồn kho?
+            </p>
+            {confirmation.note && (
+              <p className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600 border">
+                <strong>Ghi chú:</strong> {confirmation.note}
+              </p>
+            )}
+            <div className="max-h-60 overflow-y-auto rounded-lg border">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-slate-50 text-slate-500 border-b">
+                  <tr>
+                    <th className="p-2">Mã lô</th>
+                    <th className="p-2">Vị trí</th>
+                    {confirmation.type === "TRANSFER" && (
+                      <th className="p-2">Vị trí đích</th>
+                    )}
+                    <th className="p-2 text-right">Số lượng</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {confirmation.lines.map((l, i) => (
+                    <tr key={i} className="hover:bg-slate-50/50">
+                      <td className="p-2 font-mono text-slate-800">
+                        {stock.data?.find((b) => b.lotId === l.lotId)?.lotCode ??
+                          l.lotId.slice(0, 8)}
+                      </td>
+                      <td className="p-2 text-slate-700">{locationLabel(l.locationId)}</td>
+                      {confirmation.type === "TRANSFER" && (
+                        <td className="p-2 text-slate-700">
+                          {l.targetLocationId ? locationLabel(l.targetLocationId) : "—"}
+                        </td>
+                      )}
+                      <td className="p-2 text-right font-medium text-slate-900">
+                        {quantity(l.quantityKg)} kg
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="border-t bg-slate-50/80 font-medium">
+                  <tr>
+                    <td colSpan={confirmation.type === "TRANSFER" ? 3 : 2} className="p-2 text-slate-600">
+                      Tổng cộng ({confirmation.lines.length} dòng):
+                    </td>
+                    <td className="p-2 text-right text-emerald-700 font-bold">
+                      {quantity(
+                        confirmation.lines.reduce((sum, l) => sum + (l.quantityKg ?? 0), 0)
+                      )}{" "}
+                      kg
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <Button
+                variant="secondary"
+                disabled={actionLoadingId === `confirm-${confirmation.id}`}
+                onClick={() => setConfirmation(null)}
+              >
+                Đóng
+              </Button>
+              <Button
+                disabled={actionLoadingId === `confirm-${confirmation.id}`}
+                onClick={async () => {
+                  if (
+                    await run(
+                      () => service.confirm(id, confirmation.id),
+                      "Đã xác nhận phiếu.",
+                      `confirm-${confirmation.id}`
+                    )
                   )
-                )
-                  setConfirmation(null);
-              }}
-            >
-              Xác nhận phiếu
-            </Button>
+                    setConfirmation(null);
+                }}
+              >
+                {actionLoadingId === `confirm-${confirmation.id}`
+                  ? "Đang xác nhận..."
+                  : "Xác nhận phiếu"}
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
