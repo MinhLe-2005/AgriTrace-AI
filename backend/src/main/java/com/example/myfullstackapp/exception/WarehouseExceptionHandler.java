@@ -5,6 +5,11 @@ import com.example.myfullstackapp.controller.OutboundReceiptController;
 import com.example.myfullstackapp.controller.StockReservationController;
 import com.example.myfullstackapp.controller.StorageLocationController;
 import com.example.myfullstackapp.controller.WarehouseController;
+import com.example.myfullstackapp.controller.WarehouseHeatmapController;
+import com.example.myfullstackapp.controller.WarehouseMonitoringController;
+import com.example.myfullstackapp.controller.WarehouseQualityController;
+import com.example.myfullstackapp.controller.WarehouseRiskController;
+import com.example.myfullstackapp.controller.WarehouseTelemetryController;
 import com.example.myfullstackapp.dto.ApiError;
 
 import org.springframework.core.Ordered;
@@ -21,12 +26,35 @@ import java.util.List;
 @RestControllerAdvice(
         assignableTypes = {
             WarehouseController.class,
+            WarehouseHeatmapController.class,
             StorageLocationController.class,
             InboundReceiptController.class,
             OutboundReceiptController.class,
-            StockReservationController.class
+            StockReservationController.class,
+            WarehouseQualityController.class,
+            WarehouseRiskController.class,
+            WarehouseMonitoringController.class,
+            WarehouseTelemetryController.class
         })
 public class WarehouseExceptionHandler {
+    @ExceptionHandler(WarehouseSensorAuthenticationException.class)
+    ResponseEntity<ApiError> sensorAuthentication(WarehouseSensorAuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiError.of(ex.getMessage(), "INVALID_SENSOR_CREDENTIALS", List.of()));
+    }
+
+    @ExceptionHandler(WarehouseSensorRateLimitException.class)
+    ResponseEntity<ApiError> sensorRateLimit(WarehouseSensorRateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiError.of(ex.getMessage(), "SENSOR_RATE_LIMIT", List.of()));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    ResponseEntity<ApiError> conflict(ConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(ex.getMessage(), "CONFLICT", List.of()));
+    }
+
     @ExceptionHandler(WarehouseIntegrationException.class)
     ResponseEntity<ApiError> integration(WarehouseIntegrationException ex) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)

@@ -17,7 +17,8 @@ public class StockReservation {
     public enum Status {
         ACTIVE,
         RELEASED,
-        CONSUMED
+        CONSUMED,
+        EXPIRED
     }
 
     @Id

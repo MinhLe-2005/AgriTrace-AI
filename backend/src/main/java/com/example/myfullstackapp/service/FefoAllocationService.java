@@ -23,7 +23,7 @@ public class FefoAllocationService {
                                 b ->
                                         productId.equals(b.productId())
                                                 && !b.held()
-                                                && !b.expiryDate().isBefore(today)
+                                                && b.expiryDate().isAfter(today)
                                                 && b.availableKg().signum() > 0)
                         .sorted(
                                 Comparator.comparing(BalanceView::expiryDate)

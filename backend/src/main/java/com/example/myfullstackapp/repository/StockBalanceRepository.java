@@ -18,4 +18,7 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, UUID
 
     @Query("select coalesce(sum(b.quantityKg),0) from StockBalance b where b.locationId=:id")
     BigDecimal sumQuantityByLocation(@Param("id") UUID locationId);
+
+    @Query("select coalesce(sum(b.quantityKg),0) from StockBalance b where b.warehouseId=:id")
+    BigDecimal sumQuantityByWarehouse(@Param("id") UUID warehouseId);
 }
