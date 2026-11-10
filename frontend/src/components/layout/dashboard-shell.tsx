@@ -134,8 +134,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       /* ignore */
     }
     clearSession();
-    toast.info("Đã đăng xuất.");
-    router.replace("/login");
+    toast.info("Đã đăng xuất thành công.");
+    router.replace("/");
   }
 
   const hasRole = (role: string) =>

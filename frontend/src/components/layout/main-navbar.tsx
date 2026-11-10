@@ -20,12 +20,14 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { authService } from "@/services/auth.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCartStore } from "@/stores/cart-store";
 import { useNotificationStore } from "@/stores/notification-store";
+import { toast } from "@/stores/toast-store";
 
 const navLinks = [
   { label: "Trang Chủ", href: "/" },
@@ -47,7 +49,8 @@ const roleLabelMap: Record<string, string> = {
 
 export function MainNavbar() {
   const pathname = usePathname();
-  const { user, clearSession } = useAuthStore();
+  const router = useRouter();
+  const { user, clearSession, refreshToken } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -55,6 +58,21 @@ export function MainNavbar() {
   const { notifications, markAsRead, markAllAsRead } = useNotificationStore();
   const unreadNotifs = notifications.filter((n) => !n.read);
   const cartCount = useCartStore((s) => s.getItemCount());
+
+  const handleLogout = async () => {
+    try {
+      if (refreshToken) {
+        await authService.logout(refreshToken);
+      }
+    } catch {
+      /* ignore */
+    }
+    clearSession();
+    setUserOpen(false);
+    setMobileOpen(false);
+    toast.info("Đã đăng xuất thành công.");
+    router.push("/");
+  };
 
   useEffect(() => {
     setMobileOpen(false);
@@ -478,8 +496,8 @@ export function MainNavbar() {
                         </Link>
                       )}
                       <button
-                        onClick={() => clearSession()}
-                        className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 font-medium flex items-center gap-2"
+                        onClick={handleLogout}
+                        className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 font-medium flex items-center gap-2 cursor-pointer transition-colors"
                       >
                         <LogOut size={13} strokeWidth={1.75} />
                         <span>Đăng xuất</span>
@@ -522,7 +540,7 @@ export function MainNavbar() {
           ))}
 
           {user && (
-            <div className="pt-2 border-t border-gray-100">
+            <div className="pt-2 border-t border-gray-100 space-y-1">
               {user.roles.includes("ADMIN") && (
                 <Link href="/dashboard/admin" className="block px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-lg">
                   Vào Trang Quản Trị Hệ Thống
@@ -548,6 +566,13 @@ export function MainNavbar() {
                   Xem Đơn Mua Của Bạn
                 </Link>
               )}
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <LogOut size={15} strokeWidth={1.75} />
+                <span>Đăng xuất</span>
+              </button>
             </div>
           )}
         </div>
