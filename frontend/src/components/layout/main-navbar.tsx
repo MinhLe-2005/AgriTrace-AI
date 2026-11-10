@@ -12,6 +12,7 @@ import {
   QrCode,
   Shield,
   ShoppingBag,
+  Sparkles,
   Sprout,
   Truck,
   User,
@@ -175,57 +176,65 @@ export function MainNavbar() {
                   )}
                 </div>
 
-                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-                  {notifications.length === 0 ? (
-                    <div className="p-6 text-center text-gray-400">Không có thông báo nào</div>
-                  ) : (
-                    notifications.slice(0, 5).map((n) => (
-                      <Link
-                        key={n.id}
-                        href={n.link || "/dashboard/customer?tab=notifications"}
-                        onClick={() => {
-                          markAsRead(n.id);
-                          setNotifOpen(false);
-                        }}
-                        className={`p-3.5 block transition-colors hover:bg-gray-50/80 ${
-                          !n.read ? "bg-emerald-50/40" : ""
-                        }`}
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <div
-                            className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                              n.type === "order"
-                                ? "bg-blue-100 text-blue-700"
-                                : n.type === "voucher"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-emerald-100 text-emerald-700"
-                            }`}
-                          >
-                            {n.type === "order" ? (
-                              <Truck size={14} />
-                            ) : n.type === "voucher" ? (
-                              <Gift size={14} />
-                            ) : (
-                              <Leaf size={14} />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-1">
-                              <p className="font-semibold text-gray-900 text-xs truncate">{n.title}</p>
-                              {!n.read && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
+                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-gray-400">Không có thông báo nào</div>
+                    ) : (
+                      notifications.slice(0, 6).map((n) => (
+                        <Link
+                          key={n.id}
+                          href={n.link || "/dashboard/customer?tab=notifications"}
+                          onClick={() => {
+                            markAsRead(n.id);
+                            setNotifOpen(false);
+                          }}
+                          className={`p-3.5 block transition-colors hover:bg-gray-50/80 ${
+                            !n.read ? "bg-emerald-50/40" : ""
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                                n.type === "order"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : n.type === "voucher"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : n.type === "promo"
+                                  ? "bg-rose-100 text-rose-700"
+                                  : n.type === "season"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                              }`}
+                            >
+                              {n.type === "order" ? (
+                                <Truck size={14} />
+                              ) : n.type === "voucher" ? (
+                                <Gift size={14} />
+                              ) : n.type === "promo" ? (
+                                <Sparkles size={14} />
+                              ) : n.type === "season" ? (
+                                <Sprout size={14} />
+                              ) : (
+                                <Leaf size={14} />
                               )}
                             </div>
-                            <p className="text-gray-500 text-[11px] line-clamp-2 mt-0.5 leading-snug">
-                              {n.message}
-                            </p>
-                            <span className="text-[10px] text-gray-400 mt-1 block">{n.createdAt}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <p className="font-semibold text-gray-900 text-xs truncate">{n.title}</p>
+                                {!n.read && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
+                                )}
+                              </div>
+                              <p className="text-gray-500 text-[11px] line-clamp-2 mt-0.5 leading-snug">
+                                {n.message}
+                              </p>
+                              <span className="text-[10px] text-gray-400 mt-1 block">{n.createdAt}</span>
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-                    ))
-                  )}
-                </div>
+                        </Link>
+                      ))
+                    )}
+                  </div>
 
                 <div className="p-2 border-t border-gray-100 bg-gray-50/50 text-center">
                   <Link

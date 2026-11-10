@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type NotificationType = "order" | "voucher" | "system";
+export type NotificationType = "order" | "voucher" | "promo" | "season" | "system";
 
 export type NotificationItem = {
   id: string;
@@ -21,40 +21,58 @@ type NotificationStore = {
 
 const initialNotifications: NotificationItem[] = [
   {
-    id: "notif-1",
-    title: "Đang giao hàng xe lạnh",
-    message: "Đơn hàng AGRI-8841 đang được tài xế giao bằng xe lạnh 5°C. Dự kiến nhận trước 16:30.",
-    type: "order",
-    createdAt: "15 phút trước",
+    id: "notif-season-1",
+    title: "🍓 Mở bán Mùa Dâu Tây Mộc Châu Vụ Đông",
+    message: "Dâu tây New Zealand Mộc Châu chính thức vào vụ thu hái chín rộ. Chuỗi xe lạnh 2-5°C giao tận bàn ăn trong 24h!",
+    type: "season",
+    createdAt: "30 phút trước",
     read: false,
-    link: "/dashboard/customer?tab=orders&order=AGRI-8841",
+    link: "/products?cat=trai_cay",
   },
   {
-    id: "notif-2",
-    title: "Voucher mới trong ví của bạn",
-    message: "Bạn đã nhận được mã AGRI30 giảm 14.000đ và FREESHIP25 mừng vụ thu hoạch Mộc Châu.",
-    type: "voucher",
+    id: "notif-promo-1",
+    title: "🎉 Tuần Lễ Nông Sản Xanh - Giảm 20% & Freeship",
+    message: "Áp mã NONGNGHIEPXANH giảm ngay 20.000đ cho đơn nông sản VietGAP. Tích thêm x1.5 điểm AgriClub!",
+    type: "promo",
+    createdAt: "1 giờ trước",
+    read: false,
+    link: "/vouchers",
+  },
+  {
+    id: "notif-order-1",
+    title: "🚚 Đang giao hàng xe lạnh (AGRI-8841)",
+    message: "Đơn hàng AGRI-8841 đang được tài xế giao bằng xe lạnh 4.1°C. Dự kiến nhận trước 16:30 chiều nay.",
+    type: "order",
     createdAt: "2 giờ trước",
     read: false,
+    link: "/dashboard/customer?tab=orders",
+  },
+  {
+    id: "notif-season-2",
+    title: "🍊 Sự kiện Mùa Vụ Cam Sành Hàm Yên",
+    message: "HTX Mộc Châu vừa thu hoạch đợt Cam Sành tép vàng mọng nước chuẩn VietGAP, dồi dào Vitamin C tươi ngon.",
+    type: "season",
+    createdAt: "1 ngày trước",
+    read: true,
+    link: "/products",
+  },
+  {
+    id: "notif-voucher-1",
+    title: "🎁 Tặng Voucher AGRI30K mừng Hội Viên VIP",
+    message: "Hệ thống tặng bạn mã giảm giá 30.000đ trong ví voucher mừng nâng hạng Hội Viên AgriClub.",
+    type: "voucher",
+    createdAt: "2 ngày trước",
+    read: true,
     link: "/dashboard/customer?tab=vouchers",
   },
   {
-    id: "notif-3",
-    title: "Nhật ký VietGAP được cập nhật",
-    message: "Lô Xà Lách Thủy Canh XL-2026-08 vừa bổ sung kết quả kiểm định tồn dư thuốc BVTV = 0.",
+    id: "notif-system-1",
+    title: "🛡️ Nhật ký VietGAP được cập nhật",
+    message: "Lô Xà Lách Thủy Canh XL-2026-08 vừa bổ sung kết quả kiểm định phòng Lab: Dư lượng thuốc BVTV = 0.",
     type: "system",
-    createdAt: "1 ngày trước",
-    read: false,
-    link: "/traceability?lot=XL-2026-08",
-  },
-  {
-    id: "notif-4",
-    title: "Đơn hàng đã hoàn thành",
-    message: "Đơn hàng AGRI-8790 đã giao thành công. Bạn được tích lũy +28 điểm hội viên.",
-    type: "order",
     createdAt: "3 ngày trước",
     read: true,
-    link: "/dashboard/customer?tab=orders",
+    link: "/traceability?batch=LOT-XL-2026-08",
   },
 ];
 

@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Sprout,
   Star,
   Tag,
   Trash2,
@@ -554,7 +555,7 @@ function CustomerDashboardContent() {
   const [isSubmittingPw, setIsSubmittingPw] = useState(false);
 
   // Notifications filter
-  const [notifFilter, setNotifFilter] = useState<"ALL" | "UNREAD" | "ORDER" | "VOUCHER">("ALL");
+  const [notifFilter, setNotifFilter] = useState<"ALL" | "UNREAD" | "ORDER" | "VOUCHER" | "SEASON">("ALL");
 
   function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -636,6 +637,7 @@ function CustomerDashboardContent() {
     if (notifFilter === "UNREAD") return !n.read;
     if (notifFilter === "ORDER") return n.type === "order";
     if (notifFilter === "VOUCHER") return n.type === "voucher";
+    if (notifFilter === "SEASON") return n.type === "season" || n.type === "promo";
     return true;
   });
 
@@ -1174,13 +1176,14 @@ function CustomerDashboardContent() {
           </div>
 
           {/* Notification Filter */}
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             {(
               [
                 { key: "ALL", label: "Tất cả" },
                 { key: "UNREAD", label: `Chưa đọc (${unreadCount})` },
                 { key: "ORDER", label: "Đơn hàng" },
-                { key: "VOUCHER", label: "Voucher & Quà tặng" },
+                { key: "VOUCHER", label: "Voucher & Điểm" },
+                { key: "SEASON", label: "Mùa vụ & Khuyến mãi" },
               ] as const
             ).map((tab) => (
               <button
@@ -1221,6 +1224,10 @@ function CustomerDashboardContent() {
                           ? "bg-blue-100 text-blue-700"
                           : n.type === "voucher"
                           ? "bg-amber-100 text-amber-700"
+                          : n.type === "promo"
+                          ? "bg-rose-100 text-rose-700"
+                          : n.type === "season"
+                          ? "bg-orange-100 text-orange-700"
                           : "bg-emerald-100 text-emerald-700"
                       )}
                     >
@@ -1228,6 +1235,10 @@ function CustomerDashboardContent() {
                         <Truck size={17} />
                       ) : n.type === "voucher" ? (
                         <Gift size={17} />
+                      ) : n.type === "promo" ? (
+                        <Sparkles size={17} />
+                      ) : n.type === "season" ? (
+                        <Sprout size={17} />
                       ) : (
                         <ShieldCheck size={17} />
                       )}
