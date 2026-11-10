@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bot,
   CheckCheck,
   HelpCircle,
   MessageCircle,
@@ -9,17 +10,30 @@ import {
   Phone,
   Search,
   Send,
+  Sparkles,
   User,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ChatbaseEmbed } from "@/components/chatbase/chatbase-embed";
 
 export default function ChatPage() {
   const [activeChannelId, setActiveChannelId] = useState("ch-1");
   const [msgInput, setMsgInput] = useState("");
 
   const channels = [
+    {
+      id: "ch-ai",
+      name: "Trợ Lý AI AgriTrace (Chatbase LLM)",
+      role: "AI_BOT",
+      roleBadge: "Trợ Lý AI 24/7",
+      roleColor: "#059669",
+      lastMsg: "Giải đáp thắc mắc về nguồn gốc, quy trình VietGAP và mùa vụ...",
+      time: "Trực tuyến",
+      unread: 0,
+      contextProduct: "Trợ Lý Toàn Diện",
+    },
     {
       id: "ch-1",
       name: "Chủ Nông Trại Xanh Đà Lạt (Farmer)",
@@ -177,70 +191,78 @@ export default function ChatPage() {
 
           {/* Right: Message Window */}
           <div className="md:col-span-2 flex flex-col bg-white">
-            {/* Header with Context */}
-            <div className="p-3.5 border-b border-gray-200 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
-                  {activeChannel.name[0]}
-                </div>
-                <div>
-                  <h3 className="font-bold text-xs text-gray-900">{activeChannel.name}</h3>
-                  <div className="text-[11px] text-emerald-700 flex items-center gap-1 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Đang trực tuyến • WebSocket Connected</span>
-                  </div>
-                </div>
+            {activeChannelId === "ch-ai" ? (
+              <div className="p-4 flex-1 flex flex-col">
+                <ChatbaseEmbed minHeight="560px" />
               </div>
-
-              {/* Context Banner */}
-              <div className="hidden sm:flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2.5 py-1 rounded-lg text-[11px]">
-                <Package size={13} className="text-[#1a7a3a]" />
-                <span className="font-medium truncate max-w-[180px]">{activeChannel.contextProduct}</span>
-              </div>
-            </div>
-
-            {/* Messages Content */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#fafbfa]">
-              {activeMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[75%] p-3 rounded-2xl text-xs shadow-xs leading-relaxed ${
-                      msg.sender === "me"
-                        ? "bg-[#1a7a3a] text-white rounded-br-xs"
-                        : "bg-white text-gray-800 border border-gray-200 rounded-bl-xs"
-                    }`}
-                  >
-                    <p>{msg.text}</p>
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                      <span className={`text-[10px] ${msg.sender === "me" ? "text-emerald-100" : "text-gray-400"}`}>
-                        {msg.time}
-                      </span>
-                      {msg.sender === "me" && <CheckCheck size={12} className="text-emerald-200" />}
+            ) : (
+              <>
+                {/* Header with Context */}
+                <div className="p-3.5 border-b border-gray-200 flex items-center justify-between bg-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
+                      {activeChannel.name[0]}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-xs text-gray-900">{activeChannel.name}</h3>
+                      <div className="text-[11px] text-emerald-700 flex items-center gap-1 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Đang trực tuyến • WebSocket Connected</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
 
-            {/* Input Bar */}
-            <form onSubmit={handleSend} className="p-3 border-t border-gray-200 flex gap-2 bg-white">
-              <input
-                type="text"
-                value={msgInput}
-                onChange={(e) => setMsgInput(e.target.value)}
-                placeholder="Nhập tin nhắn trao đổi với nông trại / nhân viên..."
-                className="flex-1 px-3.5 py-2 text-xs rounded-xl border border-gray-300 focus:outline-none focus:border-[#1a7a3a] focus:ring-1 focus:ring-[#1a7a3a]"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-[#1a7a3a] hover:bg-[#156e34] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-              >
-                <Send size={14} /> Gửi
-              </button>
-            </form>
+                  {/* Context Banner */}
+                  <div className="hidden sm:flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2.5 py-1 rounded-lg text-[11px]">
+                    <Package size={13} className="text-[#1a7a3a]" />
+                    <span className="font-medium truncate max-w-[180px]">{activeChannel.contextProduct}</span>
+                  </div>
+                </div>
+
+                {/* Messages Content */}
+                <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#fafbfa]">
+                  {activeMessages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[75%] p-3 rounded-2xl text-xs shadow-xs leading-relaxed ${
+                          msg.sender === "me"
+                            ? "bg-[#1a7a3a] text-white rounded-br-xs"
+                            : "bg-white text-gray-800 border border-gray-200 rounded-bl-xs"
+                        }`}
+                      >
+                        <p>{msg.text}</p>
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          <span className={`text-[10px] ${msg.sender === "me" ? "text-emerald-100" : "text-gray-400"}`}>
+                            {msg.time}
+                          </span>
+                          {msg.sender === "me" && <CheckCheck size={12} className="text-emerald-200" />}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input Bar */}
+                <form onSubmit={handleSend} className="p-3 border-t border-gray-200 flex gap-2 bg-white">
+                  <input
+                    type="text"
+                    value={msgInput}
+                    onChange={(e) => setMsgInput(e.target.value)}
+                    placeholder="Nhập tin nhắn trao đổi với nông trại / nhân viên..."
+                    className="flex-1 px-3.5 py-2 text-xs rounded-xl border border-gray-300 focus:outline-none focus:border-[#1a7a3a] focus:ring-1 focus:ring-[#1a7a3a]"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-[#1a7a3a] hover:bg-[#156e34] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Send size={14} /> Gửi
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>
