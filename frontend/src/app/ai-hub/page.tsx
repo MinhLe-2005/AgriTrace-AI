@@ -9,7 +9,6 @@ import {
   Clock,
   HelpCircle,
   Package,
-  Send,
   ShieldAlert,
   Sparkles,
   TrendingDown,
@@ -17,20 +16,10 @@ import {
   Warehouse,
 } from "lucide-react";
 import { useState } from "react";
-import { ChatbaseEmbed } from "@/components/chatbase/chatbase-embed";
-import { toast } from "@/stores/toast-store";
+import { GeminiChatWidget } from "@/components/ai-chat/gemini-chat-widget";
 
 export default function AiHubPage() {
   const [activeTab, setActiveTab] = useState<"chatbot" | "forecast" | "risks">("chatbot");
-  const [chatMode, setChatMode] = useState<"chatbase" | "local">("chatbase");
-  const [botPrompt, setBotPrompt] = useState("");
-  const [chatLog, setChatLog] = useState([
-    {
-      role: "assistant",
-      content:
-        "Xin chào! Tôi là Trợ lý AI AgriTrace. Tôi có quyền truy xuất trực tiếp cơ sở dữ liệu chuỗi cung ứng nông sản sạch (Nông trại, Lô thu hoạch, Kho FEFO & Chứng nhận chất lượng). Bạn muốn hỏi về sản phẩm nào?",
-    },
-  ]);
 
   const forecastData = [
     {
@@ -101,27 +90,6 @@ export default function AiHubPage() {
       suggestion: "Cập nhật lộ trình thay thế cho tài xế và gửi SMS báo cho khách hàng.",
     },
   ];
-
-  function handleBotAsk(e: React.FormEvent) {
-    e.preventDefault();
-    if (!botPrompt.trim()) return;
-
-    const userText = botPrompt;
-    setBotPrompt("");
-    setChatLog((prev) => [...prev, { role: "user", content: userText }]);
-
-    setTimeout(() => {
-      let ans = "";
-      if (userText.toLowerCase().includes("chứng nhận")) {
-        ans = "Xác nhận từ hệ thống: Lô hàng đã được cấp chứng nhận VietGAP số #VG-2024-889 do Chi cục Trồng trọt cấp, còn hạn đến tháng 12/2026. Tất cả chỉ số tồn dư thuốc BVTV = 0.";
-      } else if (userText.toLowerCase().includes("thu hoạch") || userText.toLowerCase().includes("ngày")) {
-        ans = "Lịch trình: Lô sản phẩm gần nhất được thu hoạch vào 05:30 sáng ngày 14/10/2026 tại Nông Trại Xanh Đà Lạt, sau đó chuyển thẳng về kho bảo quản lạnh 4°C.";
-      } else {
-        ans = `Trợ lý AI: Yêu cầu tra cứu về "${userText}" đã được xác minh đối chiếu với hệ thống chuỗi cung ứng. Sản phẩm đạt tiêu chuẩn an toàn thực phẩm và có đầy đủ nhật ký canh tác số!`;
-      }
-      setChatLog((prev) => [...prev, { role: "assistant", content: ans }]);
-    }, 500);
-  }
 
   return (
     <div className="bg-[#f8faf8] min-h-screen py-8">
@@ -194,96 +162,10 @@ export default function AiHubPage() {
           </button>
         </div>
 
-        {/* TAB 1: AI CHATBOT */}
+        {/* TAB 1: AI CHATBOT (GEMINI) */}
         {activeTab === "chatbot" && (
           <div className="space-y-4">
-            {/* Header & Mode Switcher */}
-            <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 space-y-4">
-              <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                    <Bot size={20} className="text-[#1a7a3a]" /> Trợ Lý AI Tư Vấn Nguồn Gốc & Thông Tin Nông Sản
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Hỏi đáp trực tiếp với trợ lý AI Chatbase thông minh hoặc trải nghiệm chế độ truy vấn dữ liệu chuỗi cung ứng
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl self-start sm:self-auto">
-                  <button
-                    onClick={() => setChatMode("chatbase")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      chatMode === "chatbase"
-                        ? "bg-white text-emerald-800 shadow-xs"
-                        : "text-gray-500 hover:text-gray-900"
-                    }`}
-                  >
-                    Chatbase AI (Trực Tuyến)
-                  </button>
-                  <button
-                    onClick={() => setChatMode("local")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      chatMode === "local"
-                        ? "bg-white text-emerald-800 shadow-xs"
-                        : "text-gray-500 hover:text-gray-900"
-                    }`}
-                  >
-                    Mô Phỏng Nội Bộ (Offline)
-                  </button>
-                </div>
-              </div>
-
-              {chatMode === "chatbase" ? (
-                <ChatbaseEmbed minHeight="640px" />
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs text-gray-500 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-amber-900">
-                    <span>Đang ở chế độ mô phỏng tra cứu nhanh offline. Để trò chuyện với mô hình AI lớn, chuyển sang tab <strong>Chatbase AI (Trực Tuyến)</strong>.</span>
-                  </div>
-
-                  {/* Chat Box */}
-                  <div className="h-72 overflow-y-auto p-4 bg-gray-50 rounded-2xl space-y-3">
-                    {chatLog.map((c, i) => (
-                      <div
-                        key={i}
-                        className={`flex gap-2.5 ${c.role === "user" ? "justify-end" : "justify-start"}`}
-                      >
-                        {c.role === "assistant" && (
-                          <div className="w-8 h-8 rounded-full bg-[#1a7a3a] text-white flex items-center justify-center flex-shrink-0">
-                            <Bot size={16} />
-                          </div>
-                        )}
-                        <div
-                          className={`max-w-[80%] p-3.5 rounded-2xl text-xs leading-relaxed ${
-                            c.role === "user"
-                              ? "bg-[#1a7a3a] text-white rounded-br-xs"
-                              : "bg-white text-gray-800 border border-gray-200 rounded-bl-xs shadow-xs"
-                          }`}
-                        >
-                          {c.content}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <form onSubmit={handleBotAsk} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={botPrompt}
-                      onChange={(e) => setBotPrompt(e.target.value)}
-                      placeholder="Thử hỏi: 'Lô hàng có chứng nhận chất lượng còn hiệu lực không?' hoặc 'Ngày thu hoạch dâu tây?'..."
-                      className="flex-1 px-4 py-2.5 text-xs rounded-xl border border-gray-300 focus:outline-none focus:border-[#1a7a3a] focus:ring-1 focus:ring-[#1a7a3a]"
-                    />
-                    <button
-                      type="submit"
-                      className="px-5 py-2.5 bg-[#1a7a3a] hover:bg-[#156e34] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Send size={15} /> Gửi câu hỏi
-                    </button>
-                  </form>
-                </div>
-              )}
-            </div>
+            <GeminiChatWidget minHeight="620px" />
           </div>
         )}
 

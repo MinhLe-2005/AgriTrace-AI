@@ -16,18 +16,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { ChatbaseEmbed } from "@/components/chatbase/chatbase-embed";
+import { GeminiChatWidget } from "@/components/ai-chat/gemini-chat-widget";
 
 export default function ChatPage() {
-  const [activeChannelId, setActiveChannelId] = useState("ch-1");
+  const [activeChannelId, setActiveChannelId] = useState("ch-ai");
   const [msgInput, setMsgInput] = useState("");
 
   const channels = [
     {
       id: "ch-ai",
-      name: "Trợ Lý AI AgriTrace (Chatbase LLM)",
+      name: "Trợ Lý AI AgriTrace (Google Gemini)",
       role: "AI_BOT",
-      roleBadge: "Trợ Lý AI 24/7",
+      roleBadge: "Gemini 1.5 Flash",
       roleColor: "#059669",
       lastMsg: "Giải đáp thắc mắc về nguồn gốc, quy trình VietGAP và mùa vụ...",
       time: "Trực tuyến",
@@ -192,8 +192,8 @@ export default function ChatPage() {
           {/* Right: Message Window */}
           <div className="md:col-span-2 flex flex-col bg-white">
             {activeChannelId === "ch-ai" ? (
-              <div className="p-4 flex-1 flex flex-col">
-                <ChatbaseEmbed minHeight="560px" />
+              <div className="p-3 sm:p-4 flex-1 flex flex-col">
+                <GeminiChatWidget minHeight="560px" />
               </div>
             ) : (
               <>
