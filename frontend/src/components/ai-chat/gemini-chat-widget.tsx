@@ -61,7 +61,6 @@ export function GeminiChatWidget({
   const [customKey, setCustomKey] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Load custom key from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedKey = localStorage.getItem("agritrace_gemini_api_key")?.trim() || "";
@@ -167,20 +166,22 @@ export function GeminiChatWidget({
   const formatMarkdown = (text: string) => {
     const lines = text.split("\n");
     return lines.map((line, idx) => {
-      const formattedLine = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
       if (line.trim().startsWith("- ") || line.trim().startsWith("+ ") || line.trim().startsWith("* ")) {
         return (
-          <li
-            key={idx}
-            className="ml-3 list-disc"
-            dangerouslySetInnerHTML={{ __html: formattedLine.replace(/^[-+*]\s/, "") }}
-          />
+          <div key={idx} className="flex items-start gap-1.5 ml-1 my-0.5">
+            <span className="text-emerald-600 text-xs mt-0.5">•</span>
+            <span
+              className="flex-1 text-[12px] leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: formattedLine.replace(/^[-+*]\s/, "") }}
+            />
+          </div>
         );
       }
       return (
         <p
           key={idx}
-          className="min-h-[1.15em] leading-relaxed"
+          className="min-h-[1.2em] text-[12px] leading-relaxed"
           dangerouslySetInnerHTML={{ __html: formattedLine }}
         />
       );
@@ -192,37 +193,37 @@ export function GeminiChatWidget({
       style={minHeight ? { minHeight } : undefined}
       className={`flex flex-col h-full w-full bg-white overflow-hidden relative ${className}`}
     >
-      {/* ── Chat Header (Clean, professional, high contrast) ── */}
-      <div className="px-3.5 py-3 bg-gradient-to-r from-emerald-800 to-teal-800 text-white flex items-center justify-between shadow-xs shrink-0">
+      {/* ── Chat Header (Gleaming Emerald Gradient) ── */}
+      <div className="px-4 py-3 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white flex items-center justify-between shadow-md shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-white text-emerald-800 flex items-center justify-center font-bold shadow-xs">
-              <Bot size={18} />
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-200 text-emerald-950 flex items-center justify-center font-bold shadow-sm ring-2 ring-emerald-500/30">
+              <Sparkles size={16} />
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-emerald-800 rounded-full animate-pulse" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-emerald-900 rounded-full animate-pulse" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h3 className="font-bold text-xs truncate">Trợ Lý AI AgriTrace</h3>
-              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/40 text-emerald-100 shrink-0">
+              <h3 className="font-bold text-xs tracking-tight text-white truncate">AgriTrace AI</h3>
+              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 shrink-0">
                 Gemini
               </span>
             </div>
-            <p className="text-[10px] text-emerald-100/80 truncate">Tư vấn VietGAP & nông sản sạch 24/7</p>
+            <p className="text-[10px] text-emerald-200/80 truncate">Tư vấn nông sản sạch & VietGAP 24/7</p>
           </div>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={handleClearHistory}
-            className="p-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
             title="Làm mới đoạn chat"
           >
             <Trash2 size={14} />
           </button>
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+            className={`p-1.5 rounded-lg active:scale-95 transition-all cursor-pointer ${
               showSettings ? "bg-white/20 text-white" : "text-emerald-200 hover:text-white hover:bg-white/10"
             }`}
             title="Cài đặt API Key"
@@ -232,7 +233,7 @@ export function GeminiChatWidget({
           {isFloating && onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer ml-0.5"
               title="Đóng chat"
             >
               <X size={16} />
@@ -243,10 +244,10 @@ export function GeminiChatWidget({
 
       {/* ── Settings Drawer (For API Key) ── */}
       {showSettings && (
-        <div className="p-3 bg-emerald-50/90 border-b border-emerald-200 text-xs space-y-2 shrink-0 animate-in fade-in duration-150">
+        <div className="p-3 bg-emerald-50/95 border-b border-emerald-200 text-xs space-y-2 shrink-0 animate-in fade-in duration-150">
           <div className="flex items-center justify-between text-[11px] font-bold text-emerald-950">
             <span className="flex items-center gap-1.5">
-              <Key size={13} className="text-emerald-700" /> Cấu Hình API Key
+              <Key size={12} className="text-emerald-700" /> Cấu Hình API Key
             </span>
             <a
               href="https://aistudio.google.com/app/apikey"
@@ -254,7 +255,7 @@ export function GeminiChatWidget({
               rel="noreferrer"
               className="text-emerald-700 hover:text-emerald-900 underline flex items-center gap-0.5"
             >
-              Lấy Key <ExternalLink size={10} />
+              Lấy Key miễn phí <ExternalLink size={10} />
             </a>
           </div>
 
@@ -264,11 +265,11 @@ export function GeminiChatWidget({
               value={customKey}
               onChange={(e) => setCustomKey(e.target.value)}
               placeholder="Dán key AIzaSy... (hoặc để trống dùng .env)"
-              className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono text-[11px] bg-white"
+              className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono text-[11px] bg-white shadow-xs"
             />
             <button
               type="submit"
-              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg text-[11px] transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg text-[11px] transition-colors cursor-pointer shrink-0"
             >
               Lưu
             </button>
@@ -276,30 +277,30 @@ export function GeminiChatWidget({
         </div>
       )}
 
-      {/* ── Message Area (flex-1 with min-h-0 allows proper scrolling!) ── */}
-      <div className="flex-1 min-h-0 p-3.5 overflow-y-auto space-y-3 bg-[#f8faf8]">
+      {/* ── Message Area (flex-1 with min-h-0 allows proper scrolling) ── */}
+      <div className="flex-1 min-h-0 p-3.5 overflow-y-auto space-y-3 bg-gradient-to-b from-[#f8faf8] to-[#f4f7f4]">
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in duration-150`}
+            className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in duration-200`}
           >
             {m.role === "assistant" && (
-              <div className="w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+              <div className="w-6 h-6 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
                 <Bot size={13} />
               </div>
             )}
             <div
-              className={`max-w-[84%] p-2.5 sm:p-3 rounded-2xl text-[12px] leading-relaxed shadow-xs ${
+              className={`max-w-[85%] p-3 rounded-2xl text-[12px] leading-relaxed shadow-xs ${
                 m.role === "user"
-                  ? "bg-emerald-600 text-white rounded-br-xs font-medium"
-                  : "bg-white text-gray-800 border border-gray-200/80 rounded-bl-xs"
+                  ? "bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-tr-xs font-medium"
+                  : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs"
               }`}
             >
               <div className="space-y-1">{formatMarkdown(m.content)}</div>
               {m.time && (
                 <div
-                  className={`text-[9px] mt-1 text-right ${
-                    m.role === "user" ? "text-emerald-100" : "text-gray-400"
+                  className={`text-[9px] mt-1 text-right select-none ${
+                    m.role === "user" ? "text-emerald-100/90" : "text-gray-400"
                   }`}
                 >
                   {m.time}
@@ -307,7 +308,7 @@ export function GeminiChatWidget({
               )}
             </div>
             {m.role === "user" && (
-              <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+              <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
                 <User size={13} />
               </div>
             )}
@@ -317,16 +318,16 @@ export function GeminiChatWidget({
         {/* Loading state */}
         {loading && (
           <div className="flex gap-2 justify-start animate-in fade-in duration-150">
-            <div className="w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-6 h-6 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 mt-0.5">
               <Bot size={13} />
             </div>
-            <div className="bg-white border border-gray-200 p-2.5 rounded-2xl rounded-bl-xs text-xs text-gray-500 shadow-xs flex items-center gap-2">
-              <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce" />
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:0.2s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:0.4s]" />
+            <div className="bg-white border border-gray-200 p-2.5 rounded-2xl rounded-tl-xs text-xs text-gray-500 shadow-xs flex items-center gap-2">
+              <span className="flex gap-1 items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce [animation-delay:0.2s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce [animation-delay:0.4s]" />
               </span>
-              <span className="text-[11px] text-gray-400">AgriTrace AI đang trả lời...</span>
+              <span className="text-[11px] text-gray-400">AgriTrace AI đang suy nghĩ...</span>
             </div>
           </div>
         )}
@@ -334,15 +335,15 @@ export function GeminiChatWidget({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Suggested Quick Questions ── */}
+      {/* ── Suggested Quick Questions (Hidden scrollbar, sleek pills) ── */}
       {messages.length <= 2 && !loading && (
-        <div className="px-3 py-1.5 bg-emerald-50/50 border-t border-emerald-100/60 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+        <div className="px-3 py-2 bg-emerald-50/60 border-t border-emerald-100/60 flex items-center gap-1.5 overflow-x-auto shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <span className="text-[10px] text-emerald-800 font-bold shrink-0">Hỏi nhanh:</span>
           {SUGGESTIONS.map((s, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(s)}
-              className="text-[10px] px-2 py-0.5 rounded-full bg-white hover:bg-emerald-100 border border-emerald-200 text-emerald-900 shrink-0 transition-colors cursor-pointer"
+              className="text-[10px] px-2.5 py-1 rounded-full bg-white hover:bg-emerald-100/70 active:scale-95 border border-emerald-200/90 text-emerald-900 shrink-0 font-medium transition-all shadow-2xs cursor-pointer"
             >
               {s}
             </button>
@@ -350,28 +351,30 @@ export function GeminiChatWidget({
         </div>
       )}
 
-      {/* ── Chat Input Bar ── */}
+      {/* ── Chat Input Bar (Modern pill container) ── */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           handleSend();
         }}
-        className="p-2.5 bg-white border-t border-gray-200 flex items-center gap-1.5 shrink-0"
+        className="p-2.5 bg-white border-t border-gray-100 flex items-center gap-2 shrink-0"
       >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Hỏi về VietGAP, bảo quản rau, kho lạnh..."
-          disabled={loading}
-          className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-gray-50 disabled:opacity-50"
-        />
+        <div className="flex-1 flex items-center bg-gray-100/80 hover:bg-gray-100 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500/25 border border-transparent focus-within:border-emerald-500 rounded-full px-3.5 py-1.5 transition-all">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Hỏi về VietGAP, bảo quản rau, kho lạnh..."
+            disabled={loading}
+            className="w-full text-xs bg-transparent focus:outline-none text-slate-800 placeholder-slate-400 disabled:opacity-50"
+          />
+        </div>
         <button
           type="submit"
           disabled={!input.trim() || loading}
-          className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white rounded-xl transition-colors cursor-pointer shrink-0"
+          className="w-8 h-8 flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:bg-gray-200 disabled:cursor-not-allowed text-white rounded-full transition-all shadow-xs shrink-0 cursor-pointer"
         >
-          <Send size={14} />
+          <Send size={13} className="ml-0.5" />
         </button>
       </form>
     </div>
