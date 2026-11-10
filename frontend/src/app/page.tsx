@@ -123,9 +123,21 @@ export default function HomePage() {
       qtyOrEvent.stopPropagation();
     }
     const quantity = typeof qtyOrEvent === "number" ? qtyOrEvent : 1;
-    setQuickBuyProduct(p);
-    setQuickBuyQty(quantity);
+    addItem(
+      {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        unit: p.unit,
+        farm: p.farm || p.origin,
+        cert: p.cert,
+        batchCode: p.batchCode,
+        image: p.image,
+      },
+      quantity
+    );
     setSelectedProduct(null);
+    router.push("/cart");
   }
 
   function handleCopyVoucher(code: string) {
