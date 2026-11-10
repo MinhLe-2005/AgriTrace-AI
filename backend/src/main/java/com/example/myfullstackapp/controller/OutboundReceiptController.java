@@ -33,9 +33,6 @@ public class OutboundReceiptController {
             @PathVariable Type type,
             @Valid @RequestBody DocumentInput input,
             Principal actor) {
-        if (type != Type.INBOUND && type != Type.OUTBOUND)
-            throw new IllegalArgumentException(
-                    "This endpoint currently supports inbound and outbound receipts");
         return ApiResponse.ok(
                 "Document drafted", documents.create(warehouseId, type, input, actor.getName()));
     }

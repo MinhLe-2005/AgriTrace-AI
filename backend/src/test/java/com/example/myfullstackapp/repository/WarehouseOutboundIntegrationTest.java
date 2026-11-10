@@ -75,22 +75,21 @@ class WarehouseOutboundIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS agri_harvest_lots(id bigint primary key,product"
-                    + " varchar(255),code varchar(64),expiry_date varchar(64),qty varchar(32),unit"
-                    + " varchar(32),status varchar(64))");
-        jdbc.execute(
                 "TRUNCATE"
                     + " wh_reservation_lines,wh_reservations,wh_stock_movements,wh_stock_balances,wh_document_lines,wh_documents,wh_unit_conversions,storage_locations,warehouses,agri_harvest_lots,agri_order_items,agri_orders"
                     + " CASCADE");
         warehouseId = warehouse();
         locationId = location(warehouseId);
         for (long lot = 1; lot <= 2; lot++)
-            jdbc.update(
-                    "INSERT INTO agri_harvest_lots VALUES(?,'Rau',?,?,'1000','kg','Đã duyệt xuất"
-                            + " kho')",
+            WarehousePostgresSupport.insertHarvestLot(
+                    jdbc,
                     lot,
+                    "Rau",
                     "LOT-" + lot,
-                    InventoryService.today().plusDays(lot * 2).toString());
+                    InventoryService.today().plusDays(lot * 2),
+                    "1000",
+                    "kg",
+                    "Đã duyệt xuất kho");
         var receipt =
                 documents.create(
                         warehouseId,

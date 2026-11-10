@@ -27,7 +27,8 @@ public class WarehouseDocument {
         DRAFT,
         CONFIRMED,
         CANCELLED,
-        HANDED_OVER
+        HANDED_OVER,
+        IN_TRANSIT
     }
 
     @Id
@@ -45,6 +46,9 @@ public class WarehouseDocument {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.DRAFT;
+
+    @Column(name = "in_transit")
+    private Boolean inTransit = false;
 
     private UUID reservationId;
 

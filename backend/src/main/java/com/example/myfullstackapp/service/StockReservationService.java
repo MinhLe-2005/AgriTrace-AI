@@ -68,9 +68,14 @@ public class StockReservationService {
     private BigDecimal allocatedToOrder(Long orderId, String product) {
         BigDecimal total = BigDecimal.ZERO;
         for (var reservation : reservations.findByOrderId(orderId)) {
-            if (reservation.getStatus() == StockReservation.Status.RELEASED) continue;
+            if (reservation.getStatus() == StockReservation.Status.RELEASED
+                    || reservation.getStatus() == StockReservation.Status.EXPIRED) continue;
             if (reservation.getStatus() == StockReservation.Status.ACTIVE
-                    && !reservation.getExpiresAt().isAfter(Instant.now())) continue;
+                    && !reservation.getExpiresAt().isAfter(Instant.now())) {
+                reservation.setStatus(StockReservation.Status.EXPIRED);
+                reservations.saveAndFlush(reservation);
+                continue;
+            }
             for (var line : reservation.getLines()) {
                 var balance = inventory.balance(reservation.getWarehouseId(), line.getBalanceId());
                 if (balance.getProductId().equals(product)) total = total.add(line.getQuantityKg());
@@ -89,6 +94,46 @@ public class StockReservationService {
         return view(reservations.saveAndFlush(reservation));
     }
 
+    @Transactional
+    public ReservationView reconcile(UUID warehouseId, UUID id) {
+        inventory.lock(warehouseId, null);
+        var reservation = get(warehouseId, id);
+        if (reservation.getStatus() != StockReservation.Status.ACTIVE)
+            throw new ConflictException("Reservation is not active");
+        orders.lockOpen(reservation.getOrderId());
+        List<StockReservation.Allocation> reconciled = new ArrayList<>();
+        boolean modified = false;
+        for (var line : reservation.getLines()) {
+            var balance = inventory.balance(warehouseId, line.getBalanceId());
+            if (balance.isHeld() || !balance.getExpiryDate().isAfter(InventoryService.today())) {
+                modified = true;
+                var stock = inventory.views(warehouseId, reservation.getId(), true);
+                try {
+                    var replacement =
+                            fefo.allocate(
+                                    stock,
+                                    balance.getProductId(),
+                                    line.getQuantityKg(),
+                                    InventoryService.today());
+                    for (var alloc : replacement) {
+                        reconciled.add(
+                                new StockReservation.Allocation(
+                                        alloc.balanceId(), alloc.quantityKg()));
+                    }
+                } catch (ConflictException noStock) {
+                    // Quarantined or expired line dropped to unblock dispatch of remaining lines
+                }
+            } else {
+                reconciled.add(line);
+            }
+        }
+        if (modified) {
+            reservation.setLines(reconciled);
+            reservations.saveAndFlush(reservation);
+        }
+        return view(reservation);
+    }
+
     public StockReservation get(UUID warehouseId, UUID id) {
         return reservations
                 .findByIdAndWarehouseId(id, warehouseId)
@@ -97,8 +142,12 @@ public class StockReservationService {
 
     public StockReservation requireActive(UUID warehouseId, UUID id) {
         var reservation = get(warehouseId, id);
-        if (reservation.getStatus() != StockReservation.Status.ACTIVE
-                || !reservation.getExpiresAt().isAfter(Instant.now()))
+        if (reservation.getStatus() == StockReservation.Status.ACTIVE
+                && !reservation.getExpiresAt().isAfter(Instant.now())) {
+            reservation.setStatus(StockReservation.Status.EXPIRED);
+            reservations.save(reservation);
+        }
+        if (reservation.getStatus() != StockReservation.Status.ACTIVE)
             throw new ConflictException("Reservation is expired or no longer active");
         orders.lockOpen(reservation.getOrderId());
         Set<String> products = new HashSet<>();
@@ -143,7 +192,9 @@ public class StockReservationService {
                         .toList();
         String status = reservation.getStatus().name();
         if (reservation.getStatus() == StockReservation.Status.ACTIVE
-                && !reservation.getExpiresAt().isAfter(Instant.now())) status = "EXPIRED";
+                && !reservation.getExpiresAt().isAfter(Instant.now())) {
+            status = StockReservation.Status.EXPIRED.name();
+        }
         return new ReservationView(
                 reservation.getId(),
                 reservation.getOrderId(),

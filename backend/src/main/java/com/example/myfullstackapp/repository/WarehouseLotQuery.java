@@ -22,6 +22,47 @@ public class WarehouseLotQuery {
     private static final String SELECT =
             "select id,product,code,expiry_date,qty,unit,status from agri_harvest_lots";
 
+    /** Optional Farmer metadata, read in batches without altering its schema. */
+    public Map<String, LocalDate> harvestDates(Collection<String> ids) {
+        Map<String, LocalDate> result = new HashMap<>();
+        if (ids.isEmpty()
+                || !Boolean.TRUE.equals(
+                        jdbc.queryForObject(
+                                "select to_regclass('agri_harvest_lots') is not null",
+                                Boolean.class))) return result;
+        var ordered = new ArrayList<>(ids);
+        for (int offset = 0; offset < ordered.size(); offset += 500) {
+            var batch = ordered.subList(offset, Math.min(ordered.size(), offset + 500));
+            jdbc.query(
+                    "select id::text as"
+                        + " lot_id,coalesce(to_jsonb(l)->>'harvest_date',to_jsonb(l)->>'harvestDate')"
+                        + " as harvested from agri_harvest_lots l where id::text in ("
+                            + String.join(",", Collections.nCopies(batch.size(), "?"))
+                            + ")",
+                    rs -> {
+                        String raw = rs.getString("harvested");
+                        if (raw == null || raw.isBlank()) return;
+                        LocalDate day;
+                        try {
+                            day = LocalDate.parse(raw.trim());
+                        } catch (DateTimeParseException first) {
+                            try {
+                                day =
+                                        LocalDate.parse(
+                                                raw.trim(),
+                                                DateTimeFormatter.ofPattern("dd/MM/uuuu")
+                                                        .withResolverStyle(ResolverStyle.STRICT));
+                            } catch (DateTimeParseException invalid) {
+                                return;
+                            }
+                        }
+                        result.put(rs.getString("lot_id"), day);
+                    },
+                    batch.toArray());
+        }
+        return result;
+    }
+
     public LotSummary get(String id) {
         return read(id, false);
     }

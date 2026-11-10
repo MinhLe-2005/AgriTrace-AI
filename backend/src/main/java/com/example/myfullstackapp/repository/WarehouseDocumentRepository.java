@@ -19,13 +19,19 @@ public interface WarehouseDocumentRepository extends JpaRepository<WarehouseDocu
     interface LockScope {
         UUID getId();
 
+        UUID getWarehouseId();
+
         UUID getTargetWarehouseId();
+
+        WarehouseDocument.Type getType();
     }
 
-    Optional<LockScope> findLockScopeByIdAndWarehouseId(UUID id, UUID warehouseId);
+    @Query("select d.id as id, d.warehouseId as warehouseId, d.targetWarehouseId as targetWarehouseId, d.type as type from WarehouseDocument d where d.id=:id and (d.warehouseId=:warehouseId or d.targetWarehouseId=:warehouseId)")
+    Optional<LockScope> findLockScopeByIdAndWarehouseId(
+            @Param("id") UUID id, @Param("warehouseId") UUID warehouseId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select d from WarehouseDocument d where d.id=:id and d.warehouseId=:warehouseId")
+    @Query("select d from WarehouseDocument d where d.id=:id and (d.warehouseId=:warehouseId or d.targetWarehouseId=:warehouseId)")
     Optional<WarehouseDocument> findScopedForUpdate(
             @Param("id") UUID id, @Param("warehouseId") UUID warehouseId);
 

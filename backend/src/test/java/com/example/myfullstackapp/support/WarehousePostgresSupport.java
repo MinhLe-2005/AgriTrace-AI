@@ -1,16 +1,57 @@
 package com.example.myfullstackapp.support;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.sql.*;
+import java.time.LocalDate;
 
 /** Only disposable loopback databases named warehouse_test_* may be used. */
 public final class WarehousePostgresSupport {
     private static PostgreSQLContainer<?> postgres;
 
     private WarehousePostgresSupport() {}
+
+    /** Seed adapter data by column name, including required Farmer metadata from main. */
+    public static void insertHarvestLot(
+            JdbcTemplate jdbc,
+            long id,
+            String product,
+            String code,
+            LocalDate expiryDate,
+            String quantity,
+            String unit,
+            String status) {
+        insertHarvestLot(jdbc, id, product, code, expiryDate, quantity, unit, status, "");
+    }
+
+    public static void insertHarvestLot(
+            JdbcTemplate jdbc,
+            long id,
+            String product,
+            String code,
+            LocalDate expiryDate,
+            String quantity,
+            String unit,
+            String status,
+            String harvestDate) {
+        // Blank harvest metadata is intentional for legacy/invalid-data scenarios.
+        // Shelf-life tests provide a specific date; production entities remain unchanged.
+        jdbc.update(
+                "INSERT INTO"
+                    + " agri_harvest_lots(id,product,code,expiry_date,qty,unit,status,harvest_date,created_at)"
+                    + " VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
+                id,
+                product,
+                code,
+                expiryDate.toString(),
+                quantity,
+                unit,
+                status,
+                harvestDate);
+    }
 
     public static boolean available() {
         String url = System.getenv("WAREHOUSE_TEST_DATABASE_URL");

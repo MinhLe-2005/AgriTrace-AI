@@ -62,9 +62,9 @@ public class InventoryService {
         Map<UUID, BigDecimal> sums = new HashMap<>();
         var now = Instant.now();
         for (var reservation :
-                reservations.findByWarehouseIdAndStatus(
-                        warehouseId, StockReservation.Status.ACTIVE)) {
-            if (!reservation.getExpiresAt().isAfter(now) || reservation.getId().equals(except))
+                reservations.findByWarehouseIdAndStatusAndExpiresAtAfter(
+                        warehouseId, StockReservation.Status.ACTIVE, now)) {
+            if (reservation.getId().equals(except))
                 continue;
             for (var line : reservation.getLines())
                 sums.merge(line.getBalanceId(), line.getQuantityKg(), BigDecimal::add);
@@ -174,23 +174,9 @@ public class InventoryService {
                 && !"COUNT".equals(type)
                 && !"ADJUSTMENT".equals(type))
             throw new ConflictException("Quarantined stock cannot be dispatched or transferred");
-        var location = location(warehouseId, locationId, delta.signum() > 0);
+        location(warehouseId, locationId, delta.signum() > 0);
         if (delta.signum() > 0) {
-            BigDecimal locationAfter = balances.sumQuantityByLocation(locationId).add(delta);
-            if (locationAfter.compareTo(location.getCapacityTons().multiply(new BigDecimal("1000")))
-                    > 0) throw new ConflictException("Location capacity exceeded");
-            BigDecimal warehouseAfter =
-                    balances
-                            .findByWarehouseIdOrderByExpiryDateAscLotIdAscLocationIdAsc(warehouseId)
-                            .stream()
-                            .map(StockBalance::getQuantityKg)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add)
-                            .add(delta);
-            if (warehouseAfter.compareTo(
-                            requireWarehouse(warehouseId)
-                                    .getCapacityTons()
-                                    .multiply(new BigDecimal("1000")))
-                    > 0) throw new ConflictException("Warehouse capacity exceeded");
+            checkCapacity(warehouseId, locationId, delta);
         }
         balance.setQuantityKg(after);
         balances.saveAndFlush(balance);
@@ -205,5 +191,20 @@ public class InventoryService {
         movement.setActor(actor);
         movements.save(movement);
         return balance;
+    }
+
+    public void checkCapacity(UUID warehouseId, UUID locationId, BigDecimal delta) {
+        if (delta.signum() <= 0) return;
+        var location = location(warehouseId, locationId, true);
+        BigDecimal locationAfter = balances.sumQuantityByLocation(locationId).add(delta);
+        if (locationAfter.compareTo(location.getCapacityTons().multiply(new BigDecimal("1000"))) > 0)
+            throw new ConflictException("Location capacity exceeded");
+        BigDecimal warehouseAfter = balances.sumQuantityByWarehouse(warehouseId).add(delta);
+        if (warehouseAfter.compareTo(
+                        requireWarehouse(warehouseId)
+                                .getCapacityTons()
+                                .multiply(new BigDecimal("1000")))
+                > 0)
+            throw new ConflictException("Warehouse capacity exceeded");
     }
 }

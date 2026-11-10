@@ -238,6 +238,35 @@ Dưới đây là mẫu đặc tả chuẩn công nghệ phần mềm cho các U
 
 ---
 
+### 📋 ĐẶC TẢ USE CASE 5: [UC-16] Giám Sát Cảm Biến IoT Nhiệt Độ Kho Lạnh & Cảnh Báo Sự Cố Realtime
+- **Tác nhân chính (Primary Actor):** Cảm biến IoT / IoT Gateway (Hậu đài)
+- **Tác nhân phụ:** Thủ Kho (Warehouse Staff), Telegram Bot Notification Service, FEFO Service
+- **Mục tiêu:** Thu thập dữ liệu nhiệt độ và độ ẩm kho theo chu kỳ thời gian thực (3 - 5 giây/lần), tự động đối soát với ngưỡng an toàn `tempTargetC ± 2.0°C`, phát tín hiệu cảnh báo tức thời qua Telegram/Email cho thủ kho và cung cấp dữ liệu cho thuật toán FEFO ưu tiên giải cứu nông sản.
+- **Tiền điều kiện (Pre-conditions):**
+  1. Kho lạnh đã được cấu hình nhiệt độ mục tiêu `tempTargetC` và độ ẩm mục tiêu `humidityTarget` trong bảng `warehouses`.
+  2. Thiết bị phát dữ liệu (IoT Gateway / Mạch ESP32 PoC / Python Simulator) đang hoạt động và gửi bản tin telemetry qua mạng.
+- **Hậu điều kiện (Post-conditions):**
+  - Bản ghi được lưu vào bảng lịch sử `warehouse_telemetry_logs`.
+  - Nếu nhiệt độ vượt ngưỡng an toàn: Hệ thống kích hoạt cảnh báo khẩn cấp qua Telegram Bot đến người quản lý kho và cập nhật cờ cảnh báo cho buồng kho.
+- **Luồng sự kiện chính (Main Success Scenario):**
+  1. Cảm biến IoT gửi bản tin telemetry định kỳ qua HTTP POST đến endpoint `/api/v1/iot/telemetry` với cấu trúc JSON:
+     `{"warehouseId": "...", "locationId": "...", "temperature": 4.1, "humidity": 85.0, "timestamp": 1729000000}`.
+  2. Hệ thống kiểm tra tính hợp lệ của dữ liệu đầu vào và trạng thái hoạt động của kho tương ứng.
+  3. Hệ thống lưu bản ghi telemetry vào bảng `warehouse_telemetry_logs`.
+  4. Hệ thống so sánh nhiệt độ thực đo với nhiệt độ mục tiêu của kho: `|temperature - tempTargetC|`.
+  5. **Trường hợp an toàn ($\le 2.0^\circ\text{C}$):** Hệ thống ghi nhận trạng thái ổn định và kết thúc chu kỳ đo.
+  6. **Trường hợp vượt ngưỡng nguy hiểm ($> 2.0^\circ\text{C}$):**
+     - Hệ thống kích hoạt dịch vụ thông báo khẩn cấp `WarehouseTelemetryService`.
+     - Bắn tin nhắn cảnh báo chuông rung tức thời qua **Telegram Bot API** đến điện thoại Thủ kho: *"🚨 [CẢNH BÁO KHO LẠNH] Kho X đang ở mức nhiệt độ Y°C (Vượt ngưỡng an toàn Z°C). Nông sản có nguy cơ biến chất!"*.
+     - Gửi email tóm tắt sự cố đến Quản lý kho phụ trách.
+     - Cập nhật cờ rủi ro cho kho hàng. Khi thủ kho thực hiện xuất kho [UC-15], thuật toán FEFO sẽ tự động ưu tiên đề xuất xuất các lô hàng nằm trong kho đang bị sự cố nhiệt độ này trước để kịp thời giải cứu nông sản, giảm thiểu hao hụt.
+- **Luồng ngoại lệ (Alternative / Exception Flows):**
+  - *1a. Dữ liệu cảm biến không hợp lệ hoặc thiếu trường:* Hệ thống trả mã lỗi `400 Bad Request`, ghi log lỗi kết nối cảm biến.
+  - *6a. Cơ chế chống spam tin nhắn (Rate Limiting):* Khi sự cố nhiệt độ kéo dài liên tục, hệ thống chỉ gửi lại tin nhắn cảnh báo Telegram sau mỗi 5 - 10 phút để tránh làm tràn ngập thông báo trên điện thoại người quản lý.
+  - *6b. Mất kết nối cảm biến (Heartbeat Timeout):* Nếu quá 60 giây không nhận được bản tin telemetry từ một kho đang hoạt động, hệ thống phát cảnh báo: "Mất tín hiệu kết nối với cảm biến tại kho X".
+
+---
+
 ## 5. BẢNG PHÂN CÔNG TRÁCH NHIỆM & TIẾN ĐỘ THÀNH VIÊN (RACI MATRIX)
 
 | Thành viên | Phân hệ phụ trách | Use Cases chính | Công nghệ sử dụng | Bảng Database chịu trách nhiệm |

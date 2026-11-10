@@ -87,6 +87,7 @@ if (Test-Path .env) {
         }
     }
 }
+`$env:SPRING_PROFILES_ACTIVE = 'dev';
 & '$mvnCmd' spring-boot:run '-Dspring-boot.run.profiles=dev'
 "@
     Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", $backendCmd -WorkingDirectory $BackendDir
