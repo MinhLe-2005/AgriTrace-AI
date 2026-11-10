@@ -411,7 +411,8 @@ function CustomerDashboardContent() {
       setActiveTab(tabParam);
     }
     if (orderParam) {
-      const match = orders.find((o) => o.id === orderParam);
+      const cleanParam = orderParam.replace(/^#/, "").trim().toLowerCase();
+      const match = orders.find((o) => o.id?.replace(/^#/, "").trim().toLowerCase() === cleanParam);
       if (match) setSelectedOrder(match);
     }
   }, [tabParam, orderParam, orders]);

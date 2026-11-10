@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  ArrowLeft,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -10,13 +11,17 @@ import {
   CreditCard,
   ExternalLink,
   FileText,
+  Leaf,
   Loader2,
+  Lock,
   MapPin,
   Minus,
   Package,
   Phone,
   Plus,
   QrCode,
+  RotateCcw,
+  Scale,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -27,6 +32,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { catalogService, type ApiProduct } from "@/services/catalog.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
@@ -60,6 +66,7 @@ export function QuickBuyModal({
   product,
   initialQty = 1,
 }: QuickBuyModalProps) {
+  const router = useRouter();
   const { user } = useAuthStore();
 
   const [qty, setQty] = useState(initialQty);
@@ -81,9 +88,9 @@ export function QuickBuyModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrderCode, setCompletedOrderCode] = useState<string | null>(null);
 
-  // Terms and condition agreement
+  // Terms and condition agreement & In-Modal View Switch (prevents glitchy overlapping modals)
   const [agreeTerms, setAgreeTerms] = useState(true);
-  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [isViewingTerms, setIsViewingTerms] = useState(false);
 
   // payOS VietQR Modal state
   const [showPayosQr, setShowPayosQr] = useState(false);
@@ -104,6 +111,7 @@ export function QuickBuyModal({
       setShowPayosQr(false);
       setPayosData(null);
       setAgreeTerms(true);
+      setIsViewingTerms(false);
       setHasCopiedContent(false);
 
       if (user?.name) setReceiverName(user.name);
@@ -131,6 +139,17 @@ export function QuickBuyModal({
       }).catch(() => {});
     }
   }, [isOpen, initialQty, user]);
+
+  // Auto redirect to customer dashboard order details when order completes
+  useEffect(() => {
+    if (completedOrderCode && !showPayosQr) {
+      const timer = setTimeout(() => {
+        onClose();
+        router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [completedOrderCode, showPayosQr, onClose, router]);
 
   if (!isOpen || !product) return null;
 
@@ -315,7 +334,12 @@ export function QuickBuyModal({
         }
       }
 
-      toast.success(`Đặt hàng mua ngay thành công! Mã đơn #${generatedOrderCode}`);
+      // COD: Auto redirect directly to the order details page
+      toast.success(`Đặt hàng COD thành công! Mã đơn #${generatedOrderCode}. Đang chuyển đến đơn hàng...`);
+      setTimeout(() => {
+        onClose();
+        router.push(`/dashboard/customer?tab=orders&order=${generatedOrderCode}`);
+      }, 900);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Có lỗi xảy ra khi tạo đơn hàng.";
       toast.error(errMsg);
@@ -329,13 +353,15 @@ export function QuickBuyModal({
     setIsCheckingPayment(true);
     try {
       await paymentService.simulatePaymentSuccess(completedOrderCode);
-      toast.success("Xác nhận thanh toán payOS thành công! Đơn hàng chuyển sang ĐÃ THANH TOÁN.");
-      setShowPayosQr(false);
+      toast.success(`Xác nhận thanh toán VietQR thành công! Đang chuyển đến đơn hàng #${completedOrderCode}...`);
     } catch {
-      toast.success("Hệ thống đã ghi nhận thanh toán VietQR Napas 24/7 thành công!");
-      setShowPayosQr(false);
+      toast.success(`Đã ghi nhận thanh toán! Đang chuyển đến đơn hàng #${completedOrderCode}...`);
     } finally {
       setIsCheckingPayment(false);
+      setTimeout(() => {
+        onClose();
+        router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
+      }, 900);
     }
   }
 
@@ -353,22 +379,41 @@ export function QuickBuyModal({
       <div className="bg-white rounded-3xl max-w-xl w-full my-auto shadow-2xl border border-emerald-100 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white flex items-center justify-between shrink-0 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center font-bold text-sm text-emerald-300 shadow-inner">
-              <Zap size={18} className="fill-emerald-300" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-sm sm:text-base tracking-tight">Mua Ngay Nông Sản Siêu Tốc</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-800 text-emerald-200 border border-emerald-700/60">
-                  Chuỗi Lạnh 24H
-                </span>
+          {isViewingTerms ? (
+            /* Header for Terms View */
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsViewingTerms(false)}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                title="Quay lại đơn hàng"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <div>
+                <h3 className="font-extrabold text-sm sm:text-base">Điều Khoản Dịch Vụ & Bảo Quản Nông Sản</h3>
+                <p className="text-[11px] text-emerald-200/90">Áp dụng cho mọi đơn mua trên hệ thống AgriTrace AI</p>
               </div>
-              <p className="text-[11px] text-emerald-200/90">
-                Đặt trực tiếp 1 sản phẩm — Tách biệt, không làm xáo trộn giỏ hàng chính
-              </p>
             </div>
-          </div>
+          ) : (
+            /* Header for Checkout Wizard */
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center font-bold text-sm text-emerald-300 shadow-inner">
+                <Zap size={18} className="fill-emerald-300" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm sm:text-base tracking-tight">Mua Ngay Nông Sản Siêu Tốc</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-800 text-emerald-200 border border-emerald-700/60">
+                    Chuỗi Lạnh 24H
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-200/90">
+                  Đặt trực tiếp 1 sản phẩm — Tách biệt, không làm xáo trộn giỏ hàng chính
+                </p>
+              </div>
+            </div>
+          )}
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
@@ -378,8 +423,8 @@ export function QuickBuyModal({
           </button>
         </div>
 
-        {/* ── Stepper Indicator Bar ── */}
-        {!completedOrderCode && (
+        {/* ── Stepper Indicator Bar (Only visible during checkout) ── */}
+        {!completedOrderCode && !isViewingTerms && (
           <div className="px-5 py-3 bg-gradient-to-r from-emerald-50/80 via-teal-50/60 to-emerald-50/80 border-b border-emerald-100 shrink-0">
             <div className="flex items-center justify-between max-w-md mx-auto text-xs font-bold relative">
               {/* Step 1 Button */}
@@ -487,12 +532,88 @@ export function QuickBuyModal({
           </div>
         )}
 
+        {/* ── Sub-Breadcrumb when viewing Terms ── */}
+        {isViewingTerms && (
+          <div className="px-5 py-2.5 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between text-xs text-emerald-900 font-semibold shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span>Đơn Đặt Hàng</span>
+              <ChevronRight size={12} className="text-emerald-500" />
+              <span className="font-bold text-emerald-950">Quy Chế Hoạt Động & Bảo Vệ Khách Hàng</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsViewingTerms(false)}
+              className="text-xs text-emerald-800 hover:text-emerald-950 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+            >
+              <span>← Trở lại bước thanh toán</span>
+            </button>
+          </div>
+        )}
+
         {/* Modal Body */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-sm flex-1">
           {/* ═════════════════════════════════════════════════════════════ */}
-          {/* STEP 4: ĐẶT HÀNG THÀNH CÔNG (HIỆN KHI ĐÃ ĐẶT HOÀN TẤT)        */}
+          {/* VIEW: TERMS & POLICIES (INLINE - HOÀN TOÀN KHÔNG BỊ TRÙNG LỖI) */}
           {/* ═════════════════════════════════════════════════════════════ */}
-          {completedOrderCode && !showPayosQr ? (
+          {isViewingTerms ? (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 space-y-1.5">
+                <div className="flex items-center gap-2 text-emerald-950 font-black text-sm">
+                  <ShieldCheck size={18} className="text-emerald-700" />
+                  <span>Chính Sách & Cam Kết Chuỗi Cung Ứng Nông Sản Sạch</span>
+                </div>
+                <p className="text-xs text-emerald-900/90 leading-relaxed">
+                  AgriTrace AI cam kết bảo vệ 100% quyền lợi người tiêu dùng nông sản sạch với 4 nguyên tắc hoạt động chính:
+                </p>
+              </div>
+
+              {/* 4 Policy Points */}
+              <div className="space-y-3 text-xs text-gray-700 leading-relaxed">
+                <div className="p-3.5 rounded-2xl bg-white border border-gray-200/90 shadow-2xs space-y-1.5">
+                  <div className="flex items-center gap-2 text-gray-950 font-extrabold text-xs">
+                    <Leaf size={15} className="text-emerald-700" />
+                    <span>1. Tiêu Chuẩn Nông Sản Sạch & Nguồn Gốc Minh Bạch</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 pl-6 leading-relaxed">
+                    100% nông sản niêm yết trên AgriTrace đều đạt tiêu chuẩn VietGAP, GlobalGAP hoặc Organic hữu cơ, có mã QR GS1 truy xuất thời gian thu hoạch, phân bón/dinh dưỡng và nhật ký chăm sóc tận vườn.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-gray-200/90 shadow-2xs space-y-1.5">
+                  <div className="flex items-center gap-2 text-gray-950 font-extrabold text-xs">
+                    <Truck size={15} className="text-cyan-700" />
+                    <span>2. Quy Định Vận Chuyển Chuỗi Lạnh 2°C - 5°C Khép Kín</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 pl-6 leading-relaxed">
+                    Nông sản được bảo quản bằng thùng xe lạnh chuyên dụng kiểm soát nhiệt độ từ 2°C đến 5°C suốt tuyến đường, đóng gói màng thở sinh học ngăn đọng sương, giữ nguyên độ tươi giòn và dưỡng chất tự nhiên.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-gray-200/90 shadow-2xs space-y-1.5">
+                  <div className="flex items-center gap-2 text-gray-950 font-extrabold text-xs">
+                    <RotateCcw size={15} className="text-amber-700" />
+                    <span>3. Chính Sách Đổi Trả 1-Đổi-1 & Hoàn Tiền Trong Vòng 24 Giờ</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 pl-6 leading-relaxed">
+                    Khách hàng được quyền <strong>đồng kiểm cùng tài xế khi nhận hàng</strong>. Nếu phát hiện dập nát, hỏng hóc hoặc không đúng chuẩn, AgriTrace đổi mới 1-đổi-1 hoàn toàn miễn phí hoặc hoàn tiền 100% qua tài khoản ngân hàng trong 2 giờ.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-gray-200/90 shadow-2xs space-y-1.5">
+                  <div className="flex items-center gap-2 text-gray-950 font-extrabold text-xs">
+                    <Lock size={15} className="text-purple-700" />
+                    <span>4. Phương Thức Thanh Toán An Toàn & Bảo Mật Dữ Liệu</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 pl-6 leading-relaxed">
+                    Hỗ trợ thanh toán bảo mật VietQR Napas 24/7 (cổng payOS) và Thanh toán tiền mặt khi nhận hàng (COD). Toàn bộ dữ liệu người dùng được mã hóa SSL 256-bit chuẩn an toàn thông tin.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : completedOrderCode && !showPayosQr ? (
+            /* ═════════════════════════════════════════════════════════════ */
+            /* STEP 4: ĐẶT HÀNG THÀNH CÔNG (TỰ ĐỘNG CHUYỂN SANG ĐƠN HÀNG)    */
+            /* ═════════════════════════════════════════════════════════════ */
             <div className="text-center py-5 space-y-5 animate-in fade-in zoom-in-95 duration-200">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-sm ring-8 ring-emerald-50">
                 <CheckCircle2 size={36} />
@@ -507,6 +628,10 @@ export function QuickBuyModal({
                 <p className="text-xs text-gray-600">
                   Mã định danh đơn hàng: <strong className="text-emerald-800 text-sm font-mono font-bold">#{completedOrderCode}</strong>
                 </p>
+                <div className="pt-1 flex items-center justify-center gap-1.5 text-xs text-emerald-800 font-semibold animate-pulse">
+                  <Loader2 size={13} className="animate-spin text-emerald-700" />
+                  <span>Đang tự động chuyển sang trang quản lý đơn hàng...</span>
+                </div>
               </div>
 
               {/* Order Recap Box */}
@@ -542,14 +667,14 @@ export function QuickBuyModal({
                   className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
                 >
                   <Package size={15} />
-                  <span>Xem Chi Tiết Đơn Mua →</span>
+                  <span>Xem Chi Tiết Đơn Mua Ngay →</span>
                 </Link>
                 <button
                   type="button"
                   onClick={onClose}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-colors cursor-pointer"
                 >
-                  Đóng & Tiếp tục mua sắm
+                  Đóng & Mua tiếp
                 </button>
               </div>
             </div>
@@ -676,10 +801,13 @@ export function QuickBuyModal({
               <div className="text-center pt-1">
                 <button
                   type="button"
-                  onClick={() => setShowPayosQr(false)}
+                  onClick={() => {
+                    onClose();
+                    router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
+                  }}
                   className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer"
                 >
-                  Để thanh toán sau & Xem đơn hàng trong tài khoản
+                  Để thanh toán sau & Chuyển sang xem đơn hàng
                 </button>
               </div>
             </div>
@@ -1136,7 +1264,7 @@ export function QuickBuyModal({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setShowTermsModal(true);
+                          setIsViewingTerms(true);
                         }}
                         className="underline underline-offset-2 decoration-emerald-700 font-extrabold text-emerald-800 hover:text-emerald-950 cursor-pointer transition-colors"
                       >
@@ -1148,7 +1276,7 @@ export function QuickBuyModal({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setShowTermsModal(true);
+                          setIsViewingTerms(true);
                         }}
                         className="underline underline-offset-2 decoration-emerald-700 font-extrabold text-emerald-800 hover:text-emerald-950 cursor-pointer transition-colors"
                       >
@@ -1163,7 +1291,7 @@ export function QuickBuyModal({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setShowTermsModal(true);
+                          setIsViewingTerms(true);
                         }}
                         className="text-emerald-700 hover:text-emerald-900 font-bold underline cursor-pointer inline-flex items-center gap-0.5"
                       >
@@ -1182,7 +1310,7 @@ export function QuickBuyModal({
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setShowTermsModal(true);
+                      setIsViewingTerms(true);
                     }}
                     className="text-emerald-900 font-bold hover:underline cursor-pointer shrink-0 ml-2"
                   >
@@ -1194,10 +1322,43 @@ export function QuickBuyModal({
           )}
         </div>
 
-        {/* Modal Action Footers (Step-by-Step Navigation) */}
+        {/* Modal Action Footers (Step-by-Step Navigation or Terms Actions) */}
         {!completedOrderCode && (
           <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50/95 flex items-center justify-between gap-3 shrink-0">
-            {currentStep === 1 ? (
+            {isViewingTerms ? (
+              /* Footer when viewing Terms: clean, zero z-index conflicts */
+              <>
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  className="text-xs text-gray-500 hover:text-emerald-800 underline font-medium flex items-center gap-1"
+                >
+                  <span>Mở toàn văn điều khoản trong tab mới</span>
+                  <ExternalLink size={12} />
+                </Link>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsViewingTerms(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-200/70 transition-colors cursor-pointer"
+                  >
+                    ← Quay lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAgreeTerms(true);
+                      setIsViewingTerms(false);
+                      toast.success("Đã đồng ý điều khoản dịch vụ & chính sách nông sản.");
+                    }}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white text-xs font-extrabold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Check size={14} />
+                    <span>✓ Tôi Đã Đọc & Đồng Ý</span>
+                  </button>
+                </div>
+              </>
+            ) : currentStep === 1 ? (
               <>
                 <button
                   type="button"
@@ -1272,96 +1433,6 @@ export function QuickBuyModal({
           </div>
         )}
       </div>
-
-      {/* ── POPUP XEM CHI TIẾT ĐIỀU KHOẢN & CHÍNH SÁCH ── */}
-      {showTermsModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-lg w-full my-auto shadow-2xl border border-emerald-200 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold">
-                  <FileText size={16} />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm sm:text-base">Điều Khoản & Chính Sách Nông Sản</h4>
-                  <p className="text-[11px] text-emerald-200/90">Áp dụng cho mọi đơn đặt hàng trên hệ sinh thái AgriTrace</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
-                title="Đóng"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            {/* Scrollable Content */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs text-gray-700 leading-relaxed flex-1">
-              <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-950 space-y-1">
-                <strong className="block text-xs font-black text-emerald-950">
-                  🌿 1. Cam Kết Tiêu Chuẩn Nông Sản & Nguồn Gốc
-                </strong>
-                <p className="text-[11px] text-emerald-900 leading-snug">
-                  100% nông sản niêm yết trên AgriTrace đều đạt chuẩn kiểm định VietGAP / GlobalGAP / Organic hữu cơ, có mã QR GS1 truy xuất tận nông trại, quy trình canh tác và thời gian thu hái thực tế.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-cyan-50/80 border border-cyan-200 text-cyan-950 space-y-1">
-                <strong className="block text-xs font-black text-cyan-950">
-                  ❄️ 2. Tiêu Chuẩn Vận Chuyển Chuỗi Lạnh 2°C - 5°C
-                </strong>
-                <p className="text-[11px] text-cyan-900 leading-snug">
-                  Nông sản được bảo quản bằng thùng xe lạnh chuyên dụng kiểm soát nhiệt độ từ 2°C đến 5°C suốt tuyến đường, đóng gói màng thở sinh học ngăn đọng sương, giữ nguyên độ tươi giòn và dinh dưỡng.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-950 space-y-1">
-                <strong className="block text-xs font-black text-amber-950">
-                  🔄 3. Chính Sách Đổi Trả 1-Đổi-1 Trong Vòng 24 Giờ
-                </strong>
-                <p className="text-[11px] text-amber-900 leading-snug">
-                  Khách hàng được quyền <strong>đồng kiểm cùng tài xế khi nhận hàng</strong>. Nếu phát hiện dập nát, hỏng hóc hoặc không đúng chuẩn, AgriTrace đổi mới 1-đổi-1 hoàn toàn miễn phí hoặc hoàn tiền 100% trong 2 giờ.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200 text-purple-950 space-y-1">
-                <strong className="block text-xs font-black text-purple-950">
-                  💳 4. Phương Thức Thanh Toán An Toàn & Bảo Mật
-                </strong>
-                <p className="text-[11px] text-purple-900 leading-snug">
-                  Hỗ trợ thanh toán bảo mật VietQR Napas 24/7 (cổng payOS) và COD tiền mặt. Thông tin cá nhân khách hàng được bảo mật mã hóa SSL 256-bit chuẩn an toàn thông tin.
-                </p>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3 shrink-0">
-              <Link
-                href="/terms"
-                target="_blank"
-                className="text-xs text-gray-500 hover:text-emerald-800 underline font-medium flex items-center gap-1"
-              >
-                <span>Mở toàn văn điều khoản</span>
-                <ExternalLink size={12} />
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setAgreeTerms(true);
-                  setShowTermsModal(false);
-                }}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <Check size={14} />
-                <span>Tôi Đã Hiểu & Đồng Ý</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
