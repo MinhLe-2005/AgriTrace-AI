@@ -7,6 +7,7 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Copy,
   Edit3,
