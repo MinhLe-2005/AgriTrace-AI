@@ -83,6 +83,7 @@ export function QuickBuyModal({
 
   // Terms and condition agreement
   const [agreeTerms, setAgreeTerms] = useState(true);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   // payOS VietQR Modal state
   const [showPayosQr, setShowPayosQr] = useState(false);
@@ -1128,17 +1129,65 @@ export function QuickBuyModal({
                     className="mt-0.5 w-4 h-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-500 cursor-pointer accent-emerald-700"
                   />
                   <label htmlFor="agreeTermsCheckbox" className="text-xs text-gray-800 leading-snug cursor-pointer select-none">
-                    <strong className="text-emerald-950 font-bold">
-                      Tôi đã đọc và đồng ý với Điều khoản dịch vụ & Chính sách bảo quản nông sản của AgriTrace AI.
-                    </strong>
-                    <span className="block text-[11px] text-gray-600 mt-0.5">
-                      Cam kết chuỗi cung ứng khép kín, đổi trả 1-đổi-1 miễn phí trong 24H nếu nông sản dập nát, hỏng hóc hoặc không đúng chuẩn kiểm định.
+                    <span className="text-emerald-950 font-bold">
+                      Tôi đã đọc và đồng ý với{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowTermsModal(true);
+                        }}
+                        className="underline underline-offset-2 decoration-emerald-700 font-extrabold text-emerald-800 hover:text-emerald-950 cursor-pointer transition-colors"
+                      >
+                        Điều khoản dịch vụ
+                      </button>{" "}
+                      &{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowTermsModal(true);
+                        }}
+                        className="underline underline-offset-2 decoration-emerald-700 font-extrabold text-emerald-800 hover:text-emerald-950 cursor-pointer transition-colors"
+                      >
+                        Chính sách bảo quản nông sản
+                      </button>{" "}
+                      của AgriTrace AI.
+                    </span>
+                    <span className="block text-[11px] text-gray-600 mt-1">
+                      Cam kết chuỗi cung ứng khép kín, đổi trả 1-đổi-1 miễn phí trong 24H nếu nông sản dập nát, hỏng hóc hoặc không đúng chuẩn kiểm định.{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowTermsModal(true);
+                        }}
+                        className="text-emerald-700 hover:text-emerald-900 font-bold underline cursor-pointer inline-flex items-center gap-0.5"
+                      >
+                        [Xem chi tiết điều khoản]
+                      </button>
                     </span>
                   </label>
                 </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-800 font-semibold bg-emerald-100/70 px-2.5 py-1 rounded-lg">
-                  <ShieldCheck size={13} className="text-emerald-700 shrink-0" />
-                  <span>Bảo vệ quyền lợi người mua nông sản sạch 100% minh bạch VietGAP / GlobalGAP.</span>
+                <div className="flex items-center justify-between text-[10px] text-emerald-800 font-semibold bg-emerald-100/70 px-2.5 py-1 rounded-lg">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={13} className="text-emerald-700 shrink-0" />
+                    <span>Bảo vệ quyền lợi người mua nông sản sạch 100% minh bạch VietGAP / GlobalGAP.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowTermsModal(true);
+                    }}
+                    className="text-emerald-900 font-bold hover:underline cursor-pointer shrink-0 ml-2"
+                  >
+                    Xem chính sách →
+                  </button>
                 </div>
               </div>
             </div>
@@ -1223,6 +1272,96 @@ export function QuickBuyModal({
           </div>
         )}
       </div>
+
+      {/* ── POPUP XEM CHI TIẾT ĐIỀU KHOẢN & CHÍNH SÁCH ── */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full my-auto shadow-2xl border border-emerald-200 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold">
+                  <FileText size={16} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm sm:text-base">Điều Khoản & Chính Sách Nông Sản</h4>
+                  <p className="text-[11px] text-emerald-200/90">Áp dụng cho mọi đơn đặt hàng trên hệ sinh thái AgriTrace</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                title="Đóng"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs text-gray-700 leading-relaxed flex-1">
+              <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-950 space-y-1">
+                <strong className="block text-xs font-black text-emerald-950">
+                  🌿 1. Cam Kết Tiêu Chuẩn Nông Sản & Nguồn Gốc
+                </strong>
+                <p className="text-[11px] text-emerald-900 leading-snug">
+                  100% nông sản niêm yết trên AgriTrace đều đạt chuẩn kiểm định VietGAP / GlobalGAP / Organic hữu cơ, có mã QR GS1 truy xuất tận nông trại, quy trình canh tác và thời gian thu hái thực tế.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-cyan-50/80 border border-cyan-200 text-cyan-950 space-y-1">
+                <strong className="block text-xs font-black text-cyan-950">
+                  ❄️ 2. Tiêu Chuẩn Vận Chuyển Chuỗi Lạnh 2°C - 5°C
+                </strong>
+                <p className="text-[11px] text-cyan-900 leading-snug">
+                  Nông sản được bảo quản bằng thùng xe lạnh chuyên dụng kiểm soát nhiệt độ từ 2°C đến 5°C suốt tuyến đường, đóng gói màng thở sinh học ngăn đọng sương, giữ nguyên độ tươi giòn và dinh dưỡng.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-950 space-y-1">
+                <strong className="block text-xs font-black text-amber-950">
+                  🔄 3. Chính Sách Đổi Trả 1-Đổi-1 Trong Vòng 24 Giờ
+                </strong>
+                <p className="text-[11px] text-amber-900 leading-snug">
+                  Khách hàng được quyền <strong>đồng kiểm cùng tài xế khi nhận hàng</strong>. Nếu phát hiện dập nát, hỏng hóc hoặc không đúng chuẩn, AgriTrace đổi mới 1-đổi-1 hoàn toàn miễn phí hoặc hoàn tiền 100% trong 2 giờ.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200 text-purple-950 space-y-1">
+                <strong className="block text-xs font-black text-purple-950">
+                  💳 4. Phương Thức Thanh Toán An Toàn & Bảo Mật
+                </strong>
+                <p className="text-[11px] text-purple-900 leading-snug">
+                  Hỗ trợ thanh toán bảo mật VietQR Napas 24/7 (cổng payOS) và COD tiền mặt. Thông tin cá nhân khách hàng được bảo mật mã hóa SSL 256-bit chuẩn an toàn thông tin.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3 shrink-0">
+              <Link
+                href="/terms"
+                target="_blank"
+                className="text-xs text-gray-500 hover:text-emerald-800 underline font-medium flex items-center gap-1"
+              >
+                <span>Mở toàn văn điều khoản</span>
+                <ExternalLink size={12} />
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setAgreeTerms(true);
+                  setShowTermsModal(false);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Check size={14} />
+                <span>Tôi Đã Hiểu & Đồng Ý</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

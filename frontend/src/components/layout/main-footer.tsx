@@ -300,7 +300,7 @@ export function MainFooter() {
         <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-gray-500">
           <p>© 2026 AgriTrace Ecosystem. Nền tảng số hóa chuỗi cung ứng nông sản sạch.</p>
           <div className="flex items-center gap-4 text-gray-400">
-            <Link href="/about" className="hover:text-white transition-colors">
+            <Link href="/terms" className="hover:text-white transition-colors">
               Điều khoản dịch vụ
             </Link>
             <span>·</span>
