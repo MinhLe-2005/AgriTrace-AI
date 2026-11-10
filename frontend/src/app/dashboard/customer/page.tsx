@@ -316,7 +316,7 @@ function CustomerDashboardContent() {
   }
 
   // Live Supabase data
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<SavedVoucher[]>(mockSavedVouchers);
   const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
   const totalLoyaltyPoints = loyaltyProfile?.currentPoints ?? orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
@@ -376,6 +376,8 @@ function CustomerDashboardContent() {
             };
           });
           setOrders(mapped);
+        } else {
+          setOrders([]);
         }
         if (apiVouchers && apiVouchers.length > 0) {
           const mappedVouchers: SavedVoucher[] = apiVouchers.map((v) => ({
@@ -1007,6 +1009,27 @@ function CustomerDashboardContent() {
                 </div>
               </div>
             ))}
+
+            {filteredOrders.length === 0 && (
+              <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center space-y-4 shadow-xs">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto shadow-2xs">
+                  <ShoppingBag size={28} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-bold text-gray-900">Chưa có đơn hàng nào</h4>
+                  <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                    Đơn hàng sẽ hiển thị tại đây sau khi bạn đặt mua thành công. Hãy khám phá ngay các loại nông sản đạt chuẩn VietGAP!
+                  </p>
+                </div>
+                <Link
+                  href="/products"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-xs"
+                >
+                  <span>Khám phá nông sản sạch</span>
+                  <ChevronRight size={14} />
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}
