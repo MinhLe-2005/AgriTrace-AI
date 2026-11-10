@@ -42,6 +42,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { getApiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
 import { catalogService } from "@/services/catalog.service";
+import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { reviewService } from "@/services/review.service";
 import { useAuthStore } from "@/stores/auth-store";
@@ -316,15 +317,20 @@ function CustomerDashboardContent() {
   // Live Supabase data
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [savedVouchers, setSavedVouchers] = useState<SavedVoucher[]>(mockSavedVouchers);
-  const totalLoyaltyPoints = orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
+  const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
+  const totalLoyaltyPoints = loyaltyProfile?.currentPoints ?? orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
 
   useEffect(() => {
     async function loadSupabaseCustomerData() {
       try {
-        const [apiOrders, apiVouchers] = await Promise.all([
+        const [apiOrders, apiVouchers, apiLoyalty] = await Promise.all([
           catalogService.getOrders(user?.email),
           catalogService.getVouchers(),
+          loyaltyService.getLoyaltyMe(user?.email),
         ]);
+        if (apiLoyalty) {
+          setLoyaltyProfile(apiLoyalty);
+        }
         if (apiOrders && apiOrders.length > 0) {
           const mapped: Order[] = apiOrders.map((o) => {
             const details = getOrderStatusDetails(o.status);
@@ -1590,13 +1596,16 @@ function CustomerDashboardContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-white shadow-md">
             <div>
               <span className="text-xs uppercase tracking-wider text-amber-100 font-bold">
-                Hạng hội viên hiện tại
+                Hạng hội viên AgriClub của bạn
               </span>
               <h2 className="text-2xl font-extrabold mt-0.5 flex items-center gap-2">
-                Hội Viên Vàng (Gold Member)
+                Hội Viên {loyaltyProfile?.tier || "Vàng"} ({loyaltyProfile?.pointsMultiplier ? `${loyaltyProfile.pointsMultiplier}x` : "1.5x"} Điểm)
               </h2>
               <p className="text-xs text-amber-100 mt-1">
-                Tích lũy thêm 252 điểm nữa để thăng hạng <strong>Kim Cương</strong> nhận chiết khấu 10% trọn đời.
+                Tổng chi tiêu tích lũy: <strong>{(loyaltyProfile?.totalSpent ?? 0).toLocaleString("vi-VN")} đ</strong>
+                {loyaltyProfile?.nextTier && loyaltyProfile.nextTier !== "MAX" && (
+                  <span> · Mục tiêu hạng {loyaltyProfile.nextTier}: {loyaltyProfile.nextTierThreshold.toLocaleString("vi-VN")} đ</span>
+                )}
               </p>
             </div>
             <div className="text-right sm:text-right">
@@ -1605,14 +1614,28 @@ function CustomerDashboardContent() {
             </div>
           </div>
 
+          {/* Action button to redeem voucher */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
+            <div>
+              <span className="font-bold text-emerald-950 block">Bạn có {totalLoyaltyPoints} điểm tích lũy chưa sử dụng</span>
+              <span className="text-emerald-700">Đổi điểm lấy mã giảm giá 10k, 30k hoặc Freeship xe lạnh cho đơn hàng tiếp theo.</span>
+            </div>
+            <Link
+              href="/loyalty#redeem-section"
+              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold transition-colors shrink-0 shadow-xs"
+            >
+              Đến Quầy Đổi Voucher →
+            </Link>
+          </div>
+
           <div className="space-y-3">
-            <h3 className="text-sm font-bold text-gray-800">Đặc quyền hội viên Vàng của bạn:</h3>
+            <h3 className="text-sm font-bold text-gray-800">Đặc quyền hội viên hiện tại:</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1">
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
                   <Gift className="w-3.5 h-3.5 text-emerald-600" /> Tặng voucher hàng tháng
                 </p>
-                <p className="text-gray-500 text-[11px]">Nhận 3 mã giảm giá độc quyền vào đầu mỗi tháng.</p>
+                <p className="text-gray-500 text-[11px]">Nhận mã giảm giá độc quyền theo cấp bậc vào đầu mỗi tháng.</p>
               </div>
               <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1">
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
@@ -1624,9 +1647,36 @@ function CustomerDashboardContent() {
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
                   <Award className="w-3.5 h-3.5 text-amber-600" /> Đổi điểm nhận quà
                 </p>
-                <p className="text-gray-500 text-[11px]">Dùng 100 điểm để đổi voucher giảm 50.000đ khi mua rau củ.</p>
+                <p className="text-gray-500 text-[11px]">Dùng điểm để đổi mã giảm giá mua rau củ quả và freeship.</p>
               </div>
             </div>
+          </div>
+
+          {/* Transaction History in Customer Dashboard */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <Award className="w-4 h-4 text-emerald-600" />
+              Lịch sử biến động điểm gần nhất:
+            </h3>
+            {(!loyaltyProfile?.recentTransactions || loyaltyProfile.recentTransactions.length === 0) ? (
+              <div className="text-center py-6 text-xs text-gray-400 bg-gray-50 rounded-xl">
+                Chưa có lịch sử biến động điểm nào.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                {loyaltyProfile.recentTransactions.map((tx) => (
+                  <div key={tx.id} className="p-3 flex items-center justify-between text-xs hover:bg-gray-50 transition-colors">
+                    <div>
+                      <div className="font-semibold text-gray-900">{tx.description}</div>
+                      <div className="text-[11px] text-gray-400">{tx.createdAt ? new Date(tx.createdAt).toLocaleString("vi-VN") : "Hôm nay"}</div>
+                    </div>
+                    <div className={cn("font-bold text-sm font-mono", tx.points > 0 ? "text-emerald-600" : "text-purple-600")}>
+                      {tx.points > 0 ? `+${tx.points}` : `${tx.points}`} điểm
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
