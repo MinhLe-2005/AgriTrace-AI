@@ -80,6 +80,7 @@ export function QuickBuyModal({
   const [showPayosQr, setShowPayosQr] = useState(false);
   const [payosData, setPayosData] = useState<PaymentLinkResponse | null>(null);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [activeVouchers, setActiveVouchers] = useState<{ code: string; label: string; desc: string }[]>(QUICK_VOUCHERS);
 
   // Sync state when product opens
   useEffect(() => {
@@ -94,6 +95,26 @@ export function QuickBuyModal({
       if (user?.name) setReceiverName(user.name);
       if (user?.phone) setReceiverPhone(user.phone);
       if (user?.address) setReceiverAddress(user.address);
+
+      // Fetch active vouchers from backend to show live redeemed vouchers too
+      catalogService.getVouchers().then((list) => {
+        if (list && list.length > 0) {
+          const mapped = list.map((v) => ({
+            code: v.code,
+            label: v.badge || (v.code.includes("10K") ? "-10k" : v.code),
+            desc: v.title || v.description,
+          }));
+          const seen = new Set<string>();
+          const merged: { code: string; label: string; desc: string }[] = [];
+          for (const item of [...mapped, ...QUICK_VOUCHERS]) {
+            if (!seen.has(item.code)) {
+              seen.add(item.code);
+              merged.push(item);
+            }
+          }
+          setActiveVouchers(merged);
+        }
+      }).catch(() => {});
     }
   }, [isOpen, initialQty, user]);
 
@@ -525,18 +546,24 @@ export function QuickBuyModal({
 
                 {/* Quick Voucher Chips */}
                 {!appliedVoucher && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
-                    <span className="text-gray-400 text-[10px] shrink-0">Gợi ý:</span>
-                    {QUICK_VOUCHERS.map((v) => (
-                      <button
-                        key={v.code}
-                        type="button"
-                        onClick={() => handleApplyVoucher(v.code)}
-                        className="px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 hover:bg-amber-100 hover:border-amber-300 font-semibold shrink-0 transition-colors"
-                      >
-                        {v.code} ({v.label})
-                      </button>
-                    ))}
+                  <div className="space-y-1.5">
+                    <span className="text-gray-500 text-[11px] font-semibold block">
+                      Mã ưu đãi có sẵn (Bấm để áp dụng ngay):
+                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {activeVouchers.map((v) => (
+                        <button
+                          key={v.code}
+                          type="button"
+                          onClick={() => handleApplyVoucher(v.code)}
+                          className="px-2.5 py-1 rounded-lg border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-900 hover:bg-amber-100 hover:border-amber-400 font-bold text-xs shrink-0 transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1"
+                        >
+                          <Tag size={11} className="text-amber-600" />
+                          <span>{v.code}</span>
+                          <span className="text-[10px] font-normal text-amber-700">({v.label})</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

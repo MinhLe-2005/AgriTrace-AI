@@ -54,6 +54,9 @@ function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const catParam = searchParams.get("cat") || "all";
+  const searchParam = searchParams.get("search") || "";
+  const buyParam = searchParams.get("buy") || "";
+  const detailParam = searchParams.get("detail") || searchParams.get("product") || searchParams.get("batch") || "";
 
   const { addItem } = useCartStore();
   const { user } = useAuthStore();
@@ -65,7 +68,7 @@ function ProductsContent() {
 
   // Filter States
   const [filterCategory, setFilterCategory] = useState<string>(catParam);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParam);
   const [selectedCert, setSelectedCert] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<string>("all");
   const [customMin, setCustomMin] = useState<string>("");
@@ -78,7 +81,7 @@ function ProductsContent() {
   // Mobile Filter Drawer
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  // Modal Product Detail
+  // Modal Product Detail & Quick Buy
   const [selectedProduct, setSelectedProduct] = useState<ApiProduct | null>(null);
   const [quickBuyProduct, setQuickBuyProduct] = useState<ApiProduct | null>(null);
   const [quickBuyQty, setQuickBuyQty] = useState(1);
@@ -87,6 +90,12 @@ function ProductsContent() {
   useEffect(() => {
     if (catParam) setFilterCategory(catParam);
   }, [catParam]);
+
+  useEffect(() => {
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, [searchParam]);
 
   // Load live data from Supabase & Loyalty
   useEffect(() => {
@@ -109,6 +118,38 @@ function ProductsContent() {
     }
     loadData();
   }, [user?.email]);
+
+  // Handle direct buyParam or detailParam from AI / URL
+  useEffect(() => {
+    if (!products.length) return;
+
+    if (buyParam) {
+      const q = buyParam.toLowerCase().trim();
+      const matched = products.find(
+        (p) =>
+          p.batchCode?.toLowerCase() === q ||
+          p.id?.toLowerCase() === q ||
+          p.name.toLowerCase().includes(q)
+      );
+      if (matched) {
+        setQuickBuyProduct(matched);
+        setQuickBuyQty(1);
+        setSelectedProduct(null);
+      }
+    } else if (detailParam) {
+      const q = detailParam.toLowerCase().trim();
+      const matched = products.find(
+        (p) =>
+          p.batchCode?.toLowerCase() === q ||
+          p.id?.toLowerCase() === q ||
+          p.name.toLowerCase().includes(q)
+      );
+      if (matched) {
+        setSelectedProduct(matched);
+        setModalQty(1);
+      }
+    }
+  }, [products, buyParam, detailParam]);
 
   // Compute product count per category
   const categoryCounts = useMemo(() => {
@@ -260,22 +301,9 @@ function ProductsContent() {
   }
 
   function handleBuyNow(p: ApiProduct, qty = 1) {
-    addItem(
-      {
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        unit: p.unit,
-        farm: p.farm || p.origin,
-        cert: p.cert,
-        batchCode: p.batchCode,
-        image: p.image,
-      },
-      qty
-    );
+    setQuickBuyProduct(p);
+    setQuickBuyQty(qty);
     setSelectedProduct(null);
-    toast.success(`Đang chuyển đến giỏ hàng để đặt mua "${p.name}"...`);
-    router.push("/cart");
   }
 
   // Sidebar Filter Component
@@ -1234,7 +1262,8 @@ function ProductsContent() {
                   onClick={() => handleBuyNow(selectedProduct, modalQty)}
                   className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  <span>MUA NGAY (Đến giỏ hàng)</span>
+                  <Zap size={14} className="text-amber-300 fill-amber-300" />
+                  <span>MUA NGAY (Áp voucher)</span>
                   <ChevronRight size={14} />
                 </button>
               </div>

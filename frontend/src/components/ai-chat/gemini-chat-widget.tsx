@@ -50,7 +50,7 @@ const INITIAL_MESSAGES: Message[] = [
   {
     role: "assistant",
     content:
-      "Xin chào! Tôi là **Trợ lý AI AgriTrace** (Google Gemini). Tôi có thể tư vấn nông sản theo mùa, quy trình VietGAP, kiểm tra tem QR và đưa bạn đến thẳng trang mua hàng:\n\n- 🍓 **Dâu tây New Zealand Mộc Châu** rộ mùa đông xuân (180.000 đ/hộp)\n- 🍊 **Cam sành Hàm Yên** tép vàng mọng nước (45.000 đ/kg)\n- 🥬 **Xà lách thủy canh & Cải Kale** hái mới 05:30 sáng nay\n- 📜 **Chứng nhận an toàn VietGAP/GlobalGAP** kiểm định Quatest BVTV = 0\n\nBạn muốn tìm hiểu hoặc đặt mua sản phẩm nào hôm nay ạ?\n\n[[ACTION: 🍓 Đặt Mua Dâu Tây Mộc Châu | /products?search=Dâu+Tây]]\n[[ACTION: 🍊 Đặt Mua Cam Sành Hàm Yên | /products?search=Cam+Sành]]\n[[ACTION: 🥬 Mua Rau Củ Thủy Canh | /products?cat=rau_la]]\n[[ACTION: 🔍 Tra Cứu Lô Xà Lách XL-2026-08 | /traceability?batch=LOT-XL-2026-08]]\n[[ACTION: 🎁 Ví Voucher & Điểm Thưởng | /dashboard/customer?tab=vouchers]]",
+      "Xin chào! Tôi là **Trợ lý AI AgriTrace** (Google Gemini). Tôi có thể tư vấn nông sản theo mùa, quy trình VietGAP, kiểm tra tem QR và đưa bạn đến thẳng trang mua hàng:\n\n- 🍓 **Dâu tây New Zealand Mộc Châu** rộ mùa đông xuân (180.000 đ/hộp)\n- 🍊 **Cam sành Hàm Yên** tép vàng mọng nước (45.000 đ/kg)\n- 🥬 **Xà lách thủy canh & Cải Kale** hái mới 05:30 sáng nay\n- 📜 **Chứng nhận an toàn VietGAP/GlobalGAP** kiểm định Quatest BVTV = 0\n\nBạn muốn tìm hiểu hoặc đặt mua sản phẩm nào hôm nay ạ?\n\n[[ACTION: ⚡ Mua Ngay Dâu Tây (Áp Voucher) | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]\n[[ACTION: ⚡ Mua Ngay Cam Sành (Áp Voucher) | /products?search=Cam+Sành&buy=CS-HY-2026-03]]\n[[ACTION: 🥬 Mua Rau Củ Thủy Canh | /products?cat=rau_la]]\n[[ACTION: 🔍 Tra Cứu Lô Xà Lách XL-2026-08 | /traceability?batch=LOT-XL-2026-08]]\n[[ACTION: 🎁 Ví Voucher & Điểm Thưởng | /dashboard/customer?tab=vouchers]]",
     time: "Vừa xong",
   },
 ];
@@ -85,10 +85,10 @@ export function GeminiChatWidget({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const handleActionClick = (url: string) => {
-    toast.success("Đang chuyển trang...");
+    toast.success("Đang chuyển đến sản phẩm...");
     router.push(url);
     if (isFloating && onClose) {
-      // Optional auto-close on navigation if desired
+      onClose();
     }
   };
 
