@@ -15,9 +15,17 @@ import {
   Trash2,
   User,
   X,
+  ShoppingBag,
+  ArrowRight,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "@/stores/toast-store";
+
+interface ActionLink {
+  label: string;
+  url: string;
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -25,20 +33,34 @@ interface Message {
   time?: string;
 }
 
+function parseMessageContent(raw: string): { cleanText: string; actions: ActionLink[] } {
+  const actions: ActionLink[] = [];
+  const regex = /\[\[ACTION:\s*(.*?)\s*\|\s*(.*?)\s*\]\]/gi;
+  let match;
+  while ((match = regex.exec(raw)) !== null) {
+    if (match[1] && match[2]) {
+      actions.push({ label: match[1].trim(), url: match[2].trim() });
+    }
+  }
+  const cleanText = raw.replace(regex, "").trim();
+  return { cleanText, actions };
+}
+
 const INITIAL_MESSAGES: Message[] = [
   {
     role: "assistant",
     content:
-      "Xin chào! Tôi là **Trợ lý AI AgriTrace** (Google Gemini). Tôi có thể hỗ trợ bạn:\n\n- 🥬 Tra cứu nguồn gốc lô xà lách, dâu tây, cam sành...\n- 📜 Kiểm tra chứng nhận VietGAP, GlobalGAP\n- ❄️ Quy trình bảo quản kho lạnh FEFO\n- 🎁 Tích điểm & đổi voucher AgriClub\n\nBạn cần hỏi về nội dung nào?",
+      "Xin chào! Tôi là **Trợ lý AI AgriTrace** (Google Gemini). Tôi có thể tư vấn nông sản theo mùa, quy trình VietGAP, kiểm tra tem QR và đưa bạn đến thẳng trang mua hàng:\n\n- 🍓 **Dâu tây New Zealand Mộc Châu** rộ mùa đông xuân (180.000 đ/hộp)\n- 🍊 **Cam sành Hàm Yên** tép vàng mọng nước (45.000 đ/kg)\n- 🥬 **Xà lách thủy canh & Cải Kale** hái mới 05:30 sáng nay\n- 📜 **Chứng nhận an toàn VietGAP/GlobalGAP** kiểm định Quatest BVTV = 0\n\nBạn muốn tìm hiểu hoặc đặt mua sản phẩm nào hôm nay ạ?\n\n[[ACTION: ⚡ Mua Ngay Dâu Tây (Áp Voucher) | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]\n[[ACTION: ⚡ Mua Ngay Cam Sành (Áp Voucher) | /products?search=Cam+Sành&buy=CS-HY-2026-03]]\n[[ACTION: 🥬 Mua Rau Củ Thủy Canh | /products?cat=rau_la]]\n[[ACTION: 🔍 Tra Cứu Lô Xà Lách XL-2026-08 | /traceability?batch=LOT-XL-2026-08]]\n[[ACTION: 🎁 Ví Voucher & Điểm Thưởng | /dashboard/customer?tab=vouchers]]",
     time: "Vừa xong",
   },
 ];
 
 const SUGGESTIONS = [
-  "Lô xà lách XL-2026-08?",
-  "Bảo quản dâu tây tủ lạnh?",
-  "Tích điểm AgriClub?",
-  "Quy trình kho FEFO?",
+  "🍓 Dâu tây mùa này ngon không? Mua ở đâu?",
+  "🍊 Cam sành Hàm Yên giá bao nhiêu?",
+  "🥬 Xà lách thủy canh có an toàn không?",
+  "🔍 Tra cứu nguồn gốc lô dâu tây DT-MC?",
+  "🎁 Đổi điểm AgriClub lấy voucher gì?",
 ];
 
 interface GeminiChatWidgetProps {
@@ -54,12 +76,21 @@ export function GeminiChatWidget({
   isFloating = false,
   onClose,
 }: GeminiChatWidgetProps) {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [customKey, setCustomKey] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const handleActionClick = (url: string) => {
+    toast.success("Đang chuyển đến sản phẩm...");
+    router.push(url);
+    if (isFloating && onClose) {
+      onClose();
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -279,41 +310,72 @@ export function GeminiChatWidget({
 
       {/* ── Message Area (flex-1 with min-h-0 allows proper scrolling) ── */}
       <div className="flex-1 min-h-0 p-3.5 overflow-y-auto space-y-3 bg-gradient-to-b from-[#f8faf8] to-[#f4f7f4]">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in duration-200`}
-          >
-            {m.role === "assistant" && (
-              <div className="w-6 h-6 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                <Bot size={13} />
-              </div>
-            )}
+        {messages.map((m, i) => {
+          const isAssistant = m.role === "assistant";
+          const { cleanText, actions } = isAssistant ? parseMessageContent(m.content) : { cleanText: m.content, actions: [] };
+
+          return (
             <div
-              className={`max-w-[85%] p-3 rounded-2xl text-[12px] leading-relaxed shadow-xs ${
-                m.role === "user"
-                  ? "bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-tr-xs font-medium"
-                  : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs"
-              }`}
+              key={i}
+              className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in duration-200`}
             >
-              <div className="space-y-1">{formatMarkdown(m.content)}</div>
-              {m.time && (
-                <div
-                  className={`text-[9px] mt-1 text-right select-none ${
-                    m.role === "user" ? "text-emerald-100/90" : "text-gray-400"
-                  }`}
-                >
-                  {m.time}
+              {isAssistant && (
+                <div className="w-6 h-6 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                  <Bot size={13} />
+                </div>
+              )}
+              <div
+                className={`max-w-[88%] p-3 rounded-2xl text-[12px] leading-relaxed shadow-xs ${
+                  m.role === "user"
+                    ? "bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-tr-xs font-medium"
+                    : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs"
+                }`}
+              >
+                <div className="space-y-1">{formatMarkdown(cleanText)}</div>
+
+                {/* ── Interactive Action Buttons Generated by AI ── */}
+                {isAssistant && actions.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-emerald-100/80 space-y-1.5">
+                    <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                      <Sparkles size={11} className="text-emerald-600" />
+                      <span>Thao tác nhanh:</span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {actions.map((act, aIdx) => (
+                        <button
+                          key={aIdx}
+                          type="button"
+                          onClick={() => handleActionClick(act.url)}
+                          className="w-full text-left px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200/80 text-emerald-950 font-bold text-[11px] flex items-center justify-between gap-2 shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer group"
+                        >
+                          <span className="truncate">{act.label}</span>
+                          <span className="w-5 h-5 rounded-lg bg-emerald-700 group-hover:bg-emerald-800 text-white flex items-center justify-center shrink-0 transition-colors shadow-2xs">
+                            <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {m.time && (
+                  <div
+                    className={`text-[9px] mt-1.5 text-right select-none ${
+                      m.role === "user" ? "text-emerald-100/90" : "text-gray-400"
+                    }`}
+                  >
+                    {m.time}
+                  </div>
+                )}
+              </div>
+              {m.role === "user" && (
+                <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                  <User size={13} />
                 </div>
               )}
             </div>
-            {m.role === "user" && (
-              <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                <User size={13} />
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         {/* Loading state */}
         {loading && (

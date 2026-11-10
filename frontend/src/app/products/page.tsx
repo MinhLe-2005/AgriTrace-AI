@@ -30,6 +30,9 @@ import {
   Truck,
   X,
   Zap,
+  Crown,
+  Copy,
+  Ticket,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -41,6 +44,8 @@ import {
   ApiProduct,
   ApiCategory,
 } from "@/services/catalog.service";
+import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service";
+import { useAuthStore } from "@/stores/auth-store";
 import { useCartStore } from "@/stores/cart-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -49,8 +54,13 @@ function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const catParam = searchParams.get("cat") || "all";
+  const searchParam = searchParams.get("search") || "";
+  const buyParam = searchParams.get("buy") || "";
+  const detailParam = searchParams.get("detail") || searchParams.get("product") || searchParams.get("batch") || "";
 
   const { addItem } = useCartStore();
+  const { user } = useAuthStore();
+  const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -58,7 +68,7 @@ function ProductsContent() {
 
   // Filter States
   const [filterCategory, setFilterCategory] = useState<string>(catParam);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParam);
   const [selectedCert, setSelectedCert] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<string>("all");
   const [customMin, setCustomMin] = useState<string>("");
@@ -71,7 +81,7 @@ function ProductsContent() {
   // Mobile Filter Drawer
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  // Modal Product Detail
+  // Modal Product Detail & Quick Buy
   const [selectedProduct, setSelectedProduct] = useState<ApiProduct | null>(null);
   const [quickBuyProduct, setQuickBuyProduct] = useState<ApiProduct | null>(null);
   const [quickBuyQty, setQuickBuyQty] = useState(1);
@@ -81,17 +91,25 @@ function ProductsContent() {
     if (catParam) setFilterCategory(catParam);
   }, [catParam]);
 
-  // Load live data from Supabase
+  useEffect(() => {
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, [searchParam]);
+
+  // Load live data from Supabase & Loyalty
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [prods, cats] = await Promise.all([
+        const [prods, cats, loyalty] = await Promise.all([
           catalogService.getProducts(),
           catalogService.getCategories(),
+          loyaltyService.getLoyaltyMe(user?.email),
         ]);
         setProducts(prods);
         setCategories(cats);
+        if (loyalty) setLoyaltyProfile(loyalty);
       } catch (err) {
         console.error("Error loading products from Supabase:", err);
       } finally {
@@ -99,7 +117,39 @@ function ProductsContent() {
       }
     }
     loadData();
-  }, []);
+  }, [user?.email]);
+
+  // Handle direct buyParam or detailParam from AI / URL
+  useEffect(() => {
+    if (!products.length) return;
+
+    if (buyParam) {
+      const q = buyParam.toLowerCase().trim();
+      const matched = products.find(
+        (p) =>
+          p.batchCode?.toLowerCase() === q ||
+          p.id?.toLowerCase() === q ||
+          p.name.toLowerCase().includes(q)
+      );
+      if (matched) {
+        setQuickBuyProduct(matched);
+        setQuickBuyQty(1);
+        setSelectedProduct(null);
+      }
+    } else if (detailParam) {
+      const q = detailParam.toLowerCase().trim();
+      const matched = products.find(
+        (p) =>
+          p.batchCode?.toLowerCase() === q ||
+          p.id?.toLowerCase() === q ||
+          p.name.toLowerCase().includes(q)
+      );
+      if (matched) {
+        setSelectedProduct(matched);
+        setModalQty(1);
+      }
+    }
+  }, [products, buyParam, detailParam]);
 
   // Compute product count per category
   const categoryCounts = useMemo(() => {
@@ -522,6 +572,45 @@ function ProductsContent() {
         <div className="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
       </div>
 
+      {/* ── AgriClub VIP Points & Voucher Bar (Database Connected) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-50 via-yellow-50 to-emerald-50 border border-amber-200/90 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center font-black shadow-md shrink-0">
+            <Crown size={22} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs sm:text-sm text-gray-900">
+                Hội viên AgriClub: {user?.name || "Lê Quang Minh"}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
+                Hạng {loyaltyProfile?.tier || "VÀNG"} ({loyaltyProfile?.pointsMultiplier || 1.5}x Điểm)
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mt-0.5">
+              Bạn đang có <strong className="text-emerald-700 font-extrabold">{(loyaltyProfile?.currentPoints || 1150)} điểm</strong> khả dụng · Mua nông sản hôm nay được tích lũy điểm tự động và trừ tiền voucher!
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <Link
+            href="/loyalty#redeem-section"
+            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5"
+          >
+            <Sparkles size={13} />
+            <span>Đổi Điểm Lấy Voucher →</span>
+          </Link>
+          <Link
+            href="/dashboard/customer?tab=vouchers"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs"
+          >
+            <Ticket size={13} />
+            <span>Ví Voucher</span>
+          </Link>
+        </div>
+      </div>
+
       {/* ── 2 Cột: Sidebar Bộ Lọc Chuyên Nghiệp + Danh Sách Sản Phẩm ── */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         {/* ── CỘT TRÁI: SIDEBAR BỘ LỌC (Desktop) ── */}
@@ -723,43 +812,59 @@ function ProductsContent() {
                   <div
                     key={p.id}
                     onClick={() => setSelectedProduct(p)}
-                    className="group bg-white rounded-3xl border border-gray-200/90 hover:border-emerald-400 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
+                    className="group bg-white rounded-3xl border border-gray-200/90 hover:border-emerald-500 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
                   >
                     <div>
-                      {/* Image container */}
-                      <div className="relative aspect-4/3 overflow-hidden bg-gray-50">
+                      {/* Image container with fixed height */}
+                      <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-gray-100">
                         <Image
                           src={p.image || "/images/products/xa-lach.jpg"}
                           alt={p.name}
                           fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          className="object-cover group-hover:scale-108 transition-transform duration-500"
                         />
 
-                        {/* Badges on image */}
+                        {/* Top Badges */}
                         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-700 text-white shadow-md flex items-center gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={cn(
+                                "px-2.5 py-1 rounded-full text-[11px] font-extrabold text-white shadow-md flex items-center gap-1",
+                                p.cert?.toLowerCase().includes("organic")
+                                  ? "bg-teal-700"
+                                  : p.cert?.toLowerCase().includes("globalgap")
+                                  ? "bg-blue-700"
+                                  : "bg-emerald-700"
+                              )}
+                            >
                               <ShieldCheck size={12} />
                               {p.cert}
                             </span>
                             {p.batchCode && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-black/65 text-white backdrop-blur-xs shadow-xs">
                                 #{p.batchCode}
                               </span>
                             )}
                           </div>
 
                           {discountPercent > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-600 text-white shadow-md">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-600 text-white shadow-md animate-pulse">
                               -{discountPercent}%
                             </span>
                           )}
                         </div>
 
-                        {/* Harvest tag */}
-                        <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-medium flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>{p.harvest}</span>
+                        {/* Harvest & Cold storage tags on image bottom */}
+                        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white pointer-events-none">
+                          <div className="px-2.5 py-1 rounded-lg bg-black/65 backdrop-blur-md text-[10px] font-medium flex items-center gap-1.5 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>{p.harvest || "Hái sáng nay 05:30"}</span>
+                          </div>
+                          <div className="px-2 py-1 rounded-lg bg-emerald-950/70 backdrop-blur-md text-[10px] font-semibold flex items-center gap-1 text-emerald-200">
+                            <Thermometer size={11} className="text-cyan-300" />
+                            <span>{p.temperature ? p.temperature.split(" ")[0] : "2-5°C"}</span>
+                          </div>
                         </div>
                       </div>
 
@@ -770,26 +875,35 @@ function ProductsContent() {
                           <span className="truncate">{p.farm || p.origin}</span>
                         </div>
 
-                        <h3 className="font-bold text-gray-900 text-sm group-hover:text-emerald-700 transition-colors line-clamp-1">
+                        <h3 className="font-bold text-gray-900 text-sm sm:text-base group-hover:text-emerald-700 transition-colors line-clamp-1">
                           {p.name}
                         </h3>
 
-                        {/* Rating & Reviews */}
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <div className="flex items-center text-amber-400">
+                        {/* Rating & Stock */}
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1 text-amber-400">
                             <Star size={12} className="fill-amber-400" />
-                            <span className="ml-1 font-bold text-gray-800">
-                              {p.rating}
+                            <span className="font-bold text-gray-800">{p.rating}</span>
+                            <span className="text-gray-400">({p.reviews} đánh giá)</span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            Còn {p.stockLeft} {p.unit}
+                          </span>
+                        </div>
+
+                        {/* Loyalty Points Pill (Connected to AgriClub Engine) */}
+                        <div className="pt-0.5">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 text-[11px] font-bold text-amber-900 shadow-2xs">
+                            <Sparkles size={12} className="text-amber-600 shrink-0" />
+                            <span>
+                              Tích +{Math.round((p.price / 10000) * (loyaltyProfile?.pointsMultiplier || 1.5))} điểm AgriClub
                             </span>
                           </div>
-                          <span className="text-gray-400">
-                            ({p.reviews} đánh giá)
-                          </span>
                         </div>
 
                         {/* Price */}
                         <div className="pt-1 flex items-baseline gap-2">
-                          <span className="text-lg font-black text-emerald-800">
+                          <span className="text-xl font-black text-emerald-800">
                             {p.price.toLocaleString("vi-VN")} đ
                           </span>
                           <span className="text-xs text-gray-400 font-normal">
@@ -812,7 +926,7 @@ function ProductsContent() {
                           e.stopPropagation();
                           setSelectedProduct(p);
                         }}
-                        className="w-full py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                        className="w-full py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
                       >
                         <Eye size={13} />
                         <span>Chi tiết</span>
@@ -822,9 +936,9 @@ function ProductsContent() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleAddToCart(p, 1);
+                          handleBuyNow(p, 1);
                         }}
-                        className="w-full py-2 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-colors shadow-xs flex items-center justify-center gap-1"
+                        className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-colors shadow-xs flex items-center justify-center gap-1 active:scale-95"
                       >
                         <ShoppingBag size={13} />
                         <span>Mua ngay</span>
@@ -885,165 +999,234 @@ function ProductsContent() {
         </div>
       )}
 
-      {/* ── Product Detail Modal ── */}
+      {/* ── Product Detail Modal (Redesigned & Spacious) ── */}
       {selectedProduct && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-6 animate-fade-in"
           onClick={() => setSelectedProduct(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-gray-200/80 animate-scale-up"
+            className="bg-white rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl border border-emerald-100 animate-scale-up flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-700 text-white">
-                  {selectedProduct.cert}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-emerald-50/60 to-white">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="px-3 py-1 rounded-full text-xs font-black tracking-wide bg-emerald-700 text-white shadow-xs">
+                  {selectedProduct.cert || "VietGAP"}
                 </span>
-                <span className="text-xs font-bold text-gray-500">
-                  Mã lô: {selectedProduct.batchCode}
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                  <QrCode size={13} className="text-emerald-700" />
+                  <span>Mã lô: <strong className="font-mono text-gray-900">{selectedProduct.batchCode}</strong></span>
+                </span>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <CheckCircle2 size={12} className="text-emerald-600" />
+                  <span>Đã kiểm định nguồn gốc</span>
                 </span>
               </div>
               <button
                 onClick={() => setSelectedProduct(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 flex items-center justify-center transition-all cursor-pointer"
+                title="Đóng"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="overflow-y-auto p-5 sm:p-6 space-y-5 max-h-[75vh]">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100">
-                  <Image
-                    src={selectedProduct.image || "/images/products/xa-lach.jpg"}
-                    alt={selectedProduct.name}
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-medium">
-                    {selectedProduct.harvest}
+            {/* Modal Body (Scrollable) */}
+            <div className="overflow-y-auto p-5 sm:p-7 space-y-6 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-start">
+                {/* Left: Product Image & Badges */}
+                <div className="sm:col-span-5 space-y-3">
+                  <div className="relative aspect-4/3 sm:aspect-square rounded-2xl overflow-hidden bg-gray-100 shadow-md border border-gray-200/80 group">
+                    <Image
+                      src={selectedProduct.image || "/images/products/xa-lach.jpg"}
+                      alt={selectedProduct.name}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    {/* Top Fresh Badge */}
+                    <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-emerald-900/85 backdrop-blur-md text-white text-[11px] font-semibold flex items-center gap-1 shadow-sm">
+                      <Leaf size={11} className="text-emerald-300" />
+                      <span>{selectedProduct.harvest || "Thu hoạch 05:30 sáng nay"}</span>
+                    </div>
+
+                    {/* Bottom Cold Chain Badge */}
+                    <div className="absolute bottom-2.5 left-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-medium flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Thermometer size={12} className="text-cyan-300" />
+                        <span>Chuỗi lạnh 2°C - 5°C</span>
+                      </span>
+                      <span className="text-emerald-300 font-bold text-[10px]">Tươi 100%</span>
+                    </div>
+                  </div>
+
+                  {/* Trust highlight box */}
+                  <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-[11px] text-emerald-900 flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-emerald-700 shrink-0" />
+                    <span className="leading-snug">
+                      Đảm bảo chuẩn an toàn thực phẩm, bao đổi trả trong 24 giờ nếu dập nát.
+                    </span>
                   </div>
                 </div>
 
-                <div className="space-y-3 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <MapPin size={13} className="text-emerald-600" />
-                      <span>{selectedProduct.origin || selectedProduct.farm}</span>
+                {/* Right: Info & Pricing & Order Controls */}
+                <div className="sm:col-span-7 space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                      <MapPin size={13} className="shrink-0" />
+                      <span className="truncate">{selectedProduct.origin || selectedProduct.farm || "Nông Trại Xanh"}</span>
+                      <span className="text-gray-300">·</span>
+                      <span className="text-gray-500 font-normal">Hợp tác xã đối tác</span>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 leading-snug">
+
+                    <h3 className="text-xl sm:text-2xl font-black text-gray-950 leading-tight">
                       {selectedProduct.name}
                     </h3>
 
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <div className="flex items-center text-amber-400">
-                        <Star size={13} className="fill-amber-400" />
-                        <span className="ml-1 font-bold text-gray-800">
-                          {selectedProduct.rating}
+                    {/* Rating & reviews */}
+                    <div className="flex items-center gap-2 text-xs pt-0.5">
+                      <div className="flex items-center text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        <Star size={13} className="fill-amber-400 text-amber-400" />
+                        <span className="ml-1 font-bold text-amber-900">
+                          {selectedProduct.rating || "5.0"}
                         </span>
                       </div>
-                      <span className="text-gray-400">
-                        · {selectedProduct.reviews} đánh giá
+                      <span className="text-gray-500">
+                        ({selectedProduct.reviews || 25} đánh giá của người mua)
                       </span>
-                    </div>
-
-                    <div className="pt-2">
-                      <span className="text-2xl font-black text-emerald-800">
-                        {selectedProduct.price.toLocaleString("vi-VN")} đ
+                      <span className="text-emerald-700 font-semibold text-[11px] ml-auto">
+                        ● Còn hàng
                       </span>
-                      <span className="text-xs text-gray-500 font-normal">
-                        {" "}
-                        / {selectedProduct.unit}
-                      </span>
-                      {selectedProduct.oldPrice > selectedProduct.price && (
-                        <div className="text-xs text-gray-400 line-through">
-                          {selectedProduct.oldPrice.toLocaleString("vi-VN")} đ
-                        </div>
-                      )}
                     </div>
                   </div>
 
+                  {/* Pricing showcase */}
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-baseline justify-between gap-2">
+                    <div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-2xl sm:text-3xl font-black text-emerald-900 tracking-tight">
+                          {selectedProduct.price.toLocaleString("vi-VN")} đ
+                        </span>
+                        <span className="text-xs text-gray-500 font-semibold">
+                          / {selectedProduct.unit}
+                        </span>
+                      </div>
+                      {selectedProduct.oldPrice > selectedProduct.price && (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-400 line-through">
+                            {selectedProduct.oldPrice.toLocaleString("vi-VN")} đ
+                          </span>
+                          <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                            Tiết kiệm {Math.round(((selectedProduct.oldPrice - selectedProduct.price) / selectedProduct.oldPrice) * 100)}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-gray-400 font-medium self-end">Đã gồm VAT</span>
+                  </div>
+
+                  {/* Loyalty Points Reward Pill */}
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border border-amber-200/90 text-xs font-bold text-amber-950 shadow-2xs">
+                    <Sparkles size={15} className="text-amber-600 shrink-0" />
+                    <span className="leading-tight">
+                      Tích lũy <strong>+{Math.round((selectedProduct.price * modalQty / 10000) * (loyaltyProfile?.pointsMultiplier || 1.5))} điểm</strong> AgriClub (Hạng {loyaltyProfile?.tier || "VÀNG"} x{loyaltyProfile?.pointsMultiplier || 1.5})
+                    </span>
+                  </div>
+
                   {/* Quantity selector */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <span className="text-xs font-semibold text-gray-700">Chọn số lượng:</span>
+                  <div className="space-y-2 pt-1 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-700">Chọn số lượng mua:</span>
+                      <span className="text-xs text-gray-500">
+                        Thành tiền: <strong className="text-emerald-800 text-sm font-black">{(selectedProduct.price * modalQty).toLocaleString("vi-VN")} đ</strong>
+                      </span>
+                    </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="flex items-center border border-gray-300 rounded-xl bg-white shadow-2xs overflow-hidden">
                         <button
                           type="button"
                           onClick={() => setModalQty(Math.max(1, modalQty - 1))}
-                          className="px-3 py-1.5 hover:bg-gray-100 text-gray-600 text-sm font-bold"
+                          className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 text-gray-700 font-bold transition-colors cursor-pointer"
                         >
                           -
                         </button>
-                        <span className="px-3 py-1.5 text-xs font-bold text-gray-800 min-w-8 text-center">
+                        <span className="w-12 h-9 flex items-center justify-center text-sm font-black text-gray-900 border-x border-gray-200">
                           {modalQty}
                         </span>
                         <button
                           type="button"
                           onClick={() => setModalQty(modalQty + 1)}
-                          className="px-3 py-1.5 hover:bg-gray-100 text-gray-600 text-sm font-bold"
+                          className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 text-gray-700 font-bold transition-colors cursor-pointer"
                         >
                           +
                         </button>
                       </div>
-                      <span className="text-xs text-gray-500">
-                        = {(selectedProduct.price * modalQty).toLocaleString("vi-VN")} đ
+                      <span className="text-xs text-gray-400">
+                        (Đơn vị tính: {selectedProduct.unit})
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="p-4 rounded-2xl bg-gray-50 text-xs text-gray-600 leading-relaxed">
-                {selectedProduct.description}
+              {/* Product Description */}
+              <div className="p-4 rounded-2xl bg-gray-50/80 border border-gray-200/70 text-xs text-gray-700 leading-relaxed space-y-1">
+                <span className="font-bold text-gray-900 block text-xs uppercase tracking-wide">Mô tả sản phẩm</span>
+                <p>{selectedProduct.description || "Nông sản sạch thu hoạch trực tiếp tại nông trại, quy trình kiểm soát nghiêm ngặt từ hạt giống đến thu hoạch và đóng gói."}</p>
               </div>
 
-              {/* Specifications */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900">
-                  Thông số an toàn & Bảo quản
+              {/* Specifications: 2x2 Grid */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-700" />
+                  <span>Thông Số An Toàn & Chuỗi Cung Ứng Lạnh</span>
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <Leaf size={14} className="text-emerald-600 shrink-0" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                      <Leaf size={16} />
+                    </div>
                     <div>
-                      <div className="text-[10px] text-gray-400">Phương pháp canh tác</div>
-                      <div className="font-semibold text-gray-800">
-                        {selectedProduct.cultivation || "Thủy canh VietGAP"}
+                      <div className="text-[10px] text-gray-400 font-medium">Phương pháp canh tác</div>
+                      <div className="font-bold text-gray-900">
+                        {selectedProduct.cultivation || "Thủy canh VietGAP hồi lưu"}
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <Thermometer size={14} className="text-blue-600 shrink-0" />
+                  <div className="p-3 rounded-2xl border border-blue-100 bg-blue-50/40 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center shrink-0">
+                      <Thermometer size={16} />
+                    </div>
                     <div>
-                      <div className="text-[10px] text-gray-400">Nhiệt độ bảo quản lạnh</div>
-                      <div className="font-semibold text-gray-800">
-                        {selectedProduct.temperature || "2°C - 5°C"}
+                      <div className="text-[10px] text-gray-400 font-medium">Nhiệt độ bảo quản lạnh</div>
+                      <div className="font-bold text-gray-900">
+                        {selectedProduct.temperature || "2°C - 5°C (Xe lạnh IoT)"}
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+                  <div className="p-3 rounded-2xl border border-teal-100 bg-teal-50/40 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center shrink-0">
+                      <ShieldCheck size={16} />
+                    </div>
                     <div>
-                      <div className="text-[10px] text-gray-400">Dư lượng thuốc BVTV</div>
-                      <div className="font-semibold text-gray-800">
+                      <div className="text-[10px] text-gray-400 font-medium">Dư lượng thuốc BVTV</div>
+                      <div className="font-bold text-gray-900">
                         {selectedProduct.pesticide || "Không tồn dư hóa chất (BVTV = 0)"}
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <Package size={14} className="text-amber-600 shrink-0" />
+                  <div className="p-3 rounded-2xl border border-amber-100 bg-amber-50/40 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                      <Package size={16} />
+                    </div>
                     <div>
-                      <div className="text-[10px] text-gray-400">Đóng gói tiêu chuẩn</div>
-                      <div className="font-semibold text-gray-800">
-                        {selectedProduct.packaging || "Màng thở vi lỗ sinh học"}
+                      <div className="text-[10px] text-gray-400 font-medium">Đóng gói tiêu chuẩn</div>
+                      <div className="font-bold text-gray-900">
+                        {selectedProduct.packaging || "Màng thở vi lỗ sinh học (Tươi lâu)"}
                       </div>
                     </div>
                   </div>
@@ -1051,35 +1234,37 @@ function ProductsContent() {
               </div>
             </div>
 
-            {/* Modal Actions */}
-            <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50/70 flex items-center justify-between gap-3">
+            {/* Modal Actions Footer */}
+            <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50/90 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
               <Link
                 href={`/traceability?batch=${selectedProduct.batchCode}`}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 hover:border-emerald-500 bg-white text-gray-700 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-xl border border-gray-300 hover:border-emerald-600 bg-white hover:bg-emerald-50 text-gray-800 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-2xs"
               >
-                <QrCode size={14} className="text-emerald-700" />
-                <span>Xem nhật ký QR</span>
+                <QrCode size={15} className="text-emerald-700" />
+                <span>Xem nhật ký QR lô #{selectedProduct.batchCode}</span>
               </Link>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
                     handleAddToCart(selectedProduct, modalQty);
                     setSelectedProduct(null);
                   }}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  + Thêm vào giỏ
+                  <Plus size={14} />
+                  <span>Thêm vào giỏ</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleBuyNow(selectedProduct, modalQty)}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-colors flex items-center gap-1"
+                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  <span>Mua ngay</span>
-                  <ChevronRight size={13} />
+                  <Zap size={14} className="text-amber-300 fill-amber-300" />
+                  <span>MUA NGAY (Áp voucher)</span>
+                  <ChevronRight size={14} />
                 </button>
               </div>
             </div>

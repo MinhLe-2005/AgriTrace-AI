@@ -22,28 +22,37 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> notFound(ResourceNotFoundException ex) { return error(HttpStatus.NOT_FOUND, ex.getMessage(), "NOT_FOUND", List.of()); }
 
     @ExceptionHandler({ConflictException.class, DataIntegrityViolationException.class})
-    ResponseEntity<ApiError> conflict(RuntimeException ex) { return error(HttpStatus.CONFLICT, "Resource conflicts with existing data", "CONFLICT", List.of()); }
+    ResponseEntity<ApiError> conflict(RuntimeException ex) {
+        String msg = ex instanceof ConflictException ? ex.getMessage() : "Dữ liệu bị trùng lặp trong hệ thống";
+        return error(HttpStatus.CONFLICT, msg, "CONFLICT", List.of());
+    }
 
     @ExceptionHandler({InvalidTokenException.class, AuthenticationException.class})
-    ResponseEntity<ApiError> unauthorized(RuntimeException ex) { return error(HttpStatus.UNAUTHORIZED, "Authentication failed", "UNAUTHORIZED", List.of()); }
+    ResponseEntity<ApiError> unauthorized(RuntimeException ex) {
+        return error(HttpStatus.UNAUTHORIZED, "Tài khoản hoặc mật khẩu không chính xác", "UNAUTHORIZED", List.of());
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
-    ResponseEntity<ApiError> forbidden(AccessDeniedException ex) { return error(HttpStatus.FORBIDDEN, "You do not have permission to perform this action", "FORBIDDEN", List.of()); }
+    ResponseEntity<ApiError> forbidden(AccessDeniedException ex) { return error(HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này", "FORBIDDEN", List.of()); }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex) {
         List<String> details = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage()).toList();
-        return error(HttpStatus.BAD_REQUEST, "Validation failed", "VALIDATION_ERROR", details);
+                .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.getField() + ": không hợp lệ").toList();
+        String mainMsg = !details.isEmpty() ? details.get(0) : "Dữ liệu không hợp lệ";
+        return error(HttpStatus.BAD_REQUEST, mainMsg, "VALIDATION_ERROR", details);
     }
 
     @ExceptionHandler({ConstraintViolationException.class, MethodArgumentTypeMismatchException.class, IllegalArgumentException.class})
-    ResponseEntity<ApiError> badRequest(Exception ex) { return error(HttpStatus.BAD_REQUEST, "Invalid request", "BAD_REQUEST", List.of(ex.getMessage())); }
+    ResponseEntity<ApiError> badRequest(Exception ex) {
+        String msg = ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Yêu cầu không hợp lệ";
+        return error(HttpStatus.BAD_REQUEST, msg, "BAD_REQUEST", List.of(msg));
+    }
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> unexpected(Exception ex) {
         log.error("Unhandled error", ex);
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", "INTERNAL_ERROR", List.of());
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Đã có lỗi xảy ra từ máy chủ", "INTERNAL_ERROR", List.of());
     }
 
     private ResponseEntity<ApiError> error(HttpStatus status, String message, String code, List<String> details) {

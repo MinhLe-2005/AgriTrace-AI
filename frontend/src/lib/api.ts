@@ -18,7 +18,10 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 function messageFromError(error: AxiosError<ApiErrorResponse>) {
-  return error.response?.data?.message ?? "Something went wrong. Please try again.";
+  if (error.response?.data?.details && error.response.data.details.length > 0) {
+    return error.response.data.details[0];
+  }
+  return error.response?.data?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.";
 }
 
 function signOut() {
@@ -70,5 +73,5 @@ export function unpack<T>(response: ApiResponse<T> | T) {
 }
 
 export function getApiErrorMessage(error: unknown) {
-  return axios.isAxiosError<ApiErrorResponse>(error) ? messageFromError(error) : "Something went wrong. Please try again.";
+  return axios.isAxiosError<ApiErrorResponse>(error) ? messageFromError(error) : "Có lỗi xảy ra. Vui lòng thử lại.";
 }
