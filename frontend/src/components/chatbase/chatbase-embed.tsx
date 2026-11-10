@@ -33,7 +33,7 @@ export function ChatbaseEmbed({
   useEffect(() => {
     const envId = process.env.NEXT_PUBLIC_CHATBASE_CHATBOT_ID?.trim() || "";
     const localId = typeof window !== "undefined" ? localStorage.getItem("agritrace_chatbase_id")?.trim() || "" : "";
-    const active = defaultChatbotId || envId || localId;
+    const active = defaultChatbotId || envId || localId || "HNBmb5fk_wSlCm4pwAPS6";
     setChatbotId(active);
     setInputVal(active);
   }, [defaultChatbotId]);

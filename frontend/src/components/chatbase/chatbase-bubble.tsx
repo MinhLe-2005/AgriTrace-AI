@@ -6,10 +6,10 @@ export function ChatbaseBubble() {
   const [chatbotId, setChatbotId] = useState<string>("");
 
   useEffect(() => {
-    // 1. Try env variable first, then fallback to localStorage
+    // 1. Try env variable first, then fallback to localStorage or default ID
     const envId = process.env.NEXT_PUBLIC_CHATBASE_CHATBOT_ID?.trim() || "";
     const localId = typeof window !== "undefined" ? localStorage.getItem("agritrace_chatbase_id")?.trim() || "" : "";
-    const effectiveId = envId || localId;
+    const effectiveId = envId || localId || "HNBmb5fk_wSlCm4pwAPS6";
 
     setChatbotId(effectiveId);
 
