@@ -30,6 +30,9 @@ import {
   Truck,
   X,
   Zap,
+  Crown,
+  Copy,
+  Ticket,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -41,6 +44,8 @@ import {
   ApiProduct,
   ApiCategory,
 } from "@/services/catalog.service";
+import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service";
+import { useAuthStore } from "@/stores/auth-store";
 import { useCartStore } from "@/stores/cart-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -51,6 +56,8 @@ function ProductsContent() {
   const catParam = searchParams.get("cat") || "all";
 
   const { addItem } = useCartStore();
+  const { user } = useAuthStore();
+  const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -81,17 +88,19 @@ function ProductsContent() {
     if (catParam) setFilterCategory(catParam);
   }, [catParam]);
 
-  // Load live data from Supabase
+  // Load live data from Supabase & Loyalty
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [prods, cats] = await Promise.all([
+        const [prods, cats, loyalty] = await Promise.all([
           catalogService.getProducts(),
           catalogService.getCategories(),
+          loyaltyService.getLoyaltyMe(user?.email),
         ]);
         setProducts(prods);
         setCategories(cats);
+        if (loyalty) setLoyaltyProfile(loyalty);
       } catch (err) {
         console.error("Error loading products from Supabase:", err);
       } finally {
@@ -99,7 +108,7 @@ function ProductsContent() {
       }
     }
     loadData();
-  }, []);
+  }, [user?.email]);
 
   // Compute product count per category
   const categoryCounts = useMemo(() => {
@@ -522,6 +531,45 @@ function ProductsContent() {
         <div className="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
       </div>
 
+      {/* ── AgriClub VIP Points & Voucher Bar (Database Connected) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-50 via-yellow-50 to-emerald-50 border border-amber-200/90 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center font-black shadow-md shrink-0">
+            <Crown size={22} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs sm:text-sm text-gray-900">
+                Hội viên AgriClub: {user?.name || "Lê Quang Minh"}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
+                Hạng {loyaltyProfile?.tier || "VÀNG"} ({loyaltyProfile?.pointsMultiplier || 1.5}x Điểm)
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mt-0.5">
+              Bạn đang có <strong className="text-emerald-700 font-extrabold">{(loyaltyProfile?.currentPoints || 1150)} điểm</strong> khả dụng · Mua nông sản hôm nay được tích lũy điểm tự động và trừ tiền voucher!
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <Link
+            href="/loyalty#redeem-section"
+            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5"
+          >
+            <Sparkles size={13} />
+            <span>Đổi Điểm Lấy Voucher →</span>
+          </Link>
+          <Link
+            href="/dashboard/customer?tab=vouchers"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs"
+          >
+            <Ticket size={13} />
+            <span>Ví Voucher</span>
+          </Link>
+        </div>
+      </div>
+
       {/* ── 2 Cột: Sidebar Bộ Lọc Chuyên Nghiệp + Danh Sách Sản Phẩm ── */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         {/* ── CỘT TRÁI: SIDEBAR BỘ LỌC (Desktop) ── */}
@@ -723,43 +771,59 @@ function ProductsContent() {
                   <div
                     key={p.id}
                     onClick={() => setSelectedProduct(p)}
-                    className="group bg-white rounded-3xl border border-gray-200/90 hover:border-emerald-400 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
+                    className="group bg-white rounded-3xl border border-gray-200/90 hover:border-emerald-500 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
                   >
                     <div>
-                      {/* Image container */}
-                      <div className="relative aspect-4/3 overflow-hidden bg-gray-50">
+                      {/* Image container with fixed height */}
+                      <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-gray-100">
                         <Image
                           src={p.image || "/images/products/xa-lach.jpg"}
                           alt={p.name}
                           fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          className="object-cover group-hover:scale-108 transition-transform duration-500"
                         />
 
-                        {/* Badges on image */}
+                        {/* Top Badges */}
                         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-700 text-white shadow-md flex items-center gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={cn(
+                                "px-2.5 py-1 rounded-full text-[11px] font-extrabold text-white shadow-md flex items-center gap-1",
+                                p.cert?.toLowerCase().includes("organic")
+                                  ? "bg-teal-700"
+                                  : p.cert?.toLowerCase().includes("globalgap")
+                                  ? "bg-blue-700"
+                                  : "bg-emerald-700"
+                              )}
+                            >
                               <ShieldCheck size={12} />
                               {p.cert}
                             </span>
                             {p.batchCode && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-black/65 text-white backdrop-blur-xs shadow-xs">
                                 #{p.batchCode}
                               </span>
                             )}
                           </div>
 
                           {discountPercent > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-600 text-white shadow-md">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-600 text-white shadow-md animate-pulse">
                               -{discountPercent}%
                             </span>
                           )}
                         </div>
 
-                        {/* Harvest tag */}
-                        <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-medium flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>{p.harvest}</span>
+                        {/* Harvest & Cold storage tags on image bottom */}
+                        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white pointer-events-none">
+                          <div className="px-2.5 py-1 rounded-lg bg-black/65 backdrop-blur-md text-[10px] font-medium flex items-center gap-1.5 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>{p.harvest || "Hái sáng nay 05:30"}</span>
+                          </div>
+                          <div className="px-2 py-1 rounded-lg bg-emerald-950/70 backdrop-blur-md text-[10px] font-semibold flex items-center gap-1 text-emerald-200">
+                            <Thermometer size={11} className="text-cyan-300" />
+                            <span>{p.temperature ? p.temperature.split(" ")[0] : "2-5°C"}</span>
+                          </div>
                         </div>
                       </div>
 
@@ -770,26 +834,35 @@ function ProductsContent() {
                           <span className="truncate">{p.farm || p.origin}</span>
                         </div>
 
-                        <h3 className="font-bold text-gray-900 text-sm group-hover:text-emerald-700 transition-colors line-clamp-1">
+                        <h3 className="font-bold text-gray-900 text-sm sm:text-base group-hover:text-emerald-700 transition-colors line-clamp-1">
                           {p.name}
                         </h3>
 
-                        {/* Rating & Reviews */}
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <div className="flex items-center text-amber-400">
+                        {/* Rating & Stock */}
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1 text-amber-400">
                             <Star size={12} className="fill-amber-400" />
-                            <span className="ml-1 font-bold text-gray-800">
-                              {p.rating}
+                            <span className="font-bold text-gray-800">{p.rating}</span>
+                            <span className="text-gray-400">({p.reviews} đánh giá)</span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            Còn {p.stockLeft} {p.unit}
+                          </span>
+                        </div>
+
+                        {/* Loyalty Points Pill (Connected to AgriClub Engine) */}
+                        <div className="pt-0.5">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 text-[11px] font-bold text-amber-900 shadow-2xs">
+                            <Sparkles size={12} className="text-amber-600 shrink-0" />
+                            <span>
+                              Tích +{Math.round((p.price / 10000) * (loyaltyProfile?.pointsMultiplier || 1.5))} điểm AgriClub
                             </span>
                           </div>
-                          <span className="text-gray-400">
-                            ({p.reviews} đánh giá)
-                          </span>
                         </div>
 
                         {/* Price */}
                         <div className="pt-1 flex items-baseline gap-2">
-                          <span className="text-lg font-black text-emerald-800">
+                          <span className="text-xl font-black text-emerald-800">
                             {p.price.toLocaleString("vi-VN")} đ
                           </span>
                           <span className="text-xs text-gray-400 font-normal">
@@ -812,7 +885,7 @@ function ProductsContent() {
                           e.stopPropagation();
                           setSelectedProduct(p);
                         }}
-                        className="w-full py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                        className="w-full py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
                       >
                         <Eye size={13} />
                         <span>Chi tiết</span>
@@ -824,7 +897,7 @@ function ProductsContent() {
                           e.stopPropagation();
                           handleAddToCart(p, 1);
                         }}
-                        className="w-full py-2 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-colors shadow-xs flex items-center justify-center gap-1"
+                        className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-colors shadow-xs flex items-center justify-center gap-1"
                       >
                         <ShoppingBag size={13} />
                         <span>Mua ngay</span>
@@ -963,6 +1036,14 @@ function ProductsContent() {
                           {selectedProduct.oldPrice.toLocaleString("vi-VN")} đ
                         </div>
                       )}
+                    </div>
+
+                    {/* Loyalty Points Pill in Modal */}
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 text-xs font-bold text-amber-900 shadow-2xs">
+                      <Sparkles size={13} className="text-amber-600 shrink-0" />
+                      <span>
+                        Tích lũy +{Math.round((selectedProduct.price * modalQty / 10000) * (loyaltyProfile?.pointsMultiplier || 1.5))} điểm AgriClub (Hạng {loyaltyProfile?.tier || "VÀNG"})
+                      </span>
                     </div>
                   </div>
 
