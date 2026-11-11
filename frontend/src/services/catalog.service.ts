@@ -147,6 +147,11 @@ export const catalogService = {
     return res.data;
   },
 
+  async getAllTraceability(): Promise<ApiTraceability[]> {
+    const res = await api.get<ApiTraceability[]>("/traceability");
+    return res.data;
+  },
+
   async getTraceabilityByBatch(batchCode: string): Promise<ApiTraceability> {
     const res = await api.get<ApiTraceability>(`/traceability/${batchCode}`);
     return res.data;
