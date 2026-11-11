@@ -372,35 +372,25 @@ export default function EventsPage() {
                       </div>
                     </div>
 
-                    {/* Voucher Code Box */}
-                    {event.voucherCode && (
-                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs">
-                        <div className="flex items-center gap-2">
-                          <Ticket size={14} className="text-amber-700 shrink-0" />
-                          <span className="text-gray-700">Voucher tặng kèm:</span>
-                          <span className="font-mono font-black text-amber-900 px-2 py-0.5 rounded bg-white border border-amber-300">
-                            {event.voucherCode}
+                    {/* Direct Discount Banner */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                          ⚡
+                        </span>
+                        <div>
+                          <span className="text-emerald-950 font-bold block">
+                            Trợ giá trực tiếp vụ mùa:
+                          </span>
+                          <span className="text-gray-500 text-[10px]">
+                            Đã trừ thẳng vào giá bán, không cần nhập mã
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyVoucher(event.voucherCode!)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition-colors flex items-center gap-1"
-                        >
-                          {copiedVoucher === event.voucherCode ? (
-                            <>
-                              <Check size={11} />
-                              <span>Đã sao chép</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={11} />
-                              <span>Sao chép</span>
-                            </>
-                          )}
-                        </button>
                       </div>
-                    )}
+                      <span className="px-2 py-0.5 rounded-md bg-white border border-emerald-300 text-emerald-800 font-extrabold text-[10px] shrink-0">
+                        Mua là giảm ngay
+                      </span>
+                    </div>
 
                     {/* Applied Products Preview */}
                     {matchedProducts.length > 0 && (
@@ -587,27 +577,20 @@ export default function EventsPage() {
                 </ul>
               </div>
 
-              {/* Voucher Action if any */}
-              {selectedEvent.voucherCode && (
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between gap-3">
-                  <div>
-                    <span className="font-bold text-amber-900 block text-xs">
-                      Tặng thêm Voucher độc quyền sự kiện này:
-                    </span>
-                    <span className="font-mono text-base font-black text-amber-950">
-                      {selectedEvent.voucherCode}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyVoucher(selectedEvent.voucherCode!)}
-                    className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5"
-                  >
-                    <Copy size={13} />
-                    <span>Lấy Mã Giảm Giá</span>
-                  </button>
+              {/* Direct discount explanation */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 text-lg font-bold shadow-xs">
+                  ⚡
                 </div>
-              )}
+                <div>
+                  <span className="font-bold text-emerald-950 block text-xs sm:text-sm">
+                    Cơ chế: Trợ giá xuất xưởng trực tiếp (Không cần nhập mã giảm giá)
+                  </span>
+                  <p className="text-[11px] sm:text-xs text-emerald-800 mt-0.5 leading-relaxed">
+                    Mức giảm giá đã được liên minh HTX trừ trực tiếp vào giá bán niêm yết trên website. Quý khách chỉ cần chọn mua sản phẩm là tự động được hưởng mức giá ưu đãi này mà không cần nhập bất kỳ mã ưu đãi nào.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Modal Actions */}

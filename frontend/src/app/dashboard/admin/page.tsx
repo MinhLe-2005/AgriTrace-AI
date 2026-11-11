@@ -1352,7 +1352,7 @@ export default function AdminPortalPage() {
                     <th className="p-3.5">Biểu trưng & Tên sự kiện</th>
                     <th className="p-3.5">Phân loại</th>
                     <th className="p-3.5">Thời gian & Trạng thái</th>
-                    <th className="p-3.5">Mức giảm & Voucher</th>
+                    <th className="p-3.5">Mức trợ giá trực tiếp</th>
                     <th className="p-3.5">Nông sản áp dụng</th>
                     <th className="p-3.5 text-center">Bật/Tắt</th>
                     <th className="p-3.5 text-right">Thao tác</th>
@@ -1419,13 +1419,11 @@ export default function AdminPortalPage() {
                                 </span>
                               ) : null}
                             </div>
-                            {c.voucherCode && (
-                              <div className="mt-1">
-                                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-mono text-[10px] font-bold">
-                                  Mã: {c.voucherCode}
-                                </span>
-                              </div>
-                            )}
+                            <div className="mt-1">
+                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                ⚡ Trừ thẳng giá (Không cần mã)
+                              </span>
+                            </div>
                           </td>
                           <td className="p-3.5">
                             <div className="text-gray-700 font-medium">
@@ -2013,14 +2011,15 @@ export default function AdminPortalPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-gray-700 block mb-1">Mã Voucher tặng kèm:</label>
+                  <label className="font-semibold text-gray-700 block mb-1">Voucher cộng dồn thêm (Tùy chọn):</label>
                   <input
                     type="text"
                     value={eventForm.voucherCode}
                     onChange={(e) => setEventForm({ ...eventForm, voucherCode: e.target.value.toUpperCase() })}
                     className="w-full p-2.5 rounded-xl border border-gray-200 outline-none focus:border-red-600 uppercase font-mono font-bold"
-                    placeholder="DAUTAY25"
+                    placeholder="Để trống nếu chỉ giảm trực tiếp"
                   />
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">Mặc định sự kiện trừ thẳng vào giá bán, không cần nhập mã.</span>
                 </div>
               </div>
 

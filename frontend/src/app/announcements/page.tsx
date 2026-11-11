@@ -436,6 +436,17 @@ export default function AnnouncementsPage() {
                           {camp.description}
                         </p>
 
+                        {/* Direct discount indicator */}
+                        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[10px]">
+                          <span className="text-emerald-950 font-bold flex items-center gap-1">
+                            <span>⚡</span>
+                            <span>Trợ giá trực tiếp (Không cần mã)</span>
+                          </span>
+                          <span className="text-emerald-800 font-extrabold bg-white px-1.5 py-0.5 rounded border border-emerald-300">
+                            {isActive ? "Mua là giảm ngay" : "Hết thời hạn"}
+                          </span>
+                        </div>
+
                         <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-gray-50 rounded-xl text-[11px]">
                           <span className="text-gray-500 flex items-center gap-1 font-mono text-[10px]">
                             <Calendar size={12} className="text-gray-400" />
@@ -503,7 +514,7 @@ export default function AnnouncementsPage() {
                       <th className="p-3">Thời Gian Áp Dụng</th>
                       <th className="p-3">Sự Kiện & Nông Sản</th>
                       <th className="p-3 text-center">Mức Giảm</th>
-                      <th className="p-3">Voucher Kèm</th>
+                      <th className="p-3 text-center">Hình Thức Giảm</th>
                       <th className="p-3 text-center">Trạng Thái Thực Hiện</th>
                       <th className="p-3 text-right">Chi Tiết</th>
                     </tr>
@@ -540,14 +551,10 @@ export default function AnnouncementsPage() {
                               -{camp.discountPercent}%
                             </span>
                           </td>
-                          <td className="p-3 font-mono text-[11px]">
-                            {camp.voucherCode ? (
-                              <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-bold">
-                                {camp.voucherCode}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
+                          <td className="p-3 text-center whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                              ⚡ Trừ thẳng vào giá (Không cần mã)
+                            </span>
                           </td>
                           <td className="p-3 text-center whitespace-nowrap">
                             {isActive ? (
@@ -812,27 +819,20 @@ export default function AnnouncementsPage() {
                 </ul>
               </div>
 
-              {/* Voucher Action if any */}
-              {selectedEvent.voucherCode && (
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between gap-3">
-                  <div>
-                    <span className="font-bold text-amber-900 block text-xs">
-                      Tặng thêm Voucher độc quyền sự kiện này:
-                    </span>
-                    <span className="font-mono text-base font-black text-amber-950">
-                      {selectedEvent.voucherCode}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyVoucher(selectedEvent.voucherCode!)}
-                    className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Copy size={13} />
-                    <span>Lấy Mã Giảm Giá</span>
-                  </button>
+              {/* Direct Discount Reassurance */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 text-lg font-bold shadow-xs">
+                  ⚡
                 </div>
-              )}
+                <div>
+                  <span className="font-bold text-emerald-950 block text-xs sm:text-sm">
+                    Cơ chế: Trợ giá trực tiếp tại vườn (Không cần nhập mã giảm giá)
+                  </span>
+                  <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+                    Mức giảm giá đã được trừ thẳng vào giá niêm yết bán lẻ trên toàn hệ thống. Quý khách chỉ cần chọn mua sản phẩm là tự động được tính theo giá đã giảm mà không cần nhập bất kỳ mã ưu đãi nào.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Modal Actions */}
