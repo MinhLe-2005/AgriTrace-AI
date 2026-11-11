@@ -33,6 +33,12 @@ import {
   Crown,
   Copy,
   Ticket,
+  Flame,
+  Percent,
+  Bell,
+  Gift,
+  HelpCircle,
+  Clock,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -86,6 +92,16 @@ function ProductsContent() {
   const [quickBuyProduct, setQuickBuyProduct] = useState<ApiProduct | null>(null);
   const [quickBuyQty, setQuickBuyQty] = useState(1);
   const [modalQty, setModalQty] = useState(1);
+  const [showPromoInfoModal, setShowPromoInfoModal] = useState(false);
+  const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
+
+  const handleCopyVoucher = (code: string) => {
+    if (typeof window !== "undefined" && navigator?.clipboard) {
+      navigator.clipboard.writeText(code);
+    }
+    setCopiedVoucher(code);
+    setTimeout(() => setCopiedVoucher(null), 2500);
+  };
 
   useEffect(() => {
     if (catParam) setFilterCategory(catParam);
@@ -572,6 +588,80 @@ function ProductsContent() {
         <div className="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
       </div>
 
+      {/* ── Seasonal Sale & Promotion Announcement Banner ── */}
+      <div className="rounded-3xl overflow-hidden border border-amber-300/90 bg-gradient-to-br from-amber-500/10 via-yellow-50/70 to-emerald-50/70 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white shadow-xs animate-pulse">
+                <Flame size={13} className="text-yellow-200 fill-yellow-200" />
+                SỰ KIỆN ƯU ĐÃI ĐANG DIỄN RA
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                🌾 Mùa Vụ Thu Đông 2026
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-500">
+                <Clock size={12} className="text-emerald-600" /> Cập nhật đợt thu hoạch hôm nay
+              </span>
+            </div>
+
+            <h2 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight">
+              Nông Sản Chính Vụ Trợ Giá Trực Tiếp Đến 18% · Áp Thêm Voucher Giảm 30%
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-3xl">
+              Nông sản đang vào <strong>chính vụ thu hoạch rộ</strong> tại Đà Lạt, Mộc Châu và Hàm Yên nên được trợ giá trực tiếp tại vườn (tiết kiệm 10.000 đ - 35.000 đ/KG so với giá niêm yết). Đồng thời, bạn được <strong>áp dụng thêm Mã Giảm Giá</strong> (như <span className="font-mono font-bold text-emerald-800">AGRI30</span>, <span className="font-mono font-bold text-emerald-800">FREESHIP</span>) khi thanh toán để trừ thêm tiền!
+            </p>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap md:flex-col lg:flex-row items-center gap-2 shrink-0">
+            <Link
+              href="/vouchers"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+            >
+              <Ticket size={14} />
+              <span>Xem Kho Voucher (Giảm 30%)</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setShowPromoInfoModal(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-amber-950 border border-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+            >
+              <HelpCircle size={14} className="text-amber-600" />
+              <span>Cơ Chế Giảm Giá Là Gì?</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Explanation Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-amber-200/60 text-xs">
+          <div className="flex items-start gap-2.5 bg-white/80 p-2.5 rounded-xl border border-amber-100 shadow-2xs">
+            <span className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 font-bold flex items-center justify-center shrink-0 text-xs">1</span>
+            <div>
+              <strong className="text-gray-900 block font-bold">Giảm Giá Mùa Vụ (Trực Tiếp)</strong>
+              <span className="text-gray-500 text-[11px]">Trợ giá theo sản lượng thu hoạch tại vườn, giá gốc bị gạch ngang.</span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 bg-white/80 p-2.5 rounded-xl border border-amber-100 shadow-2xs">
+            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">2</span>
+            <div>
+              <strong className="text-gray-900 block font-bold">Mã Giảm Giá Voucher (Trừ Thêm)</strong>
+              <span className="text-gray-500 text-[11px]">Nhập mã tại bước Mua Ngay để trừ thêm 30.000 đ hoặc Freeship 25k.</span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 bg-white/80 p-2.5 rounded-xl border border-amber-100 shadow-2xs">
+            <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center shrink-0 text-xs">3</span>
+            <div>
+              <strong className="text-gray-900 block font-bold">Thông Báo Khuyến Mãi</strong>
+              <span className="text-gray-500 text-[11px]">Xem tại biểu tượng Chuông 🔔 ở góc trên hoặc mục Thông báo cá nhân.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── AgriClub VIP Points & Voucher Bar (Database Connected) ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-50 via-yellow-50 to-emerald-50 border border-amber-200/90 shadow-xs">
         <div className="flex items-center gap-3.5">
@@ -849,8 +939,9 @@ function ProductsContent() {
                           </div>
 
                           {discountPercent > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-600 text-white shadow-md animate-pulse">
-                              -{discountPercent}%
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md flex items-center gap-1 animate-pulse">
+                              <Flame size={11} className="text-yellow-200 fill-yellow-200" />
+                              <span>Vụ mùa -{discountPercent}%</span>
                             </span>
                           )}
                         </div>
@@ -902,17 +993,24 @@ function ProductsContent() {
                         </div>
 
                         {/* Price */}
-                        <div className="pt-1 flex items-baseline gap-2">
-                          <span className="text-xl font-black text-emerald-800">
-                            {p.price.toLocaleString("vi-VN")} đ
-                          </span>
-                          <span className="text-xs text-gray-400 font-normal">
-                            / {p.unit}
-                          </span>
-                          {p.oldPrice > p.price && (
-                            <span className="text-xs text-gray-400 line-through">
-                              {p.oldPrice.toLocaleString("vi-VN")} đ
+                        <div className="pt-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xl font-black text-emerald-800">
+                              {p.price.toLocaleString("vi-VN")} đ
                             </span>
+                            <span className="text-xs text-gray-400 font-normal">
+                              / {p.unit}
+                            </span>
+                            {p.oldPrice > p.price && (
+                              <span className="text-xs text-gray-400 line-through">
+                                {p.oldPrice.toLocaleString("vi-VN")} đ
+                              </span>
+                            )}
+                          </div>
+                          {p.oldPrice > p.price && (
+                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-rose-600 mt-0.5">
+                              <span>🌾 Trợ giá chính vụ Thu Đông (Tiết kiệm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ)</span>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1126,6 +1224,27 @@ function ProductsContent() {
                     <span className="text-[11px] text-gray-400 font-medium self-end">Đã gồm VAT</span>
                   </div>
 
+                  {/* Seasonal Discount & Voucher Stacking Explanation */}
+                  <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/90 text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                      <Flame size={14} className="text-rose-600 fill-rose-600" />
+                      <span>Ưu Đãi Chính Vụ & Mã Giảm Giá Hợp Lệ</span>
+                    </div>
+                    <p className="text-[11px] text-gray-700 leading-relaxed">
+                      🌾 Sản phẩm đang vào <strong>chính vụ thu hoạch rộ tại {selectedProduct.origin}</strong> nên được trợ giá trực tiếp <strong>{selectedProduct.oldPrice > selectedProduct.price ? Math.round(((selectedProduct.oldPrice - selectedProduct.price) / selectedProduct.oldPrice) * 100) : 15}%</strong> (tiết kiệm {(selectedProduct.oldPrice > selectedProduct.price ? selectedProduct.oldPrice - selectedProduct.price : 10000).toLocaleString("vi-VN")} đ/{selectedProduct.unit}).
+                    </p>
+                    <div className="text-[11px] text-emerald-800 font-medium bg-emerald-50 p-2 rounded-xl border border-emerald-200/70 flex items-center justify-between">
+                      <span>Áp thêm mã voucher <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-300 text-emerald-900">AGRI30</strong> để giảm thêm 30.000 đ khi Mua Ngay</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyVoucher("AGRI30")}
+                        className="text-emerald-700 font-bold hover:underline shrink-0 ml-2"
+                      >
+                        {copiedVoucher === "AGRI30" ? "Đã sao chép!" : "Sao chép mã"}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Loyalty Points Reward Pill */}
                   <div className="flex items-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border border-amber-200/90 text-xs font-bold text-amber-950 shadow-2xs">
                     <Sparkles size={15} className="text-amber-600 shrink-0" />
@@ -1271,6 +1390,108 @@ function ProductsContent() {
           </div>
         </div>
       )}
+      {/* ── Modal Giải Thích Chi Tiết Cơ Chế Giảm Giá & Thông Báo Khuyến Mãi ── */}
+      {showPromoInfoModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-emerald-100 flex flex-col">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-emerald-800 to-teal-800 text-white rounded-t-3xl flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                  <Flame size={20} className="text-yellow-300 fill-yellow-300" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">Chính Sách & Các Loại Giảm Giá</h3>
+                  <p className="text-xs text-emerald-200">Hệ thống minh bạch giá trị nông sản AgriTrace</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPromoInfoModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 text-xs text-gray-700">
+              {/* Mục 1: Giảm giá mùa vụ */}
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2">
+                <div className="flex items-center gap-2 font-black text-amber-950 text-sm">
+                  <span className="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center text-xs">1</span>
+                  <span>Giảm Giá Mùa Vụ (Trợ Giá Trực Tiếp Tại Vườn)</span>
+                </div>
+                <p className="text-gray-600 leading-relaxed">
+                  Là mức giá ưu đãi tự động áp dụng trực tiếp lên từng sản phẩm khi nông sản bước vào thời điểm <strong>thu hoạch rộ (chính vụ)</strong> tại các nông trại đối tác ở Đà Lạt, Mộc Châu, Hàm Yên.
+                </p>
+                <div className="p-2.5 bg-white rounded-xl border border-amber-200 text-gray-800 space-y-1">
+                  <div className="font-bold text-gray-900">• Cơ chế hiển thị:</div>
+                  <div>Giá cũ gạch ngang (ví dụ 75.000 đ) <span className="text-emerald-700 font-bold">→ Giá bán thực tế 65.000 đ</span> kèm nhãn <span className="bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded text-[11px]">🔥 Vụ mùa -13%</span>.</div>
+                  <div className="text-gray-500">• Bạn <strong>không cần nhập mã</strong>, giá niêm yết đã là giá được trợ giá trực tiếp tốt nhất.</div>
+                </div>
+              </div>
+
+              {/* Mục 2: Voucher giảm thêm */}
+              <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2">
+                <div className="flex items-center gap-2 font-black text-blue-950 text-sm">
+                  <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs">2</span>
+                  <span>Mã Voucher Khuyến Mãi (Giảm Thêm Khi Mua)</span>
+                </div>
+                <p className="text-gray-600 leading-relaxed">
+                  Mã Voucher là mã ưu đãi độc quyền do hệ thống hoặc đối tác cấp, bạn có thể áp dụng ở bước <strong>&ldquo;Mua Ngay&rdquo;</strong> hoặc trang <strong>Giỏ hàng</strong> để trừ thêm tiền trên tổng đơn.
+                </p>
+                <div className="p-2.5 bg-white rounded-xl border border-blue-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-emerald-800">AGRI30</span>
+                    <span className="text-gray-600">Giảm 30.000 đ cho đơn từ 150k</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-emerald-800">FREESHIP</span>
+                    <span className="text-gray-600">Miễn phí 25.000 đ vận chuyển thùng lạnh</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-700 font-semibold pt-1 border-t border-gray-100">
+                    💡 Ưu đãi được <strong>CỘNG DỒN</strong>: Giá vụ mùa giảm + Voucher trừ tiếp + Tích điểm AgriClub!
+                  </div>
+                </div>
+              </div>
+
+              {/* Mục 3: Xem thông báo khuyến mãi ở đâu */}
+              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2">
+                <div className="flex items-center gap-2 font-black text-emerald-950 text-sm">
+                  <span className="w-6 h-6 rounded-lg bg-emerald-700 text-white flex items-center justify-center text-xs">3</span>
+                  <span>Xem Thông Báo Sale & Chiến Dịch Mới Ở Đâu?</span>
+                </div>
+                <ul className="space-y-1.5 text-gray-700 leading-relaxed list-disc list-inside">
+                  <li><strong>Biểu tượng Chuông 🔔 trên thanh điều hướng:</strong> Thông báo các sự kiện mùa vụ như <em>Mùa Dâu Tây Mộc Châu</em>, <em>Tuần Lễ Nông Sản Xanh</em>, mã freeship mới.</li>
+                  <li><strong>Banner đầu trang Sản Phẩm:</strong> Thông báo chiến dịch thu hoạch nông sản đang diễn ra trong ngày.</li>
+                  <li><strong>Trang &ldquo;Ưu Đãi &amp; Hội Viên&rdquo; (/vouchers):</strong> Kho toàn bộ mã giảm giá đang kích hoạt, chỉ cần bấm &ldquo;Sao chép&rdquo; hoặc &ldquo;Dùng ngay&rdquo;.</li>
+                  <li><strong>Trợ lý Nông Nghiệp AI (Góc phải dưới màn hình):</strong> Bấm &ldquo;Hỏi Trợ Lý AI&rdquo; và gõ: <em>&ldquo;Hôm nay có mã giảm giá nào không?&rdquo;</em>, AI sẽ tìm voucher phù hợp nhất cho bạn.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 rounded-b-3xl flex items-center justify-end gap-2.5">
+              <Link
+                href="/vouchers"
+                onClick={() => setShowPromoInfoModal(false)}
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold transition-all"
+              >
+                Đến Kho Voucher
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowPromoInfoModal(false)}
+                className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold transition-colors cursor-pointer"
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mua Ngay Siêu Tốc Modal */}
       <QuickBuyModal
         isOpen={!!quickBuyProduct}
