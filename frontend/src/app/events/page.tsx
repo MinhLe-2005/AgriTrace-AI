@@ -122,28 +122,40 @@ export default function EventsPage() {
     return `Còn lại ${diffDays} ngày áp dụng`;
   };
 
-  // Find products matching an event
+  // Find products matching an event strictly according to targetType
   const getEventProducts = (event: CampaignItem) => {
     return products.filter((p) => {
-      // 1. Target by product names
-      if (event.targetProductNames && event.targetProductNames.length > 0) {
-        const pName = p.name.toLowerCase();
-        const matchedName = event.targetProductNames.some((n) =>
-          pName.includes(n.toLowerCase())
-        );
-        if (matchedName) return true;
-      }
-      // 2. Target by category
-      if (event.targetCategoryCodes && event.targetCategoryCodes.length > 0) {
-        const cleanCat = (p.categoryCode || "").toLowerCase().replace(/[_-]/g, "");
-        const matchedCat = event.targetCategoryCodes.some((code) => {
-          const c = code.toLowerCase().replace(/[_-]/g, "");
-          return cleanCat.includes(c) || c.includes(cleanCat);
-        });
-        if (matchedCat) return true;
-      }
-      // 3. Target all
+      // 1. Target all products
       if (event.targetType === "all") return true;
+
+      // 2. Target specific products
+      if (event.targetType === "product") {
+        const pName = (p.name || "").toLowerCase();
+        if (event.targetProductNames && event.targetProductNames.length > 0) {
+          const matchedName = event.targetProductNames.some((n) =>
+            pName.includes(n.toLowerCase().trim())
+          );
+          if (matchedName) return true;
+        }
+        if (event.targetProductIds && event.targetProductIds.length > 0) {
+          if (event.targetProductIds.some((id) => id.toLowerCase() === p.id.toLowerCase())) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      // 3. Target by category
+      if (event.targetType === "category") {
+        if (event.targetCategoryCodes && event.targetCategoryCodes.length > 0) {
+          const cleanCat = (p.categoryCode || "").toLowerCase().replace(/[_-]/g, "");
+          return event.targetCategoryCodes.some((code) => {
+            const c = code.toLowerCase().replace(/[_-]/g, "");
+            return cleanCat === c || cleanCat.includes(c) || c.includes(cleanCat);
+          });
+        }
+        return false;
+      }
 
       return false;
     });

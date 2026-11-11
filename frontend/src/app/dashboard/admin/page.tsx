@@ -420,14 +420,20 @@ function AdminPortalContent() {
       toast.error("Vui lòng nhập tên sự kiện!");
       return;
     }
-    const catCodes = eventForm.targetCategoryCodes
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const prodNames = eventForm.targetProductNames
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const catCodes =
+      eventForm.targetType === "category"
+        ? eventForm.targetCategoryCodes
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+    const prodNames =
+      eventForm.targetType === "product"
+        ? eventForm.targetProductNames
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
 
     if (editingEventId) {
       updateCampaign(editingEventId, {
