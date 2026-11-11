@@ -11,8 +11,10 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Copy,
   Download,
   ExternalLink,
+  Eye,
   FileCheck,
   FileText,
   Flame,
@@ -21,6 +23,7 @@ import {
   Leaf,
   Layers,
   Megaphone,
+  Plus,
   Printer,
   QrCode,
   Search,
@@ -35,6 +38,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useAuthStore } from "@/stores/auth-store";
+import { useCampaignStore, type CampaignItem } from "@/stores/campaign-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
 
@@ -110,9 +115,23 @@ const ANNOUNCEMENTS: AnnouncementItem[] = [
 ];
 
 export default function AnnouncementsPage() {
+  const { campaigns, getCampaignStatus } = useCampaignStore();
+  const { user } = useAuthStore();
   const [filterType, setFilterType] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [copiedLink, setCopiedLink] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CampaignItem | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
+
+  const handleCopyVoucher = (code: string) => {
+    if (typeof window !== "undefined" && navigator?.clipboard) {
+      navigator.clipboard.writeText(code);
+    }
+    setCopiedVoucher(code);
+    toast.success(`Đã sao chép mã voucher [${code}]!`);
+    setTimeout(() => setCopiedVoucher(null), 2500);
+  };
 
   const handleCopyLink = () => {
     if (typeof window !== "undefined" && navigator?.clipboard) {
@@ -311,158 +330,257 @@ export default function AnnouncementsPage() {
             </p>
           </div>
 
-          {/* Điều 2: Biểu Giá Trợ Giá Mùa Vụ Chi Tiết (BẢNG TRỌNG TÂM CỦA NGƯỜI DÙNG) */}
-          <div className="space-y-3">
-            <div className="font-bold text-gray-900 flex items-center justify-between text-xs sm:text-sm">
+          {/* Điều 2: Các Sự Kiện & Mùa Vụ Khuyến Mãi (DỮ LIỆU ĐỘNG TỪ HỆ THỐNG ADMIN) */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-emerald-700 text-white font-black text-xs flex items-center justify-center">
+                <span className="w-6 h-6 rounded-lg bg-emerald-700 text-white font-black text-xs flex items-center justify-center shrink-0">
                   2
                 </span>
-                <span>Điều 2: Biểu Giá Trợ Giá & Lịch Thu Hoạch Chi Tiết Từng Loại Nông Sản</span>
+                <div>
+                  <h3 className="font-extrabold text-gray-900 text-sm sm:text-base">
+                    Điều 2: Danh Sách Các Sự Kiện Giảm Giá & Trợ Giá Mùa Vụ (Đồng Bộ Động Từ Admin)
+                  </h3>
+                  <p className="text-[11px] text-gray-500">
+                    Mỗi sự kiện dưới đây được thiết lập độc lập. Khi Admin thêm mới hoặc sửa sự kiện, sản phẩm sẽ tự động giảm giá trên cửa hàng và tự động về giá gốc khi hết thời hạn.
+                  </p>
+                </div>
               </div>
-              <span className="text-[11px] font-mono text-emerald-800 font-bold">Kèm phụ lục bảng biểu số 01</span>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {user?.roles?.includes("ADMIN") && (
+                  <Link
+                    href="/dashboard/admin"
+                    className="px-3 py-1.5 rounded-xl bg-red-950 hover:bg-red-900 text-white text-[11px] font-bold transition-colors flex items-center gap-1 shadow-xs"
+                    title="Vào Cổng Admin để thêm, sửa, xóa sự kiện"
+                  >
+                    <Plus size={13} />
+                    <span>Admin: Quản Lý Sự Kiện</span>
+                  </Link>
+                )}
+                <div className="flex items-center bg-gray-100 p-0.5 rounded-xl text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("cards")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg transition-colors cursor-pointer",
+                      viewMode === "cards" ? "bg-white text-emerald-900 shadow-2xs" : "text-gray-500 hover:text-gray-900"
+                    )}
+                  >
+                    Dạng Thẻ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("table")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg transition-colors cursor-pointer",
+                      viewMode === "table" ? "bg-white text-emerald-900 shadow-2xs" : "text-gray-500 hover:text-gray-900"
+                    )}
+                  >
+                    Dạng Bảng
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-emerald-900 text-white font-bold uppercase text-[11px]">
-                  <tr>
-                    <th className="p-3">Thời Gian Áp Dụng</th>
-                    <th className="p-3">Nông Sản Chính Vụ</th>
-                    <th className="p-3 text-center">Mức Trợ Giá Trực Tiếp</th>
-                    <th className="p-3">Tiết Kiệm So Với Giá Gốc</th>
-                    <th className="p-3 text-center">Trạng Thái Thực Hiện</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
-                  <tr className="hover:bg-emerald-50/40 bg-emerald-50/20">
-                    <td className="p-3 font-bold text-gray-900 whitespace-nowrap">Tháng 10 – Tháng 12</td>
-                    <td className="p-3 font-semibold text-emerald-950">
-                      🥗 Cải Xoăn Kale & Xà Lách Lô Lô Đà Lạt
-                      <span className="block text-[10px] text-gray-500 font-normal">Canh tác thủy canh NFT chuẩn VietGAP / Organic</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-200">
-                        -13% đến -17%
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-emerald-800 whitespace-nowrap">
-                      Tiết kiệm 10.000đ – 15.000đ/KG
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        🔥 Đang Thu Hoạch Rộ
-                      </span>
-                    </td>
-                  </tr>
+            {/* Dynamic Content: CARDS VIEW (Mặc định) */}
+            {viewMode === "cards" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {campaigns.map((camp) => {
+                  const status = getCampaignStatus(camp);
+                  const isActive = status === "active";
+                  const isExpired = status === "expired";
 
-                  <tr className="hover:bg-emerald-50/40">
-                    <td className="p-3 font-bold text-gray-900 whitespace-nowrap">Tháng 9 – Tháng 12</td>
-                    <td className="p-3 font-semibold text-emerald-950">
-                      🍊 Cam Sành Bố Hạ & Hàm Yên
-                      <span className="block text-[10px] text-gray-500 font-normal">Vỏ mỏng, tép vàng giòn, mọng nước giàu Vitamin C</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-200">
-                        -18%
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-emerald-800 whitespace-nowrap">
-                      Tiết kiệm 10.000đ/KG
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        🔥 Đang Áp Dụng
-                      </span>
-                    </td>
-                  </tr>
+                  return (
+                    <div
+                      key={camp.id}
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between space-y-3 bg-white",
+                        isActive
+                          ? "border-emerald-300 shadow-xs hover:border-emerald-500 hover:shadow-md"
+                          : isExpired
+                          ? "border-gray-200 bg-gray-50/60 opacity-80"
+                          : "border-blue-200"
+                      )}
+                    >
+                      <div className="space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl p-1 rounded-xl bg-gray-100 shrink-0">
+                              {camp.bannerIcon || "🌾"}
+                            </span>
+                            <div>
+                              <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold border", camp.typeColor)}>
+                                {camp.typeLabel}
+                              </span>
+                              <h4 className="font-bold text-gray-900 text-xs sm:text-sm mt-0.5 line-clamp-1">
+                                {camp.title}
+                              </h4>
+                            </div>
+                          </div>
+                          <span
+                            className={cn(
+                              "px-2.5 py-1 rounded-xl font-black text-xs shrink-0 shadow-2xs",
+                              isActive
+                                ? "bg-rose-500 text-white"
+                                : isExpired
+                                ? "bg-gray-200 text-gray-500 line-through"
+                                : "bg-blue-600 text-white"
+                            )}
+                          >
+                            -{camp.discountPercent}%
+                          </span>
+                        </div>
 
-                  <tr className="hover:bg-emerald-50/40 bg-emerald-50/20">
-                    <td className="p-3 font-bold text-gray-900 whitespace-nowrap">Tháng 10 – Tháng 4</td>
-                    <td className="p-3 font-semibold text-emerald-950">
-                      🍓 Dâu Tây New Zealand Mộc Châu
-                      <span className="block text-[10px] text-gray-500 font-normal">Trồng nhà kính công nghệ cao, đạt chuẩn GlobalGAP</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-200">
-                        -14%
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-emerald-800 whitespace-nowrap">
-                      Tiết kiệm 25.000đ/Hộp 500g
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        🔥 Vụ Mới Xuất Kho
-                      </span>
-                    </td>
-                  </tr>
+                        <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed">
+                          {camp.description}
+                        </p>
 
-                  <tr className="hover:bg-emerald-50/40">
-                    <td className="p-3 font-bold text-gray-900 whitespace-nowrap">Tháng 4 – Tháng 10</td>
-                    <td className="p-3 font-semibold text-emerald-950">
-                      🥑 Bơ Sáp 034 Tây Nguyên
-                      <span className="block text-[10px] text-gray-500 font-normal">Cơm vàng dẻo quánh, hạt lép, xả kho tươi cuối vụ</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-200">
-                        -17%
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-emerald-800 whitespace-nowrap">
-                      Tiết kiệm 15.000đ/KG
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                        ❄️ Cuối Vụ (Ưu Tiên FEFO)
-                      </span>
-                    </td>
-                  </tr>
+                        <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-gray-50 rounded-xl text-[11px]">
+                          <span className="text-gray-500 flex items-center gap-1 font-mono text-[10px]">
+                            <Calendar size={12} className="text-gray-400" />
+                            <span>{camp.startDate} → {camp.endDate}</span>
+                          </span>
+                          <span
+                            className={cn(
+                              "font-bold text-[10px] px-2 py-0.5 rounded-full",
+                              isActive
+                                ? "bg-emerald-100 text-emerald-800"
+                                : isExpired
+                                ? "bg-gray-200 text-gray-600"
+                                : "bg-blue-100 text-blue-800"
+                            )}
+                          >
+                            {isActive ? "🔥 Đang áp dụng" : isExpired ? "⏹️ Đã hết hạn (Về giá gốc)" : "⏳ Sắp tới"}
+                          </span>
+                        </div>
 
-                  <tr className="hover:bg-emerald-50/40 bg-emerald-50/20">
-                    <td className="p-3 font-bold text-gray-900 whitespace-nowrap">Tháng 11 – Tháng 3</td>
-                    <td className="p-3 font-semibold text-emerald-950">
-                      🥭 Xoài Cát Hòa Lộc
-                      <span className="block text-[10px] text-gray-500 font-normal">Vựa trái cây Tiền Giang & Đồng Tháp</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-900 border border-purple-200">
-                        Pre-order
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-purple-800 whitespace-nowrap">
-                      Nhân đôi (x2) điểm hội viên
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                        ⏳ Mở Bán 15/11
-                      </span>
-                    </td>
-                  </tr>
+                        {camp.targetProductNames && camp.targetProductNames.length > 0 && (
+                          <div className="text-[11px] text-gray-700">
+                            <span className="font-semibold text-gray-500">Nông sản: </span>
+                            <span className="font-bold text-emerald-900">{camp.targetProductNames.join(", ")}</span>
+                          </div>
+                        )}
+                      </div>
 
-                  <tr className="hover:bg-emerald-50/40">
-                    <td className="p-3 font-bold text-gray-900 whitespace-nowrap">Tháng 12 – Tháng 1</td>
-                    <td className="p-3 font-semibold text-emerald-950">
-                      🍈 Bưởi Da Xanh Bến Tre
-                      <span className="block text-[10px] text-gray-500 font-normal">Vườn Bến Tre, cam kết không tăng giá dịp Tết</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-900 border border-blue-200">
-                        Bình ổn giá Tết
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-blue-800 whitespace-nowrap">
-                      Giữ nguyên giá niêm yết dịp Tết
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                        🌾 Đã Ký Bao Tiêu
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                      <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEvent(camp)}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Eye size={12} />
+                          <span>Xem Bài Chi Tiết</span>
+                        </button>
+
+                        <Link
+                          href={
+                            camp.targetProductNames && camp.targetProductNames.length > 0
+                              ? `/products?search=${encodeURIComponent(camp.targetProductNames[0])}`
+                              : "/products"
+                          }
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl font-bold text-[11px] transition-colors flex items-center gap-1",
+                            isActive
+                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                              : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          )}
+                        >
+                          <ShoppingBag size={12} />
+                          <span>{isActive ? "Mua ngay" : "Xem sản phẩm"}</span>
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Dynamic Content: TABLE VIEW */
+              <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-emerald-900 text-white font-bold uppercase text-[11px]">
+                    <tr>
+                      <th className="p-3">Thời Gian Áp Dụng</th>
+                      <th className="p-3">Sự Kiện & Nông Sản</th>
+                      <th className="p-3 text-center">Mức Giảm</th>
+                      <th className="p-3">Voucher Kèm</th>
+                      <th className="p-3 text-center">Trạng Thái Thực Hiện</th>
+                      <th className="p-3 text-right">Chi Tiết</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-gray-700">
+                    {campaigns.map((camp) => {
+                      const status = getCampaignStatus(camp);
+                      const isActive = status === "active";
+                      const isExpired = status === "expired";
+
+                      return (
+                        <tr key={camp.id} className={cn("hover:bg-emerald-50/40 transition-colors", isActive ? "bg-emerald-50/15" : "")}>
+                          <td className="p-3 font-mono font-bold text-gray-800 whitespace-nowrap">
+                            {camp.startDate} → {camp.endDate}
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold text-gray-900 flex items-center gap-1.5">
+                              <span>{camp.bannerIcon || "🌾"}</span>
+                              <span>{camp.title}</span>
+                            </div>
+                            <span className="text-[10px] text-gray-500 block mt-0.5">
+                              Áp dụng: {camp.targetProductNames?.join(", ") || camp.targetCategoryCodes?.join(", ") || "Toàn bộ"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span
+                              className={cn(
+                                "px-2.5 py-0.5 rounded-full text-xs font-black border",
+                                isActive
+                                  ? "bg-rose-100 text-rose-800 border-rose-200"
+                                  : "bg-gray-100 text-gray-500 border-gray-200 line-through"
+                              )}
+                            >
+                              -{camp.discountPercent}%
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono text-[11px]">
+                            {camp.voucherCode ? (
+                              <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-bold">
+                                {camp.voucherCode}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center whitespace-nowrap">
+                            {isActive ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                                🔥 Đang Áp Dụng Giảm Giá
+                              </span>
+                            ) : isExpired ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                ⏹️ Đã Hết Hạn (Về Giá Gốc)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                ⏳ Sắp Diễn Ra
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEvent(camp)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[10px] transition-colors cursor-pointer"
+                            >
+                              Xem bài viết
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Điều 3: Cơ Chế Cộng Dồn 2 Tầng Ưu Đãi */}
@@ -597,6 +715,154 @@ export default function AnnouncementsPage() {
           </div>
         </div>
       </div>
+
+      {/* ========================================================= */}
+      {/* MODAL: BÀI VIẾT CHI TIẾT SỰ KIỆN GIẢM GIÁ (BLOG-STYLE)    */}
+      {/* ========================================================= */}
+      {selectedEvent && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-gray-200 space-y-6 my-8 max-h-[85vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl p-2 rounded-2xl bg-gray-100 border border-gray-200 shrink-0">
+                  {selectedEvent.bannerIcon || "🌾"}
+                </span>
+                <div>
+                  <span
+                    className={cn(
+                      "px-2.5 py-0.5 rounded-full text-[11px] font-bold border",
+                      selectedEvent.typeColor
+                    )}
+                  >
+                    {selectedEvent.typeLabel}
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-black text-gray-900 mt-1">
+                    {selectedEvent.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedEvent(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center text-sm shrink-0 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Status Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 bg-emerald-50/60 rounded-2xl border border-emerald-200 text-xs">
+              <div>
+                <span className="text-gray-500 block">Thời gian diễn ra:</span>
+                <strong className="text-gray-900">
+                  {new Date(selectedEvent.startDate).toLocaleDateString("vi-VN")} -{" "}
+                  {new Date(selectedEvent.endDate).toLocaleDateString("vi-VN")}
+                </strong>
+              </div>
+              <div>
+                <span className="text-gray-500 block">Mức trợ giá tại vườn:</span>
+                <strong className="text-rose-600 text-sm">
+                  -{selectedEvent.discountPercent}% trực tiếp
+                </strong>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <span className="text-gray-500 block">Trạng thái:</span>
+                <strong
+                  className={cn(
+                    getCampaignStatus(selectedEvent) === "active"
+                      ? "text-emerald-700"
+                      : "text-gray-500"
+                  )}
+                >
+                  {getCampaignStatus(selectedEvent) === "active"
+                    ? "🔥 Đang áp dụng"
+                    : "⏹️ Đã kết thúc"}
+                </strong>
+              </div>
+            </div>
+
+            {/* Event Description & Blog Content */}
+            <div className="space-y-4 text-xs sm:text-sm text-gray-700 leading-relaxed">
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 font-medium italic text-gray-800">
+                &quot;{selectedEvent.description}&quot;
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-900 text-sm mb-1.5">
+                  Bối cảnh mùa vụ & Thỏa thuận trợ giá:
+                </h4>
+                <p>
+                  {selectedEvent.fullContent ||
+                    "Chiến dịch do Ban điều phối mùa vụ AgriTrace AI phối hợp trực tiếp cùng các Hợp tác xã thành viên tổ chức. Nhằm bảo đảm bao tiêu toàn bộ sản lượng thu hoạch rộ lúc nông sản đạt độ ngọt đậm đà nhất và hàm lượng vitamin cao nhất, sản phẩm được phân phối thẳng từ kho lạnh trung tâm đến người tiêu dùng với biểu giá tối ưu nhất."}
+                </p>
+              </div>
+
+              {/* Quality Commitments */}
+              <div className="p-4 bg-white rounded-2xl border border-gray-200 space-y-2">
+                <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-700" />
+                  <span>Cam kết chất lượng xuyên suốt sự kiện:</span>
+                </h4>
+                <ul className="space-y-1.5 text-xs text-gray-600 list-disc list-inside">
+                  <li>Không xả hàng cận date: 100% nông sản thu hoạch mới lúc 05:30 sáng.</li>
+                  <li>Dư lượng thuốc BVTV = 0 (Kiểm định độc lập Quatest 1).</li>
+                  <li>Bảo quản chuỗi lạnh khép kín 2°C - 5°C, giao tận tay trong 24H.</li>
+                  <li>Tự động đóng chiến dịch khi mùa thu hoạch kết thúc theo đúng ngày công bố.</li>
+                </ul>
+              </div>
+
+              {/* Voucher Action if any */}
+              {selectedEvent.voucherCode && (
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="font-bold text-amber-900 block text-xs">
+                      Tặng thêm Voucher độc quyền sự kiện này:
+                    </span>
+                    <span className="font-mono text-base font-black text-amber-950">
+                      {selectedEvent.voucherCode}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyVoucher(selectedEvent.voucherCode!)}
+                    className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Copy size={13} />
+                    <span>Lấy Mã Giảm Giá</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setSelectedEvent(null)}
+                className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold cursor-pointer"
+              >
+                Đóng
+              </button>
+              <Link
+                href={
+                  selectedEvent.targetProductNames &&
+                  selectedEvent.targetProductNames.length > 0
+                    ? `/products?search=${encodeURIComponent(
+                        selectedEvent.targetProductNames[0]
+                      )}`
+                    : "/products"
+                }
+                onClick={() => setSelectedEvent(null)}
+                className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-md"
+              >
+                <ShoppingBag size={14} />
+                <span>Mua Nông Sản Sự Kiện Này</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

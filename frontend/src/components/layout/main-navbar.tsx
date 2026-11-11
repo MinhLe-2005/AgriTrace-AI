@@ -296,7 +296,24 @@ export function MainNavbar() {
             )}
           </div>
 
-          {/* 3. Truy Xuất QR Dropdown */}
+          {/* 3. Sự Kiện & Giảm Giá (Top-level Navigation) */}
+          <Link
+            href="/events"
+            className={cn(
+              "px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all duration-150 cursor-pointer",
+              pathname.startsWith("/events")
+                ? "text-rose-700 bg-rose-50/80 font-bold"
+                : "text-gray-700 hover:text-rose-700 hover:bg-gray-100/80"
+            )}
+          >
+            <Flame size={14} className="text-rose-500 fill-rose-500 animate-pulse" />
+            <span>Sự Kiện & Giảm Giá</span>
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-500 text-white shadow-2xs">
+              HOT
+            </span>
+          </Link>
+
+          {/* 4. Truy Xuất QR Dropdown */}
           <div
             className="relative"
             onMouseEnter={() => handleMouseEnter("traceability")}
