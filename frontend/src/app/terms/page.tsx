@@ -57,7 +57,7 @@ export default function TermsPage() {
         {/* Main Content Sections */}
         <div className="space-y-6">
           {/* Section 1 */}
-          <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
+          <div id="standards" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
             <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
               <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
                 <Leaf size={20} />
@@ -88,7 +88,7 @@ export default function TermsPage() {
           </div>
 
           {/* Section 2 */}
-          <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
+          <div id="coldchain" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
             <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
               <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-800 flex items-center justify-center font-bold">
                 <Truck size={20} />
@@ -119,7 +119,7 @@ export default function TermsPage() {
           </div>
 
           {/* Section 3 */}
-          <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
+          <div id="returns" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
             <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
               <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
                 <RotateCcw size={20} />
@@ -153,7 +153,7 @@ export default function TermsPage() {
           </div>
 
           {/* Section 4 */}
-          <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
+          <div id="payment" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
             <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
               <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold">
                 <Lock size={20} />

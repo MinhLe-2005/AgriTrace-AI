@@ -208,12 +208,12 @@ export function MainFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/cart" className="hover:text-emerald-400 transition-colors">
+                <Link href="/terms#coldchain" className="hover:text-emerald-400 transition-colors">
                   Chính sách giao hàng xe lạnh 24H
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard/customer?tab=orders" className="hover:text-emerald-400 transition-colors">
+                <Link href="/terms#returns" className="hover:text-emerald-400 transition-colors">
                   Quy định đổi trả hàng miễn phí
                 </Link>
               </li>
@@ -223,8 +223,8 @@ export function MainFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-emerald-400 transition-colors">
-                  Trung tâm trợ giúp & Khiếu nại
+                <Link href="/faq" className="hover:text-emerald-400 transition-colors">
+                  Trung tâm trợ giúp & Khiếu nại (FAQ)
                 </Link>
               </li>
             </ul>
