@@ -56,10 +56,21 @@ import { useCartStore } from "@/stores/cart-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
 
+function normalizeCategoryCode(code?: string | null): string {
+  if (!code) return "";
+  const clean = code.toLowerCase().trim().replace(/[_-]/g, "");
+  if (clean === "raula" || clean === "rauanla" || clean === "rau") return "rau_la";
+  if (clean === "cuqua" || clean === "cu" || clean === "qua") return "cu_qua";
+  if (clean === "traicay" || clean === "trai" || clean === "fruit") return "trai_cay";
+  if (clean === "nam" || clean === "namchebien" || clean === "mushroom") return "nam_chebien";
+  return code.toLowerCase().trim();
+}
+
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const catParam = searchParams.get("cat") || "all";
+  const rawCatParam = searchParams.get("cat") || "all";
+  const catParam = rawCatParam === "all" ? "all" : normalizeCategoryCode(rawCatParam);
   const searchParam = searchParams.get("search") || "";
   const buyParam = searchParams.get("buy") || "";
   const detailParam = searchParams.get("detail") || searchParams.get("product") || searchParams.get("batch") || "";
@@ -172,7 +183,11 @@ function ProductsContent() {
     const counts: Record<string, number> = { all: products.length };
     products.forEach((p) => {
       if (p.categoryCode) {
+        const norm = normalizeCategoryCode(p.categoryCode);
         counts[p.categoryCode] = (counts[p.categoryCode] || 0) + 1;
+        if (norm !== p.categoryCode) {
+          counts[norm] = (counts[norm] || 0) + 1;
+        }
       }
     });
     return counts;
@@ -193,9 +208,9 @@ function ProductsContent() {
   // Filter & Sort
   const filteredAndSorted = useMemo(() => {
     const result = products.filter((p) => {
-      // 1. Category
-      const pCat = (p.categoryCode || "").toLowerCase().replace(/_/g, "-");
-      const fCat = (filterCategory || "").toLowerCase().replace(/_/g, "-");
+      // 1. Category (smart normalized matching)
+      const pCat = normalizeCategoryCode(p.categoryCode);
+      const fCat = normalizeCategoryCode(filterCategory);
       const matchCat =
         filterCategory === "all" ||
         p.categoryCode === filterCategory ||
@@ -372,8 +387,8 @@ function ProductsContent() {
           </button>
 
           {categories.map((c) => {
-            const isSelected = filterCategory === c.code;
-            const count = categoryCounts[c.code] || 0;
+            const isSelected = normalizeCategoryCode(filterCategory) === normalizeCategoryCode(c.code);
+            const count = categoryCounts[c.code] || categoryCounts[normalizeCategoryCode(c.code)] || 0;
             return (
               <button
                 key={c.code}
@@ -779,7 +794,13 @@ function ProductsContent() {
 
               {filterCategory !== "all" && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-900 font-semibold shadow-2xs">
-                  Danh mục: {categories.find((c) => c.code === filterCategory)?.name || filterCategory}
+                  Danh mục: {
+                    categories.find((c) => normalizeCategoryCode(c.code) === normalizeCategoryCode(filterCategory))?.name ||
+                    (normalizeCategoryCode(filterCategory) === "rau_la" ? "Rau Ăn Lá Thủy Canh" :
+                     normalizeCategoryCode(filterCategory) === "cu_qua" ? "Củ Quả Tươi Sạch" :
+                     normalizeCategoryCode(filterCategory) === "trai_cay" ? "Trái Cây Đặc Sản" :
+                     normalizeCategoryCode(filterCategory) === "nam_chebien" ? "Nấm & Nông Sản Chế Biến" : filterCategory)
+                  }
                   <button onClick={() => setFilterCategory("all")} className="hover:text-rose-600">
                     <X size={12} />
                   </button>

@@ -236,6 +236,16 @@ export default function TraceabilityPage() {
       setBatchCode(q);
       setSearchedBatch(q);
     }
+    const tab = searchParams.get("tab");
+    if (tab === "cert") {
+      setTimeout(() => {
+        document.getElementById("cert-inspection")?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+    } else if (tab === "log") {
+      setTimeout(() => {
+        document.getElementById("farming-log")?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+    }
   }, [searchParams]);
 
   // Clean parsed batch code
@@ -561,7 +571,7 @@ export default function TraceabilityPage() {
 
           <div className="p-6 sm:p-8 space-y-8">
             {/* ── BẢNG 1: BÁO CÁO KẾT QUẢ KIỂM NGHIỆM VSATTP ── */}
-            <div className="space-y-3">
+            <div id="cert-inspection" className="scroll-mt-24 space-y-3">
               <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                 <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
                   <FileCheck size={18} className="text-emerald-700" />
@@ -615,7 +625,7 @@ export default function TraceabilityPage() {
             </div>
 
             {/* ── BẢNG 2: HÀNH TRÌNH CHUỖI CUNG ỨNG MINH BẠCH ── */}
-            <div className="space-y-4">
+            <div id="farming-log" className="scroll-mt-24 space-y-4">
               <h3 className="font-bold text-base text-gray-900 border-b border-gray-100 pb-2 flex items-center gap-2">
                 <ShieldCheck size={18} className="text-emerald-700" />
                 <span>Hành Trình Chuỗi Cung Ứng Lạnh Minh Bạch</span>

@@ -1,17 +1,24 @@
 "use client";
 
-import { CheckCircle2, ChevronRight, Package, Home, ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+import { CheckCircle2, ChevronRight, Package, Home, ArrowRight, ShieldCheck, Sparkles, Clock } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { catalogService, type ApiOrder } from "@/services/catalog.service";
 import { paymentService } from "@/services/payment.service";
 
 function SuccessContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const orderCode = searchParams.get("orderCode") || searchParams.get("code") || "AGRI-SUCCESS";
   const [order, setOrder] = useState<ApiOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [countdown, setCountdown] = useState(5);
+
+  const targetUrl =
+    orderCode && orderCode !== "AGRI-SUCCESS"
+      ? `/dashboard/customer?tab=orders&order=${encodeURIComponent(orderCode)}`
+      : `/dashboard/customer?tab=orders`;
 
   useEffect(() => {
     if (!orderCode) {
@@ -21,12 +28,31 @@ function SuccessContent() {
     // Auto mark as PAID if returning from payOS success url
     paymentService.simulatePaymentSuccess(orderCode).catch(() => {});
 
-    catalogService.getOrders().then((orders) => {
-      const found = orders.find((o) => o.orderCode === orderCode);
-      if (found) setOrder(found);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    catalogService
+      .getOrders()
+      .then((orders) => {
+        const found = orders.find((o) => o.orderCode === orderCode);
+        if (found) setOrder(found);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [orderCode]);
+
+  // Auto redirect countdown to order details
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          router.push(targetUrl);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [router, targetUrl]);
 
   return (
     <div className="min-h-screen bg-[#f8faf8] flex items-center justify-center p-4 py-12">
@@ -74,19 +100,33 @@ function SuccessContent() {
 
         <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100 text-emerald-800 text-xs flex items-center gap-2">
           <ShieldCheck size={20} className="shrink-0 text-emerald-600" />
-          <span>Nông sản tươi của bạn đang được đóng gói và chuẩn bị bàn giao cho đối tác vận chuyển.</span>
+          <span>Nông sản tươi của bạn đang được đóng gói và chuẩn bị bàn giao cho đối tác vận chuyển lạnh.</span>
+        </div>
+
+        {/* Auto Redirect Countdown Notice */}
+        <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200/90 text-xs text-amber-950 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-amber-600 shrink-0 animate-spin" />
+            <span>Tự động chuyển đến <strong>Chi tiết đơn hàng</strong> sau <strong className="text-emerald-800 text-sm font-mono font-black">{countdown}s</strong>...</span>
+          </div>
+          <Link
+            href={targetUrl}
+            className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950 shrink-0 ml-2"
+          >
+            Chuyển ngay →
+          </Link>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <Link
-            href="/dashboard/customer"
-            className="flex-1 py-3 px-4 rounded-xl font-bold text-sm bg-emerald-800 hover:bg-emerald-900 text-white shadow-md flex items-center justify-center gap-2 transition-all"
+            href={targetUrl}
+            className="flex-1 py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            <Package size={16} /> Theo Dõi Đơn Hàng
+            <Package size={16} /> Xem Chi Tiết Đơn Hàng ({orderCode})
           </Link>
           <Link
             href="/"
-            className="py-3 px-4 rounded-xl font-bold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center gap-2 transition-all"
+            className="py-3 px-4 rounded-xl font-bold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <Home size={16} /> Về Trang Chủ
           </Link>

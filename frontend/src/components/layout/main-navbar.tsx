@@ -190,7 +190,7 @@ export function MainNavbar() {
                     </Link>
 
                     <Link
-                      href="/products?cat=rau_an_la"
+                      href="/products?cat=rau_la"
                       className="p-2.5 rounded-xl hover:bg-emerald-50/80 transition-all flex items-start gap-2.5 group"
                     >
                       <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-teal-700 group-hover:text-white transition-colors">
@@ -235,6 +235,21 @@ export function MainNavbar() {
                     </Link>
 
                     <Link
+                      href="/products?cat=nam_chebien"
+                      className="p-2.5 rounded-xl hover:bg-emerald-50/80 transition-all flex items-start gap-2.5 group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-700 group-hover:text-white transition-colors">
+                        <Sprout size={15} />
+                      </div>
+                      <div>
+                        <span className="font-bold text-gray-900 group-hover:text-emerald-800 block">
+                          Nấm & Nông Sản Chế Biến
+                        </span>
+                        <span className="text-[10px] text-gray-500 line-clamp-1">Nấm đùi gà, mộc nhĩ hữu cơ Organic</span>
+                      </div>
+                    </Link>
+
+                    <Link
                       href="/seasons"
                       className="p-2.5 rounded-xl hover:bg-emerald-50/80 transition-all flex items-start gap-2.5 group"
                     >
@@ -243,7 +258,7 @@ export function MainNavbar() {
                       </div>
                       <div>
                         <span className="font-bold text-gray-900 group-hover:text-emerald-800 block">
-                          Nông Sản Theo Mùa
+                          Nông Sản Theo Mùa Vụ
                         </span>
                         <span className="text-[10px] text-gray-500 line-clamp-1">Lịch vụ mùa thu hoạch Tây Bắc & Đà Lạt</span>
                       </div>
@@ -423,7 +438,7 @@ export function MainNavbar() {
                   </Link>
 
                   <Link
-                    href="/loyalty?tab=redeem"
+                    href="/loyalty#redeem-section"
                     className="p-2.5 rounded-xl hover:bg-amber-50/70 transition-all flex items-start gap-2.5 group"
                   >
                     <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-teal-700 group-hover:text-white transition-colors">
@@ -885,12 +900,22 @@ export function MainNavbar() {
               </div>
             </>
           ) : (
-            <Link
-              href="/login"
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 transition-all shadow-xs"
-            >
-              Đăng Nhập
-            </Link>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/dashboard/customer?tab=orders"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                title="Xem đơn mua của bạn"
+              >
+                <ShoppingBag size={14} strokeWidth={1.75} />
+                <span>Đơn Mua</span>
+              </Link>
+              <Link
+                href="/login"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 transition-all shadow-xs"
+              >
+                Đăng Nhập
+              </Link>
+            </div>
           )}
 
           {/* Mobile hamburger button */}
@@ -931,7 +956,7 @@ export function MainNavbar() {
                 <Link href="/products" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
                   • Tất cả nông sản sạch
                 </Link>
-                <Link href="/products?cat=rau_an_la" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
+                <Link href="/products?cat=rau_la" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
                   • Rau ăn lá thủy canh
                 </Link>
                 <Link href="/products?cat=cu_qua" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
@@ -940,8 +965,14 @@ export function MainNavbar() {
                 <Link href="/products?cat=trai_cay" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
                   • Trái cây đặc sản
                 </Link>
+                <Link href="/products?cat=nam_chebien" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
+                  • Nấm & nông sản chế biến
+                </Link>
                 <Link href="/seasons" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
                   • Nông sản theo mùa vụ
+                </Link>
+                <Link href="/farming-techniques" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
+                  • Kỹ thuật canh tác VietGAP
                 </Link>
               </div>
             )}
@@ -990,7 +1021,7 @@ export function MainNavbar() {
                 <Link href="/loyalty" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
                   • Thẻ hội viên AgriClub
                 </Link>
-                <Link href="/loyalty?tab=redeem" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
+                <Link href="/loyalty#redeem-section" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
                   • Đổi điểm tích lũy lấy quà
                 </Link>
               </div>

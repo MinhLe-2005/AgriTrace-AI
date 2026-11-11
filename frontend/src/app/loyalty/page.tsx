@@ -469,7 +469,7 @@ export default function LoyaltyPage() {
         </div>
 
         {/* ── Redeem Points Section ── */}
-        <div id="redeem-section" className="bg-white p-6 sm:p-7 rounded-3xl border border-gray-200/90 shadow-xs space-y-5">
+        <div id="redeem-section" className="scroll-mt-24 bg-white p-6 sm:p-7 rounded-3xl border border-gray-200/90 shadow-xs space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
