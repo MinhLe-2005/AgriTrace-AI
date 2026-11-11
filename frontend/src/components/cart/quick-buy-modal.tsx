@@ -375,8 +375,14 @@ export function QuickBuyModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-xl w-full my-auto shadow-2xl border border-emerald-100 overflow-hidden flex flex-col max-h-[92vh]">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl max-w-xl w-full my-auto shadow-2xl border border-emerald-100 overflow-hidden flex flex-col max-h-[92vh] cursor-default"
+      >
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white flex items-center justify-between shrink-0 shadow-sm">
           {isViewingTerms ? (

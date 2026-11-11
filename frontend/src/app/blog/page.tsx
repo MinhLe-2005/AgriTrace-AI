@@ -739,9 +739,12 @@ export default function BlogPage() {
 
       {/* ─── FULL ARTICLE READING MODAL (PROFESSIONAL READER) ─── */}
       {selectedPost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto">
+        <div
+          onClick={() => setSelectedPost(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto cursor-pointer animate-fade-in"
+        >
           <div
-            className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[92vh] border border-gray-200 animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[92vh] border border-gray-200 animate-in fade-in zoom-in-95 duration-200 cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

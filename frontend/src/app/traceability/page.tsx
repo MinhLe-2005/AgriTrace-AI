@@ -1064,8 +1064,8 @@ export default function TraceabilityPage() {
       {/* MODAL: CAMERA QUÉT MÃ QR TRỰC TIẾP                        */}
       {/* ========================================================= */}
       {isCameraOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl p-6 space-y-4 animate-scale-up relative">
+        <div onClick={stopCameraScanner} className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl p-6 space-y-4 animate-scale-up relative cursor-default">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
                 <Camera size={18} className="text-emerald-700" />
@@ -1154,9 +1154,12 @@ export default function TraceabilityPage() {
       {/* MODAL: BẢN SCAN PHIẾU KIỂM NGHIỆM QUATEST 1 CHÍNH THỨC     */}
       {/* ========================================================= */}
       {showQuatestModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-6 backdrop-blur-xs overflow-y-auto">
+        <div
+          onClick={() => setShowQuatestModal(false)}
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-6 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
           <div
-            className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-200 p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 my-auto"
+            className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-200 p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 my-auto cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header Document */}

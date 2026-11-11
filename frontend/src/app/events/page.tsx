@@ -538,8 +538,14 @@ export default function EventsPage() {
       {/* MODAL: BÀI CHI TIẾT SỰ KIỆN (BLOG-STYLE EVENT ARTICLE)    */}
       {/* ========================================================= */}
       {selectedEvent && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-gray-200 space-y-6 my-8 max-h-[85vh] overflow-y-auto">
+        <div
+          onClick={() => setSelectedEvent(null)}
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-gray-200 space-y-6 my-8 max-h-[85vh] overflow-y-auto cursor-default"
+          >
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-100">
               <div className="flex items-center gap-3">

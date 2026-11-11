@@ -1125,8 +1125,14 @@ function ProductsContent() {
 
       {/* ── Mobile Filter Modal/Drawer ── */}
       {isMobileFilterOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
+        <div
+          onClick={() => setIsMobileFilterOpen(false)}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300 cursor-default"
+          >
             {/* Drawer Header */}
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-gray-900">
@@ -1465,8 +1471,14 @@ function ProductsContent() {
       )}
       {/* ── Modal Giải Thích Chi Tiết Cơ Chế Giảm Giá & Thông Báo Khuyến Mãi ── */}
       {showPromoInfoModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-emerald-100 flex flex-col">
+        <div
+          onClick={() => setShowPromoInfoModal(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-emerald-100 flex flex-col cursor-default"
+          >
             {/* Header */}
             <div className="p-5 sm:p-6 bg-gradient-to-r from-emerald-800 to-teal-800 text-white rounded-t-3xl flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">

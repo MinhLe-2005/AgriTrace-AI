@@ -1678,10 +1678,11 @@ function AdminPortalContent() {
         </div>
       )}
       {showCreateVoucherModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
+        <div onClick={() => setShowCreateVoucherModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">
           <form
             onSubmit={handleCreateVoucher}
-            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-4 cursor-default"
           >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
@@ -1805,10 +1806,11 @@ function AdminPortalContent() {
       {/* MODAL: TẶNG ĐIỂM THƯỞNG VIP CHO HỘI VIÊN                   */}
       {/* ========================================================= */}
       {showBonusModal && selectedMember && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
+        <div onClick={() => setShowBonusModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">
           <form
             onSubmit={handleSendBonus}
-            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-200 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-200 space-y-4 cursor-default"
           >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
@@ -1884,10 +1886,11 @@ function AdminPortalContent() {
       {/* MODAL: THÊM / CHỈNH SỬA SỰ KIỆN MÙA VỤ (CAMPAIGN/EVENT)    */}
       {/* ========================================================= */}
       {showEventModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in overflow-y-auto">
+        <div onClick={() => setShowEventModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in overflow-y-auto cursor-pointer">
           <form
             onSubmit={handleSaveEvent}
-            className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 my-8"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 my-8 cursor-default"
           >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
@@ -2175,10 +2178,11 @@ function AdminPortalContent() {
       {/* MODAL: VIẾT / SỬA BÀI BLOG & CẨM NANG                        */}
       {/* ========================================================= */}
       {showBlogModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in overflow-y-auto">
+        <div onClick={() => setShowBlogModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in overflow-y-auto cursor-pointer">
           <form
             onSubmit={handleSaveBlog}
-            className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 my-8"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 my-8 cursor-default"
           >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">

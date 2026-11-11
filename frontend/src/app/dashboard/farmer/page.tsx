@@ -1682,8 +1682,8 @@ export default function FarmerPortalPage() {
       {/* MODAL: THÊM NÔNG TRẠI MỚI */}
       {/* ========================================================================= */}
       {isAddFarmModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col">
+        <div onClick={() => setIsAddFarmModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
             <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Home size={18} className="text-emerald-400" />
@@ -1816,8 +1816,8 @@ export default function FarmerPortalPage() {
       {/* MODAL: CHỈNH SỬA THÔNG TIN NÔNG TRẠI */}
       {/* ========================================================================= */}
       {editingFarm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col">
+        <div onClick={() => setEditingFarm(null)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
             <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Edit3 size={18} className="text-emerald-400" />
@@ -1923,8 +1923,8 @@ export default function FarmerPortalPage() {
       {/* MODAL: TẠO LÔ THU HOẠCH MỚI */}
       {/* ========================================================================= */}
       {isBatchModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]">
+        <div onClick={() => setIsBatchModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh] cursor-default">
             <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package size={18} className="text-emerald-400" />
@@ -2134,8 +2134,8 @@ export default function FarmerPortalPage() {
       {/* MODAL: GHI NHẬT KÝ CANH TÁC */}
       {/* ========================================================================= */}
       {isLogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col">
+        <div onClick={() => setIsLogModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
             <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText size={18} className="text-emerald-400" />
@@ -2283,8 +2283,8 @@ export default function FarmerPortalPage() {
       {/* MODAL: THÊM SẢN PHẨM NÔNG NGHIỆP MỚI */}
       {/* ========================================================================= */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col">
+        <div onClick={() => setIsProductModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
             <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sprout size={18} className="text-emerald-400" />
