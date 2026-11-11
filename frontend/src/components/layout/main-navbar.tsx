@@ -410,6 +410,26 @@ export function MainNavbar() {
                   </div>
 
                   <Link
+                    href="/events"
+                    className="p-2.5 rounded-xl hover:bg-rose-50/70 transition-all flex items-start gap-2.5 group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                      <Sparkles size={15} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-gray-900 group-hover:text-rose-800 block">
+                          Sự Kiện & Mùa Vụ Khuyến Mãi
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-500 text-white">
+                          HOT
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-gray-500">Trợ giá vụ mùa tại vườn, đếm ngược thời gian sale</span>
+                    </div>
+                  </Link>
+
+                  <Link
                     href="/vouchers"
                     className="p-2.5 rounded-xl hover:bg-amber-50/70 transition-all flex items-start gap-2.5 group"
                   >
@@ -1061,6 +1081,9 @@ export function MainNavbar() {
             </button>
             {mobileExpanded === "loyalty" && (
               <div className="p-2 space-y-1 bg-white border-t border-gray-100">
+                <Link href="/events" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-rose-700 font-bold hover:text-rose-900">
+                  🔥 Sự kiện & mùa vụ khuyến mãi
+                </Link>
                 <Link href="/vouchers" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-gray-600 hover:text-emerald-800">
                   • Kho mã ưu đãi (Voucher)
                 </Link>

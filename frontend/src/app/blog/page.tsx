@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useCampaignStore } from "@/stores/campaign-store";
 import { toast } from "@/stores/toast-store";
 
 interface BlogPostSection {
@@ -427,25 +428,74 @@ const CATEGORIES = [
 ];
 
 export default function BlogPage() {
+  const { blogPosts } = useCampaignStore();
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
 
-  const featuredPost = POSTS.find((p) => p.featured);
-  const remainingPosts = POSTS.filter((p) => !p.featured);
+  const allPosts: BlogPost[] = useMemo(() => {
+    // Merge custom admin posts with default POSTS
+    const customPosts: BlogPost[] = blogPosts
+      .filter((bp) => !POSTS.some((p) => p.id === bp.id || p.slug === bp.slug))
+      .map((bp) => ({
+        id: bp.id,
+        title: bp.title,
+        slug: bp.slug,
+        excerpt: bp.excerpt,
+        category: bp.category,
+        categoryLabel: bp.categoryLabel,
+        categoryColor:
+          bp.category === "season"
+            ? "bg-amber-100 text-amber-900"
+            : bp.category === "ai"
+            ? "bg-teal-100 text-teal-900"
+            : bp.category === "standard"
+            ? "bg-purple-100 text-purple-900"
+            : "bg-blue-100 text-blue-900",
+        author: bp.author,
+        authorRole: bp.authorRole,
+        date: bp.date,
+        readTime: bp.readTime,
+        featured: bp.featured,
+        relatedProduct: bp.relatedProductName
+          ? {
+              name: bp.relatedProductName,
+              price: "Xem chi tiết",
+              unit: "KG",
+              badge: "Nông sản liên kết",
+              link: `/products?search=${encodeURIComponent(bp.relatedProductName)}`,
+            }
+          : undefined,
+        sections: [
+          {
+            heading: "Nội dung bài viết",
+            paragraphs: bp.content ? bp.content.split("\n\n").filter(Boolean) : [bp.excerpt],
+          },
+        ],
+      }));
+
+    return [...customPosts, ...POSTS].filter((p) => {
+      const adminMatch = blogPosts.find((bp) => bp.id === p.id || bp.slug === p.slug);
+      if (adminMatch && !adminMatch.active) return false;
+      return true;
+    });
+  }, [blogPosts]);
+
+  const featuredPost = allPosts.find((p) => p.featured) || allPosts[0];
+  const remainingPosts = allPosts.filter((p) => p.id !== featuredPost?.id);
 
   // Sync with URL Hash on load
   useEffect(() => {
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace("#", "");
       if (hash) {
-        const found = POSTS.find((p) => p.slug === hash);
+        const found = allPosts.find((p) => p.slug === hash);
         if (found) setSelectedPost(found);
       }
     }
-  }, []);
+  }, [allPosts]);
 
   const openPost = (post: BlogPost) => {
     setSelectedPost(post);

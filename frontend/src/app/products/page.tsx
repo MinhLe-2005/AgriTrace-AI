@@ -52,6 +52,7 @@ import {
 } from "@/services/catalog.service";
 import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service";
 import { useAuthStore } from "@/stores/auth-store";
+import { useCampaignStore } from "@/stores/campaign-store";
 import { useCartStore } from "@/stores/cart-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -77,6 +78,7 @@ function ProductsContent() {
 
   const { addItem } = useCartStore();
   const { user } = useAuthStore();
+  const { getProductDiscount } = useCampaignStore();
   const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
@@ -178,10 +180,41 @@ function ProductsContent() {
     }
   }, [products, buyParam, detailParam]);
 
+  // Dynamically compute product prices based on active seasonal events
+  const dynamicProducts = useMemo(() => {
+    return products.map((p) => {
+      const basePrice = p.oldPrice > 0 ? p.oldPrice : p.price;
+      const discountInfo = getProductDiscount(p.id, p.categoryCode, p.name, basePrice);
+
+      if (discountInfo && discountInfo.hasDiscount) {
+        return {
+          ...p,
+          price: discountInfo.discountedPrice,
+          oldPrice: basePrice,
+          campaignTitle: discountInfo.campaignTitle,
+          campaignEndDate: discountInfo.endDate,
+          campaignVoucher: discountInfo.voucherCode,
+          campaignDiscountPercent: discountInfo.discountPercent,
+        };
+      }
+
+      // No active campaign, or campaign expired -> REVERT TO FULL BASE PRICE, NO DISCOUNT!
+      return {
+        ...p,
+        price: basePrice,
+        oldPrice: 0,
+        campaignTitle: undefined,
+        campaignEndDate: undefined,
+        campaignVoucher: undefined,
+        campaignDiscountPercent: 0,
+      };
+    });
+  }, [products, getProductDiscount]);
+
   // Compute product count per category
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: products.length };
-    products.forEach((p) => {
+    const counts: Record<string, number> = { all: dynamicProducts.length };
+    dynamicProducts.forEach((p) => {
       if (p.categoryCode) {
         const norm = normalizeCategoryCode(p.categoryCode);
         counts[p.categoryCode] = (counts[p.categoryCode] || 0) + 1;
@@ -191,23 +224,23 @@ function ProductsContent() {
       }
     });
     return counts;
-  }, [products]);
+  }, [dynamicProducts]);
 
   // Unique Origins from products
   const availableOrigins = useMemo(() => {
     const set = new Set<string>();
-    products.forEach((p) => {
+    dynamicProducts.forEach((p) => {
       if (p.origin) {
         const province = p.origin.split(",").pop()?.trim() || p.origin;
         set.add(province);
       }
     });
     return Array.from(set);
-  }, [products]);
+  }, [dynamicProducts]);
 
   // Filter & Sort
   const filteredAndSorted = useMemo(() => {
-    const result = products.filter((p) => {
+    const result = dynamicProducts.filter((p) => {
       // 1. Category (smart normalized matching)
       const pCat = normalizeCategoryCode(p.categoryCode);
       const fCat = normalizeCategoryCode(filterCategory);
@@ -275,7 +308,7 @@ function ProductsContent() {
       return 0;
     });
   }, [
-    products,
+    dynamicProducts,
     filterCategory,
     searchQuery,
     selectedCert,
@@ -1049,7 +1082,7 @@ function ProductsContent() {
                               className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline mt-0.5 text-left cursor-pointer group/promo"
                               title="Bấm để xem căn cứ & lịch biểu trợ giá mùa vụ"
                             >
-                              <span>🌾 Vụ Thu Đông (T10 - T12) · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ</span>
+                              <span>🌾 {(p as any).campaignTitle || "Vụ mùa chính vụ"} · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ</span>
                               <Info size={11} className="text-amber-600 group-hover/promo:scale-110 transition-transform shrink-0" />
                             </button>
                           )}
@@ -1601,8 +1634,8 @@ function ProductsContent() {
                     Nhận thông báo tự động khi nông trại vừa thu hoạch xong lô mới hoặc phát hành quyết định trợ giá vụ mới.
                   </div>
                   <div className="p-2 bg-white rounded-xl border border-gray-200">
-                    <strong className="text-gray-900 block">• Trang Lịch Mùa Vụ (/seasons):</strong>
-                    Theo dõi lịch thu hoạch 12 tháng của toàn bộ nông sản Việt Nam, sản lượng dự kiến và mức chiết khấu.
+                    <strong className="text-gray-900 block">• Trang Sự Kiện & Mùa Vụ (/events):</strong>
+                    Theo dõi từng sự kiện trợ giá, đếm ngược thời gian áp dụng và danh sách quả đang rộ vụ.
                   </div>
                   <div className="p-2 bg-white rounded-xl border border-gray-200">
                     <strong className="text-gray-900 block">• Kho Voucher & Hội Viên (/vouchers):</strong>
@@ -1619,11 +1652,12 @@ function ProductsContent() {
             {/* Footer */}
             <div className="p-4 bg-gray-50 border-t border-gray-200 rounded-b-3xl flex flex-wrap items-center justify-between gap-2 shrink-0">
               <Link
-                href="/seasons"
+                href="/events"
                 onClick={() => setShowPromoInfoModal(false)}
-                className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                className="px-4 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm"
               >
-                <span>Xem Lịch Thu Hoạch 12 Tháng Chi Tiết →</span>
+                <Sparkles size={14} />
+                <span>Xem Tất Cả Sự Kiện & Mùa Vụ Khuyến Mãi (/events) →</span>
               </Link>
               <div className="flex items-center gap-2">
                 <Link
