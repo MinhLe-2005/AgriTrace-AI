@@ -21,6 +21,15 @@ type NotificationStore = {
 
 const initialNotifications: NotificationItem[] = [
   {
+    id: "notif-season-pricing",
+    title: "📢 Thông báo Quyết định Trợ giá Mùa Vụ Thu Đông 2026",
+    message: "Quyết định số 88/2026/QĐ-AGRI: Trợ giá trực tiếp 13% - 18% cho rau củ quả chính vụ tại Đà Lạt & Mộc Châu (Áp dụng: 01/10 – 31/12/2026). Không cần nhập mã!",
+    type: "season",
+    createdAt: "Vừa xong",
+    read: false,
+    link: "/seasons#pricing-policy",
+  },
+  {
     id: "notif-season-1",
     title: "🍓 Mở bán Mùa Dâu Tây Mộc Châu Vụ Đông",
     message: "Dâu tây New Zealand Mộc Châu chính thức vào vụ thu hái chín rộ. Chuỗi xe lạnh 2-5°C giao tận bàn ăn trong 24h!",
