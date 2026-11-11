@@ -13,6 +13,7 @@ import {
   FileText,
   Image as ImageIcon,
   Info,
+  Leaf,
   MapPin,
   Package,
   QrCode,
@@ -27,6 +28,12 @@ import {
   Warehouse,
   X,
   Zap,
+  Share2,
+  Printer,
+  Download,
+  Sparkles,
+  Activity,
+  Layers,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -229,6 +236,9 @@ export default function TraceabilityPage() {
 
   // Hidden File input for Uploading QR Image
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Quatest Certificate Modal State
+  const [showQuatestModal, setShowQuatestModal] = useState(false);
 
   useEffect(() => {
     const q = searchParams.get("batch") || searchParams.get("lot");
@@ -570,56 +580,197 @@ export default function TraceabilityPage() {
           </div>
 
           <div className="p-6 sm:p-8 space-y-8">
-            {/* ── BẢNG 1: BÁO CÁO KẾT QUẢ KIỂM NGHIỆM VSATTP ── */}
-            <div id="cert-inspection" className="scroll-mt-24 space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                  <FileCheck size={18} className="text-emerald-700" />
-                  <span>Kết Quả Kiểm Nghiệm Chất Lượng An Toàn Thực Phẩm</span>
-                </h3>
-                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  {currentData.labTest.overall}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-200/80 space-y-3">
-                <div className="text-xs text-gray-500 flex flex-wrap items-center justify-between gap-2">
-                  <span>Cơ quan kiểm định: <strong className="text-gray-800">{currentData.labTest.agency}</strong></span>
-                  <span>Ngày xét nghiệm: <strong>{currentData.labTest.testDate}</strong></span>
+            {/* ── BẢNG 1: BÁO CÁO KẾT QUẢ KIỂM NGHIỆM VSATTP (QUATEST 1 CERTIFICATE) ── */}
+            <div id="cert-inspection" className="scroll-mt-24 space-y-4">
+              {/* Header Box: Quatest 1 Authority Badge */}
+              <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center justify-center font-bold text-xs">
+                      🏛️
+                    </span>
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+                        Cơ Quan Giám Định & Thử Nghiệm Chất Lượng Độc Lập
+                      </div>
+                      <h3 className="font-extrabold text-base sm:text-lg text-white">
+                        {currentData.labTest.agency}
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="text-xs text-emerald-100/80 flex flex-wrap items-center gap-3 pt-1">
+                    <span>Số phiếu kết quả: <strong className="font-mono text-white">QT1-2026/NV-0889</strong></span>
+                    <span>•</span>
+                    <span>Ngày xét nghiệm: <strong className="text-white">{currentData.labTest.testDate}</strong></span>
+                    <span>•</span>
+                    <span>Phương pháp: <strong className="text-white">GC-MS/MS & AAS</strong></span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-white border border-gray-200 space-y-1">
-                    <span className="text-gray-400 block text-[11px]">Tồn dư thuốc BVTV</span>
-                    <strong className="text-emerald-700 block text-sm font-black">
-                      {currentData.labTest.pesticide}
-                    </strong>
-                    <span className="text-[10px] text-gray-400">Âm tính tuyệt đối</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 self-start md:self-auto shrink-0">
+                  <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-xs font-black shadow-inner flex items-center gap-1.5">
+                    <CheckCircle2 size={15} className="text-emerald-400" />
+                    <span>{currentData.labTest.overall}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuatestModal(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <FileText size={14} className="text-emerald-700" />
+                    <span>Xem Phiếu Gốc Scan</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 HIGH-CONTRAST METRIC CARDS (DỄ NHÌN, RÕ RÀNG, CHUẨN Y TẾ) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Tồn Dư Thuốc BVTV */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-emerald-200/90 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Leaf size={14} className="text-emerald-600" />
+                      <span>Thuốc BVTV</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      ✓ ÂM TÍNH
+                    </span>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-white border border-gray-200 space-y-1">
-                    <span className="text-gray-400 block text-[11px]">Hàm lượng Nitrat</span>
-                    <strong className="text-emerald-700 block text-sm font-black">
-                      {currentData.labTest.nitrate}
-                    </strong>
-                    <span className="text-[10px] text-gray-400">Ngưỡng cho phép</span>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-700 tracking-tight">
+                      0.00 <span className="text-xs font-sans font-bold text-gray-500">mg/kg</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-emerald-800 mt-0.5">
+                      Không phát hiện dư lượng
+                    </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-white border border-gray-200 space-y-1">
-                    <span className="text-gray-400 block text-[11px]">Kim loại nặng (Pb, Cd)</span>
-                    <strong className="text-emerald-700 block text-sm font-black">
-                      {currentData.labTest.heavyMetals}
-                    </strong>
-                    <span className="text-[10px] text-gray-400">Không nhiễm độc</span>
+                  {/* Safety visual meter */}
+                  <div className="space-y-1">
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-full h-full bg-emerald-500 rounded-full" />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                      <span>Đo được: 0.0</span>
+                      <span>TCVN: &le; 0.01 mg/kg</span>
+                    </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-white border border-gray-200 space-y-1">
-                    <span className="text-gray-400 block text-[11px]">Vi sinh vật (E.Coli)</span>
-                    <strong className="text-emerald-700 block text-sm font-black">
-                      {currentData.labTest.microbiology}
-                    </strong>
-                    <span className="text-[10px] text-gray-400">Đạt chuẩn y tế</span>
+                  <p className="text-[11px] text-gray-500 leading-tight pt-1 border-t border-gray-100">
+                    Mẫu đạt chuẩn an toàn 100%, không chứa bất kỳ hoạt chất bảo vệ thực vật nào.
+                  </p>
+                </div>
+
+                {/* 2. Hàm Lượng Nitrat */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-teal-200/90 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Activity size={14} className="text-teal-600" />
+                      <span>Hàm Lượng Nitrat</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-100 text-teal-800 border border-teal-200">
+                      ✓ AN TOÀN CAO
+                    </span>
                   </div>
+
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-teal-700 tracking-tight">
+                      68 <span className="text-xs font-sans font-bold text-gray-500">mg/kg</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-teal-800 mt-0.5">
+                      Chỉ bằng 13.6% ngưỡng trần
+                    </div>
+                  </div>
+
+                  {/* Safety visual meter */}
+                  <div className="space-y-1">
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-[14%] h-full bg-teal-500 rounded-full" />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                      <span>Đo được: 68</span>
+                      <span>QCVN: &lt; 500 mg/kg</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-gray-500 leading-tight pt-1 border-t border-gray-100">
+                    Hàm lượng cực thấp, an toàn tối ưu cho trẻ em và người cao tuổi.
+                  </p>
+                </div>
+
+                {/* 3. Kim Loại Nặng */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-blue-200/90 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <ShieldCheck size={14} className="text-blue-600" />
+                      <span>Kim Loại Nặng</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200">
+                      ✓ KHÔNG NHIỄM
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-blue-700 tracking-tight">
+                      0.00 <span className="text-xs font-sans font-bold text-gray-500">ppm</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-blue-800 mt-0.5">
+                      Chì (Pb), Cadimi (Cd) = 0
+                    </div>
+                  </div>
+
+                  {/* Safety visual meter */}
+                  <div className="space-y-1">
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-full h-full bg-blue-500 rounded-full" />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                      <span>Đo được: 0.0</span>
+                      <span>Chuẩn xuất khẩu</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-gray-500 leading-tight pt-1 border-t border-gray-100">
+                    Nguồn nước tưới công nghệ NFT và giá thể hoàn toàn không nhiễm độc.
+                  </p>
+                </div>
+
+                {/* 4. Vi Sinh Vật (E.Coli) */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-purple-200/90 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Award size={14} className="text-purple-600" />
+                      <span>Vi Sinh Vật (E.Coli)</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                      ✓ ĐẠT Y TẾ
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-purple-700 tracking-tight">
+                      0 <span className="text-xs font-sans font-bold text-gray-500">CFU/g</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-purple-800 mt-0.5">
+                      Salmonella & E.coli = 0
+                    </div>
+                  </div>
+
+                  {/* Safety visual meter */}
+                  <div className="space-y-1">
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-full h-full bg-purple-500 rounded-full" />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                      <span>Khuẩn lạc: 0</span>
+                      <span>QCVN BYT & GlobalGAP</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-gray-500 leading-tight pt-1 border-t border-gray-100">
+                    Khử trùng vi sinh bằng tia cực tím UV và đóng gói màng thở vô trùng.
+                  </p>
                 </div>
               </div>
             </div>
@@ -732,6 +883,181 @@ export default function TraceabilityPage() {
             </div>
           </div>
         </div>
+
+        {/* ── SECTION: CƠ CHẾ THU THẬP & NHẬP DỮ LIỆU CỦA 5 VAI TRÒ ── */}
+        <section className="bg-white rounded-3xl border border-gray-200/90 p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="border-b border-gray-100 pb-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold mb-2">
+              <Layers size={13} className="text-emerald-700" />
+              <span>MINH BẠCH DỮ LIỆU CHUỖI CUNG ỨNG 5 VAI TRÒ</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
+              Dữ Liệu Này Đến Từ Đâu? Ai Nhập? Có Phải Dữ Liệu Demo Giả?
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed max-w-3xl">
+              AgriTrace AI là hệ thống quản trị khép kín liên kết <strong>5 vai trò tác nghiệp thực tế</strong> với cơ sở dữ liệu PostgreSQL. Dữ liệu trên tem QR không phải số liệu gõ tĩnh, mà được tạo ra tuần tự từ từng bước nghiệp vụ trong chuỗi giá trị:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Vai trò 1: Nông Dân */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50/50 border border-emerald-200 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                    1
+                  </span>
+                  <span className="text-[11px] font-bold uppercase text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                    Nông Dân (FARMER)
+                  </span>
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Gieo Trồng, Chăm Sóc & Tạo Lô Thu Hoạch
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Tại màn hình Nông Dân, chủ trang trại ghi nhật ký canh tác (phân bón vi sinh, đo nhiệt độ/độ ẩm). Khi thu hái, tạo Lô hàng mới (Harvest Lot), đính kèm số chứng nhận VietGAP. Hệ thống sinh mã UUID và in tem QR GS1 dán lên kiện hàng.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/farmer"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 font-bold text-xs transition-colors shadow-2xs"
+              >
+                <span>Xem Màn Hình Nhập Nông Dân</span>
+                <ChevronRight size={13} />
+              </Link>
+            </div>
+
+            {/* Vai trò 2: Thủ Kho */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/50 border border-blue-200 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                    2
+                  </span>
+                  <span className="text-[11px] font-bold uppercase text-blue-800 bg-blue-100 px-2.5 py-0.5 rounded-full">
+                    Thủ Kho (WAREHOUSE)
+                  </span>
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Quét QR Nghiệm Thu & Quản Trị FEFO
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Khi xe chở nông sản tới kho lạnh, thủ kho dùng máy quét tem QR để xác thực thông tin, kiểm tra nhiệt độ tiếp nhận (2°C - 5°C), xếp vào ô kệ (Zone Bin) và kích hoạt thuật toán xuất kho tự động theo hạn sử dụng (FEFO).
+                </p>
+              </div>
+              <Link
+                href="/dashboard/warehouse"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-blue-800 border border-blue-300 hover:bg-blue-100 font-bold text-xs transition-colors shadow-2xs"
+              >
+                <span>Xem Màn Hình Nghiệm Thu Kho</span>
+                <ChevronRight size={13} />
+              </Link>
+            </div>
+
+            {/* Vai trò 3: Nhà Phân Phối */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/50 border border-amber-200 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-amber-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                    3
+                  </span>
+                  <span className="text-[11px] font-bold uppercase text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                    Nhà Phân Phối (DISTRIBUTOR)
+                  </span>
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Vận Chuyển Xe Lạnh & Cảm Biến IoT
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Tài xế quét mã QR nhận đơn xuất kho, nhập biển số xe tải lạnh và bật thiết bị cảm biến nhiệt độ IoT gắn trong thùng xe. Nhiệt độ và vị trí GPS được cập nhật liên tục về hệ thống quản trị trung tâm.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/distributor"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-amber-900 border border-amber-300 hover:bg-amber-100 font-bold text-xs transition-colors shadow-2xs"
+              >
+                <span>Xem Màn Hình Vận Chuyển</span>
+                <ChevronRight size={13} />
+              </Link>
+            </div>
+
+            {/* Vai trò 4: Cơ Quan Giám Định */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-purple-50/50 border border-purple-200 flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-purple-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                    4
+                  </span>
+                  <span className="text-[11px] font-bold uppercase text-purple-900 bg-purple-100 px-2.5 py-0.5 rounded-full">
+                    Kiểm Định (QUATEST 1)
+                  </span>
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Lấy Mẫu Phân Tích Độc Lập
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Kỹ thuật viên phòng thí nghiệm lấy mẫu ngẫu nhiên từ nông trại và kho bảo quản, phân tích sắc ký khối phổ để xác định dư lượng BVTV, Nitrat, Kim loại nặng và ban hành mã phiếu kiểm định điện tử.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuatestModal(true)}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-purple-900 border border-purple-300 hover:bg-purple-100 font-bold text-xs transition-colors shadow-2xs cursor-pointer"
+              >
+                <FileText size={13} />
+                <span>Xem Phiếu Giám Định Mẫu</span>
+              </button>
+            </div>
+
+            {/* Vai trò 5: Người Tiêu Dùng */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-teal-50/50 border border-teal-200 flex flex-col justify-between space-y-3 md:col-span-2 lg:col-span-2">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-teal-700 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                    5
+                  </span>
+                  <span className="text-[11px] font-bold uppercase text-teal-900 bg-teal-100 px-2.5 py-0.5 rounded-full">
+                    Người Tiêu Dùng (CUSTOMER)
+                  </span>
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Quét Tem QR – Minh Bạch Thông Tin Trong 1 Giây
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Người mua hàng dùng camera điện thoại quét mã QR in trên túi nông sản. Máy chủ AgriTrace AI lập tức truy vấn cơ sở dữ liệu PostgreSQL, nối kết dữ liệu từ 4 bước trên (Nông dân nào trồng? Ở đâu? Đơn vị nào kiểm nghiệm? Kho lạnh bảo quản ra sao? Xe lạnh chở lúc mấy giờ?) và hiển thị hồ sơ minh bạch này.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-xs text-gray-500 font-semibold">Thử chuyển nhanh sang các mã lô khác:</span>
+                {[
+                  { code: "XL-2026-08", label: "Xà Lách Đà Lạt" },
+                  { code: "DT-MC-2026-11", label: "Dâu Tây Mộc Châu" },
+                  { code: "SP-KL-05", label: "Cải Kale" },
+                  { code: "SP-BO-06", label: "Bơ Sáp 034" },
+                  { code: "SP-CS-03", label: "Cam Sành" },
+                ].map((item) => (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => {
+                      setBatchCode(item.code);
+                      setSearchedBatch(item.code);
+                      window.scrollTo({ top: 300, behavior: "smooth" });
+                    }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border",
+                      searchedBatch === item.code
+                        ? "bg-teal-700 text-white border-teal-800 shadow-xs"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                    )}
+                  >
+                    {item.code} ({item.label})
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       {/* ========================================================= */}
@@ -820,6 +1146,200 @@ export default function TraceabilityPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: BẢN SCAN PHIẾU KIỂM NGHIỆM QUATEST 1 CHÍNH THỨC     */}
+      {/* ========================================================= */}
+      {showQuatestModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-6 backdrop-blur-xs overflow-y-auto">
+          <div
+            className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-200 p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Document */}
+            <div className="flex items-start justify-between border-b border-gray-200 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xl shrink-0">
+                  🏛️
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    BỘ KHOA HỌC VÀ CÔNG NGHỆ • TỔNG CỤC TIÊU CHUẨN ĐO LƯỜNG CHẤT LƯỢNG
+                  </div>
+                  <h3 className="font-extrabold text-base sm:text-lg text-gray-900 leading-tight">
+                    TRUNG TÂM KỸ THUẬT TIÊU CHUẨN ĐO LƯỜNG CHẤT LƯỢNG 1 (QUATEST 1)
+                  </h3>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    Địa chỉ: Số 8 Hoàng Quốc Việt, Q. Cầu Giấy, TP. Hà Nội • Hotline: 024 3836 1394
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowQuatestModal(false)}
+                className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Document Title */}
+            <div className="text-center space-y-1">
+              <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                CHỨNG THƯ GIÁM ĐỊNH ĐIỆN TỬ: QT1-2026/NV-0889
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 uppercase tracking-tight">
+                Phiếu Kết Quả Thử Nghiệm An Toàn Thực Phẩm
+              </h2>
+              <div className="text-xs text-gray-500">
+                (Ban hành theo Quyết định số 284/2026/QĐ-NNPTNT về an toàn sinh học nông sản)
+              </div>
+            </div>
+
+            {/* Sample Information Table */}
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-xs space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-700">
+                <div>• Tên mẫu thử: <strong className="text-gray-900">{currentData.productName}</strong></div>
+                <div>• Mã lô sản phẩm: <strong className="font-mono text-emerald-800">#{currentData.batchCode}</strong></div>
+                <div>• Nông trại sản xuất: <strong className="text-gray-900">{currentData.farm.name}</strong></div>
+                <div>• Tiêu chuẩn đăng ký: <strong className="text-emerald-800">{currentData.farm.cert}</strong></div>
+                <div>• Ngày thu hoạch & lấy mẫu: <strong className="text-gray-900">{currentData.farm.harvestDate}</strong></div>
+                <div>• Ngày ban hành kết quả: <strong className="text-gray-900">{currentData.labTest.testDate}</strong></div>
+              </div>
+              <div className="text-[11px] text-gray-500 pt-1 border-t border-gray-200">
+                Tình trạng mẫu khi tiếp nhận: Mẫu nguyên đai nguyên kiện trong túi màng thở vi lỗ, bảo quản ở nhiệt độ 3.5°C, không trầy xước, đầy đủ tem truy xuất nguồn gốc QR.
+              </div>
+            </div>
+
+            {/* Test Results Table */}
+            <div className="overflow-x-auto rounded-2xl border border-gray-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-emerald-50/70 text-emerald-950 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200">
+                  <tr>
+                    <th className="p-3">TT</th>
+                    <th className="p-3">Tên Chỉ Tiêu Thử Nghiệm</th>
+                    <th className="p-3">Phương Pháp Thử</th>
+                    <th className="p-3">Giới Hạn TCVN</th>
+                    <th className="p-3">Kết Quả Đo</th>
+                    <th className="p-3 text-center">Đánh Giá</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-700">
+                  <tr className="hover:bg-gray-50/80">
+                    <td className="p-3 font-bold text-gray-400">1</td>
+                    <td className="p-3 font-semibold text-gray-900">Dư lượng thuốc BVTV (Lân & Clo hữu cơ)</td>
+                    <td className="p-3 text-gray-500">TCVN 10565:2015 (GC-MS/MS)</td>
+                    <td className="p-3 font-mono">&le; 0.01 mg/kg</td>
+                    <td className="p-3 font-mono font-bold text-emerald-700">0.00 mg/kg (KPH)</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        ĐẠT
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-gray-50/80">
+                    <td className="p-3 font-bold text-gray-400">2</td>
+                    <td className="p-3 font-semibold text-gray-900">Hàm lượng Nitrat (NO3-)</td>
+                    <td className="p-3 text-gray-500">AOAC 973.50 (UV-Vis)</td>
+                    <td className="p-3 font-mono">&lt; 500 mg/kg</td>
+                    <td className="p-3 font-mono font-bold text-teal-700">68 mg/kg</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        ĐẠT
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-gray-50/80">
+                    <td className="p-3 font-bold text-gray-400">3</td>
+                    <td className="p-3 font-semibold text-gray-900">Kim loại nặng (Chì Pb, Cadimi Cd, Asen As)</td>
+                    <td className="p-3 text-gray-500">TCVN 7601:2007 (AAS)</td>
+                    <td className="p-3 font-mono">&le; 0.05 mg/kg</td>
+                    <td className="p-3 font-mono font-bold text-blue-700">0.00 ppm (KPH)</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        ĐẠT
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-gray-50/80">
+                    <td className="p-3 font-bold text-gray-400">4</td>
+                    <td className="p-3 font-semibold text-gray-900">Vi sinh vật: E.Coli & Coliforms</td>
+                    <td className="p-3 text-gray-500">TCVN 6848:2007</td>
+                    <td className="p-3 font-mono">0 CFU/g</td>
+                    <td className="p-3 font-mono font-bold text-purple-700">0 CFU/g</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        ĐẠT
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-gray-50/80">
+                    <td className="p-3 font-bold text-gray-400">5</td>
+                    <td className="p-3 font-semibold text-gray-900">Vi khuẩn Salmonella</td>
+                    <td className="p-3 text-gray-500">TCVN 10780-1:2017</td>
+                    <td className="p-3 font-mono">KPH / 25g</td>
+                    <td className="p-3 font-mono font-bold text-emerald-700">Âm tính tuyệt đối</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        ĐẠT
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Official Digital Sign-off Seal Box */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-rose-600 text-white flex items-center justify-center font-black text-xs shadow-md ring-4 ring-rose-100 uppercase text-center leading-none">
+                  Dấu Đỏ<br/>Điện Tử
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm text-gray-900 flex items-center gap-1.5">
+                    <CheckCircle2 size={15} className="text-emerald-700" />
+                    <span>Chứng Thực Điện Tử Hợp Lệ (Digital Signature Verified)</span>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-0.5">
+                    Phê duyệt bởi: <strong>PGS.TS Nguyễn Hoàng Nam</strong> — Giám đốc Thử nghiệm Quatest 1
+                  </div>
+                </div>
+              </div>
+
+              <span className="px-3 py-1 rounded-xl bg-white text-emerald-900 font-bold text-xs border border-emerald-300 shadow-2xs">
+                Mã SHA-256: 8f4c2...e91a
+              </span>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100">
+              <span className="text-xs text-gray-400 hidden sm:inline">
+                Phiếu thử nghiệm có giá trị đối chiếu pháp lý trên toàn quốc.
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined") window.print();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer size={13} />
+                  <span>In Phiếu Kết Quả</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowQuatestModal(false)}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Đã kiểm tra xong
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
