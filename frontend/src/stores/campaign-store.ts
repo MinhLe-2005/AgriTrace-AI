@@ -327,28 +327,26 @@ export const useCampaignStore = create<CampaignStore>()(
         for (const camp of activeCampaigns) {
           let matched = false;
 
-          // 1. By exact ID
-          if (productId && camp.targetProductIds?.some((id) => id.toLowerCase() === productId.toLowerCase())) {
-            matched = true;
-          }
-
-          // 2. By category
-          if (!matched && cleanCat && camp.targetCategoryCodes) {
-            matched = camp.targetCategoryCodes.some((code) => {
-              const c = code.toLowerCase().replace(/[_-]/g, "");
-              return c === cleanCat || cleanCat.includes(c) || c.includes(cleanCat);
-            });
-          }
-
-          // 3. By name keywords
-          if (!matched && cleanName && camp.targetProductNames) {
-            matched = camp.targetProductNames.some((keyword) =>
-              cleanName.includes(keyword.toLowerCase())
-            );
-          }
-
-          // 4. Target type === "all"
-          if (!matched && camp.targetType === "all") {
+          if (camp.targetType === "product") {
+            // 1. By exact ID
+            if (productId && camp.targetProductIds?.some((id) => id.toLowerCase() === productId.toLowerCase())) {
+              matched = true;
+            }
+            // 2. By name keywords
+            if (!matched && cleanName && camp.targetProductNames) {
+              matched = camp.targetProductNames.some((keyword) =>
+                cleanName.includes(keyword.toLowerCase())
+              );
+            }
+          } else if (camp.targetType === "category") {
+            // Match by category
+            if (cleanCat && camp.targetCategoryCodes) {
+              matched = camp.targetCategoryCodes.some((code) => {
+                const c = code.toLowerCase().replace(/[_-]/g, "");
+                return c === cleanCat || cleanCat.includes(c) || c.includes(cleanCat);
+              });
+            }
+          } else if (camp.targetType === "all") {
             matched = true;
           }
 
