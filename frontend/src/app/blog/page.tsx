@@ -59,8 +59,90 @@ interface BlogPost {
 
 const POSTS: BlogPost[] = [
   {
-    id: "post-1",
+    id: "post-season-pricing",
     featured: true,
+    title: "Thông Báo Quyết Định Trợ Giá Nông Sản Theo Mùa Vụ Thu Đông 2026: Biểu Giá Trực Tiếp Tại Vườn & Lịch Thu Hoạch Chi Tiết (QĐ #88/2026/QĐ-AGRI)",
+    slug: "quyet-dinh-tro-gia-nong-san-mua-vu-thu-dong-2026",
+    excerpt:
+      "Công bố Quyết định số 88/2026/QĐ-AGRI về chính sách trợ giá trực tiếp 13% – 18% cho nông sản chính vụ tại Đà Lạt, Mộc Châu và Hàm Yên. Bảng tổng hợp lịch biểu tháng nào giảm món gì, cơ chế cộng dồn voucher và hướng dẫn nhận thông báo sale.",
+    category: "season",
+    categoryLabel: "Quyết định & Mùa vụ",
+    categoryColor: "bg-amber-100 text-amber-900",
+    author: "Ban Điều Phối Mùa Vụ & Liên Minh HTX",
+    authorRole: "Hội Đồng Quản Trị Chuỗi Cung Ứng AgriTrace AI",
+    date: "11/11/2026",
+    readTime: "5 phút đọc",
+    relatedProduct: {
+      name: "Dâu Tây New Zealand Mộc Châu (Vụ Mới)",
+      price: "180.000 đ",
+      oldPrice: "210.000 đ",
+      unit: "HỘP 500G",
+      badge: "Vụ mùa -14%",
+      link: "/products?search=Dâu+Tây",
+    },
+    sections: [
+      {
+        heading: "1. Căn cứ ban hành Quyết định số 88/2026/QĐ-AGRI",
+        paragraphs: [
+          "Căn cứ vào kế hoạch sản xuất nông nghiệp công nghệ cao vụ Thu Đông 2026 và thỏa thuận bao tiêu nông sản giữa Liên minh Hợp tác xã Nông sản Việt Nam với Hệ thống Quản trị Chuỗi Cung Ứng AgriTrace AI.",
+          "Nhằm hỗ trợ bà con nông dân tại các vùng chuyên canh Đà Lạt, Mộc Châu, Hàm Yên và Bảo Lộc tiêu thụ sản phẩm đúng vụ thu hoạch rộ, đồng thời đưa nông sản sạch chuẩn VietGAP/GlobalGAP đến tay người tiêu dùng đô thị với mức chi phí tối ưu nhất, Tổng Giám đốc AgriTrace AI cùng đại diện các HTX thành viên chính thức ký ban hành Quyết định số 88/2026/QĐ-AGRI về Biểu giá trợ giá nông sản vụ Thu Đông 2026.",
+        ],
+        quote: "Nông sản vào chính vụ là lúc chất lượng ngon nhất, dinh dưỡng đậm đà nhất và cũng là thời điểm bà con cần chuỗi tiêu thụ nhanh nhất để giữ trọn độ tươi giòn 24H.",
+      },
+      {
+        heading: "2. Vì sao giảm giá trực tiếp tại vườn mà không cần nhập mã Voucher?",
+        paragraphs: [
+          "Nhiều khách hàng thường thắc mắc: 'Tại sao sản phẩm lại giảm giá trực tiếp mà không cần nhập mã khuyến mãi? Có phải hàng giảm giá là hàng tồn đọng hay cận date?'. AgriTrace AI xin khẳng định: Đây là chính sách TRỢ GIÁ MÙA VỤ CHÍNH THỨC, hoàn toàn khác với việc xả hàng lỗi.",
+          "Lý do là bởi: Khi bước vào chính vụ (Peak Season), năng suất thu hoạch tại các nông trại đạt đỉnh (tăng từ 40% đến 60% sản lượng thông thường). Chi phí vận hành và logistics trên mỗi đơn vị sản phẩm giảm đáng kể. Đặc thù của nông sản tươi sống là chu kỳ tươi ngon tối ưu rất ngắn (24H - 48H); để tránh lưu kho lạnh lâu ngày gây giảm vitamin, liên minh HTX chủ động áp dụng mức trợ giá 13% – 18% trực tiếp vào giá niêm yết bán lẻ.",
+          "Mọi khách hàng khi chọn mua đều được trừ thẳng vào đơn giá hiển thị trên website mà không cần phải thực hiện bất kỳ thao tác săn mã hay nhập voucher phức tạp nào.",
+        ],
+        keyTakeaways: [
+          "100% nông sản trợ giá là hàng hái mới sáng sớm (05:30) tại vườn, vận chuyển xe lạnh 2°C - 5°C.",
+          "Trợ giá tự động trừ trực tiếp trên giá bán niêm yết mà không cần điều kiện mã.",
+          "Tiết kiệm từ 10.000đ đến 35.000đ trên mỗi kilôgam nông sản sạch so với giá thị trường.",
+        ],
+      },
+      {
+        heading: "3. Lịch biểu mùa vụ cụ thể: Từ tháng nào tới tháng nào giảm món gì?",
+        paragraphs: [
+          "Hệ thống AgriTrace AI công khai minh bạch lịch biểu thu hoạch và mức trợ giá tương ứng cho từng loại nông sản sạch trên toàn quốc trong bảng theo dõi dưới đây:",
+        ],
+        keyTakeaways: [
+          "Tháng 10 – Tháng 12: Cải Xoăn Kale & Xà Lách Lô Lô Đà Lạt — Trợ giá trực tiếp 13% đến 17% (Tiết kiệm 10.000đ – 15.000đ/KG so với giá gốc).",
+          "Tháng 9 – Tháng 12: Cam Sành Bố Hạ & Hàm Yên — Trợ giá trực tiếp 18% (Tiết kiệm 10.000đ/KG, tép vàng giòn mọng nước giàu vitamin C).",
+          "Tháng 10 – Tháng 4: Dâu Tây New Zealand Mộc Châu — Trợ giá trực tiếp 14% (Tiết kiệm 25.000đ/Hộp 500g, quả đỏ căng mọng đạt chuẩn GlobalGAP).",
+          "Tháng 4 – Tháng 10: Bơ Sáp 034 Tây Nguyên — Trợ giá trực tiếp 17% (Tiết kiệm 15.000đ/KG, cơm vàng dẻo quánh, ưu tiên xuất kho nhanh theo chuẩn FEFO).",
+          "Tháng 11 – Tháng 3: Xoài Cát Hòa Lộc — Áp dụng chương trình Đặt trước (Pre-order), nhân đôi (x2) điểm tích lũy hội viên AgriClub.",
+          "Tháng 12 – Tháng 1: Bưởi Da Xanh Bến Tre — Cam kết bình ổn giá Tết Nguyên Đán, đảm bảo không tăng giá đột biến trong dịp lễ chạp.",
+        ],
+      },
+      {
+        heading: "4. Cơ chế cộng dồn 2 tầng ưu đãi: Nhân đôi niềm vui tiết kiệm",
+        paragraphs: [
+          "Một ưu điểm vượt trội chỉ có tại AgriTrace AI là cơ chế CỘNG DỒN 2 TẦNG ƯU ĐÃI (Dual-Tier Savings):",
+          "• Tầng 1: Trợ giá mùa vụ tự động — Sản phẩm đã được giảm giá trực tiếp từ 13% - 18% trên giá gốc khi bạn chọn vào giỏ hàng.",
+          "• Tầng 2: Voucher khuyến mãi & Freeship — Tại bước đặt hàng nhanh hoặc thanh toán, bạn được áp dụng thêm các mã ưu đãi độc quyền như AGRI30 (giảm thêm 30.000đ cho đơn từ 200k) hoặc mã FREESHIP (miễn phí vận chuyển xe lạnh 25.000đ).",
+          "Công thức tổng tiết kiệm: Tổng Giảm = Trợ Giá Vụ Mùa (Giảm trực tiếp) + Voucher Áp Dụng (Trừ thêm). Khách hàng có thể tiết kiệm tới 40% – 50% tổng chi phí cho bữa ăn an toàn của gia đình.",
+        ],
+      },
+      {
+        heading: "5. Các kênh tra cứu và nhận thông báo sale mùa vụ nhanh nhất",
+        paragraphs: [
+          "Để không bỏ lỡ những đợt nông sản chính vụ tươi mới và biểu giá ưu đãi, khách hàng có thể theo dõi qua các kênh chính thức sau:",
+        ],
+        keyTakeaways: [
+          "Biểu tượng Chuông 🔔 trên thanh điều hướng (Navbar): Tự động phát thông báo khi có quyết định trợ giá vụ mới hoặc nông trại vừa thu hoạch xong một lô hàng tươi sáng nay.",
+          "Trang Công Báo & Quyết Định (/announcements): Trung tâm lưu trữ toàn văn các văn bản pháp lý, quy chế trợ giá và thông cáo báo chí của hệ thống.",
+          "Banner Chiến Dịch tại trang Sản Phẩm (/products): Bấm vào nhãn 'Vụ mùa -13%' hoặc nút 'Cơ Chế & Lịch Trợ Giá Mùa Vụ' để tra cứu quyết định ngay khi đang mua sắm.",
+          "Trang Lịch Mùa Vụ Nông Sản (/seasons): Xem toàn văn quy chế tại mục #pricing-policy và theo dõi tiến độ thu hoạch 12 tháng trong năm.",
+          "Trợ Lý AI Nông Nghiệp 24/7 (Góc phải màn hình): Nhấp vào 'Hỏi Trợ Lý AI' và hỏi: 'Tháng này nông sản nào đang được trợ giá chính vụ?', AI sẽ tra cứu dữ liệu thời gian thực và dẫn bạn tới thẳng sản phẩm phù hợp.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "post-1",
+    featured: false,
     title: "Ứng Dụng Trí Tuệ Nhân Tạo (AI) Trong Dự Báo Nhu Cầu & Quản Trị Chuỗi Nông Sản 2026",
     slug: "ung-dung-ai-du-bao-nhu-cau-nong-san-2026",
     excerpt:

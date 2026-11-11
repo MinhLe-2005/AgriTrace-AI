@@ -22,12 +22,12 @@ type NotificationStore = {
 const initialNotifications: NotificationItem[] = [
   {
     id: "notif-season-pricing",
-    title: "📢 Thông báo Quyết định Trợ giá Mùa Vụ Thu Đông 2026",
-    message: "Quyết định số 88/2026/QĐ-AGRI: Trợ giá trực tiếp 13% - 18% cho rau củ quả chính vụ tại Đà Lạt & Mộc Châu (Áp dụng: 01/10 – 31/12/2026). Không cần nhập mã!",
+    title: "📢 Thông báo Quyết định Trợ giá Mùa Vụ Thu Đông 2026 (QĐ #88/QĐ-AGRI)",
+    message: "Quyết định số 88/2026/QĐ-AGRI: Trợ giá trực tiếp 13% - 18% cho rau củ quả chính vụ tại Đà Lạt & Mộc Châu (01/10 – 31/12/2026). Bấm để xem toàn văn quyết định & lịch biểu!",
     type: "season",
     createdAt: "Vừa xong",
     read: false,
-    link: "/seasons#pricing-policy",
+    link: "/announcements#decision-88",
   },
   {
     id: "notif-season-1",

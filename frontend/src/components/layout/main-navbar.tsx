@@ -29,6 +29,8 @@ import {
   Warehouse,
   X,
   Zap,
+  Megaphone,
+  Flame,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -495,6 +497,30 @@ export function MainNavbar() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
+                    {/* Featured Announcement Item: QĐ #88/QĐ-AGRI */}
+                    <Link
+                      href="/announcements"
+                      className="col-span-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-emerald-50 hover:from-amber-100 hover:to-emerald-100 border border-amber-200 transition-all flex items-center justify-between group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Megaphone size={16} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-gray-900 group-hover:text-emerald-900">
+                              Thông Báo & Quyết Định Nghiệp Vụ
+                            </span>
+                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-rose-600 text-white animate-pulse">
+                              QĐ #88 Trợ Giá
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-600 line-clamp-1">Công báo quyết định trợ giá vụ mùa, kiểm định Quatest 1</span>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-400 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+
                     {/* Item 1: Terms */}
                     <Link
                       href="/terms"
@@ -668,13 +694,19 @@ export function MainNavbar() {
                             setNotifOpen(false);
                           }}
                           className={`p-3.5 block transition-colors hover:bg-gray-50/80 ${
-                            !n.read ? "bg-emerald-50/40" : ""
+                            n.id === "notif-season-pricing"
+                              ? "bg-gradient-to-r from-amber-50/90 via-rose-50/60 to-white border-l-4 border-rose-500"
+                              : !n.read
+                              ? "bg-emerald-50/40"
+                              : ""
                           }`}
                         >
                           <div className="flex items-start gap-2.5">
                             <div
                               className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                                n.type === "order"
+                                n.id === "notif-season-pricing"
+                                  ? "bg-rose-600 text-white shadow-xs"
+                                  : n.type === "order"
                                   ? "bg-blue-100 text-blue-700"
                                   : n.type === "voucher"
                                   ? "bg-amber-100 text-amber-700"
@@ -685,7 +717,9 @@ export function MainNavbar() {
                                   : "bg-emerald-100 text-emerald-700"
                               }`}
                             >
-                              {n.type === "order" ? (
+                              {n.id === "notif-season-pricing" ? (
+                                <Megaphone size={14} />
+                              ) : n.type === "order" ? (
                                 <Truck size={14} />
                               ) : n.type === "voucher" ? (
                                 <Gift size={14} />
@@ -700,9 +734,13 @@ export function MainNavbar() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-1">
                                 <p className="font-semibold text-gray-900 text-xs truncate">{n.title}</p>
-                                {!n.read && (
+                                {n.id === "notif-season-pricing" ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-600 text-white shrink-0 animate-pulse">
+                                    QĐ MỚI
+                                  </span>
+                                ) : !n.read ? (
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
-                                )}
+                                ) : null}
                               </div>
                               <p className="text-gray-500 text-[11px] line-clamp-2 mt-0.5 leading-snug">
                                 {n.message}
@@ -715,13 +753,21 @@ export function MainNavbar() {
                     )}
                   </div>
 
-                  <div className="p-2 border-t border-gray-100 bg-gray-50/50 text-center">
+                  <div className="p-2.5 border-t border-gray-100 bg-gray-50/70 flex items-center justify-between text-xs px-3">
+                    <Link
+                      href="/announcements"
+                      onClick={() => setNotifOpen(false)}
+                      className="font-bold text-emerald-800 hover:text-emerald-950 hover:underline flex items-center gap-1"
+                    >
+                      <Megaphone size={12} className="text-rose-600" />
+                      <span>Trung Tâm Quyết Định & Thông Báo →</span>
+                    </Link>
                     <Link
                       href="/dashboard/customer?tab=notifications"
                       onClick={() => setNotifOpen(false)}
-                      className="text-xs font-semibold text-emerald-800 hover:underline block py-1"
+                      className="text-gray-500 hover:text-gray-800 text-[11px]"
                     >
-                      Xem tất cả trong tài khoản →
+                      Tất cả →
                     </Link>
                   </div>
                 </div>
@@ -1045,6 +1091,9 @@ export function MainNavbar() {
             </button>
             {mobileExpanded === "support" && (
               <div className="p-2 space-y-1 bg-white border-t border-gray-100 font-medium">
+                <Link href="/announcements" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-rose-800 font-bold bg-rose-50/80 rounded-lg">
+                  📢 Quyết định trợ giá mùa vụ & Thông báo (QĐ #88)
+                </Link>
                 <Link href="/terms" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-emerald-800 font-bold hover:bg-emerald-50 rounded-lg">
                   📜 Điều khoản dịch vụ & Đổi trả 24H
                 </Link>
