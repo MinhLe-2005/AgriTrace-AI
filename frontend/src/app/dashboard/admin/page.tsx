@@ -33,7 +33,8 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { ErrorState, LoadingSkeleton } from "@/components/ui/states";
 import { useUsers } from "@/hooks/use-users";
@@ -66,8 +67,27 @@ function submittedAt(value: string) {
 
 type AdminTab = "verifications" | "orders" | "vouchers" | "loyalty" | "events" | "blog";
 
-export default function AdminPortalPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("verifications");
+function AdminPortalContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab") as AdminTab | null;
+
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    if (tabParam && ["verifications", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
+      return tabParam;
+    }
+    return "verifications";
+  });
+
+  useEffect(() => {
+    if (tabParam && ["verifications", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: AdminTab) => {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", `/dashboard/admin?tab=${tab}`);
+  };
 
   // Member 1: Users & Verifications Hooks
   const users = useUsers();
@@ -650,9 +670,9 @@ export default function AdminPortalPage() {
         {/* Global Navigation Tabs */}
         <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-red-900/60 p-1 border border-red-800/80 text-xs font-semibold">
           <button
-            onClick={() => setActiveTab("verifications")}
+            onClick={() => handleTabChange("verifications")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
               activeTab === "verifications"
                 ? "bg-white text-red-950 shadow-xs"
                 : "text-red-200 hover:text-white hover:bg-red-800/60"
@@ -662,9 +682,9 @@ export default function AdminPortalPage() {
             <span>Duyệt Hồ Sơ ({pendingCount})</span>
           </button>
           <button
-            onClick={() => setActiveTab("orders")}
+            onClick={() => handleTabChange("orders")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
               activeTab === "orders"
                 ? "bg-white text-red-950 shadow-xs"
                 : "text-red-200 hover:text-white hover:bg-red-800/60"
@@ -674,9 +694,9 @@ export default function AdminPortalPage() {
             <span>Quản Lý Đơn Hàng</span>
           </button>
           <button
-            onClick={() => setActiveTab("vouchers")}
+            onClick={() => handleTabChange("vouchers")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
               activeTab === "vouchers"
                 ? "bg-white text-red-950 shadow-xs"
                 : "text-red-200 hover:text-white hover:bg-red-800/60"
@@ -686,9 +706,9 @@ export default function AdminPortalPage() {
             <span>Kho Voucher</span>
           </button>
           <button
-            onClick={() => setActiveTab("loyalty")}
+            onClick={() => handleTabChange("loyalty")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
               activeTab === "loyalty"
                 ? "bg-white text-red-950 shadow-xs"
                 : "text-red-200 hover:text-white hover:bg-red-800/60"
@@ -698,9 +718,9 @@ export default function AdminPortalPage() {
             <span>Hội Viên AgriClub</span>
           </button>
           <button
-            onClick={() => setActiveTab("events")}
+            onClick={() => handleTabChange("events")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
               activeTab === "events"
                 ? "bg-white text-red-950 shadow-xs"
                 : "text-red-200 hover:text-white hover:bg-red-800/60"
@@ -710,9 +730,9 @@ export default function AdminPortalPage() {
             <span>Sự Kiện & Mùa Vụ ({campaigns.length})</span>
           </button>
           <button
-            onClick={() => setActiveTab("blog")}
+            onClick={() => handleTabChange("blog")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
               activeTab === "blog"
                 ? "bg-white text-red-950 shadow-xs"
                 : "text-red-200 hover:text-white hover:bg-red-800/60"
@@ -2342,5 +2362,19 @@ export default function AdminPortalPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminPortalPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-12 text-center text-xs text-gray-400">
+          Đang tải bảng điều khiển quản trị...
+        </div>
+      }
+    >
+      <AdminPortalContent />
+    </Suspense>
   );
 }

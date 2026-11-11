@@ -164,36 +164,77 @@ export default function EventsPage() {
         </div>
 
         {/* Hero Section */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-900 via-teal-900 to-green-950 p-6 sm:p-10 text-white shadow-xl">
+        <div
+          className="relative overflow-hidden rounded-3xl p-6 sm:p-10 text-white shadow-xl"
+          style={{
+            backgroundColor: "#064e3b",
+            backgroundImage: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #022c22 100%)",
+            color: "#ffffff",
+          }}
+        >
           <div className="relative z-10 max-w-2xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold"
+              style={{
+                backgroundColor: "rgba(16, 185, 129, 0.2)",
+                border: "1px solid rgba(52, 211, 153, 0.4)",
+                color: "#6ee7b7",
+              }}
+            >
               <Sparkles size={14} />
               <span>Chính Sách Trợ Giá Trực Tiếp Từ Vườn 2026</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
+            <h1
+              className="text-2xl sm:text-4xl font-black tracking-tight leading-tight"
+              style={{ color: "#ffffff", textShadow: "0 2px 10px rgba(0,0,0,0.3)" }}
+            >
               Sự Kiện & Lễ Hội Mùa Vụ Nông Sản Sạch
             </h1>
-            <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+            <p
+              className="text-xs sm:text-sm leading-relaxed"
+              style={{ color: "#ecfdf5" }}
+            >
               Tổng hợp tất cả chiến dịch trợ giá nông sản thu hoạch rộ, xả kho bảo quản lạnh FEFO và tuần lễ đặc sản vùng miền. Giá giảm trực tiếp tại vườn theo từng giai đoạn mùa vụ và tự động ngưng áp dụng khi hết thời hạn.
             </p>
             <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15">
-                <ShieldCheck size={14} className="text-emerald-400" />
-                <span>100% Chuẩn VietGAP / GlobalGAP</span>
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-xs"
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.12)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "#ffffff",
+                }}
+              >
+                <ShieldCheck size={14} className="text-emerald-300" />
+                <span className="font-semibold">100% Chuẩn VietGAP / GlobalGAP</span>
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15">
-                <Truck size={14} className="text-emerald-400" />
-                <span>Xe Lạnh 2°C - 5°C Trong 24H</span>
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-xs"
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.12)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "#ffffff",
+                }}
+              >
+                <Truck size={14} className="text-emerald-300" />
+                <span className="font-semibold">Xe Lạnh 2°C - 5°C Trong 24H</span>
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15">
-                <Clock size={14} className="text-emerald-400" />
-                <span>Tự Động Kết Thúc Đúng Hạn</span>
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-xs"
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.12)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "#ffffff",
+                }}
+              >
+                <Clock size={14} className="text-emerald-300" />
+                <span className="font-semibold">Tự Động Kết Thúc Đúng Hạn</span>
               </div>
             </div>
           </div>
 
           {/* Decorative Floating Emojis */}
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20 sm:opacity-30 text-8xl sm:text-9xl pointer-events-none select-none">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-25 sm:opacity-35 text-8xl sm:text-9xl pointer-events-none select-none">
             🍓🥗🍊
           </div>
         </div>
