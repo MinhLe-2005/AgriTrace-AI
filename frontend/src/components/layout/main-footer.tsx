@@ -203,8 +203,8 @@ export function MainFooter() {
             </h4>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <Link href="/announcements" className="hover:text-emerald-400 transition-colors flex items-center gap-1 text-emerald-300 font-bold">
-                  <span>📢 Quyết định trợ giá vụ mùa (QĐ #88)</span>
+                <Link href="/events" className="hover:text-emerald-400 transition-colors flex items-center gap-1 text-emerald-300 font-bold">
+                  <span>🔥 Sự kiện & Trợ giá mùa vụ</span>
                 </Link>
               </li>
               <li>

@@ -534,30 +534,6 @@ export function MainNavbar() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    {/* Featured Announcement Item: QĐ #88/QĐ-AGRI */}
-                    <Link
-                      href="/announcements"
-                      className="col-span-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-emerald-50 hover:from-amber-100 hover:to-emerald-100 border border-amber-200 transition-all flex items-center justify-between group"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                          <Megaphone size={16} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-gray-900 group-hover:text-emerald-900">
-                              Thông Báo & Quyết Định Nghiệp Vụ
-                            </span>
-                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-rose-600 text-white animate-pulse">
-                              QĐ #88 Trợ Giá
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-gray-600 line-clamp-1">Công báo quyết định trợ giá vụ mùa, kiểm định Quatest 1</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} className="text-gray-400 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-
                     {/* Item 1: Terms */}
                     <Link
                       href="/terms"
@@ -792,12 +768,12 @@ export function MainNavbar() {
 
                   <div className="p-2.5 border-t border-gray-100 bg-gray-50/70 flex items-center justify-between text-xs px-3">
                     <Link
-                      href="/announcements"
+                      href="/events"
                       onClick={() => setNotifOpen(false)}
                       className="font-bold text-emerald-800 hover:text-emerald-950 hover:underline flex items-center gap-1"
                     >
-                      <Megaphone size={12} className="text-rose-600" />
-                      <span>Trung Tâm Quyết Định & Thông Báo →</span>
+                      <Flame size={13} className="text-rose-600 fill-rose-600" />
+                      <span>Xem Tất Cả Sự Kiện Mùa Vụ →</span>
                     </Link>
                     <Link
                       href="/dashboard/customer?tab=notifications"
@@ -1131,9 +1107,6 @@ export function MainNavbar() {
             </button>
             {mobileExpanded === "support" && (
               <div className="p-2 space-y-1 bg-white border-t border-gray-100 font-medium">
-                <Link href="/announcements" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-rose-800 font-bold bg-rose-50/80 rounded-lg">
-                  📢 Quyết định trợ giá mùa vụ & Thông báo (QĐ #88)
-                </Link>
                 <Link href="/terms" onClick={() => setMobileOpen(false)} className="block px-3 py-1.5 text-emerald-800 font-bold hover:bg-emerald-50 rounded-lg">
                   📜 Điều khoản dịch vụ & Đổi trả 24H
                 </Link>

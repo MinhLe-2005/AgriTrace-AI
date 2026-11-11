@@ -649,7 +649,7 @@ function ProductsContent() {
                 🌾 Mùa Vụ Thu Đông 2026
               </span>
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200">
-                <Calendar size={12} className="text-emerald-700" /> Hiệu lực: 01/10 – 31/12/2026 (QĐ #88/QĐ-AGRI)
+                <Calendar size={12} className="text-emerald-700" /> Hiệu lực: 01/10 – 31/12/2026
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-500">
                 <Clock size={12} className="text-emerald-600" /> Cập nhật đợt thu hoạch hôm nay
@@ -674,14 +674,13 @@ function ProductsContent() {
               <span>Xem Kho Voucher (Giảm 30%)</span>
             </Link>
 
-            <button
-              type="button"
-              onClick={() => setShowPromoInfoModal(true)}
+            <Link
+              href="/events"
               className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-amber-950 border border-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
-              <Info size={14} className="text-amber-600" />
-              <span>Cơ Chế & Lịch Trợ Giá Mùa Vụ</span>
-            </button>
+              <Flame size={14} className="text-rose-600 fill-rose-600" />
+              <span>Xem Các Sự Kiện Mùa Vụ →</span>
+            </Link>
           </div>
         </div>
 
@@ -1476,7 +1475,7 @@ function ProductsContent() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base sm:text-lg">Cơ Chế & Lịch Biểu Giảm Giá Nông Sản</h3>
-                  <p className="text-xs text-emerald-200">Quyết định số 88/2026/QĐ-AGRI · Ban hành ngày 01/10/2026</p>
+                  <p className="text-xs text-emerald-200">Chính sách trợ giá nông sản thu hoạch chính vụ 2026</p>
                 </div>
               </div>
               <button

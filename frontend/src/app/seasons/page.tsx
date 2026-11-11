@@ -134,10 +134,10 @@ export default function SeasonsPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white shadow-xs">
-                  📢 THÔNG CÁO CHÍNH THỨC
+                  📢 THÔNG BÁO MÙA VỤ
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                  Quyết Định Số 88/2026/QĐ-AGRI
+                  Chương Trình Trợ Giá Thu Đông
                 </span>
                 <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">
                   Hiệu lực: 01/10/2026 – 31/12/2026
@@ -280,7 +280,7 @@ export default function SeasonsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                Văn Bản Nghiệp Vụ Chính Thức
+                Chính Sách Bán Hàng Minh Bạch
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-gray-900 mt-1">
                 Quy Chế & Cơ Chế Giảm Giá Nông Sản Theo Mùa Vụ
@@ -289,7 +289,7 @@ export default function SeasonsPage() {
                 Minh bạch chuỗi giá trị và cơ chế định giá xuất kho của hệ thống AgriTrace AI.
               </p>
             </div>
-            <span className="text-xs text-gray-400 font-mono">QĐ-88/2026/QĐ-AGRI</span>
+            <span className="text-xs text-emerald-800 font-semibold">Vụ Thu Đông 2026</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-700">

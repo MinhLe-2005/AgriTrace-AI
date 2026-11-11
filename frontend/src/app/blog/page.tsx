@@ -62,12 +62,12 @@ const POSTS: BlogPost[] = [
   {
     id: "post-season-pricing",
     featured: true,
-    title: "Thông Báo Quyết Định Trợ Giá Nông Sản Theo Mùa Vụ Thu Đông 2026: Biểu Giá Trực Tiếp Tại Vườn & Lịch Thu Hoạch Chi Tiết (QĐ #88/2026/QĐ-AGRI)",
-    slug: "quyet-dinh-tro-gia-nong-san-mua-vu-thu-dong-2026",
+    title: "Chương Trình Trợ Giá Nông Sản Mùa Vụ Thu Đông: Biểu Giá Trực Tiếp Tại Vườn & Lịch Thu Hoạch Chi Tiết",
+    slug: "chuong-trinh-tro-gia-nong-san-mua-vu-thu-dong",
     excerpt:
-      "Công bố Quyết định số 88/2026/QĐ-AGRI về chính sách trợ giá trực tiếp 13% – 18% cho nông sản chính vụ tại Đà Lạt, Mộc Châu và Hàm Yên. Bảng tổng hợp lịch biểu tháng nào giảm món gì, cơ chế cộng dồn voucher và hướng dẫn nhận thông báo sale.",
+      "Chính sách trợ giá trực tiếp 13% – 18% cho nông sản chính vụ tại Đà Lạt, Mộc Châu và Hàm Yên. Bảng tổng hợp lịch biểu tháng nào giảm món gì, cơ chế cộng dồn voucher và hướng dẫn theo dõi sự kiện khuyến mãi.",
     category: "season",
-    categoryLabel: "Quyết định & Mùa vụ",
+    categoryLabel: "Mùa Vụ & Ưu Đãi",
     categoryColor: "bg-amber-100 text-amber-900",
     author: "Ban Điều Phối Mùa Vụ & Liên Minh HTX",
     authorRole: "Hội Đồng Quản Trị Chuỗi Cung Ứng AgriTrace AI",
@@ -83,10 +83,10 @@ const POSTS: BlogPost[] = [
     },
     sections: [
       {
-        heading: "1. Căn cứ ban hành Quyết định số 88/2026/QĐ-AGRI",
+        heading: "1. Vì sao nông sản chính vụ lại có chính sách trợ giá trực tiếp?",
         paragraphs: [
-          "Căn cứ vào kế hoạch sản xuất nông nghiệp công nghệ cao vụ Thu Đông 2026 và thỏa thuận bao tiêu nông sản giữa Liên minh Hợp tác xã Nông sản Việt Nam với Hệ thống Quản trị Chuỗi Cung Ứng AgriTrace AI.",
-          "Nhằm hỗ trợ bà con nông dân tại các vùng chuyên canh Đà Lạt, Mộc Châu, Hàm Yên và Bảo Lộc tiêu thụ sản phẩm đúng vụ thu hoạch rộ, đồng thời đưa nông sản sạch chuẩn VietGAP/GlobalGAP đến tay người tiêu dùng đô thị với mức chi phí tối ưu nhất, Tổng Giám đốc AgriTrace AI cùng đại diện các HTX thành viên chính thức ký ban hành Quyết định số 88/2026/QĐ-AGRI về Biểu giá trợ giá nông sản vụ Thu Đông 2026.",
+          "Vào thời điểm vụ Thu Đông, các vùng chuyên canh nông sản đối tác của AgriTrace AI tại Đà Lạt, Mộc Châu, Hàm Yên và Bảo Lộc bước vào giai đoạn thu hoạch rộ nhất trong năm. Sản lượng hái mới tại các nông trại công nghệ cao đạt đỉnh (tăng từ 40% đến 60% so với thông thường).",
+          "Nhằm đồng hành cùng bà con nông dân bao tiêu nhanh chóng sản lượng lớn, đồng thời đưa nông sản sạch chuẩn VietGAP/GlobalGAP đến tay người tiêu dùng đô thị trong vòng 24H với chi phí tối ưu nhất, hệ thống AgriTrace AI cùng liên minh HTX áp dụng chính sách trợ giá trực tiếp từ 13% đến 18% vào đơn giá niêm yết xuất kho.",
         ],
         quote: "Nông sản vào chính vụ là lúc chất lượng ngon nhất, dinh dưỡng đậm đà nhất và cũng là thời điểm bà con cần chuỗi tiêu thụ nhanh nhất để giữ trọn độ tươi giòn 24H.",
       },
@@ -133,7 +133,7 @@ const POSTS: BlogPost[] = [
         ],
         keyTakeaways: [
           "Biểu tượng Chuông 🔔 trên thanh điều hướng (Navbar): Tự động phát thông báo khi có quyết định trợ giá vụ mới hoặc nông trại vừa thu hoạch xong một lô hàng tươi sáng nay.",
-          "Trang Công Báo & Quyết Định (/announcements): Trung tâm lưu trữ toàn văn các văn bản pháp lý, quy chế trợ giá và thông cáo báo chí của hệ thống.",
+          "Trang Sự Kiện & Giảm Giá (/events): Cập nhật trực tiếp các sự kiện trợ giá mùa vụ đang diễn ra, thời hạn áp dụng và danh mục sản phẩm giảm giá.",
           "Banner Chiến Dịch tại trang Sản Phẩm (/products): Bấm vào nhãn 'Vụ mùa -13%' hoặc nút 'Cơ Chế & Lịch Trợ Giá Mùa Vụ' để tra cứu quyết định ngay khi đang mua sắm.",
           "Trang Lịch Mùa Vụ Nông Sản (/seasons): Xem toàn văn quy chế tại mục #pricing-policy và theo dõi tiến độ thu hoạch 12 tháng trong năm.",
           "Trợ Lý AI Nông Nghiệp 24/7 (Góc phải màn hình): Nhấp vào 'Hỏi Trợ Lý AI' và hỏi: 'Tháng này nông sản nào đang được trợ giá chính vụ?', AI sẽ tra cứu dữ liệu thời gian thực và dẫn bạn tới thẳng sản phẩm phù hợp.",
@@ -283,7 +283,7 @@ const POSTS: BlogPost[] = [
       {
         heading: "3. Cơ chế trợ giá trực tiếp tại AgriTrace",
         paragraphs: [
-          "Tất cả trái cây chính vụ trong danh mục đều được áp dụng Quyết định số 88/2026/QĐ-AGRI: giảm trực tiếp từ 14% đến 18% trên giá niêm yết xuất kho, kết hợp giao nhận xe lạnh 24H để giữ trọn vẹn chất lượng từ vườn về nhà.",
+          "Tất cả trái cây chính vụ trong danh mục đều được áp dụng chính sách trợ giá trực tiếp từ 14% đến 18% trên giá niêm yết xuất kho, kết hợp giao nhận xe lạnh 24H để giữ trọn vẹn chất lượng từ vườn về nhà.",
         ],
       },
     ],

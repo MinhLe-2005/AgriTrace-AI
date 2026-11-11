@@ -164,7 +164,7 @@ export default function EventsPage() {
         </div>
 
         {/* Hero Section */}
-        <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-emerald-900 via-teal-900 to-green-950 p-6 sm:p-10 text-white shadow-xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-900 via-teal-900 to-green-950 p-6 sm:p-10 text-white shadow-xl">
           <div className="relative z-10 max-w-2xl space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
               <Sparkles size={14} />
