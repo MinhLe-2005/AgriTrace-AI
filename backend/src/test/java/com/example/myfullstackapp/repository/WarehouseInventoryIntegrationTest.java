@@ -161,6 +161,59 @@ class WarehouseInventoryIntegrationTest {
     }
 
     @Test
+    void inventoryPagesFilterBeforeCountingAvailableRows() {
+        addStock(2, 1, true, "Đã duyệt xuất kho");
+        addStock(3, 2, false, "Chờ duyệt xuất kho");
+        addStock(4, -1, false, "Đã duyệt xuất kho");
+        addStock(5, 3, false, "Đã duyệt xuất kho");
+        reserve("20", false);
+        assertEquals(
+                List.of("4", "2"),
+                inventory.page(warehouseId, null, null, false, 0, 2).stream()
+                        .map(WarehouseOperations.BalanceView::lotId)
+                        .toList());
+        assertEquals("5", inventory.page(warehouseId, null, null, true, 0, 1).getFirst().lotId());
+        var second = inventory.page(warehouseId, null, null, true, 1, 1).getFirst();
+        assertEquals("1", second.lotId());
+        assertEquals(0, new BigDecimal("80").compareTo(second.availableKg()));
+        assertTrue(inventory.page(warehouseId, null, null, true, 2, 1).isEmpty());
+        assertEquals(
+                "1", inventory.page(warehouseId, "1", locationId, false, 0, 2).getFirst().lotId());
+        assertTrue(inventory.page(warehouseId, null, UUID.randomUUID(), false, 0, 2).isEmpty());
+        reserve("80", false);
+        assertTrue(inventory.page(warehouseId, null, null, true, 1, 1).isEmpty());
+        assertThrows(
+                com.example.myfullstackapp.exception.ResourceNotFoundException.class,
+                () -> inventory.page(UUID.randomUUID(), null, null, false, 0, 2));
+    }
+
+    @Test
+    void physicalPageDoesNotReadFarmerMetadataOutsideRequestedPage() {
+        addStock(2, 6, false, "Đã duyệt xuất kho");
+        jdbc.update("UPDATE agri_harvest_lots SET qty='invalid' WHERE id=2");
+        assertEquals("1", inventory.page(warehouseId, null, null, false, 0, 1).getFirst().lotId());
+        assertThrows(
+                com.example.myfullstackapp.exception.WarehouseIntegrationException.class,
+                () -> inventory.page(warehouseId, null, null, false, 1, 1));
+    }
+
+    private void addStock(long id, int expiresInDays, boolean held, String status) {
+        var expiry = InventoryService.today().plusDays(expiresInDays);
+        WarehousePostgresSupport.insertHarvestLot(
+                jdbc, id, "Rau", "LOT-" + id, expiry, "1000", "kg", status);
+        var balance = new StockBalance();
+        balance.setWarehouseId(warehouseId);
+        balance.setLocationId(locationId);
+        balance.setLotId(Long.toString(id));
+        balance.setProductId("Rau");
+        balance.setLotCode("LOT-" + id);
+        balance.setExpiryDate(expiry);
+        balance.setQuantityKg(new BigDecimal("100"));
+        balance.setHeld(held);
+        balances.saveAndFlush(balance);
+    }
+
+    @Test
     void invalidLedgerRangesAreRejected() {
         assertThrows(
                 IllegalArgumentException.class,

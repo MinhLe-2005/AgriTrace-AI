@@ -32,12 +32,6 @@ public class InventoryController {
             @RequestParam(defaultValue = "100") @Min(1) @Max(500) int size) {
         return ApiResponse.ok(
                 "Inventory retrieved",
-                inventory.getBalances(warehouseId).stream()
-                        .filter(b -> lotId == null || lotId.equals(b.lotId()))
-                        .filter(b -> locationId == null || locationId.equals(b.locationId()))
-                        .filter(b -> !onlyAvailable || b.availableKg().signum() > 0)
-                        .skip((long) page * size)
-                        .limit(size)
-                        .toList());
+                inventory.page(warehouseId, lotId, locationId, onlyAvailable, page, size));
     }
 }
