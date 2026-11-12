@@ -87,7 +87,10 @@ public class InventoryService {
                 .map(
                         b -> {
                             BigDecimal held = reserved.getOrDefault(b.getId(), BigDecimal.ZERO);
-                            boolean eligible = !b.isHeld() && !b.getExpiryDate().isBefore(today());
+                            boolean eligible =
+                                    !b.isHeld()
+                                            && WarehouseExpiryPolicy.usableOn(
+                                                    b.getExpiryDate(), today());
                             var location =
                                     currentLocations.computeIfAbsent(
                                             b.getLocationId(),

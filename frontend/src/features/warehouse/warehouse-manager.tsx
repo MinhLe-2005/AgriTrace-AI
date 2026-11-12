@@ -1058,6 +1058,10 @@ export function WarehouseManager() {
           )}
           {tab === "FEFO & giữ hàng" && (
             <>
+              <p className="text-sm text-slate-600">
+                Hạn dùng được tính đến hết ngày ghi trên lô theo giờ Việt Nam.
+                Hàng bị giữ chất lượng vẫn cần được mở giữ trước khi xuất.
+              </p>
               <div className="flex gap-2">
                 <Button
                   onClick={() =>
