@@ -309,7 +309,7 @@ public class WarehouseDocumentService {
             Map<UUID, BalanceView> eligible = new HashMap<>();
             for (var b : inventory.views(document.getWarehouseId(), reservation.getId(), true))
                 if (b.availableKg().signum() > 0
-                        && b.expiryDate().isAfter(InventoryService.today()))
+                        && WarehouseExpiryPolicy.usableOn(b.expiryDate(), InventoryService.today()))
                     eligible.put(b.id(), b);
             Map<String, BigDecimal> expected = new HashMap<>();
             for (var allocation : reservation.getLines()) {
@@ -503,7 +503,9 @@ public class WarehouseDocumentService {
                                                     "Dispatched lot snapshot is missing"));
             var snapshot = lotSnapshot(source);
             boolean quarantine =
-                    source.isHeld() || source.getExpiryDate().isBefore(InventoryService.today());
+                    source.isHeld()
+                            || WarehouseExpiryPolicy.expired(
+                                    source.getExpiryDate(), InventoryService.today());
             try {
                 var current = lots.get(line.getLotId());
                 quarantine |=
@@ -532,7 +534,7 @@ public class WarehouseDocumentService {
                 inspection.setHeld(true);
                 inspection.setNote(
                         "Transfer receipt requires quality review; source lot is held, expired or"
-                            + " changed");
+                                + " changed");
                 inspection.setActor(actor);
                 inspections.save(inspection);
             }
@@ -595,7 +597,8 @@ public class WarehouseDocumentService {
     }
 
     private void requireEligible(LotSummary lot) {
-        if (!"APPROVED".equals(lot.status()) || lot.expiryDate().isBefore(InventoryService.today()))
+        if (!"APPROVED".equals(lot.status())
+                || WarehouseExpiryPolicy.expired(lot.expiryDate(), InventoryService.today()))
             throw new ConflictException("Lot must be approved and unexpired");
         initialKg(lot);
     }

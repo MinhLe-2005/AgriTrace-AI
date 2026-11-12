@@ -104,7 +104,8 @@ public class StockReservationService {
         Map<UUID, BigDecimal> free = new HashMap<>();
         for (var balance : stock) {
             if (balance.availableKg().signum() > 0
-                    && balance.expiryDate().isAfter(InventoryService.today())) {
+                    && WarehouseExpiryPolicy.usableOn(
+                            balance.expiryDate(), InventoryService.today())) {
                 available.put(balance.id(), balance);
                 free.put(balance.id(), balance.availableKg());
             }
