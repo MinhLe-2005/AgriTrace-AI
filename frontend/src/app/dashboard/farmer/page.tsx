@@ -102,6 +102,7 @@ export type CertificationItem = {
 const STORAGE_KEYS = {
   farms: "agritrace_farmer_farms_v1",
   selectedFarmId: "agritrace_farmer_selected_farm_v1",
+  logs: "agritrace_farmer_logs_v1",
 } as const;
 
 const DEFAULT_FARMS: FarmItem[] = [
@@ -134,6 +135,261 @@ const DEFAULT_FARMS: FarmItem[] = [
     isDefault: false,
   },
 ];
+
+const DEFAULT_BATCHES: BatchItem[] = [
+  {
+    code: "XC-2026-01",
+    farmCode: "NT-DT-02",
+    product: "Xoài Cát Chu Cao Lãnh",
+    plantingDate: "10/05/2026",
+    harvestDate: "15/10/2026",
+    expiryDate: "30/11/2026",
+    qty: "1200",
+    unit: "kg",
+    status: "Đã duyệt xuất kho",
+    statusColor: "#10b981",
+    cert: "VietGAP",
+    cultivation: "Bao trái hữu cơ, thu hoạch đợt 1",
+    transportDestination: "Kho Tổng Logistics TP.HCM",
+    transportStatus: "Đã nhập kho đích",
+  },
+  {
+    code: "XC-2026-02",
+    farmCode: "NT-DT-02",
+    product: "Xoài Cát Chu Cao Lãnh",
+    plantingDate: "10/05/2026",
+    harvestDate: "27/10/2026",
+    expiryDate: "25/11/2026",
+    qty: "850",
+    unit: "kg",
+    status: "Chờ duyệt xuất kho",
+    statusColor: "#f97316",
+    cert: "VietGAP",
+    cultivation: "Đợt thu hoạch 2 - Trái chín độ 85%",
+    transportDestination: "Lưu tại kho bảo quản nông trại",
+    transportStatus: "Chưa vận chuyển",
+  },
+  {
+    code: "SR-2026-01",
+    farmCode: "NT-DL-01",
+    product: "Sầu Riêng Ri6 Chín Cây",
+    plantingDate: "01/01/2026",
+    harvestDate: "20/10/2026",
+    expiryDate: "20/11/2026",
+    qty: "500",
+    unit: "kg",
+    status: "Đang lưu kho lạnh",
+    statusColor: "#3b82f6",
+    cert: "GlobalGAP",
+    cultivation: "Hữu cơ sinh học, bảo quản kho mát",
+    transportDestination: "Kho Lạnh Phân Phối Hà Nội",
+    transportStatus: "Đang vận chuyển",
+  },
+  {
+    code: "DT-2026-03",
+    farmCode: "NT-DL-01",
+    product: "Dâu Tây Giống Nhật",
+    plantingDate: "15/08/2026",
+    harvestDate: "10/11/2026",
+    expiryDate: "18/11/2026",
+    qty: "100",
+    unit: "kg",
+    status: "Đang chăm sóc",
+    statusColor: "#f59e0b",
+    cert: "VietGAP",
+    cultivation: "Nhà màng công nghệ cao",
+    transportDestination: "Vườn đang chăm sóc (Chưa vận chuyển)",
+    transportStatus: "Chưa vận chuyển",
+  },
+];
+
+const DEFAULT_LOGS: FarmingLogItem[] = [
+  {
+    id: "l1",
+    farmCode: "NT-DT-02",
+    batchCode: "XC-2026-02",
+    date: "15/07/2026",
+    stage: "Bón phân",
+    action: "Bón phân hữu cơ vi sinh đợt 2",
+    materialsUsed: "Phân bón trùn quế hữu cơ O-Micro",
+    notes: "Tỷ lệ bón 2kg/gốc, tưới ẩm đất",
+  },
+  {
+    id: "l2",
+    farmCode: "NT-DT-02",
+    batchCode: "XC-2026-02",
+    date: "20/08/2026",
+    stage: "Phun sinh học",
+    action: "Bao trái và phun dung dịch xua đuổi ruồi vàng thảo mộc",
+    materialsUsed: "Chế phẩm sinh học tỏi - ớt - gừng lên men",
+    notes: "Cách ly an toàn 100% không dùng hóa chất độc hại",
+  },
+  {
+    id: "l3",
+    farmCode: "NT-DT-02",
+    batchCode: "XC-2026-02",
+    date: "27/10/2026",
+    stage: "Thu hoạch",
+    action: "Thu hoạch đợt 2 sáng sớm, phân loại trái",
+    materialsUsed: "Dụng cụ khử trùng, thùng lót giấy mềm",
+    notes: "Trái đạt chuẩn độ ngọt, chuyển gửi Admin duyệt",
+  },
+  {
+    id: "l4",
+    farmCode: "NT-DL-01",
+    batchCode: "SR-2026-01",
+    date: "10/09/2026",
+    stage: "Tưới tiêu",
+    action: "Tưới nước nhỏ giọt tự động kiểm soát EC và pH",
+    materialsUsed: "Nguồn nước sạch ngầm",
+    notes: "Độ pH ổn định 6.2",
+  },
+  {
+    id: "l5",
+    farmCode: "NT-DL-01",
+    batchCode: "DT-2026-03",
+    date: "12/10/2026",
+    stage: "Tưới tiêu",
+    action: "Tưới dinh dưỡng nhỏ giọt công nghệ Israel cho dâu tây",
+    materialsUsed: "Dung dịch dinh dưỡng hữu cơ vi lượng A-B",
+    notes: "Kiểm tra độ ẩm giá thể mùn dừa đạt 75%",
+  },
+];
+
+function getLocalIsoDate(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDisplayDate(dStr: string): string {
+  if (!dStr) return "";
+  const parts = dStr.split("-");
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dStr;
+}
+
+function resolveBatchStatusColor(status?: string, fallbackColor?: string): string {
+  if (status === "Đã duyệt xuất kho") return "#10b981";
+  if (status === "Đang lưu kho lạnh") return "#3b82f6";
+  if (status === "Đang chăm sóc") return "#f59e0b";
+  if (status === "Chờ duyệt xuất kho") return "#f97316";
+  return fallbackColor || "#f97316";
+}
+
+function normalizeBatchCert(certStandard?: string): string {
+  if (!certStandard) return "VietGAP";
+  const lower = certStandard.toLowerCase();
+  if (lower.includes("globalgap")) return "GlobalGAP";
+  if (lower.includes("organic")) return "Organic USDA";
+  return "VietGAP";
+}
+
+function extractFarmCode(farmName?: string, origin?: string, farmList: FarmItem[] = DEFAULT_FARMS): string {
+  const combined = `${farmName || ""} ${origin || ""}`.trim();
+  const codeMatch = combined.match(/\(Mã:\s*([^)]+)\)/i);
+  if (codeMatch?.[1]) {
+    return codeMatch[1].trim().toUpperCase();
+  }
+  const combinedLower = combined.toLowerCase();
+  for (const f of farmList) {
+    if (combinedLower.includes(f.code.toLowerCase()) || combinedLower.includes(f.name.toLowerCase())) {
+      return f.code;
+    }
+  }
+  if (combinedLower.includes("cao lãnh") || combinedLower.includes("đồng tháp")) {
+    return "NT-DT-02";
+  }
+  if (combinedLower.includes("đà lạt") || combinedLower.includes("lâm đồng")) {
+    return "NT-DL-01";
+  }
+  return farmList[0]?.code || "NT-DL-01";
+}
+
+function generateLotCodeForProduct(productName: string, existingBatches: BatchItem[]): string {
+  const ascii = productName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/[^A-Za-z\s]/g, " ")
+    .trim();
+  const words = ascii.split(/\s+/).filter(Boolean);
+  let prefix = "AG";
+  if (words.length >= 2) {
+    prefix = (words[0][0] + words[1][0]).toUpperCase();
+  } else if (words.length === 1 && words[0].length >= 2) {
+    prefix = words[0].slice(0, 2).toUpperCase();
+  }
+  const year = new Date().getFullYear();
+  const existingCodes = new Set(existingBatches.map((b) => b.code.toUpperCase()));
+  for (let i = 0; i < 15; i += 1) {
+    const rand = Math.floor(Math.random() * 89) + 10;
+    const candidate = `${prefix}-${year}-${rand}`;
+    if (!existingCodes.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `${prefix}-${year}-${String(Date.now()).slice(-3)}`;
+}
+
+function computeHarvestStats(batchList: BatchItem[]): { totalKgLabel: string; productSummary: string } {
+  let totalKg = 0;
+  const productsSet = new Set<string>();
+  for (const b of batchList) {
+    const num = Number(b.qty);
+    if (Number.isFinite(num) && num > 0) {
+      const unitLower = (b.unit || "kg").trim().toLowerCase();
+      if (unitLower === "tấn" || unitLower === "t" || unitLower === "ton") {
+        totalKg += num * 1000;
+      } else if (unitLower === "tạ") {
+        totalKg += num * 100;
+      } else if (unitLower === "g") {
+        totalKg += num / 1000;
+      } else if (unitLower.includes("500g")) {
+        totalKg += num * 0.5;
+      } else {
+        totalKg += num;
+      }
+    }
+    if (b.product?.trim()) {
+      productsSet.add(b.product.trim());
+    }
+  }
+  const rounded = Math.round(totalKg * 100) / 100;
+  const names = Array.from(productsSet).slice(0, 3);
+  const summary =
+    names.length === 0
+      ? "Chưa có nông sản thu hoạch"
+      : productsSet.size > 3
+      ? `${names.join(", ")}...`
+      : names.join(", ");
+  return {
+    totalKgLabel: `${rounded.toLocaleString("vi-VN")} kg`,
+    productSummary: summary,
+  };
+}
+
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  const maybeErr = err as { response?: { data?: { message?: string } | string }; message?: string };
+  if (typeof maybeErr?.response?.data === "string" && maybeErr.response.data.trim()) {
+    return maybeErr.response.data;
+  }
+  if (
+    maybeErr?.response?.data &&
+    typeof maybeErr.response.data === "object" &&
+    typeof maybeErr.response.data.message === "string" &&
+    maybeErr.response.data.message.trim()
+  ) {
+    return maybeErr.response.data.message;
+  }
+  if (typeof maybeErr?.message === "string" && maybeErr.message.trim()) {
+    return maybeErr.message;
+  }
+  return fallback;
+}
 
 function getNextFarmCode(farmList: FarmItem[]): string {
   const used = new Set(farmList.map((f) => f.code.toUpperCase()));
@@ -189,77 +445,13 @@ export default function FarmerPortalPage() {
   // =========================================================================
   // 2. DỮ LIỆU LÔ THU HOẠCH
   // =========================================================================
-  const [batches, setBatches] = useState<BatchItem[]>([
-    {
-      code: "XC-2026-01",
-      farmCode: "NT-DT-02",
-      product: "Xoài Cát Chu Cao Lãnh",
-      plantingDate: "10/05/2026",
-      harvestDate: "15/10/2026",
-      expiryDate: "30/10/2026",
-      qty: "1200",
-      unit: "kg",
-      status: "Đã duyệt xuất kho",
-      statusColor: "#10b981",
-      cert: "VietGAP",
-      cultivation: "Bao trái hữu cơ, thu hoạch đợt 1",
-      transportDestination: "Kho Tổng Logistics TP.HCM",
-      transportStatus: "Đã nhập kho đích",
-    },
-    {
-      code: "XC-2026-02",
-      farmCode: "NT-DT-02",
-      product: "Xoài Cát Chu Cao Lãnh",
-      plantingDate: "10/05/2026",
-      harvestDate: "27/10/2026",
-      expiryDate: "11/11/2026",
-      qty: "850",
-      unit: "kg",
-      status: "Chờ duyệt xuất kho",
-      statusColor: "#f97316",
-      cert: "VietGAP",
-      cultivation: "Đợt thu hoạch 2 - Trái chín độ 85%",
-      transportDestination: "Lưu tại kho bảo quản nông trại",
-      transportStatus: "Chưa vận chuyển",
-    },
-    {
-      code: "SR-2026-01",
-      farmCode: "NT-DL-01",
-      product: "Sầu Riêng Ri6 Chín Cây",
-      plantingDate: "01/01/2026",
-      harvestDate: "20/10/2026",
-      expiryDate: "05/11/2026",
-      qty: "500",
-      unit: "kg",
-      status: "Đang lưu kho lạnh",
-      statusColor: "#3b82f6",
-      cert: "GlobalGAP",
-      cultivation: "Hữu cơ sinh học, bảo quản kho mát",
-      transportDestination: "Kho Lạnh Phân Phối Hà Nội",
-      transportStatus: "Đang vận chuyển",
-    },
-    {
-      code: "DT-2026-03",
-      farmCode: "NT-DL-01",
-      product: "Dâu Tây Giống Nhật",
-      plantingDate: "15/08/2026",
-      harvestDate: "28/10/2026 (Dự kiến)",
-      expiryDate: "05/11/2026",
-      qty: "200",
-      unit: "hộp 500g",
-      status: "Đang chăm sóc",
-      statusColor: "#f59e0b",
-      cert: "VietGAP",
-      cultivation: "Nhà màng công nghệ cao",
-      transportDestination: "Vườn đang chăm sóc (Chưa vận chuyển)",
-      transportStatus: "Chưa vận chuyển",
-    },
-  ]);
+  const [batches, setBatches] = useState<BatchItem[]>(DEFAULT_BATCHES);
 
   const [activeFilter, setActiveFilter] = useState<string>("Tất cả");
   const [selectedBatchFarm, setSelectedBatchFarm] = useState<string>("ALL");
   const [selectedTransportFilter, setSelectedTransportFilter] = useState<string>("Tất cả");
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
 
   useEffect(() => {
     const savedFarms = readStoredJson<FarmItem[]>(STORAGE_KEYS.farms);
@@ -275,6 +467,15 @@ export default function FarmerPortalPage() {
     } catch {
       // Ignore storage access errors
     }
+    const savedLogs = readStoredJson<FarmingLogItem[]>(STORAGE_KEYS.logs);
+    if (Array.isArray(savedLogs) && savedLogs.length > 0) {
+      setFarmingLogs(savedLogs);
+    }
+
+    setFormPlantingDate(getLocalIsoDate(-30));
+    setFormHarvestDate(getLocalIsoDate(0));
+    setFormExpiryDate(getLocalIsoDate(14));
+    setLogDate(getLocalIsoDate(0));
     setStorageLoaded(true);
 
     farmerService
@@ -283,7 +484,7 @@ export default function FarmerPortalPage() {
         if (data && data.length > 0) {
           const mapped: BatchItem[] = data.map((b) => ({
             code: b.code,
-            farmCode: "NT-DL-01",
+            farmCode: extractFarmCode(b.farmName, undefined, effectiveFarms),
             product: b.product,
             plantingDate: b.plantingDate || "",
             harvestDate: b.harvestDate,
@@ -291,9 +492,11 @@ export default function FarmerPortalPage() {
             qty: b.qty,
             unit: b.unit || "kg",
             status: (b.status as BatchItem["status"]) || "Chờ duyệt xuất kho",
-            statusColor: b.statusColor || "#10b981",
+            statusColor: resolveBatchStatusColor(b.status, b.statusColor),
             cert: b.cert || "VietGAP",
             cultivation: b.cultivation || "Theo tiêu chuẩn",
+            transportDestination: b.transportDestination || "Lưu tại kho bảo quản nông trại",
+            transportStatus: (b.transportStatus as BatchItem["transportStatus"]) || "Chưa vận chuyển",
           }));
           setBatches(mapped);
         }
@@ -332,13 +535,13 @@ export default function FarmerPortalPage() {
   }, []);
 
   // Form State tạo Lô mới
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = "2026-11-12";
   const [formFarmCode, setFormFarmCode] = useState("NT-DT-02");
   const [formProduct, setFormProduct] = useState("Xoài Cát Chu Cao Lãnh");
   const [formLotCode, setFormLotCode] = useState("XC-2026-03");
-  const [formPlantingDate, setFormPlantingDate] = useState("2026-05-10");
+  const [formPlantingDate, setFormPlantingDate] = useState("2026-09-01");
   const [formHarvestDate, setFormHarvestDate] = useState(todayStr);
-  const [formExpiryDate, setFormExpiryDate] = useState("2026-11-15");
+  const [formExpiryDate, setFormExpiryDate] = useState("2026-11-26");
   const [formQty, setFormQty] = useState("500");
   const [formUnit, setFormUnit] = useState("kg");
   const [formCert, setFormCert] = useState("VietGAP");
@@ -348,60 +551,10 @@ export default function FarmerPortalPage() {
   // =========================================================================
   // 3. DỮ LIỆU NHẬT KÝ CANH TÁC
   // =========================================================================
-  const [farmingLogs, setFarmingLogs] = useState<FarmingLogItem[]>([
-    {
-      id: "l1",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "15/07/2026",
-      stage: "Bón phân",
-      action: "Bón phân hữu cơ vi sinh đợt 2",
-      materialsUsed: "Phân bón trùn quế hữu cơ O-Micro",
-      notes: "Tỷ lệ bón 2kg/gốc, tưới ẩm đất",
-    },
-    {
-      id: "l2",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "20/08/2026",
-      stage: "Phun sinh học",
-      action: "Bao trái và phun dung dịch xua đuổi ruồi vàng thảo mộc",
-      materialsUsed: "Chế phẩm sinh học tỏi - ớt - gừng lên men",
-      notes: "Cách ly an toàn 100% không dùng hóa chất độc hại",
-    },
-    {
-      id: "l3",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "27/10/2026",
-      stage: "Thu hoạch",
-      action: "Thu hoạch đợt 2 sáng sớm, phân loại trái",
-      materialsUsed: "Dụng cụ khử trùng, thùng lót giấy mềm",
-      notes: "Trái đạt chuẩn độ ngọt, chuyển gửi Admin duyệt",
-    },
-    {
-      id: "l4",
-      farmCode: "NT-DL-01",
-      batchCode: "SR-2026-01",
-      date: "10/09/2026",
-      stage: "Tưới tiêu",
-      action: "Tưới nước nhỏ giọt tự động kiểm soát EC và pH",
-      materialsUsed: "Nguồn nước sạch ngầm",
-      notes: "Độ pH ổn định 6.2",
-    },
-    {
-      id: "l5",
-      farmCode: "NT-DL-01",
-      batchCode: "DT-2026-03",
-      date: "12/10/2026",
-      stage: "Tưới tiêu",
-      action: "Tưới dinh dưỡng nhỏ giọt công nghệ Israel cho dâu tây",
-      materialsUsed: "Dung dịch dinh dưỡng hữu cơ vi lượng A-B",
-      notes: "Kiểm tra độ ẩm giá thể mùn dừa đạt 75%",
-    },
-  ]);
+  const [farmingLogs, setFarmingLogs] = useState<FarmingLogItem[]>(DEFAULT_LOGS);
 
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
   const [selectedFarmForLog, setSelectedFarmForLog] = useState("NT-DT-02");
   const [selectedBatchForLog, setSelectedBatchForLog] = useState("XC-2026-02");
   const [logDate, setLogDate] = useState(todayStr);
@@ -529,6 +682,15 @@ export default function FarmerPortalPage() {
     }
   }, [selectedFarmId, storageLoaded]);
 
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.logs, JSON.stringify(farmingLogs));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [farmingLogs, storageLoaded]);
+
   // =========================================================================
   // HANDLERS
   // =========================================================================
@@ -639,54 +801,96 @@ export default function FarmerPortalPage() {
   // Sinh mã lô tự động
   const handleProductSelect = (productName: string) => {
     setFormProduct(productName);
-    const words = productName.split(" ");
-    let prefix = "AG";
-    if (words.length >= 2) {
-      prefix = (words[0][0] + words[1][0]).toUpperCase();
-    }
-    const rand = Math.floor(Math.random() * 80) + 10;
-    setFormLotCode(`${prefix}-2026-${rand}`);
+    setFormLotCode(generateLotCodeForProduct(productName, batches));
   };
 
-  const handleOpenCreateBatch = () => {
-    handleProductSelect(products[0]?.name || "Xoài Cát Chu");
+  const openCreateBatchModal = (preferredFarmCode?: string, preferredProductName?: string) => {
+    const targetFarmCode =
+      preferredFarmCode ||
+      (selectedBatchFarm !== "ALL" ? selectedBatchFarm : currentFarm?.code || farms[0]?.code || "NT-DL-01");
+    const targetFarm = farms.find((f) => f.code === targetFarmCode);
+    const matchingProducts = products.filter((p) => !p.farmCode || p.farmCode === targetFarmCode);
+    const nextProduct = preferredProductName || matchingProducts[0]?.name || products[0]?.name || "Nông sản sạch";
+
+    setFormFarmCode(targetFarmCode);
+    setFormProduct(nextProduct);
+    setFormLotCode(generateLotCodeForProduct(nextProduct, batches));
+    setFormCert(normalizeBatchCert(targetFarm?.certStandard));
+    setFormPlantingDate(getLocalIsoDate(-30));
+    setFormHarvestDate(getLocalIsoDate(0));
+    setFormExpiryDate(getLocalIsoDate(14));
+    setFormQty("500");
+    setFormUnit("kg");
+    setFormCultivation(
+      targetFarm?.certStandard?.toLowerCase().includes("globalgap")
+        ? "Quy trình an toàn GlobalGAP"
+        : "Quy trình an toàn VietGAP"
+    );
+    setFormTransportDest("Kho Tổng Logistics TP.HCM");
     setIsBatchModalOpen(true);
+  };
+
+  const handleBatchFarmChange = (nextFarmCode: string) => {
+    setFormFarmCode(nextFarmCode);
+    const targetFarm = farms.find((f) => f.code === nextFarmCode);
+    const matchingProducts = products.filter((p) => !p.farmCode || p.farmCode === nextFarmCode);
+    const nextProduct = matchingProducts[0]?.name || products[0]?.name || "Nông sản sạch";
+    setFormProduct(nextProduct);
+    setFormLotCode(generateLotCodeForProduct(nextProduct, batches));
+    setFormCert(normalizeBatchCert(targetFarm?.certStandard));
   };
 
   // Nộp form tạo Lô thu hoạch
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formLotCode.trim()) {
+    const codeUpper = formLotCode.trim().toUpperCase();
+    if (!codeUpper) {
       toast.error("Vui lòng nhập mã lô thu hoạch!");
       return;
     }
+    if (batches.some((b) => b.code.toUpperCase() === codeUpper)) {
+      toast.error(`Mã lô ${codeUpper} đã tồn tại trong danh sách!`);
+      return;
+    }
+    const qtyNum = Number(formQty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      toast.error("Sản lượng thu hoạch phải lớn hơn 0!");
+      return;
+    }
+    if (!formHarvestDate || !formExpiryDate) {
+      toast.error("Vui lòng nhập đầy đủ ngày thu hoạch và hạn sử dụng!");
+      return;
+    }
+    if (formExpiryDate < formHarvestDate) {
+      toast.error("Hạn sử dụng phải sau hoặc cùng ngày thu hoạch!");
+      return;
+    }
+    if (formPlantingDate && formHarvestDate < formPlantingDate) {
+      toast.error("Ngày thu hoạch không thể trước ngày gieo trồng!");
+      return;
+    }
 
-    const formatDisplayDate = (dStr: string) => {
-      if (!dStr) return "";
-      const p = dStr.split("-");
-      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dStr;
-    };
-
+    const targetFarm = farms.find((f) => f.code === formFarmCode) || currentFarm;
     const newBatch: BatchItem = {
-      code: formLotCode.trim().toUpperCase(),
-      farmCode: formFarmCode,
-      product: formProduct,
+      code: codeUpper,
+      farmCode: targetFarm.code,
+      product: formProduct.trim() || "Nông sản sạch",
       plantingDate: formatDisplayDate(formPlantingDate),
       harvestDate: formatDisplayDate(formHarvestDate),
       expiryDate: formatDisplayDate(formExpiryDate),
-      qty: formQty,
+      qty: String(qtyNum),
       unit: formUnit,
       status: "Chờ duyệt xuất kho",
       statusColor: "#f97316",
       cert: formCert,
-      cultivation: formCultivation,
+      cultivation: formCultivation.trim() || "Theo quy trình an toàn",
       transportDestination: formTransportDest,
       transportStatus: "Chưa vận chuyển",
     };
 
-    // Lưu vào database backend (bảng agri_harvest_lots & tự động sinh mã QR agri_traceability)
+    setIsSubmittingBatch(true);
     try {
-      await farmerService.createBatch({
+      const saved = await farmerService.createBatch({
         code: newBatch.code,
         product: newBatch.product,
         plantingDate: newBatch.plantingDate,
@@ -698,32 +902,66 @@ export default function FarmerPortalPage() {
         statusColor: newBatch.statusColor,
         cert: newBatch.cert,
         cultivation: newBatch.cultivation,
-        farmName: `${currentFarm.name} (Mã: ${currentFarm.code})`,
+        farmName: `${targetFarm.name} (Mã: ${targetFarm.code})`,
+        transportDestination: newBatch.transportDestination,
+        transportStatus: newBatch.transportStatus,
       });
-    } catch (err) {
-      console.warn("Không thể lưu lô qua API, lưu tại phiên:", err);
-    }
 
-    setBatches([newBatch, ...batches]);
-    setIsBatchModalOpen(false);
-    toast.success(`Đã tạo thành công lô ${newBatch.code} cho ${currentFarm.name}!`);
+      const persistedBatch: BatchItem = {
+        ...newBatch,
+        code: saved.code || newBatch.code,
+        transportDestination: saved.transportDestination || newBatch.transportDestination,
+        transportStatus: (saved.transportStatus as BatchItem["transportStatus"]) || newBatch.transportStatus,
+      };
+      setBatches([persistedBatch, ...batches]);
+      setIsBatchModalOpen(false);
+      toast.success(`Đã tạo & lưu lô ${persistedBatch.code} cho ${targetFarm.name}!`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể tạo lô thu hoạch trên máy chủ!"));
+    } finally {
+      setIsSubmittingBatch(false);
+    }
   };
 
   const handleDeleteBatch = async (code: string) => {
     try {
       await farmerService.deleteBatch(code);
+      setBatches((prev) => prev.filter((item) => item.code !== code));
+      toast.info(`Đã xóa lô ${code} khỏi hệ thống!`);
     } catch (err) {
-      console.warn("Xóa lô qua API thất bại:", err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setBatches((prev) => prev.filter((item) => item.code !== code));
+        toast.info(`Đã xóa lô ${code}!`);
+      } else {
+        toast.error(getApiErrorMessage(err, `Không thể xóa lô ${code} trên hệ thống!`));
+      }
     }
-    setBatches(batches.filter((item) => item.code !== code));
-    toast.info(`Đã xóa lô ${code}!`);
+  };
+
+  const openCreateLogModal = (farmCode?: string, batchCode?: string) => {
+    const initialFarm =
+      farmCode || (selectedLogFarm !== "ALL" ? selectedLogFarm : currentFarm?.code || farms[0]?.code || "NT-DL-01");
+    setSelectedFarmForLog(initialFarm);
+    if (batchCode) {
+      setSelectedBatchForLog(batchCode);
+    } else {
+      const matchingBatches = batches.filter((b) => b.farmCode === initialFarm);
+      setSelectedBatchForLog(matchingBatches[0]?.code || "");
+    }
+    setLogDate(getLocalIsoDate(0));
+    setLogStage("Bón phân");
+    setLogAction("");
+    setLogMaterials("");
+    setLogNotes("");
+    setIsLogModalOpen(true);
   };
 
   // Ghi nhật ký canh tác
-  const handleCreateLog = (e: React.FormEvent) => {
+  const handleCreateLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBatchForLog) {
-      toast.error("Vui lòng chọn lô thu hoạch của nông trại!");
+      toast.error("Nông trại này chưa có lô thu hoạch. Vui lòng tạo lô trước!");
       return;
     }
     if (!logAction.trim()) {
@@ -731,28 +969,54 @@ export default function FarmerPortalPage() {
       return;
     }
 
-    const formatDisplayDate = (dStr: string) => {
-      const p = dStr.split("-");
-      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dStr;
-    };
-
+    const formattedDate = formatDisplayDate(logDate);
     const newLog: FarmingLogItem = {
       id: "l_" + Date.now(),
       farmCode: selectedFarmForLog,
       batchCode: selectedBatchForLog,
-      date: formatDisplayDate(logDate),
+      date: formattedDate,
       stage: logStage,
       action: logAction.trim(),
       materialsUsed: logMaterials.trim(),
       notes: logNotes.trim(),
     };
 
+    setIsSubmittingLog(true);
+    let syncedToQr = false;
+    try {
+      await farmerService.addBatchLog(selectedBatchForLog, {
+        stage: logStage,
+        time: formattedDate,
+        materials: logMaterials.trim(),
+        note: logNotes.trim() ? `${logAction.trim()} - ${logNotes.trim()}` : logAction.trim(),
+      });
+      syncedToQr = true;
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status !== 404) {
+        console.warn("Đồng bộ nhật ký lên QR không thành công:", err);
+      }
+    } finally {
+      setIsSubmittingLog(false);
+    }
+
     setFarmingLogs([newLog, ...farmingLogs]);
     setIsLogModalOpen(false);
     setLogAction("");
     setLogMaterials("");
     setLogNotes("");
-    toast.success(`Đã ghi nhật ký canh tác cho lô ${selectedBatchForLog}!`);
+    if (syncedToQr) {
+      toast.success(`Đã ghi nhật ký & đồng bộ mã QR cho lô ${selectedBatchForLog}!`);
+    } else {
+      toast.info(`Đã lưu nhật ký tại máy cho lô ${selectedBatchForLog}!`);
+    }
+  };
+
+  const handleDeleteLog = (id: string, actionName: string) => {
+    if (confirm(`Bạn có chắc muốn xóa ghi chép "${actionName}"?`)) {
+      setFarmingLogs((prev) => prev.filter((item) => item.id !== id));
+      toast.info("Đã xóa ghi chép nhật ký!");
+    }
   };
 
   // Upload ảnh nông sản
@@ -829,13 +1093,15 @@ export default function FarmerPortalPage() {
   };
 
   const filteredBatches = batches.filter((b) => {
-    const matchStatus =
-      activeFilter === "Tất cả" || b.status.toLowerCase().includes(activeFilter.toLowerCase());
+    const matchStatus = activeFilter === "Tất cả" || b.status === activeFilter;
     const matchFarm = selectedBatchFarm === "ALL" || b.farmCode === selectedBatchFarm;
+    const effectiveTransport = b.transportStatus || "Chưa vận chuyển";
     const matchTransport =
-      selectedTransportFilter === "Tất cả" || (b.transportStatus || "").includes(selectedTransportFilter);
+      selectedTransportFilter === "Tất cả" || effectiveTransport === selectedTransportFilter;
     return matchStatus && matchFarm && matchTransport;
   });
+
+  const harvestStats = computeHarvestStats(batches);
 
   const displayedProducts = products.filter((p) => {
     if (selectedProductFarm === "ALL") return true;
@@ -882,7 +1148,7 @@ export default function FarmerPortalPage() {
             <Plus size={15} /> Thêm Nông Trại
           </button>
           <button
-            onClick={handleOpenCreateBatch}
+            onClick={() => openCreateBatchModal()}
             className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition-all transform active:scale-95 cursor-pointer"
           >
             <Plus size={16} /> Tạo Lô Thu Hoạch
@@ -1077,8 +1343,10 @@ export default function FarmerPortalPage() {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-gray-500 font-semibold uppercase">Tổng sản lượng quản lý</div>
-              <div className="text-xl font-extrabold text-gray-900 mt-1">2,750 kg</div>
-              <div className="text-[11px] text-emerald-600 mt-0.5">Xoài, Sầu riêng, Dâu tây</div>
+              <div className="text-xl font-extrabold text-gray-900 mt-1">{harvestStats.totalKgLabel}</div>
+              <div className="text-[11px] text-emerald-600 mt-0.5 truncate" title={harvestStats.productSummary}>
+                {harvestStats.productSummary}
+              </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-gray-500 font-semibold uppercase">Đã duyệt xuất kho</div>
@@ -1097,7 +1365,7 @@ export default function FarmerPortalPage() {
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-amber-700 font-semibold uppercase">Lưu tại kho vườn</div>
               <div className="text-xl font-extrabold text-amber-600 mt-1">
-                {batches.filter((b) => b.transportStatus === "Chưa vận chuyển").length} Lô
+                {batches.filter((b) => !b.transportStatus || b.transportStatus === "Chưa vận chuyển").length} Lô
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">Chưa vận chuyển đi</div>
             </div>
@@ -1166,14 +1434,34 @@ export default function FarmerPortalPage() {
 
               {/* Status Filters */}
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Lọc trạng thái kiểm duyệt */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 text-xs flex-wrap">
+                  {["Tất cả", "Chờ duyệt xuất kho", "Đã duyệt xuất kho", "Đang lưu kho lạnh", "Đang chăm sóc"].map((st) => {
+                    const sel = activeFilter === st;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setActiveFilter(st)}
+                        className={`px-2 py-0.5 rounded-lg font-semibold text-[11px] cursor-pointer transition-all ${
+                          sel ? "bg-emerald-700 text-white" : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        {st === "Tất cả" ? "Tất cả trạng thái" : st}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Lọc tình trạng vận chuyển */}
-                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 text-xs">
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 text-xs flex-wrap">
                   <Truck size={13} className="text-gray-400 ml-1 mr-0.5" />
                   {["Tất cả", "Chưa vận chuyển", "Đang vận chuyển", "Đã nhập kho đích"].map((v) => {
                     const sel = selectedTransportFilter === v;
                     return (
                       <button
                         key={v}
+                        type="button"
                         onClick={() => setSelectedTransportFilter(v)}
                         className={`px-2 py-0.5 rounded-lg font-semibold text-[11px] cursor-pointer transition-all ${
                           sel ? "bg-emerald-700 text-white" : "text-gray-600 hover:bg-gray-100"
@@ -1187,11 +1475,7 @@ export default function FarmerPortalPage() {
 
                 {/* Nút Khai báo lô mới */}
                 <button
-                  onClick={() => {
-                    const initialFarm = selectedBatchFarm !== "ALL" ? selectedBatchFarm : farms[0]?.code || "NT-DT-02";
-                    setFormFarmCode(initialFarm);
-                    setIsBatchModalOpen(true);
-                  }}
+                  onClick={() => openCreateBatchModal()}
                   className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer ml-auto"
                 >
                   <Plus size={14} /> Khai Báo Lô Mới
@@ -1297,11 +1581,7 @@ export default function FarmerPortalPage() {
                           <td className="py-3 px-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => {
-                                  setSelectedFarmForLog(b.farmCode);
-                                  setSelectedBatchForLog(b.code);
-                                  setIsLogModalOpen(true);
-                                }}
+                                onClick={() => openCreateLogModal(b.farmCode, b.code)}
                                 className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer"
                               >
                                 <FileText size={12} /> Nhật ký
@@ -1351,13 +1631,7 @@ export default function FarmerPortalPage() {
               </p>
             </div>
             <button
-              onClick={() => {
-                const initialFarm = selectedLogFarm !== "ALL" ? selectedLogFarm : farms[0]?.code || "NT-DT-02";
-                setSelectedFarmForLog(initialFarm);
-                const matchingBatches = batches.filter((b) => b.farmCode === initialFarm);
-                setSelectedBatchForLog(matchingBatches[0]?.code || batches[0]?.code || "");
-                setIsLogModalOpen(true);
-              }}
+              onClick={() => openCreateLogModal()}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Ghi Chép Mới
@@ -1467,9 +1741,19 @@ export default function FarmerPortalPage() {
                           </span>
                         </div>
 
-                        <span className="text-gray-400 flex items-center gap-1 text-[11px] font-medium">
-                          <Clock size={12} /> {log.date}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 flex items-center gap-1 text-[11px] font-medium">
+                            <Clock size={12} /> {log.date}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteLog(log.id, log.action)}
+                            className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
+                            title="Xóa ghi chép"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Tên hành động canh tác */}
@@ -1630,11 +1914,7 @@ export default function FarmerPortalPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => {
-                            handleProductSelect(p.name);
-                            if (p.farmCode) setFormFarmCode(p.farmCode);
-                            setIsBatchModalOpen(true);
-                          }}
+                          onClick={() => openCreateBatchModal(p.farmCode || currentFarm?.code, p.name)}
                           className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold text-[11px] rounded-lg border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
                         >
                           + Tạo Lô
@@ -2059,7 +2339,7 @@ export default function FarmerPortalPage() {
                 </label>
                 <select
                   value={formFarmCode}
-                  onChange={(e) => setFormFarmCode(e.target.value)}
+                  onChange={(e) => handleBatchFarmChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-bold text-gray-800"
                 >
                   {farms.map((f) => (
@@ -2155,9 +2435,8 @@ export default function FarmerPortalPage() {
                       className="w-24 px-2 py-2 border border-gray-300 rounded-xl bg-white"
                     >
                       <option value="kg">kg</option>
-                      <option value="tạ">tạ</option>
+                      <option value="g">g</option>
                       <option value="tấn">tấn</option>
-                      <option value="hộp">hộp</option>
                     </select>
                   </div>
                 </div>
@@ -2236,9 +2515,10 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-sm"
+                  disabled={isSubmittingBatch}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-sm"
                 >
-                  <CheckCircle2 size={16} /> Lưu & Cấp Mã QR
+                  <CheckCircle2 size={16} /> {isSubmittingBatch ? "Đang lưu..." : "Lưu & Cấp Mã QR"}
                 </button>
               </div>
             </form>
@@ -2375,6 +2655,12 @@ export default function FarmerPortalPage() {
                 />
               </div>
 
+              {!selectedBatchForLog && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium">
+                  ⚠️ Nông trại đang chọn chưa có lô thu hoạch. Hãy tạo lô ở Tab Quản Lý Lô Thu Hoạch trước khi ghi nhật ký.
+                </div>
+              )}
+
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -2385,9 +2671,10 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  disabled={!selectedBatchForLog || isSubmittingLog}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <Save size={15} /> Lưu Nhật Ký
+                  <Save size={15} /> {isSubmittingLog ? "Đang lưu..." : "Lưu Nhật Ký"}
                 </button>
               </div>
             </form>
