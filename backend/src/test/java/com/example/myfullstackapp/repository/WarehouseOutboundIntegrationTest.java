@@ -287,6 +287,27 @@ class WarehouseOutboundIntegrationTest {
     }
 
     @Test
+    void expiredPartialReservationRetainsTheDispatchedOrderQuantity() {
+        var reservation = reservations.create(warehouseId, request(1L, "100"), "staff");
+        var receipt =
+                documents.create(
+                        warehouseId,
+                        Type.OUTBOUND,
+                        new DocumentInput(
+                                null, reservation.id(), "Partial", List.of(line("1", "40"))),
+                        "staff");
+        documents.confirm(warehouseId, receipt.id(), "staff");
+        jdbc.update(
+                "update wh_reservations set expires_at=? where id=?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(1)),
+                reservation.id());
+        assertThrows(
+                ConflictException.class,
+                () -> reservations.create(warehouseId, request(1L, "111"), "staff"));
+        reservations.create(warehouseId, request(1L, "110"), "staff");
+    }
+
+    @Test
     void reconciliationProtectsValidAllocationsAndDoesNotLoseUnfilledDemand() {
         var reservation = reservations.create(warehouseId, request(1L, "150"), "staff");
         jdbc.update(

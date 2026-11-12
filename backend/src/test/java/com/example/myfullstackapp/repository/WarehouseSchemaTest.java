@@ -54,6 +54,123 @@ class WarehouseSchemaTest {
                     "INSERT INTO warehouses(id,name,location,capacity_tons) VALUES('"
                             + warehouse
                             + "','Test','HCM',1)");
+            UUID location = UUID.randomUUID(),
+                    balance = UUID.randomUUID(),
+                    reservation = UUID.randomUUID();
+            statement.execute(
+                    "INSERT INTO"
+                        + " storage_locations(id,warehouse_id,code,name,capacity_tons,temp_target_c,humidity_target)"
+                        + " VALUES('"
+                            + location
+                            + "','"
+                            + warehouse
+                            + "','A','A',1,4,85)");
+            statement.execute(
+                    "INSERT INTO"
+                        + " wh_stock_balances(id,warehouse_id,location_id,lot_id,product_id,lot_code,expiry_date,quantity_kg)"
+                        + " VALUES('"
+                            + balance
+                            + "','"
+                            + warehouse
+                            + "','"
+                            + location
+                            + "','1','Rau','L1',CURRENT_DATE+7,60)");
+            statement.execute(
+                    "INSERT INTO"
+                        + " wh_reservations(id,warehouse_id,order_id,expires_at,created_by,status)"
+                        + " VALUES('"
+                            + reservation
+                            + "','"
+                            + warehouse
+                            + "',1,CURRENT_TIMESTAMP+INTERVAL '1 hour','staff','CONSUMED')");
+            statement.execute(
+                    "INSERT INTO wh_reservation_lines(reservation_id,balance_id,quantity_kg)"
+                        + " VALUES('"
+                            + reservation
+                            + "','"
+                            + balance
+                            + "',100)");
+            UUID outbound = UUID.randomUUID(), transfer = UUID.randomUUID();
+            statement.execute(
+                    "INSERT INTO"
+                        + " wh_documents(id,warehouse_id,type,status,reservation_id,created_by)"
+                        + " VALUES('"
+                            + outbound
+                            + "','"
+                            + warehouse
+                            + "','OUTBOUND','CONFIRMED','"
+                            + reservation
+                            + "','staff')");
+            statement.execute(
+                    "INSERT INTO wh_document_lines(id,document_id,lot_id,location_id,quantity_kg)"
+                        + " VALUES(gen_random_uuid(),'"
+                            + outbound
+                            + "','1','"
+                            + location
+                            + "',40)");
+            statement.execute(
+                    "INSERT INTO"
+                        + " wh_documents(id,warehouse_id,target_warehouse_id,type,status,created_by)"
+                        + " VALUES('"
+                            + transfer
+                            + "','"
+                            + warehouse
+                            + "','"
+                            + warehouse
+                            + "','TRANSFER','IN_TRANSIT','staff')");
+            statement.execute(
+                    "INSERT INTO"
+                        + " wh_document_lines(id,document_id,lot_id,location_id,target_location_id,quantity_kg)"
+                        + " VALUES(gen_random_uuid(),'"
+                            + transfer
+                            + "','1','"
+                            + location
+                            + "','"
+                            + location
+                            + "',20)");
+            for (int run = 0; run < 2; run++) {
+                statement.execute(
+                        Files.readString(
+                                Path.of("../docs/warehouse/P10_partial_reservations.sql")));
+                statement.execute(
+                        Files.readString(Path.of("../docs/warehouse/P11_transfer_receiving.sql")));
+            }
+            try (var rows =
+                    statement.executeQuery(
+                            "select dispatched_kg from wh_reservation_lines where reservation_id='"
+                                    + reservation
+                                    + "'")) {
+                assertTrue(rows.next());
+                assertEquals(0, new java.math.BigDecimal("40").compareTo(rows.getBigDecimal(1)));
+            }
+            try (var rows =
+                    statement.executeQuery(
+                            "select status from wh_reservations where id='" + reservation + "'")) {
+                assertTrue(rows.next());
+                assertEquals("ACTIVE", rows.getString(1));
+            }
+            assertThrows(
+                    SQLException.class,
+                    () ->
+                            statement.execute(
+                                    "update wh_reservation_lines set dispatched_kg=101 where"
+                                        + " reservation_id='"
+                                            + reservation
+                                            + "'"));
+            assertThrows(
+                    SQLException.class,
+                    () ->
+                            statement.execute(
+                                    "update wh_document_lines set received_quantity_kg=21 where"
+                                        + " document_id='"
+                                            + transfer
+                                            + "'"));
+            try (var rows =
+                    statement.executeQuery(
+                            "select in_transit from wh_documents where id='" + transfer + "'")) {
+                assertTrue(rows.next());
+                assertTrue(rows.getBoolean(1));
+            }
             assertThrows(
                     SQLException.class,
                     () ->
