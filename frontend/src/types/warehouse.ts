@@ -90,6 +90,7 @@ export interface Allocation {
   lotCode: string;
   expiryDate: string;
   quantityKg: number;
+  dispatchedKg?: number;
 }
 export interface Reservation {
   id: string;

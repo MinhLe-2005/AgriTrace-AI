@@ -68,17 +68,18 @@ public class StockReservationService {
     private BigDecimal allocatedToOrder(Long orderId, String product) {
         BigDecimal total = BigDecimal.ZERO;
         for (var reservation : reservations.findByOrderId(orderId)) {
-            if (reservation.getStatus() == StockReservation.Status.RELEASED
-                    || reservation.getStatus() == StockReservation.Status.EXPIRED) continue;
             if (reservation.getStatus() == StockReservation.Status.ACTIVE
                     && !reservation.getExpiresAt().isAfter(Instant.now())) {
                 reservation.setStatus(StockReservation.Status.EXPIRED);
                 reservations.saveAndFlush(reservation);
-                continue;
             }
+            boolean active =
+                    reservation.getStatus() == StockReservation.Status.ACTIVE
+                            && reservation.getExpiresAt().isAfter(Instant.now());
             for (var line : reservation.getLines()) {
                 var balance = inventory.balance(reservation.getWarehouseId(), line.getBalanceId());
-                if (balance.getProductId().equals(product)) total = total.add(line.getQuantityKg());
+                if (balance.getProductId().equals(product))
+                    total = total.add(active ? line.getQuantityKg() : line.getDispatchedKg());
             }
         }
         return total;
@@ -97,41 +98,110 @@ public class StockReservationService {
     @Transactional
     public ReservationView reconcile(UUID warehouseId, UUID id) {
         inventory.lock(warehouseId, null);
-        var reservation = get(warehouseId, id);
-        if (reservation.getStatus() != StockReservation.Status.ACTIVE)
-            throw new ConflictException("Reservation is not active");
-        orders.lockOpen(reservation.getOrderId());
-        List<StockReservation.Allocation> reconciled = new ArrayList<>();
-        boolean modified = false;
-        for (var line : reservation.getLines()) {
-            var balance = inventory.balance(warehouseId, line.getBalanceId());
-            if (balance.isHeld() || !balance.getExpiryDate().isAfter(InventoryService.today())) {
-                modified = true;
-                var stock = inventory.views(warehouseId, reservation.getId(), true);
-                try {
-                    var replacement =
-                            fefo.allocate(
-                                    stock,
-                                    balance.getProductId(),
-                                    line.getQuantityKg(),
-                                    InventoryService.today());
-                    for (var alloc : replacement) {
-                        reconciled.add(
-                                new StockReservation.Allocation(
-                                        alloc.balanceId(), alloc.quantityKg()));
-                    }
-                } catch (ConflictException noStock) {
-                    // Quarantined or expired line dropped to unblock dispatch of remaining lines
-                }
-            } else {
-                reconciled.add(line);
+        var reservation = requireActive(warehouseId, id);
+        var stock = inventory.views(warehouseId, id, true);
+        Map<UUID, BalanceView> available = new HashMap<>();
+        Map<UUID, BigDecimal> free = new HashMap<>();
+        for (var balance : stock) {
+            if (balance.availableKg().signum() > 0
+                    && balance.expiryDate().isAfter(InventoryService.today())) {
+                available.put(balance.id(), balance);
+                free.put(balance.id(), balance.availableKg());
             }
         }
-        if (modified) {
-            reservation.setLines(reconciled);
-            reservations.saveAndFlush(reservation);
+        Map<UUID, StockReservation.Allocation> result = new TreeMap<>();
+        record Missing(UUID balanceId, String product, BigDecimal quantity) {}
+        List<Missing> missing = new ArrayList<>();
+        // Protect every valid original allocation before assigning replacement stock.
+        for (var line : reservation.getLines()) {
+            var balance = inventory.balance(warehouseId, line.getBalanceId());
+            BigDecimal pending = line.remainingKg();
+            if (pending.signum() == 0 || available.containsKey(balance.getId())) {
+                merge(result, balance.getId(), line.getQuantityKg(), line.getDispatchedKg());
+                if (pending.signum() > 0) {
+                    BigDecimal remaining = free.get(balance.getId()).subtract(pending);
+                    if (remaining.signum() < 0)
+                        throw new ConflictException("Existing reservations exceed available stock");
+                    free.put(balance.getId(), remaining);
+                }
+            } else {
+                if (line.getDispatchedKg().signum() > 0)
+                    merge(result, balance.getId(), line.getDispatchedKg(), line.getDispatchedKg());
+                missing.add(new Missing(balance.getId(), balance.getProductId(), pending));
+            }
         }
-        return view(reservation);
+        for (var item : missing) {
+            BigDecimal supply =
+                    available.values().stream()
+                            .filter(b -> b.productId().equals(item.product()))
+                            .map(b -> free.get(b.id()))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal replace = supply.min(item.quantity());
+            if (replace.signum() > 0) {
+                var candidates =
+                        available.values().stream()
+                                .map(
+                                        b ->
+                                                new BalanceView(
+                                                        b.id(),
+                                                        b.warehouseId(),
+                                                        b.locationId(),
+                                                        b.lotId(),
+                                                        b.productId(),
+                                                        b.lotCode(),
+                                                        b.expiryDate(),
+                                                        b.quantityKg(),
+                                                        BigDecimal.ZERO,
+                                                        free.get(b.id()),
+                                                        b.held(),
+                                                        b.receivedAt()))
+                                .toList();
+                for (var allocation :
+                        fefo.allocate(
+                                candidates, item.product(), replace, InventoryService.today())) {
+                    merge(result, allocation.balanceId(), allocation.quantityKg(), BigDecimal.ZERO);
+                    free.compute(
+                            allocation.balanceId(),
+                            (key, value) -> value.subtract(allocation.quantityKg()));
+                }
+            }
+            BigDecimal unresolved = item.quantity().subtract(replace);
+            if (unresolved.signum() > 0)
+                merge(result, item.balanceId(), unresolved, BigDecimal.ZERO);
+        }
+        reservation.setLines(new ArrayList<>(result.values()));
+        return view(reservations.saveAndFlush(reservation));
+    }
+
+    private void merge(
+            Map<UUID, StockReservation.Allocation> target,
+            UUID balanceId,
+            BigDecimal quantity,
+            BigDecimal dispatched) {
+        var allocation =
+                target.computeIfAbsent(
+                        balanceId, key -> new StockReservation.Allocation(key, BigDecimal.ZERO));
+        allocation.setQuantityKg(allocation.getQuantityKg().add(quantity));
+        allocation.setDispatchedKg(allocation.getDispatchedKg().add(dispatched));
+    }
+
+    @Transactional
+    public void consume(UUID warehouseId, UUID id, Map<UUID, BigDecimal> quantities) {
+        inventory.lock(warehouseId, null);
+        var reservation = requireActive(warehouseId, id);
+        Map<UUID, StockReservation.Allocation> allocations = new HashMap<>();
+        for (var line : reservation.getLines()) allocations.put(line.getBalanceId(), line);
+        for (var entry : quantities.entrySet()) {
+            var line = allocations.get(entry.getKey());
+            if (line == null
+                    || entry.getValue().signum() <= 0
+                    || entry.getValue().compareTo(line.remainingKg()) > 0)
+                throw new ConflictException("Dispatch exceeds the remaining reservation");
+            line.setDispatchedKg(line.getDispatchedKg().add(entry.getValue()));
+        }
+        if (reservation.getLines().stream().allMatch(line -> line.remainingKg().signum() == 0))
+            reservation.setStatus(StockReservation.Status.CONSUMED);
+        reservations.saveAndFlush(reservation);
     }
 
     public StockReservation get(UUID warehouseId, UUID id) {
@@ -187,13 +257,18 @@ public class StockReservationService {
                                             balance.getLocationId(),
                                             balance.getLotCode(),
                                             balance.getExpiryDate(),
-                                            a.getQuantityKg());
+                                            a.getQuantityKg(),
+                                            a.getDispatchedKg());
                                 })
                         .toList();
         String status = reservation.getStatus().name();
         if (reservation.getStatus() == StockReservation.Status.ACTIVE
                 && !reservation.getExpiresAt().isAfter(Instant.now())) {
             status = StockReservation.Status.EXPIRED.name();
+        } else if (reservation.getStatus() == StockReservation.Status.ACTIVE
+                && reservation.getLines().stream()
+                        .anyMatch(a -> a.getDispatchedKg().signum() > 0)) {
+            status = "PARTIALLY_CONSUMED";
         }
         return new ReservationView(
                 reservation.getId(),

@@ -108,7 +108,18 @@ public final class WarehouseOperations {
             UUID locationId,
             String lotCode,
             LocalDate expiryDate,
-            BigDecimal quantityKg) {}
+            BigDecimal quantityKg,
+            BigDecimal dispatchedKg) {
+        public AllocationView(
+                UUID balanceId,
+                String lotId,
+                UUID locationId,
+                String lotCode,
+                LocalDate expiryDate,
+                BigDecimal quantityKg) {
+            this(balanceId, lotId, locationId, lotCode, expiryDate, quantityKg, BigDecimal.ZERO);
+        }
+    }
 
     public record ReservationView(
             UUID id, Long orderId, String status, Instant expiresAt, List<AllocationView> lines) {}

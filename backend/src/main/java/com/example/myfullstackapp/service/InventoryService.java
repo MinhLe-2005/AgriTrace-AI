@@ -64,10 +64,9 @@ public class InventoryService {
         for (var reservation :
                 reservations.findByWarehouseIdAndStatusAndExpiresAtAfter(
                         warehouseId, StockReservation.Status.ACTIVE, now)) {
-            if (reservation.getId().equals(except))
-                continue;
+            if (reservation.getId().equals(except)) continue;
             for (var line : reservation.getLines())
-                sums.merge(line.getBalanceId(), line.getQuantityKg(), BigDecimal::add);
+                sums.merge(line.getBalanceId(), line.remainingKg(), BigDecimal::add);
         }
         return sums;
     }
@@ -197,14 +196,13 @@ public class InventoryService {
         if (delta.signum() <= 0) return;
         var location = location(warehouseId, locationId, true);
         BigDecimal locationAfter = balances.sumQuantityByLocation(locationId).add(delta);
-        if (locationAfter.compareTo(location.getCapacityTons().multiply(new BigDecimal("1000"))) > 0)
-            throw new ConflictException("Location capacity exceeded");
+        if (locationAfter.compareTo(location.getCapacityTons().multiply(new BigDecimal("1000")))
+                > 0) throw new ConflictException("Location capacity exceeded");
         BigDecimal warehouseAfter = balances.sumQuantityByWarehouse(warehouseId).add(delta);
         if (warehouseAfter.compareTo(
                         requireWarehouse(warehouseId)
                                 .getCapacityTons()
                                 .multiply(new BigDecimal("1000")))
-                > 0)
-            throw new ConflictException("Warehouse capacity exceeded");
+                > 0) throw new ConflictException("Warehouse capacity exceeded");
     }
 }
