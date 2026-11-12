@@ -7,6 +7,8 @@ import com.example.myfullstackapp.repository.*;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 
@@ -77,53 +79,140 @@ public class InventoryService {
     }
 
     public List<BalanceView> views(UUID warehouseId, UUID exceptReservation, boolean eligibleOnly) {
-        Warehouse warehouse = requireWarehouse(warehouseId);
-        var reserved = reserved(warehouseId, exceptReservation);
-        Map<String, LotSummary> currentLots = new HashMap<>();
-        Map<UUID, StorageLocation> currentLocations = new HashMap<>();
-        return balances
-                .findByWarehouseIdOrderByExpiryDateAscLotIdAscLocationIdAsc(warehouseId)
-                .stream()
+        return project(
+                warehouseId,
+                balances.findByWarehouseIdOrderByExpiryDateAscLotIdAscLocationIdAsc(warehouseId),
+                exceptReservation,
+                new HashMap<>());
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<BalanceView> page(
+            UUID warehouseId,
+            String lotId,
+            UUID locationId,
+            boolean onlyAvailable,
+            int page,
+            int size) {
+        if (page < 0 || size < 1 || size > 500)
+            throw new IllegalArgumentException("Invalid inventory page");
+        var warehouse = requireWarehouse(warehouseId);
+        if (onlyAvailable && !warehouse.isActive()) return List.of();
+        var sort = Sort.by("expiryDate", "lotId", "locationId", "id");
+        if (!onlyAvailable) {
+            var slice =
+                    balances.searchWarehouse(
+                            warehouseId,
+                            lotId,
+                            locationId,
+                            false,
+                            today(),
+                            PageRequest.of(page, size, sort));
+            return project(warehouseId, slice.getContent(), null, new HashMap<>());
+        }
+        // Farmer approval and live reservations are checked before counting an available row.
+        // Scan bounded database slices rather than materializing every warehouse balance.
+        var request = PageRequest.of(0, Math.max(size, 100), sort);
+        long skip = (long) page * size;
+        List<BalanceView> result = new ArrayList<>();
+        Map<String, LotSummary> lotCache = new HashMap<>();
+        while (true) {
+            var slice =
+                    balances.searchWarehouse(
+                            warehouseId, lotId, locationId, true, today(), request);
+            for (var value : project(warehouseId, slice.getContent(), null, lotCache)) {
+                if (value.availableKg().signum() == 0) continue;
+                if (skip > 0) {
+                    skip--;
+                    continue;
+                }
+                result.add(value);
+                if (result.size() == size) return List.copyOf(result);
+            }
+            if (!slice.hasNext()) return List.copyOf(result);
+            request = request.next();
+        }
+    }
+
+    private List<BalanceView> project(
+            UUID warehouseId,
+            List<StockBalance> rows,
+            UUID exceptReservation,
+            Map<String, LotSummary> lotCache) {
+        var warehouse = requireWarehouse(warehouseId);
+        if (rows.isEmpty()) return List.of();
+        Map<UUID, StorageLocation> locationData = new HashMap<>();
+        var locationIds = rows.stream().map(StockBalance::getLocationId).distinct().toList();
+        for (int offset = 0; offset < locationIds.size(); offset += 500) {
+            for (var location :
+                    locations.findForBalances(
+                            warehouseId,
+                            locationIds.subList(
+                                    offset, Math.min(locationIds.size(), offset + 500))))
+                locationData.put(location.getId(), location);
+        }
+        Set<String> needed = new HashSet<>();
+        for (var balance : rows) {
+            var location = locationData.get(balance.getLocationId());
+            if (location == null)
+                throw new ResourceNotFoundException("Location not found in warehouse");
+            if (warehouse.isActive()
+                    && location.isActive()
+                    && !balance.isHeld()
+                    && balance.getQuantityKg().signum() > 0
+                    && WarehouseExpiryPolicy.usableOn(balance.getExpiryDate(), today())
+                    && !lotCache.containsKey(balance.getLotId())) needed.add(balance.getLotId());
+        }
+        lotCache.putAll(lots.getMany(needed));
+        for (String id : needed) lotCache.putIfAbsent(id, null);
+        Map<UUID, BigDecimal> held = new HashMap<>();
+        var balanceIds = rows.stream().map(StockBalance::getId).toList();
+        var now = Instant.now();
+        for (int offset = 0; offset < balanceIds.size(); offset += 500) {
+            for (var total :
+                    reservations.sumForBalances(
+                            warehouseId,
+                            StockReservation.Status.ACTIVE,
+                            now,
+                            exceptReservation,
+                            balanceIds.subList(offset, Math.min(balanceIds.size(), offset + 500))))
+                held.put(total.getBalanceId(), total.getQuantityKg());
+        }
+        return rows.stream()
                 .map(
-                        b -> {
-                            BigDecimal held = reserved.getOrDefault(b.getId(), BigDecimal.ZERO);
+                        balance -> {
+                            var location = locationData.get(balance.getLocationId());
+                            var lot = lotCache.get(balance.getLotId());
                             boolean eligible =
-                                    !b.isHeld()
+                                    warehouse.isActive()
+                                            && location.isActive()
+                                            && !balance.isHeld()
                                             && WarehouseExpiryPolicy.usableOn(
-                                                    b.getExpiryDate(), today());
-                            var location =
-                                    currentLocations.computeIfAbsent(
-                                            b.getLocationId(),
-                                            locationId -> location(warehouseId, locationId, false));
-                            eligible &= warehouse.isActive() && location.isActive();
-                            if (eligible && b.getQuantityKg().signum() > 0) {
-                                try {
-                                    var lot = currentLots.computeIfAbsent(b.getLotId(), lots::get);
-                                    eligible &=
-                                            "APPROVED".equals(lot.status())
-                                                    && b.getExpiryDate().equals(lot.expiryDate())
-                                                    && b.getProductId().equals(lot.productId());
-                                } catch (ResourceNotFoundException deletedLot) {
-                                    eligible = false;
-                                }
-                            }
-                            BigDecimal available =
+                                                    balance.getExpiryDate(), today())
+                                            && lot != null
+                                            && "APPROVED".equals(lot.status())
+                                            && balance.getExpiryDate().equals(lot.expiryDate())
+                                            && balance.getProductId().equals(lot.productId());
+                            var reserved = held.getOrDefault(balance.getId(), BigDecimal.ZERO);
+                            var available =
                                     eligible
-                                            ? b.getQuantityKg().subtract(held).max(BigDecimal.ZERO)
+                                            ? balance.getQuantityKg()
+                                                    .subtract(reserved)
+                                                    .max(BigDecimal.ZERO)
                                             : BigDecimal.ZERO;
                             return new BalanceView(
-                                    b.getId(),
+                                    balance.getId(),
                                     warehouseId,
-                                    b.getLocationId(),
-                                    b.getLotId(),
-                                    b.getProductId(),
-                                    b.getLotCode(),
-                                    b.getExpiryDate(),
-                                    b.getQuantityKg(),
-                                    held,
+                                    balance.getLocationId(),
+                                    balance.getLotId(),
+                                    balance.getProductId(),
+                                    balance.getLotCode(),
+                                    balance.getExpiryDate(),
+                                    balance.getQuantityKg(),
+                                    reserved,
                                     available,
-                                    b.isHeld(),
-                                    b.getReceivedAt());
+                                    balance.isHeld(),
+                                    balance.getReceivedAt());
                         })
                 .toList();
     }

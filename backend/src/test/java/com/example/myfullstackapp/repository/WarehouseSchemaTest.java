@@ -85,7 +85,7 @@ class WarehouseSchemaTest {
                             + "',1,CURRENT_TIMESTAMP+INTERVAL '1 hour','staff','CONSUMED')");
             statement.execute(
                     "INSERT INTO wh_reservation_lines(reservation_id,balance_id,quantity_kg)"
-                        + " VALUES('"
+                            + " VALUES('"
                             + reservation
                             + "','"
                             + balance
@@ -93,8 +93,8 @@ class WarehouseSchemaTest {
             UUID outbound = UUID.randomUUID(), transfer = UUID.randomUUID();
             statement.execute(
                     "INSERT INTO"
-                        + " wh_documents(id,warehouse_id,type,status,reservation_id,created_by)"
-                        + " VALUES('"
+                            + " wh_documents(id,warehouse_id,type,status,reservation_id,created_by)"
+                            + " VALUES('"
                             + outbound
                             + "','"
                             + warehouse
@@ -103,7 +103,7 @@ class WarehouseSchemaTest {
                             + "','staff')");
             statement.execute(
                     "INSERT INTO wh_document_lines(id,document_id,lot_id,location_id,quantity_kg)"
-                        + " VALUES(gen_random_uuid(),'"
+                            + " VALUES(gen_random_uuid(),'"
                             + outbound
                             + "','1','"
                             + location
@@ -134,6 +134,8 @@ class WarehouseSchemaTest {
                                 Path.of("../docs/warehouse/P10_partial_reservations.sql")));
                 statement.execute(
                         Files.readString(Path.of("../docs/warehouse/P11_transfer_receiving.sql")));
+                statement.execute(
+                        Files.readString(Path.of("../docs/warehouse/P12_inventory_indexes.sql")));
             }
             try (var rows =
                     statement.executeQuery(
@@ -154,7 +156,7 @@ class WarehouseSchemaTest {
                     () ->
                             statement.execute(
                                     "update wh_reservation_lines set dispatched_kg=101 where"
-                                        + " reservation_id='"
+                                            + " reservation_id='"
                                             + reservation
                                             + "'"));
             assertThrows(
@@ -162,7 +164,7 @@ class WarehouseSchemaTest {
                     () ->
                             statement.execute(
                                     "update wh_document_lines set received_quantity_kg=21 where"
-                                        + " document_id='"
+                                            + " document_id='"
                                             + transfer
                                             + "'"));
             try (var rows =

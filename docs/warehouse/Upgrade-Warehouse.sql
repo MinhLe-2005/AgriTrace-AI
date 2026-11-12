@@ -4,3 +4,4 @@
 \set ON_ERROR_STOP on
 \ir P10_partial_reservations.sql
 \ir P11_transfer_receiving.sql
+\ir P12_inventory_indexes.sql

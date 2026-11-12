@@ -18,3 +18,4 @@ END $$;
 \ir P09_heatmap_schema.sql
 \ir P10_partial_reservations.sql
 \ir P11_transfer_receiving.sql
+\ir P12_inventory_indexes.sql
