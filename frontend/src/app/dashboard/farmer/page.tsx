@@ -105,6 +105,13 @@ const STORAGE_KEYS = {
   logs: "agritrace_farmer_logs_v1",
 } as const;
 
+const PRODUCT_CATEGORIES = [
+  { value: "trai_cay", label: "Trái Cây Tươi & Đặc Sản" },
+  { value: "rau_la", label: "Rau Ăn Lá Hữu Cơ" },
+  { value: "cu_qua", label: "Củ Quả Sạch" },
+  { value: "nam_chebien", label: "Nấm & Đặc Sản Chế Biến" },
+] as const;
+
 const DEFAULT_FARMS: FarmItem[] = [
   {
     id: "f1",
@@ -255,6 +262,64 @@ const DEFAULT_LOGS: FarmingLogItem[] = [
     notes: "Kiểm tra độ ẩm giá thể mùn dừa đạt 75%",
   },
 ];
+
+const DEFAULT_PRODUCTS: ProductItem[] = [
+  {
+    id: "p1",
+    farmCode: "NT-DT-02",
+    name: "Xoài Cát Chu Cao Lãnh",
+    category: "trai_cay",
+    price: 65000,
+    unit: "kg",
+    description: "Xoài Cát Chu thịt dày, thơm ngọt đậm đà canh tác chuẩn VietGAP",
+    origin: "Vườn Cây Ăn Trái Cao Lãnh",
+    image: "🥭",
+  },
+  {
+    id: "p2",
+    farmCode: "NT-DL-01",
+    name: "Thanh Long Ruột Đỏ",
+    category: "trai_cay",
+    price: 45000,
+    unit: "kg",
+    description: "Thanh long mọng nước, vị ngọt thanh tự nhiên",
+    origin: "Nông Trại Xanh Đà Lạt",
+    image: "🐉",
+  },
+  {
+    id: "p3",
+    farmCode: "NT-DL-01",
+    name: "Sầu Riêng Ri6 Chín Cây",
+    category: "trai_cay",
+    price: 135000,
+    unit: "kg",
+    description: "Cơm vàng hạt lép, thu hoạch độ chín hoàn hảo tại vườn",
+    origin: "Nông Trại Xanh Đà Lạt",
+    image: "👑",
+  },
+  {
+    id: "p4",
+    farmCode: "NT-DL-01",
+    name: "Dâu Tây Giống Nhật",
+    category: "trai_cay",
+    price: 180000,
+    unit: "hộp 500g",
+    description: "Dâu tây canh tác giá thể xơ dừa nhà màng, vị ngọt thơm dịu",
+    origin: "Nông Trại Xanh Đà Lạt",
+    image: "🍓",
+  },
+];
+
+function getCategoryLabel(categoryValue?: string): string {
+  if (!categoryValue) return "Trái Cây Tươi & Đặc Sản";
+  const found = PRODUCT_CATEGORIES.find((c) => c.value === categoryValue);
+  if (found) return found.label;
+  const lower = categoryValue.toLowerCase();
+  if (lower.includes("rau")) return "Rau Ăn Lá Hữu Cơ";
+  if (lower.includes("cu") || lower.includes("củ")) return "Củ Quả Sạch";
+  if (lower.includes("nam") || lower.includes("nấm")) return "Nấm & Đặc Sản Chế Biến";
+  return categoryValue;
+}
 
 function getLocalIsoDate(offsetDays = 0): string {
   const d = new Date();
@@ -510,19 +575,17 @@ export default function FarmerPortalPage() {
       .then((data) => {
         if (data && data.length > 0) {
           const mapped: ProductItem[] = data.map((p) => {
-            const isCaoLanh =
-              (p.farm && p.farm.includes("Cao Lãnh")) ||
-              (p.origin && p.origin.includes("Cao Lãnh")) ||
-              (p.origin && p.origin.includes("Đồng Tháp"));
+            const farmCode = extractFarmCode(p.farm, p.origin, effectiveFarms);
+            const matchedFarm = effectiveFarms.find((f) => f.code === farmCode);
             return {
               id: p.id,
-              farmCode: isCaoLanh ? "NT-DT-02" : "NT-DL-01",
+              farmCode,
               name: p.name,
-              category: p.categoryCode || "Trái Cây Đặc Sản",
+              category: p.categoryCode || "trai_cay",
               price: Number(p.price) || 50000,
               unit: p.unit || "kg",
               description: p.description || p.name,
-              origin: p.origin || p.farm || (isCaoLanh ? "Vườn Cây Ăn Trái Cao Lãnh" : "Nông Trại Xanh Đà Lạt"),
+              origin: p.origin || p.farm || matchedFarm?.name || "Nông Trại Liên Kết",
               image: p.image || "🌱",
             };
           });
@@ -567,57 +630,13 @@ export default function FarmerPortalPage() {
   // =========================================================================
   // 4. DỮ LIỆU SẢN PHẨM NÔNG NGHIỆP
   // =========================================================================
-  const [products, setProducts] = useState<ProductItem[]>([
-    {
-      id: "p1",
-      farmCode: "NT-DT-02",
-      name: "Xoài Cát Chu Cao Lãnh",
-      category: "Trái Cây Đặc Sản",
-      price: 65000,
-      unit: "kg",
-      description: "Xoài Cát Chu thịt dày, thơm ngọt đậm đà canh tác chuẩn VietGAP",
-      origin: "Vườn Cây Ăn Trái Cao Lãnh",
-      image: "🥭",
-    },
-    {
-      id: "p2",
-      farmCode: "NT-DL-01",
-      name: "Thanh Long Ruột Đỏ",
-      category: "Trái Cây Đặc Sản",
-      price: 45000,
-      unit: "kg",
-      description: "Thanh long mọng nước, vị ngọt thanh tự nhiên",
-      origin: "Nông Trại Xanh Đà Lạt",
-      image: "🐉",
-    },
-    {
-      id: "p3",
-      farmCode: "NT-DL-01",
-      name: "Sầu Riêng Ri6 Chín Cây",
-      category: "Trái Cây Cao Cấp",
-      price: 135000,
-      unit: "kg",
-      description: "Cơm vàng hạt lép, thu hoạch độ chín hoàn hảo tại vườn",
-      origin: "Nông Trại Xanh Đà Lạt",
-      image: "👑",
-    },
-    {
-      id: "p4",
-      farmCode: "NT-DL-01",
-      name: "Dâu Tây Giống Nhật",
-      category: "Trái Cây Đặc Sản",
-      price: 180000,
-      unit: "hộp 500g",
-      description: "Dâu tây canh tác giá thể xơ dừa nhà màng, vị ngọt thơm dịu",
-      origin: "Nông Trại Xanh Đà Lạt",
-      image: "🍓",
-    },
-  ]);
+  const [products, setProducts] = useState<ProductItem[]>(DEFAULT_PRODUCTS);
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
   const [newProdFarmCode, setNewProdFarmCode] = useState("NT-DT-02");
   const [newProdName, setNewProdName] = useState("");
-  const [newProdCategory, setNewProdCategory] = useState("Trái Cây Đặc Sản");
+  const [newProdCategory, setNewProdCategory] = useState("trai_cay");
   const [newProdPrice, setNewProdPrice] = useState("75000");
   const [newProdUnit, setNewProdUnit] = useState("kg");
   const [newProdDesc, setNewProdDesc] = useState("");
@@ -1036,6 +1055,21 @@ export default function FarmerPortalPage() {
     }
   };
 
+  const openCreateProductModal = () => {
+    const initialFarm =
+      selectedProductFarm !== "ALL"
+        ? selectedProductFarm
+        : currentFarm?.code || farms[0]?.code || "NT-DL-01";
+    setNewProdFarmCode(initialFarm);
+    setNewProdName("");
+    setNewProdCategory("trai_cay");
+    setNewProdPrice("75000");
+    setNewProdUnit("kg");
+    setNewProdDesc("");
+    setNewProdImage("🥭");
+    setIsProductModalOpen(true);
+  };
+
   // Thêm Sản phẩm mới
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1043,22 +1077,29 @@ export default function FarmerPortalPage() {
       toast.error("Vui lòng nhập tên sản phẩm!");
       return;
     }
+    const priceNum = Number(newProdPrice);
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      toast.error("Giá bán dự kiến phải lớn hơn 0 VNĐ!");
+      return;
+    }
 
-    const targetFarm = farms.find((f) => f.code === newProdFarmCode);
+    const targetFarm = farms.find((f) => f.code === newProdFarmCode) || currentFarm;
+    const clientProdId = "p_" + Date.now();
     const newProd: ProductItem = {
-      id: "p_" + Date.now(),
-      farmCode: newProdFarmCode,
+      id: clientProdId,
+      farmCode: targetFarm.code,
       name: newProdName.trim(),
       category: newProdCategory,
-      price: Number(newProdPrice) || 50000,
+      price: priceNum,
       unit: newProdUnit,
       description: newProdDesc.trim() || "Nông sản sạch canh tác theo quy chuẩn tự nhiên",
-      origin: targetFarm ? targetFarm.name : "Nông trại",
+      origin: targetFarm.name,
       image: newProdImage || "🌱",
     };
 
+    setIsSubmittingProduct(true);
     try {
-      await farmerService.createProduct({
+      const saved = await farmerService.createProduct({
         id: newProd.id,
         name: newProd.name,
         price: newProd.price,
@@ -1066,30 +1107,45 @@ export default function FarmerPortalPage() {
         unit: newProd.unit,
         description: newProd.description,
         origin: newProd.origin,
-        farm: currentFarm.name,
+        farm: `${targetFarm.name} (Mã: ${targetFarm.code})`,
+        cert: normalizeBatchCert(targetFarm.certStandard),
         image: newProd.image,
         categoryCode: newProd.category,
       });
-    } catch (err) {
-      console.warn("Không thể lưu sản phẩm qua API:", err);
-    }
 
-    setProducts([...products, newProd]);
-    setIsProductModalOpen(false);
-    setNewProdName("");
-    setNewProdDesc("");
-    setNewProdImage("🥭");
-    toast.success(`Đã thêm sản phẩm "${newProd.name}" vào danh mục trang trại!`);
+      const persistedProd: ProductItem = {
+        ...newProd,
+        id: saved.id || newProd.id,
+        category: saved.categoryCode || newProd.category,
+        image: saved.image || newProd.image,
+      };
+      setProducts([...products, persistedProd]);
+      setIsProductModalOpen(false);
+      setNewProdName("");
+      setNewProdDesc("");
+      setNewProdImage("🥭");
+      toast.success(`Đã thêm & lưu sản phẩm "${persistedProd.name}" cho ${targetFarm.name}!`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể lưu sản phẩm lên máy chủ!"));
+    } finally {
+      setIsSubmittingProduct(false);
+    }
   };
 
   const handleDeleteProduct = async (id: string, name: string) => {
     try {
       await farmerService.deleteProduct(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      toast.info(`Đã xóa sản phẩm "${name}" khỏi hệ thống!`);
     } catch (err) {
-      console.warn("Không thể xóa sản phẩm qua API:", err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        toast.info(`Đã xóa sản phẩm "${name}"!`);
+      } else {
+        toast.error(getApiErrorMessage(err, `Không thể xóa sản phẩm "${name}"!`));
+      }
     }
-    setProducts(products.filter((p) => p.id !== id));
-    toast.info(`Đã xóa sản phẩm "${name}"!`);
   };
 
   const filteredBatches = batches.filter((b) => {
@@ -1804,11 +1860,7 @@ export default function FarmerPortalPage() {
               </p>
             </div>
             <button
-              onClick={() => {
-                const initialFarm = selectedProductFarm !== "ALL" ? selectedProductFarm : farms[0]?.code || "NT-DT-02";
-                setNewProdFarmCode(initialFarm);
-                setIsProductModalOpen(true);
-              }}
+              onClick={openCreateProductModal}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Sản Phẩm Mới
@@ -1893,7 +1945,7 @@ export default function FarmerPortalPage() {
                           )}
                         </div>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                          {p.category}
+                          {getCategoryLabel(p.category)}
                         </span>
                       </div>
 
@@ -2794,9 +2846,11 @@ export default function FarmerPortalPage() {
                     onChange={(e) => setNewProdCategory(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white"
                   >
-                    <option value="Trái Cây Đặc Sản">Trái Cây Đặc Sản</option>
-                    <option value="Trái Cây Cao Cấp">Trái Cây Cao Cấp</option>
-                    <option value="Rau Củ Hữu Cơ">Rau Củ Hữu Cơ</option>
+                    {PRODUCT_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -2846,9 +2900,10 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  disabled={isSubmittingProduct}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <Save size={15} /> Lưu Sản Phẩm
+                  <Save size={15} /> {isSubmittingProduct ? "Đang lưu..." : "Lưu Sản Phẩm"}
                 </button>
               </div>
             </form>

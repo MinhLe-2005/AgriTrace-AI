@@ -46,7 +46,7 @@ public class Product {
     @Column(length = 128)
     private String harvest;
 
-    @Column(length = 255)
+    @Column(columnDefinition = "TEXT")
     private String image;
 
     @Column(length = 64)
