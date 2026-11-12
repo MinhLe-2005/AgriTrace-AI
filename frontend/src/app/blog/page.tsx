@@ -427,8 +427,14 @@ const CATEGORIES = [
   { key: "guide", label: "Cẩm nang tiêu dùng" },
 ];
 
+/** Slug của các bài mặc định đồng thời nằm trong seed backend (backend/src/main/resources/seed/blog-posts.json). */
+const BACKEND_MANAGED_SLUGS = new Set([
+  "ung-dung-ai-du-bao-nhu-cau-nong-san-2026",
+  "cam-nang-quet-ma-qr-truy-xuat-nguon-goc",
+]);
+
 export default function BlogPage() {
-  const { blogPosts, loadBlogPosts } = useCampaignStore();
+  const { blogPosts, blogPostsLoaded, loadBlogPosts } = useCampaignStore();
 
   useEffect(() => {
     loadBlogPosts();
@@ -482,10 +488,12 @@ export default function BlogPage() {
 
     return [...customPosts, ...POSTS].filter((p) => {
       const adminMatch = blogPosts.find((bp) => bp.id === p.id || bp.slug === p.slug);
-      if (adminMatch && !adminMatch.active) return false;
+      if (adminMatch) return adminMatch.active;
+      // Bài mặc định do backend quản lý: API công khai không trả bài đã ẩn/xóa → ẩn luôn bản cứng
+      if (blogPostsLoaded && BACKEND_MANAGED_SLUGS.has(p.slug)) return false;
       return true;
     });
-  }, [blogPosts]);
+  }, [blogPosts, blogPostsLoaded]);
 
   const featuredPost = allPosts.find((p) => p.featured) || allPosts[0];
   const remainingPosts = allPosts.filter((p) => p.id !== featuredPost?.id);

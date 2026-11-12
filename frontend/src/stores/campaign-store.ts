@@ -94,8 +94,10 @@ function stripMeta<T extends { id?: string; createdAt?: string }>(item: T) {
   return rest;
 }
 
-// Lần tải sự kiện đang chạy, dùng chung để nhiều trang mount cùng lúc không gọi API trùng
+// Lần tải sự kiện đang chạy, dùng chung để nhiều trang mount cùng lúc không gọi API trùng.
+// campaignsRequestSeq đảm bảo chỉ phản hồi của lần gọi mới nhất được ghi vào store.
 let campaignsInFlight: Promise<void> | null = null;
+let campaignsRequestSeq = 0;
 
 function getCurrentISODate(): string {
   const now = new Date();
@@ -110,18 +112,21 @@ export const useCampaignStore = create<CampaignStore>()((set, get) => ({
 
       loadCampaigns: async (force = false) => {
         if (get().campaignsLoaded && !force) return;
-        if (!campaignsInFlight || force) {
-          campaignsInFlight = contentService
-            .listCampaigns()
-            .then((campaigns) => set({ campaigns, campaignsLoaded: true }))
-            .catch((err) => {
-              console.error("Failed to load campaigns:", err);
-            })
-            .finally(() => {
-              campaignsInFlight = null;
-            });
-        }
-        return campaignsInFlight;
+        if (campaignsInFlight && !force) return campaignsInFlight;
+        const seq = ++campaignsRequestSeq;
+        const request = contentService
+          .listCampaigns()
+          .then((campaigns) => {
+            if (seq === campaignsRequestSeq) set({ campaigns, campaignsLoaded: true });
+          })
+          .catch((err) => {
+            console.error("Failed to load campaigns:", err);
+          })
+          .finally(() => {
+            if (campaignsInFlight === request) campaignsInFlight = null;
+          });
+        campaignsInFlight = request;
+        return request;
       },
 
       loadBlogPosts: async (includeInactive = false) => {

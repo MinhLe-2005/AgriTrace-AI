@@ -151,7 +151,8 @@ export default function LoyaltyPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const data = await loyaltyService.getLoyaltyMe(user?.email);
+        if (!user) return;
+        const data = await loyaltyService.getLoyaltyMe(user.email);
         if (data) {
           setProfile(data);
         }

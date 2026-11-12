@@ -139,7 +139,7 @@ function ProductsContent() {
         const [prods, cats, loyalty] = await Promise.all([
           catalogService.getProducts(),
           catalogService.getCategories(),
-          loyaltyService.getLoyaltyMe(user?.email),
+          user ? loyaltyService.getLoyaltyMe(user.email) : Promise.resolve(null),
         ]);
         setProducts(prods);
         setCategories(cats);

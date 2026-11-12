@@ -250,8 +250,8 @@ public class LoyaltyService {
     }
 
     /**
-     * Thu hồi điểm đã tích của một đơn khi đơn bị hủy: trừ đúng số điểm EARNED của đơn
-     * (không để âm) và trừ lại tổng chi tiêu. Hạng thành viên giữ nguyên để tránh hạ hạng đột ngột.
+     * Thu hồi điểm đã tích của một đơn khi đơn bị hủy/hoàn tiền: trừ đúng số điểm EARNED của đơn
+     * và trừ lại tổng chi tiêu. Hạng thành viên giữ nguyên để tránh hạ hạng đột ngột.
      * Gọi nhiều lần cho cùng một đơn chỉ thu hồi một lần.
      */
     @Transactional
@@ -272,7 +272,9 @@ public class LoyaltyService {
                 .sum();
         if (earned <= 0) return;
 
-        int deducted = Math.min(earned, Math.max(0, membership.getCurrentPoints()));
+        // Thu hồi đủ số điểm đã tích. Nếu khách đã tiêu điểm này, số dư có thể âm
+        // (nợ điểm) và sẽ bù dần bằng điểm của các đơn sau; redeem sẽ bị chặn khi số dư âm.
+        int deducted = earned;
         membership.setCurrentPoints(membership.getCurrentPoints() - deducted);
         BigDecimal spent = membership.getTotalSpent() != null ? membership.getTotalSpent() : BigDecimal.ZERO;
         membership.setTotalSpent(spent.subtract(BigDecimal.valueOf(orderTotal)).max(BigDecimal.ZERO));

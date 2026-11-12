@@ -95,6 +95,8 @@ export type ApiOrder = {
     | "REFUNDED"
     | "PENDING";
   paymentMethod: string;
+  /** Trạng thái có thể chuyển tới, do backend tính (OrderStatusRules). */
+  allowedNextStatuses?: string[];
   voucherUsed?: string;
   cancelReason?: string;
   cancelledAt?: string;

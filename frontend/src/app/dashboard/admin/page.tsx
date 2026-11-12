@@ -273,20 +273,12 @@ function AdminPortalContent() {
   // --- Handlers: Orders ---
   async function handleUpdateOrderStatus(orderCode: string, newStatus: string) {
     try {
-      const ok = await loyaltyService.adminUpdateOrderStatus(orderCode, newStatus);
-      if (ok && newStatus === "CANCELLED") {
-        fetchOrders();
-      }
-      if (ok) {
-        toast.success(`Đã cập nhật trạng thái đơn #${orderCode} sang ${newStatus}!`);
-        setOrders((prev) =>
-          prev.map((o) => (o.orderCode === orderCode ? { ...o, status: newStatus as ApiOrder["status"] } : o))
-        );
-        if (selectedOrder?.orderCode === orderCode) {
-          setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus as ApiOrder["status"] } : null));
-        }
-      } else {
-        toast.error("Cập nhật trạng thái thất bại.");
+      // Dùng đơn backend trả về để cập nhật cả status lẫn allowedNextStatuses
+      const updated = await catalogService.updateOrderStatus(orderCode, newStatus);
+      toast.success(`Đã cập nhật trạng thái đơn #${orderCode} sang ${newStatus}!`);
+      setOrders((prev) => prev.map((o) => (o.orderCode === orderCode ? updated : o)));
+      if (selectedOrder?.orderCode === orderCode) {
+        setSelectedOrder(updated);
       }
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -1078,7 +1070,7 @@ function AdminPortalContent() {
                           <div className="flex items-center justify-end gap-1.5">
                             <select
                               value={order.status}
-                              disabled={(ORDER_TRANSITIONS[order.status] ?? []).length === 0}
+                              disabled={(order.allowedNextStatuses ?? []).length === 0}
                               onChange={(e) => {
                                 const next = e.target.value;
                                 if (next === "CANCELLED" && !window.confirm(`Hủy đơn #${order.orderCode}? Tồn kho sẽ được hoàn và điểm thưởng của khách bị thu hồi.`)) return;
@@ -1090,7 +1082,7 @@ function AdminPortalContent() {
                                 <option
                                   key={opt.value}
                                   value={opt.value}
-                                  disabled={opt.value !== order.status && !(ORDER_TRANSITIONS[order.status] ?? []).includes(opt.value)}
+                                  disabled={opt.value !== order.status && !(order.allowedNextStatuses ?? []).includes(opt.value)}
                                 >
                                   {opt.label}
                                 </option>
@@ -2434,17 +2426,6 @@ function AdminPortalContent() {
     </div>
   );
 }
-
-/** Phải khớp với ALLOWED_TRANSITIONS trong OrderController (backend). */
-const ORDER_TRANSITIONS: Record<string, string[]> = {
-  PENDING_PAYMENT: ["PAID", "CONFIRMED", "CANCELLED"],
-  PAID: ["CONFIRMED", "SHIPPING", "CANCELLED", "REFUNDED"],
-  CONFIRMED: ["PAID", "SHIPPING", "CANCELLED"],
-  SHIPPING: ["DELIVERED"],
-  DELIVERED: ["REFUNDED"],
-  CANCELLED: [],
-  REFUNDED: [],
-};
 
 const ORDER_STATUS_OPTIONS = [
   { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },

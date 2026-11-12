@@ -114,9 +114,4 @@ export const loyaltyService = {
     const res = await api.delete<{ success: boolean }>(`/vouchers/${id}`);
     return res.data?.success || false;
   },
-
-  async adminUpdateOrderStatus(orderCode: string, status: string): Promise<boolean> {
-    const res = await api.patch<{ success: boolean }>(`/orders/${orderCode}/status`, { status });
-    return res.data?.success || false;
-  },
 };
