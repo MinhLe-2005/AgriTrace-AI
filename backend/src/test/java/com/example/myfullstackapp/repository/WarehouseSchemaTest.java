@@ -90,6 +90,24 @@ class WarehouseSchemaTest {
                             + "','"
                             + balance
                             + "',100)");
+            UUID unshippedBalance = UUID.randomUUID();
+            statement.execute(
+                    "INSERT INTO"
+                        + " wh_stock_balances(id,warehouse_id,location_id,lot_id,product_id,lot_code,expiry_date,quantity_kg)"
+                        + " VALUES('"
+                            + unshippedBalance
+                            + "','"
+                            + warehouse
+                            + "','"
+                            + location
+                            + "','2','Rau','L2',CURRENT_DATE+7,25)");
+            statement.execute(
+                    "INSERT INTO wh_reservation_lines(reservation_id,balance_id,quantity_kg)"
+                        + " VALUES('"
+                            + reservation
+                            + "','"
+                            + unshippedBalance
+                            + "',25)");
             UUID outbound = UUID.randomUUID(), transfer = UUID.randomUUID();
             statement.execute(
                     "INSERT INTO"
@@ -141,9 +159,19 @@ class WarehouseSchemaTest {
                     statement.executeQuery(
                             "select dispatched_kg from wh_reservation_lines where reservation_id='"
                                     + reservation
+                                    + "' AND balance_id='"
+                                    + balance
                                     + "'")) {
                 assertTrue(rows.next());
                 assertEquals(0, new java.math.BigDecimal("40").compareTo(rows.getBigDecimal(1)));
+            }
+            try (var rows =
+                    statement.executeQuery(
+                            "select dispatched_kg from wh_reservation_lines where balance_id='"
+                                    + unshippedBalance
+                                    + "'")) {
+                assertTrue(rows.next());
+                assertEquals(0, rows.getBigDecimal(1).signum());
             }
             try (var rows =
                     statement.executeQuery(

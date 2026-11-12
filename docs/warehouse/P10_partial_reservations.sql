@@ -10,7 +10,10 @@ UPDATE wh_reservation_lines l SET dispatched_kg = LEAST(l.quantity_kg, COALESCE(
         AND b.location_id=dl.location_id AND b.lot_id=dl.lot_id
     WHERE d.reservation_id=l.reservation_id AND b.id=l.balance_id
         AND d.type='OUTBOUND' AND d.status IN ('CONFIRMED','HANDED_OVER')
-), l.quantity_kg))
+), CASE WHEN EXISTS (
+    SELECT 1 FROM wh_documents d WHERE d.reservation_id=l.reservation_id
+        AND d.type='OUTBOUND' AND d.status IN ('CONFIRMED','HANDED_OVER')
+) THEN 0 ELSE l.quantity_kg END))
 FROM wh_reservations r
 WHERE r.id=l.reservation_id AND r.status='CONSUMED' AND COALESCE(l.dispatched_kg,0)=0;
 UPDATE wh_reservation_lines SET dispatched_kg=0 WHERE dispatched_kg IS NULL;
