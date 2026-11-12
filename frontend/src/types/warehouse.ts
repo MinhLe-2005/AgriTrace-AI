@@ -53,11 +53,13 @@ export interface Balance {
 export type DocumentType =
   "INBOUND" | "OUTBOUND" | "COUNT" | "ADJUSTMENT" | "TRANSFER";
 export interface DocumentLine {
+  id?: string;
   lotId: string;
   locationId: string;
   targetLocationId?: string | null;
   quantityKg: number;
   expectedKg?: number;
+  receivedKg?: number;
 }
 export interface WarehouseDocument {
   id: string;
@@ -65,7 +67,13 @@ export interface WarehouseDocument {
   targetWarehouseId?: string;
   reservationId?: string;
   type: DocumentType;
-  status: "DRAFT" | "CONFIRMED" | "CANCELLED" | "HANDED_OVER" | "IN_TRANSIT";
+  status:
+    | "DRAFT"
+    | "CONFIRMED"
+    | "CANCELLED"
+    | "HANDED_OVER"
+    | "IN_TRANSIT"
+    | "RECEIVED";
   inTransit?: boolean;
   note?: string;
   handoverReference?: string;
@@ -75,9 +83,13 @@ export interface WarehouseDocument {
   confirmedAt?: string;
   handoverBy?: string;
   handedOverAt?: string;
+  receivedBy?: string;
+  receivedAt?: string;
+  receivingNote?: string;
   lines: DocumentLine[];
 }
 export interface DocumentInput {
+  inTransit?: boolean;
   note: string;
   targetWarehouseId?: string | null;
   reservationId?: string | null;

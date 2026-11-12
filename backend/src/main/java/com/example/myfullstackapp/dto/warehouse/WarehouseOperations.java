@@ -52,7 +52,8 @@ public final class WarehouseOperations {
             UUID locationId,
             UUID targetLocationId,
             BigDecimal quantityKg,
-            BigDecimal expectedKg) {}
+            BigDecimal expectedKg,
+            BigDecimal receivedKg) {}
 
     public record DocumentView(
             UUID id,
@@ -69,7 +70,19 @@ public final class WarehouseOperations {
             Instant confirmedAt,
             List<LineView> lines,
             String handoverBy,
-            Instant handedOverAt) {}
+            Instant handedOverAt,
+            boolean inTransit,
+            String receivedBy,
+            Instant receivedAt,
+            String receivingNote) {}
+
+    public record TransferReceiveLine(
+            @NotNull UUID lineId,
+            @NotNull @DecimalMin("0") @Digits(integer = 11, fraction = 3) BigDecimal receivedKg) {}
+
+    public record TransferReceiveInput(
+            @NotEmpty @Size(max = 100) List<@Valid TransferReceiveLine> lines,
+            @Size(max = 500) String note) {}
 
     public record BalanceView(
             UUID id,

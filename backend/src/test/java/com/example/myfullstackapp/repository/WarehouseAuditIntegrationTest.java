@@ -147,6 +147,127 @@ class WarehouseAuditIntegrationTest {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    private DocumentView transit(String kg) {
+        return documents.create(
+                warehouseId,
+                Type.TRANSFER,
+                new DocumentInput(
+                        other,
+                        null,
+                        "Transport",
+                        List.of(new LineInput("1", locationId, otherLocation, new BigDecimal(kg))),
+                        true),
+                "sender");
+    }
+
+    private TransferReceiveInput receiveInput(
+            DocumentView transfer, String cumulative, String note) {
+        return new TransferReceiveInput(
+                List.of(
+                        new TransferReceiveLine(
+                                transfer.lines().getFirst().id(), new BigDecimal(cumulative))),
+                note);
+    }
+
+    @Test
+    void transitIsVisibleAtDestinationAndPartialReceiptsAreIdempotent() {
+        var transfer = transit("100");
+        assertThrows(ConflictException.class, () -> documents.cancel(other, transfer.id()));
+        documents.confirm(warehouseId, transfer.id(), "sender");
+        assertEquals(
+                WarehouseDocument.Status.IN_TRANSIT,
+                documents.confirm(warehouseId, transfer.id(), "sender").status());
+        assertEquals(0, total(warehouseId).signum());
+        assertEquals(0, total(other).signum());
+        assertTrue(documents.list(other, 0).stream().anyMatch(d -> d.id().equals(transfer.id())));
+        assertEquals(transfer.id(), documents.get(other, transfer.id()).id());
+        UUID unrelated = warehouse();
+        assertThrows(
+                ResourceNotFoundException.class, () -> documents.get(unrelated, transfer.id()));
+        documents.handover(warehouseId, transfer.id(), new HandoverInput("TR-001"), "sender");
+        assertEquals(
+                "sender",
+                documents
+                        .handover(warehouseId, transfer.id(), new HandoverInput("TR-001"), "retry")
+                        .handoverBy());
+        var partial =
+                documents.receiveTransfer(
+                        other,
+                        transfer.id(),
+                        receiveInput(transfer, "98", "2 kg pending"),
+                        "receiver");
+        assertEquals(WarehouseDocument.Status.IN_TRANSIT, partial.status());
+        assertEquals(0, new BigDecimal("98").compareTo(total(other)));
+        documents.receiveTransfer(
+                other, transfer.id(), receiveInput(transfer, "98", "retry"), "receiver");
+        assertThrows(
+                ConflictException.class,
+                () ->
+                        documents.receiveTransfer(
+                                other,
+                                transfer.id(),
+                                receiveInput(transfer, "101", "invalid"),
+                                "receiver"));
+        assertEquals(0, new BigDecimal("98").compareTo(total(other)));
+        var received =
+                documents.receiveTransfer(
+                        other,
+                        transfer.id(),
+                        receiveInput(transfer, "100", "Complete"),
+                        "receiver");
+        assertEquals(WarehouseDocument.Status.RECEIVED, received.status());
+        documents.receiveTransfer(
+                other, transfer.id(), receiveInput(transfer, "100", "retry"), "receiver");
+        assertEquals(0, new BigDecimal("100").compareTo(total(other)));
+        assertEquals(
+                2L,
+                jdbc.queryForObject(
+                        "select count(*) from wh_stock_movements where document_id=? and"
+                            + " type='TRANSFER_IN'",
+                        Long.class,
+                        transfer.id()));
+    }
+
+    @Test
+    void receiptCapacityFailureKeepsGoodsInTransit() {
+        var transfer = transit("100");
+        documents.confirm(warehouseId, transfer.id(), "sender");
+        locations.update(
+                other,
+                otherLocation,
+                new StorageLocationUpdateRequest(
+                        "A",
+                        "A",
+                        new BigDecimal("0.05"),
+                        new BigDecimal("4"),
+                        new BigDecimal("85")));
+        assertThrows(
+                ConflictException.class,
+                () ->
+                        documents.receiveTransfer(
+                                other,
+                                transfer.id(),
+                                receiveInput(transfer, "100", "Full"),
+                                "receiver"));
+        assertEquals(0, total(other).signum());
+        assertEquals(
+                WarehouseDocument.Status.IN_TRANSIT, documents.get(other, transfer.id()).status());
+    }
+
+    @Test
+    void approvalChangedDuringTransitIsReceivedIntoQualityHold() {
+        var transfer = transit("100");
+        documents.confirm(warehouseId, transfer.id(), "sender");
+        jdbc.update("update agri_harvest_lots set status='Chờ duyệt xuất kho' where id=1");
+        documents.receiveTransfer(
+                other, transfer.id(), receiveInput(transfer, "100", "Review quality"), "receiver");
+        var received = inventory.getBalances(other).getFirst();
+        assertTrue(received.held());
+        assertEquals(0, received.availableKg().signum());
+        assertEquals(0, new BigDecimal("100").compareTo(received.quantityKg()));
+        assertEquals(1, quality.list(other, 0).size());
+    }
+
     @Test
     void countRecordsOnlyDifferenceAndPreservesFarmerQuantity() {
         var count = create(warehouseId, Type.COUNT, null, locationId, null, "90");

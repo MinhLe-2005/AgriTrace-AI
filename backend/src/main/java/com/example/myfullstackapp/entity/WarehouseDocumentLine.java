@@ -31,6 +31,9 @@ public class WarehouseDocumentLine {
     @Column(nullable = false, precision = 14, scale = 3)
     private BigDecimal quantityKg;
 
+    @Column(nullable = false, precision = 14, scale = 3)
+    private BigDecimal receivedQuantityKg = BigDecimal.ZERO;
+
     @Column(precision = 14, scale = 3)
     private BigDecimal expectedKg;
 

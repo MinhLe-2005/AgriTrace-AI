@@ -28,7 +28,8 @@ public class WarehouseDocument {
         CONFIRMED,
         CANCELLED,
         HANDED_OVER,
-        IN_TRANSIT
+        IN_TRANSIT,
+        RECEIVED
     }
 
     @Id
@@ -62,6 +63,14 @@ public class WarehouseDocument {
     private String handoverBy;
 
     private Instant handedOverAt;
+
+    @Column(length = 254)
+    private String receivedBy;
+
+    private Instant receivedAt;
+
+    @Column(length = 500)
+    private String receivingNote;
 
     @Column(nullable = false, length = 254)
     private String createdBy;
