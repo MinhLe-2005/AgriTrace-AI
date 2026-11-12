@@ -265,6 +265,9 @@ function AdminPortalContent() {
   async function handleUpdateOrderStatus(orderCode: string, newStatus: string) {
     try {
       const ok = await loyaltyService.adminUpdateOrderStatus(orderCode, newStatus);
+      if (ok && newStatus === "CANCELLED") {
+        fetchOrders();
+      }
       if (ok) {
         toast.success(`Đã cập nhật trạng thái đơn #${orderCode} sang ${newStatus}!`);
         setOrders((prev) =>
@@ -276,8 +279,8 @@ function AdminPortalContent() {
       } else {
         toast.error("Cập nhật trạng thái thất bại.");
       }
-    } catch {
-      toast.error("Lỗi khi kết nối cập nhật đơn hàng.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -313,8 +316,8 @@ function AdminPortalContent() {
         description: "Mã ưu đãi áp dụng toàn hệ thống AgriTrace AI",
       });
       fetchVouchers();
-    } catch {
-      toast.error("Không thể tạo voucher. Mã có thể đã tồn tại.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -336,8 +339,8 @@ function AdminPortalContent() {
         toast.success(`Đã xóa voucher [${code}]!`);
         setVouchers((prev) => prev.filter((v) => v.id !== id));
       }
-    } catch {
-      toast.error("Không thể xóa voucher.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -345,6 +348,14 @@ function AdminPortalContent() {
   async function handleSendBonus(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedMember) return;
+    if (!Number.isInteger(bonusPoints) || bonusPoints === 0) {
+      toast.error("Số điểm điều chỉnh phải là số nguyên khác 0.");
+      return;
+    }
+    if (bonusPoints < 0 && selectedMember.currentPoints + bonusPoints < 0) {
+      toast.error(`Hội viên chỉ còn ${selectedMember.currentPoints} điểm, không thể trừ ${Math.abs(bonusPoints)} điểm.`);
+      return;
+    }
     try {
       const ok = await loyaltyService.adminAddBonus(
         selectedMember.user.id,
@@ -358,8 +369,8 @@ function AdminPortalContent() {
         setShowBonusModal(false);
         fetchMembers();
       }
-    } catch {
-      toast.error("Không thể cập nhật điểm thưởng.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -449,6 +460,8 @@ function AdminPortalContent() {
         targetType: eventForm.targetType,
         targetCategoryCodes: catCodes,
         targetProductNames: prodNames,
+        // Form không quản lý targetProductIds → xóa để seed ID cũ không còn áp giảm giá ngầm
+        targetProductIds: [],
         voucherCode: eventForm.voucherCode.trim() || undefined,
         bannerIcon: eventForm.bannerIcon.trim() || "🌿",
         badgeText: eventForm.badgeText.trim() || `Vụ mùa -${eventForm.discountPercent}%`,
@@ -644,7 +657,7 @@ function AdminPortalContent() {
 
   const totalRevenue = useMemo(() => {
     return orders
-      .filter((o) => o.status !== "CANCELLED")
+      .filter((o) => REVENUE_STATUSES.has(String(o.status).toUpperCase()))
       .reduce((sum, o) => sum + (o.total || 0), 0);
   }, [orders]);
 
@@ -1026,13 +1039,23 @@ function AdminPortalContent() {
                           <div className="flex items-center justify-end gap-1.5">
                             <select
                               value={order.status}
-                              onChange={(e) => handleUpdateOrderStatus(order.orderCode, e.target.value)}
-                              className="text-[11px] font-semibold border border-gray-200 rounded-lg p-1 bg-white outline-none focus:border-red-600"
+                              disabled={(ORDER_TRANSITIONS[order.status] ?? []).length === 0}
+                              onChange={(e) => {
+                                const next = e.target.value;
+                                if (next === "CANCELLED" && !window.confirm(`Hủy đơn #${order.orderCode}? Tồn kho sẽ được hoàn và điểm thưởng của khách bị thu hồi.`)) return;
+                                handleUpdateOrderStatus(order.orderCode, next);
+                              }}
+                              className="text-[11px] font-semibold border border-gray-200 rounded-lg p-1 bg-white outline-none focus:border-red-600 disabled:opacity-50"
                             >
-                              <option value="CONFIRMED">Chờ xác nhận</option>
-                              <option value="SHIPPING">Giao xe lạnh</option>
-                              <option value="DELIVERED">Đã giao hàng</option>
-                              <option value="CANCELLED">Hủy đơn</option>
+                              {ORDER_STATUS_OPTIONS.map((opt) => (
+                                <option
+                                  key={opt.value}
+                                  value={opt.value}
+                                  disabled={opt.value !== order.status && !(ORDER_TRANSITIONS[order.status] ?? []).includes(opt.value)}
+                                >
+                                  {opt.label}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         </td>
@@ -2374,6 +2397,30 @@ function AdminPortalContent() {
     </div>
   );
 }
+
+/** Phải khớp với ALLOWED_TRANSITIONS trong OrderController (backend). */
+const ORDER_TRANSITIONS: Record<string, string[]> = {
+  PENDING_PAYMENT: ["PAID", "CONFIRMED", "CANCELLED"],
+  PAID: ["CONFIRMED", "SHIPPING", "CANCELLED", "REFUNDED"],
+  CONFIRMED: ["PAID", "SHIPPING", "CANCELLED"],
+  SHIPPING: ["DELIVERED"],
+  DELIVERED: ["REFUNDED"],
+  CANCELLED: [],
+  REFUNDED: [],
+};
+
+const ORDER_STATUS_OPTIONS = [
+  { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },
+  { value: "PAID", label: "Đã thanh toán" },
+  { value: "CONFIRMED", label: "Đã xác nhận" },
+  { value: "SHIPPING", label: "Giao xe lạnh" },
+  { value: "DELIVERED", label: "Đã giao hàng" },
+  { value: "CANCELLED", label: "Hủy đơn" },
+  { value: "REFUNDED", label: "Đã hoàn tiền" },
+];
+
+/** Chỉ tính doanh thu cho đơn đã thanh toán hoặc COD đã được xác nhận. */
+const REVENUE_STATUSES = new Set(["PAID", "CONFIRMED", "SHIPPING", "DELIVERED"]);
 
 export default function AdminPortalPage() {
   return (

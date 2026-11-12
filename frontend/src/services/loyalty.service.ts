@@ -4,7 +4,7 @@ import type { ApiVoucher } from "./catalog.service";
 export type LoyaltyTransaction = {
   id: string;
   points: number;
-  transactionType: "EARNED" | "REDEEMED" | "BONUS";
+  transactionType: "EARNED" | "REDEEMED" | "BONUS" | "REVOKED";
   description: string;
   createdAt: string;
 };

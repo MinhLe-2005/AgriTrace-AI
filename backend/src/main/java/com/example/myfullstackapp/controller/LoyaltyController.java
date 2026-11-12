@@ -152,6 +152,6 @@ public class LoyaltyController {
     @PostMapping("/admin/bonus")
     public ApiResponse<String> adminAddBonus(@Valid @RequestBody AdminBonusPointsRequest req) {
         loyaltyService.adminAddBonusPoints(req.getUserId(), req.getPoints(), req.getReason());
-        return ApiResponse.ok("Cập nhật điểm thưởng thành công", "Đã cộng/trừ " + req.getPoints() + " điểm");
+        return ApiResponse.ok("Cập nhật điểm thưởng thành công", (req.getPoints() > 0 ? "Đã cộng " : "Đã trừ ") + Math.abs(req.getPoints()) + " điểm");
     }
 }

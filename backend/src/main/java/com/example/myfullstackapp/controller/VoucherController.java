@@ -1,6 +1,9 @@
 package com.example.myfullstackapp.controller;
 
+import com.example.myfullstackapp.dto.voucher.CreateVoucherRequest;
 import com.example.myfullstackapp.entity.Voucher;
+import com.example.myfullstackapp.exception.ConflictException;
+import jakarta.validation.Valid;
 import com.example.myfullstackapp.repository.OrderRepository;
 import com.example.myfullstackapp.repository.VoucherRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,16 +42,43 @@ public class VoucherController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<Voucher> createVoucher(@RequestBody Voucher req) {
-        if (req.getCode() == null || req.getCode().isBlank()) {
-            throw new IllegalArgumentException("Mã voucher không được để trống");
+    public ResponseEntity<Voucher> createVoucher(@Valid @RequestBody CreateVoucherRequest req) {
+        String code = req.getCode().trim().toUpperCase();
+        if (voucherRepository.existsByCodeIgnoreCase(code)) {
+            throw new ConflictException("Mã voucher [" + code + "] đã tồn tại");
         }
-        req.setCode(req.getCode().trim().toUpperCase());
-        if (req.getActive() == null) req.setActive(true);
-        if (req.getBadgeColor() == null || req.getBadgeColor().isBlank()) {
-            req.setBadgeColor("bg-emerald-100 text-emerald-800");
+        String discount = req.getDiscount().trim();
+        validateDiscount(discount);
+        Voucher voucher = Voucher.builder()
+                .code(code)
+                .title(req.getTitle().trim())
+                .description(req.getDescription())
+                .badge(req.getBadge())
+                .badgeColor(req.getBadgeColor() == null || req.getBadgeColor().isBlank()
+                        ? "bg-emerald-100 text-emerald-800" : req.getBadgeColor())
+                .discount(discount)
+                .minOrder(req.getMinOrder())
+                .exp(req.getExp())
+                .active(req.getActive() == null || req.getActive())
+                .build();
+        return ResponseEntity.ok(voucherRepository.save(voucher));
+    }
+
+    /** Mức giảm hợp lệ: phần trăm 1-100% hoặc số tiền dương. */
+    private static void validateDiscount(String discount) {
+        if (discount.endsWith("%")) {
+            try {
+                double pct = Double.parseDouble(discount.replace("%", "").trim());
+                if (pct > 0 && pct <= 100) return;
+            } catch (NumberFormatException ignored) {
+                // fall through
+            }
+            throw new IllegalArgumentException("Mức giảm phần trăm phải trong khoảng 1-100%");
         }
-        return ResponseEntity.ok(voucherRepository.save(req));
+        String digits = discount.replaceAll("[^0-9]", "");
+        if (digits.isEmpty() || Long.parseLong(digits) <= 0) {
+            throw new IllegalArgumentException("Mức giảm phải là phần trăm (VD: 10%) hoặc số tiền dương (VD: 20000)");
+        }
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -63,6 +93,9 @@ public class VoucherController {
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteVoucher(@PathVariable Long id) {
+        if (!voucherRepository.existsById(id)) {
+            throw new IllegalArgumentException("Không tìm thấy voucher ID: " + id);
+        }
         voucherRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Đã xóa voucher thành công"));
     }

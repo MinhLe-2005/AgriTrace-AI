@@ -35,6 +35,17 @@ public class OrderController {
 
     private static final Set<String> NON_CANCELLABLE_STATUSES = Set.of("SHIPPING", "DELIVERED", "CANCELLED", "REFUNDED");
 
+    /** Các bước chuyển trạng thái hợp lệ. CANCELLED/REFUNDED là trạng thái cuối. */
+    private static final java.util.Map<String, Set<String>> ALLOWED_TRANSITIONS = java.util.Map.of(
+            "PENDING_PAYMENT", Set.of("PAID", "CONFIRMED", "CANCELLED"),
+            "PAID", Set.of("CONFIRMED", "SHIPPING", "CANCELLED", "REFUNDED"),
+            "CONFIRMED", Set.of("PAID", "SHIPPING", "CANCELLED"),
+            "SHIPPING", Set.of("DELIVERED"),
+            "DELIVERED", Set.of("REFUNDED"),
+            "CANCELLED", Set.of(),
+            "REFUNDED", Set.of()
+    );
+
     @GetMapping
     public ResponseEntity<List<Order>> getOrders(
             @RequestParam(required = false) String email,
@@ -220,28 +231,40 @@ public class OrderController {
     @Transactional
     public ApiResponse<Order> cancelOrder(
             @PathVariable String orderCode,
-            @RequestBody(required = false) CancelOrderRequest request
+            @RequestBody(required = false) CancelOrderRequest request,
+            Authentication authentication
     ) {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
 
-        if (NON_CANCELLABLE_STATUSES.contains(order.getStatus().toUpperCase())) {
-            throw new IllegalStateException("Không thể hủy đơn hàng khi đơn đã sang trạng thái " + order.getStatus());
+        // Chỉ chủ đơn hoặc ADMIN/DISTRIBUTOR mới được hủy
+        boolean owner = isLoggedIn(authentication) && order.getUserEmail() != null
+                && order.getUserEmail().equalsIgnoreCase(authentication.getName());
+        if (!owner && !(isLoggedIn(authentication) && canManageDistribution(authentication))) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền hủy đơn hàng này");
         }
 
+        if (NON_CANCELLABLE_STATUSES.contains(order.getStatus().toUpperCase())) {
+            throw new IllegalArgumentException("Không thể hủy đơn hàng khi đơn đã sang trạng thái " + order.getStatus());
+        }
+
+        applyCancellation(order, request != null && request.getReason() != null ? request.getReason() : "Khách hàng yêu cầu hủy đơn");
+        Order saved = orderRepository.save(order);
+        return ApiResponse.ok("Hủy đơn hàng thành công!", saved);
+    }
+
+    /** Hủy đơn: đặt trạng thái, hoàn tồn kho và thu hồi điểm đã tích. Dùng chung cho /cancel và /status. */
+    private void applyCancellation(Order order, String reason) {
         order.setStatus("CANCELLED");
         order.setCancelledAt(LocalDateTime.now());
-        order.setCancelReason(request != null && request.getReason() != null ? request.getReason() : "Khách hàng yêu cầu hủy đơn");
-
-        // Restore product stock
+        order.setCancelReason(reason);
         if (order.getItems() != null) {
             for (OrderItem item : order.getItems()) {
                 restoreProductStock(item.getName(), item.getQty());
             }
         }
-
-        Order saved = orderRepository.save(order);
-        return ApiResponse.ok("Hủy đơn hàng thành công!", saved);
+        loyaltyService.revokeOrderPoints(order.getUserEmail(), order.getOrderCode(),
+                order.getTotal() != null ? order.getTotal() : 0L);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'DISTRIBUTOR')")
@@ -254,8 +277,23 @@ public class OrderController {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
 
+        String currentStatus = order.getStatus() != null ? order.getStatus().toUpperCase() : "CONFIRMED";
         String newStatus = request.getStatus().trim().toUpperCase();
-        order.setStatus(newStatus);
+        if (!ALLOWED_TRANSITIONS.containsKey(newStatus)) {
+            throw new IllegalArgumentException("Trạng thái không hợp lệ: " + newStatus);
+        }
+        if (newStatus.equals(currentStatus)) {
+            return ApiResponse.ok("Trạng thái đơn hàng không thay đổi", order);
+        }
+        if (!ALLOWED_TRANSITIONS.getOrDefault(currentStatus, Set.of()).contains(newStatus)) {
+            throw new IllegalArgumentException("Không thể chuyển đơn #" + orderCode + " từ " + currentStatus + " sang " + newStatus);
+        }
+
+        if ("CANCELLED".equals(newStatus)) {
+            applyCancellation(order, "Quản trị viên hủy đơn");
+        } else {
+            order.setStatus(newStatus);
+        }
         if ("PAID".equals(newStatus) && order.getPaidAt() == null) {
             order.setPaidAt(LocalDateTime.now());
         }
