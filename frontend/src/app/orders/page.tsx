@@ -28,6 +28,7 @@ function OrdersLookupContent() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchedOrder, setSearchedOrder] = useState<ApiOrder | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState("");
 
   // If user is logged in and didn't specify an explicit lookup code, redirect to customer dashboard orders tab
   useEffect(() => {
@@ -54,19 +55,19 @@ function OrdersLookupContent() {
     setSearchedOrder(null);
 
     try {
-      const orders = await catalogService.getOrders();
       const cleanQ = q.replace(/^#/, "");
-      const found = orders.find(
-        (o) =>
-          o.orderCode?.toUpperCase() === cleanQ ||
-          o.orderCode?.toUpperCase() === `AGRI-${cleanQ}` ||
-          o.receiverPhone?.includes(cleanQ)
-      );
+      const phone = phoneInput.trim() || undefined;
+      if (!user && !phone) {
+        setSearchError("Vui lòng nhập số điện thoại người nhận để xác minh đơn hàng.");
+        return;
+      }
+      const code = cleanQ.startsWith("AGRI-") ? cleanQ : `AGRI-${cleanQ}`;
+      const found = await catalogService.getOrderByCode(code, phone);
 
       if (found) {
         setSearchedOrder(found);
       } else {
-        setSearchError(`Không tìm thấy đơn hàng "${q}". Vui lòng kiểm tra lại mã đơn hàng hoặc số điện thoại.`);
+        setSearchError(`Không tìm thấy đơn hàng "${q}" khớp với số điện thoại đã nhập. Vui lòng kiểm tra lại.`);
       }
     } catch {
       setSearchError("Có lỗi khi tra cứu đơn hàng. Vui lòng thử lại sau.");
@@ -95,7 +96,7 @@ function OrdersLookupContent() {
             Tra Cứu Đơn Hàng & Chuỗi Lạnh
           </h1>
           <p className="text-xs sm:text-sm text-gray-500">
-            Nhập mã đơn hàng (ví dụ: <strong className="text-gray-700">AGRI-8790</strong>) hoặc số điện thoại người nhận để theo dõi tiến độ thu hái, kiểm định và vận chuyển xe lạnh.
+            Nhập mã đơn hàng (ví dụ: <strong className="text-gray-700">AGRI-8790</strong>) kèm số điện thoại người nhận để theo dõi tiến độ thu hái, kiểm định và vận chuyển xe lạnh.
           </p>
         </div>
 
@@ -118,6 +119,13 @@ function OrdersLookupContent() {
                 className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
               />
             </div>
+            <input
+              type="tel"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="SĐT người nhận"
+              className="sm:w-44 px-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
             <button
               type="submit"
               disabled={isSearching}

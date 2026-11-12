@@ -29,9 +29,13 @@ function SuccessContent() {
     paymentService.simulatePaymentSuccess(orderCode).catch(() => {});
 
     catalogService
-      .getOrders()
-      .then((orders) => {
-        const found = orders.find((o) => o.orderCode === orderCode);
+      .getOrderByCode(
+        orderCode,
+        typeof window !== "undefined"
+          ? sessionStorage.getItem(`agri-order-phone:${orderCode}`) ?? undefined
+          : undefined
+      )
+      .then((found) => {
         if (found) setOrder(found);
         setLoading(false);
       })

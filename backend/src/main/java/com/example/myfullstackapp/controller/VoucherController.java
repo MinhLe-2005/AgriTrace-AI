@@ -5,6 +5,7 @@ import com.example.myfullstackapp.repository.OrderRepository;
 import com.example.myfullstackapp.repository.VoucherRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +24,7 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.findByActiveTrue());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/all")
     public ResponseEntity<List<Voucher>> getAllVouchers() {
         return ResponseEntity.ok(voucherRepository.findAll());
@@ -35,6 +37,7 @@ public class VoucherController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Voucher> createVoucher(@RequestBody Voucher req) {
         if (req.getCode() == null || req.getCode().isBlank()) {
@@ -48,6 +51,7 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.save(req));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<Voucher> toggleVoucher(@PathVariable Long id) {
         Voucher voucher = voucherRepository.findById(id)
@@ -56,6 +60,7 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.save(voucher));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteVoucher(@PathVariable Long id) {
         voucherRepository.deleteById(id);

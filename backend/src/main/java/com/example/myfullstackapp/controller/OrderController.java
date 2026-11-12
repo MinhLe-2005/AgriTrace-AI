@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -39,17 +40,18 @@ public class OrderController {
             @RequestParam(required = false) String email,
             Authentication authentication
     ) {
-        if (email == null && canManageDistribution(authentication)) {
+        if (!isLoggedIn(authentication)) {
+            throw new org.springframework.security.access.AccessDeniedException("Vui lòng đăng nhập để xem đơn hàng");
+        }
+        boolean manager = canManageDistribution(authentication);
+        if ((email == null || email.isBlank()) && manager) {
             return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
         }
-        String targetEmail = email;
-        if (targetEmail == null && authentication != null) {
-            targetEmail = authentication.getName();
+        String targetEmail = (email == null || email.isBlank()) ? authentication.getName() : email.trim();
+        if (!manager && !targetEmail.equalsIgnoreCase(authentication.getName())) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xem đơn hàng của tài khoản khác");
         }
-        if (targetEmail != null && !targetEmail.isBlank()) {
-            return ResponseEntity.ok(orderRepository.findByUserEmailOrderByCreatedAtDesc(targetEmail));
-        }
-        return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
+        return ResponseEntity.ok(orderRepository.findByUserEmailOrderByCreatedAtDesc(targetEmail));
     }
 
     private boolean canManageDistribution(Authentication authentication) {
@@ -58,11 +60,55 @@ public class OrderController {
         );
     }
 
+    /**
+     * Tra cứu đơn theo mã. Được phép khi: là ADMIN/DISTRIBUTOR, là chủ đơn (đã đăng nhập),
+     * hoặc khách cung cấp đúng số điện thoại người nhận. Sai điều kiện trả 404 để không lộ đơn tồn tại.
+     */
     @GetMapping("/{orderCode}")
-    public ResponseEntity<Order> getOrderByCode(@PathVariable String orderCode) {
-        return orderRepository.findByOrderCode(orderCode)
+    public ResponseEntity<Order> getOrderByCode(
+            @PathVariable String orderCode,
+            @RequestParam(required = false) String phone,
+            Authentication authentication
+    ) {
+        return orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
+                .filter(order -> canViewOrder(order, phone, authentication))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private boolean canViewOrder(Order order, String phone, Authentication authentication) {
+        if (isLoggedIn(authentication)) {
+            if (canManageDistribution(authentication)) return true;
+            if (order.getUserEmail() != null && order.getUserEmail().equalsIgnoreCase(authentication.getName())) return true;
+        }
+        String given = normalizePhone(phone);
+        String actual = normalizePhone(order.getReceiverPhone());
+        return given.length() >= 9 && given.equals(actual);
+    }
+
+    private static String normalizePhone(String phone) {
+        if (phone == null) return "";
+        String digits = phone.replaceAll("[^0-9]", "");
+        if (digits.startsWith("84") && digits.length() > 10) digits = "0" + digits.substring(2);
+        return digits;
+    }
+
+    private static boolean isLoggedIn(Authentication authentication) {
+        return authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
+    }
+
+    private static final String ORDER_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    private String generateOrderCode() {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            StringBuilder sb = new StringBuilder("AGRI-");
+            for (int i = 0; i < 8; i++) sb.append(ORDER_CODE_ALPHABET.charAt(RANDOM.nextInt(ORDER_CODE_ALPHABET.length())));
+            String code = sb.toString();
+            if (orderRepository.findByOrderCode(code).isEmpty()) return code;
+        }
+        throw new IllegalStateException("Không thể sinh mã đơn hàng, vui lòng thử lại");
     }
 
     @PostMapping
@@ -79,7 +125,7 @@ public class OrderController {
             email = "customer@gmail.com";
         }
 
-        String orderCode = "AGRI-" + (int)(Math.random() * 9000 + 1000);
+        String orderCode = generateOrderCode();
 
         String paymentMethod = req.getPaymentMethod() != null ? req.getPaymentMethod().toUpperCase() : "COD";
         // Order lifecycle initial status based on payment method
@@ -198,6 +244,7 @@ public class OrderController {
         return ApiResponse.ok("Hủy đơn hàng thành công!", saved);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'DISTRIBUTOR')")
     @PatchMapping("/{orderCode}/status")
     @Transactional
     public ApiResponse<Order> updateStatus(

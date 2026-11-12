@@ -162,6 +162,18 @@ export const catalogService = {
     return res.data;
   },
 
+  /** Khách chưa đăng nhập phải gửi kèm SĐT người nhận; chủ đơn/admin không cần. */
+  async getOrderByCode(orderCode: string, phone?: string): Promise<ApiOrder | null> {
+    try {
+      const res = await api.get<ApiOrder>(`/orders/${encodeURIComponent(orderCode)}`, {
+        params: phone ? { phone } : undefined,
+      });
+      return res.data ?? null;
+    } catch {
+      return null;
+    }
+  },
+
   async createOrder(data: {
     userEmail?: string;
     receiverName: string;
