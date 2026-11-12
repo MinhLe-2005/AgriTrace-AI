@@ -14,6 +14,8 @@ export type ApiHarvestLot = {
   cert?: string;
   cultivation?: string;
   farmName?: string;
+  transportDestination?: string;
+  transportStatus?: string;
   createdAt?: string;
 };
 
@@ -43,7 +45,10 @@ export const farmerService = {
   },
 
   async createBatch(lot: ApiHarvestLot): Promise<ApiHarvestLot> {
-    const res = await api.post<{ success: boolean; data: ApiHarvestLot }>("/farmer/batches", lot);
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiHarvestLot }>("/farmer/batches", lot);
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể tạo lô thu hoạch");
+    }
     return res.data.data;
   },
 
