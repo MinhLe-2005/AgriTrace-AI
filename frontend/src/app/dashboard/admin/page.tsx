@@ -137,8 +137,17 @@ function AdminPortalContent() {
     getCampaignStatus,
     addBlogPost,
     updateBlogPost,
+    toggleBlogPost,
     deleteBlogPost,
+    loadCampaigns,
+    loadBlogPosts,
   } = useCampaignStore();
+
+  useEffect(() => {
+    // Admin luôn tải bản mới nhất, kể cả bài viết đang ẩn
+    loadCampaigns(true);
+    loadBlogPosts(true);
+  }, [loadCampaigns, loadBlogPosts]);
 
   const [eventSearch, setEventSearch] = useState("");
   const [eventFilter, setEventFilter] = useState<"all" | "active" | "upcoming" | "expired">("all");
@@ -425,7 +434,7 @@ function AdminPortalContent() {
     setShowEventModal(true);
   };
 
-  const handleSaveEvent = (e: React.FormEvent) => {
+  const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventForm.title.trim()) {
       toast.error("Vui lòng nhập tên sự kiện!");
@@ -446,10 +455,11 @@ function AdminPortalContent() {
             .filter(Boolean)
         : [];
 
+    try {
     if (editingEventId) {
-      updateCampaign(editingEventId, {
+      await updateCampaign(editingEventId, {
         title: eventForm.title.trim(),
-        slug: eventForm.slug.trim() || eventForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: eventForm.slug.trim(),
         type: eventForm.type,
         typeLabel: eventForm.typeLabel,
         typeColor: eventForm.typeColor,
@@ -471,9 +481,9 @@ function AdminPortalContent() {
       });
       toast.success(`Đã cập nhật sự kiện: ${eventForm.title}!`);
     } else {
-      addCampaign({
+      await addCampaign({
         title: eventForm.title.trim(),
-        slug: eventForm.slug.trim() || eventForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: eventForm.slug.trim(),
         type: eventForm.type,
         typeLabel: eventForm.typeLabel,
         typeColor: eventForm.typeColor,
@@ -494,12 +504,34 @@ function AdminPortalContent() {
       toast.success(`Đã tạo sự kiện khuyến mãi mới: ${eventForm.title}!`);
     }
     setShowEventModal(false);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
   };
 
-  const handleDeleteEvent = (id: string, title: string) => {
-    if (window.confirm(`Bạn có chắc muốn xóa sự kiện [${title}]? Sau khi xóa, các sản phẩm áp dụng sự kiện này sẽ tự động trở về giá niêm yết ban đầu.`)) {
-      deleteCampaign(id);
+  const handleDeleteEvent = async (id: string, title: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa sự kiện [${title}]? Sau khi xóa, các sản phẩm áp dụng sự kiện này sẽ tự động trở về giá niêm yết ban đầu.`)) return;
+    try {
+      await deleteCampaign(id);
       toast.success(`Đã xóa sự kiện [${title}]!`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const handleToggleEvent = async (id: string) => {
+    try {
+      await toggleCampaign(id);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const handleToggleBlog = async (id: string) => {
+    try {
+      await toggleBlogPost(id);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   };
 
@@ -546,17 +578,18 @@ function AdminPortalContent() {
     setShowBlogModal(true);
   };
 
-  const handleSaveBlog = (e: React.FormEvent) => {
+  const handleSaveBlog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!blogForm.title.trim()) {
       toast.error("Vui lòng nhập tiêu đề bài viết!");
       return;
     }
 
+    try {
     if (editingBlogId) {
-      updateBlogPost(editingBlogId, {
+      await updateBlogPost(editingBlogId, {
         title: blogForm.title.trim(),
-        slug: blogForm.slug.trim() || blogForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: blogForm.slug.trim(),
         category: blogForm.category,
         categoryLabel: blogForm.categoryLabel,
         author: blogForm.author.trim(),
@@ -572,9 +605,9 @@ function AdminPortalContent() {
       });
       toast.success(`Đã cập nhật bài viết blog: ${blogForm.title}!`);
     } else {
-      addBlogPost({
+      await addBlogPost({
         title: blogForm.title.trim(),
-        slug: blogForm.slug.trim() || blogForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: blogForm.slug.trim(),
         category: blogForm.category,
         categoryLabel: blogForm.categoryLabel,
         author: blogForm.author.trim(),
@@ -591,12 +624,18 @@ function AdminPortalContent() {
       toast.success(`Đã đăng bài viết blog mới: ${blogForm.title}!`);
     }
     setShowBlogModal(false);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
   };
 
-  const handleDeleteBlog = (id: string, title: string) => {
-    if (window.confirm(`Bạn có chắc muốn xóa bài viết [${title}]?`)) {
-      deleteBlogPost(id);
+  const handleDeleteBlog = async (id: string, title: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa bài viết [${title}]?`)) return;
+    try {
+      await deleteBlogPost(id);
       toast.success(`Đã xóa bài viết [${title}]!`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   };
 
@@ -1485,7 +1524,7 @@ function AdminPortalContent() {
                           </td>
                           <td className="p-3.5 text-center">
                             <button
-                              onClick={() => toggleCampaign(c.id)}
+                              onClick={() => handleToggleEvent(c.id)}
                               className={cn(
                                 "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
                                 c.active
@@ -1660,9 +1699,7 @@ function AdminPortalContent() {
                         </td>
                         <td className="p-3.5 text-center">
                           <button
-                            onClick={() =>
-                              updateBlogPost(p.id, { active: !p.active })
-                            }
+                            onClick={() => handleToggleBlog(p.id)}
                             className={cn(
                               "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
                               p.active

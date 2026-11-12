@@ -428,7 +428,11 @@ const CATEGORIES = [
 ];
 
 export default function BlogPage() {
-  const { blogPosts } = useCampaignStore();
+  const { blogPosts, loadBlogPosts } = useCampaignStore();
+
+  useEffect(() => {
+    loadBlogPosts();
+  }, [loadBlogPosts]);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [emailInput, setEmailInput] = useState("");

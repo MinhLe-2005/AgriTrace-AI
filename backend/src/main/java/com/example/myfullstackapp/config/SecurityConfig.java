@@ -47,7 +47,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/vouchers/all").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/*/status").hasAnyRole("ADMIN", "DISTRIBUTOR")
                         .requestMatchers("/api/v1/payment/payos/**", "/api/v1/loyalty/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/products/**", "/api/v1/vouchers/**", "/api/v1/traceability/**", "/api/v1/orders/**", "/api/v1/reviews/**", "/api/v1/loyalty/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/products/**", "/api/v1/vouchers/**", "/api/v1/traceability/**", "/api/v1/orders/**", "/api/v1/reviews/**", "/api/v1/loyalty/**", "/api/v1/campaigns", "/api/v1/blog-posts").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders/**", "/api/v1/farmer/**", "/api/v1/products/**", "/api/v1/reviews/**", "/api/v1/loyalty/**").permitAll()
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/farmer/**", "/api/v1/products/**").permitAll()
