@@ -223,7 +223,7 @@ class WarehouseAuditIntegrationTest {
                 2L,
                 jdbc.queryForObject(
                         "select count(*) from wh_stock_movements where document_id=? and"
-                            + " type='TRANSFER_IN'",
+                                + " type='TRANSFER_IN'",
                         Long.class,
                         transfer.id()));
     }
@@ -252,6 +252,36 @@ class WarehouseAuditIntegrationTest {
         assertEquals(0, total(other).signum());
         assertEquals(
                 WarehouseDocument.Status.IN_TRANSIT, documents.get(other, transfer.id()).status());
+    }
+
+    @Test
+    void concurrentRepeatedReceiptsCannotCreditDestinationTwice() throws Exception {
+        var transfer = transit("100");
+        documents.confirm(warehouseId, transfer.id(), "sender");
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var start = new CyclicBarrier(2);
+            Callable<DocumentView> receive =
+                    () -> {
+                        start.await(20, TimeUnit.SECONDS);
+                        return documents.receiveTransfer(
+                                other,
+                                transfer.id(),
+                                receiveInput(transfer, "98", "2 kg pending"),
+                                "receiver");
+                    };
+            var first = executor.submit(receive);
+            var second = executor.submit(receive);
+            first.get(30, TimeUnit.SECONDS);
+            second.get(30, TimeUnit.SECONDS);
+        }
+        assertEquals(0, new BigDecimal("98").compareTo(total(other)));
+        assertEquals(
+                1L,
+                jdbc.queryForObject(
+                        "select count(*) from wh_stock_movements where document_id=? and"
+                            + " type='TRANSFER_IN'",
+                        Long.class,
+                        transfer.id()));
     }
 
     @Test
