@@ -60,6 +60,17 @@ public class OutboundReceiptController {
         return ApiResponse.ok("Document cancelled", documents.cancel(warehouseId, id));
     }
 
+    @PutMapping("/{id}/receive")
+    public ApiResponse<DocumentView> receive(
+            @PathVariable UUID warehouseId,
+            @PathVariable UUID id,
+            @Valid @RequestBody TransferReceiveInput input,
+            Principal actor) {
+        return ApiResponse.ok(
+                "Transfer receipt recorded",
+                documents.receiveTransfer(warehouseId, id, input, actor.getName()));
+    }
+
     @PutMapping("/{id}/handover")
     public ApiResponse<DocumentView> handover(
             @PathVariable UUID warehouseId,

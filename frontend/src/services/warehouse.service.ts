@@ -75,6 +75,16 @@ export const warehouseService = {
     put<WarehouseDocument>(path(id) + "/documents/" + documentId + "/confirm"),
   cancel: (id: string, documentId: string) =>
     put<WarehouseDocument>(path(id) + "/documents/" + documentId + "/cancel"),
+  receive: (
+    id: string,
+    documentId: string,
+    lines: { lineId: string; receivedKg: number }[],
+    note: string
+  ) =>
+    put<WarehouseDocument>(path(id) + "/documents/" + documentId + "/receive", {
+      lines,
+      note,
+    }),
   handover: (id: string, documentId: string, reference: string) =>
     put<WarehouseDocument>(
       path(id) + "/documents/" + documentId + "/handover",

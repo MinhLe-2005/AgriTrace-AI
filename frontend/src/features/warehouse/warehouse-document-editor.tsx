@@ -83,6 +83,7 @@ export function WarehouseDocumentEditor({
           service.createDocument(warehouseId, type, {
             note: String(data.get("note") ?? "").trim(),
             targetWarehouseId: type === "TRANSFER" ? target : null,
+            inTransit: type === "TRANSFER",
             lines,
           }),
         "Đã lưu phiếu nháp. Xác nhận trong Chứng từ để ghi nhận tồn kho."

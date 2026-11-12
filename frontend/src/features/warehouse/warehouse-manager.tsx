@@ -139,6 +139,7 @@ function Status({ value }: { value: string }) {
     HANDED_OVER: "Đã bàn giao",
     PARTIALLY_CONSUMED: "Đã xuất một phần",
     IN_TRANSIT: "Đang vận chuyển",
+    RECEIVED: "Đã nhận đủ",
     ACTIVE: "Đang giữ",
     EXPIRED: "Hết hạn giữ",
     CONSUMED: "Đã xuất",
@@ -909,7 +910,25 @@ export function WarehouseManager() {
                         {d.id.slice(0, 8)}
                       </button>
                     </td>
-                    <td>{labels[d.type]}</td>
+                    <td>
+                      {labels[d.type]}
+                      {d.type === "TRANSFER" && (
+                        <div className="text-xs text-slate-500">
+                          {d.targetWarehouseId === id
+                            ? "Chuyển đến"
+                            : "Chuyển đi"}
+                          {" · Đã nhận "}
+                          {quantity(
+                            d.lines.reduce((n, l) => n + (l.receivedKg ?? 0), 0)
+                          )}
+                          {" / "}
+                          {quantity(
+                            d.lines.reduce((n, l) => n + l.quantityKg, 0)
+                          )}
+                          {" kg"}
+                        </div>
+                      )}
+                    </td>
                     <td>{time(d.createdAt)}</td>
                     <td>
                       <Status value={d.status} />
@@ -917,7 +936,7 @@ export function WarehouseManager() {
                     <td>{d.note}</td>
                     <td>
                       <div className="flex gap-2">
-                        {d.status === "DRAFT" && (
+                        {d.status === "DRAFT" && d.warehouseId === id && (
                           <>
                             <Button
                               size="sm"
@@ -956,11 +975,42 @@ export function WarehouseManager() {
                               size="sm"
                               disabled={actionLoadingId === `receive-${d.id}`}
                               onClick={() =>
-                                run(
-                                  () => service.confirm(id, d.id),
-                                  "Đã nhận hàng chuyển kho thành công.",
-                                  `receive-${d.id}`
-                                )
+                                setAction({
+                                  title: "Nhận hàng chuyển kho",
+                                  fields: [
+                                    ...d.lines.map((l) => ({
+                                      name: "receive-" + l.id,
+                                      label:
+                                        l.lotId +
+                                        " · Tổng đã nhận (kg), trước đó " +
+                                        quantity(l.receivedKg),
+                                      type: "number",
+                                      min: l.receivedKg ?? 0,
+                                      max: l.quantityKg,
+                                      step: 0.001,
+                                      value: l.quantityKg,
+                                    })),
+                                    {
+                                      name: "note",
+                                      label:
+                                        "Ghi chú nhận hàng / phần còn chờ đối soát",
+                                      optional: true,
+                                    },
+                                  ],
+                                  submit: (data) =>
+                                    service.receive(
+                                      id,
+                                      d.id,
+                                      d.lines.map((l) => ({
+                                        lineId: l.id ?? "",
+                                        receivedKg: num(
+                                          data,
+                                          "receive-" + l.id
+                                        ),
+                                      })),
+                                      str(data, "note")
+                                    ),
+                                })
                               }
                             >
                               {actionLoadingId === `receive-${d.id}`
@@ -969,7 +1019,10 @@ export function WarehouseManager() {
                             </Button>
                           )}
                         {(d.type === "OUTBOUND" || d.type === "TRANSFER") &&
-                          d.status === "CONFIRMED" && (
+                          d.warehouseId === id &&
+                          !d.handoverReference &&
+                          (d.status === "CONFIRMED" ||
+                            d.status === "IN_TRANSIT") && (
                             <Button
                               size="sm"
                               variant="secondary"
