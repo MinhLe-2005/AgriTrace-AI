@@ -5,6 +5,7 @@ import com.example.myfullstackapp.entity.HarvestLot;
 import com.example.myfullstackapp.entity.TraceabilityRecord;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
 import com.example.myfullstackapp.repository.TraceabilityRecordRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -114,6 +115,74 @@ public class FarmerController {
         }
 
         return ResponseEntity.ok(ApiResponse.ok("Tạo lô thu hoạch thành công!", saved));
+    }
+
+    @PostMapping("/batches/{code}/logs")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, String>>> addBatchLog(
+            @PathVariable String code,
+            @RequestBody Map<String, String> req
+    ) {
+        HarvestLot lot = harvestLotRepository.findByCodeIgnoreCase(code.trim()).orElse(null);
+        if (lot == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Không tìm thấy lô thu hoạch " + code));
+        }
+
+        String stage = req.getOrDefault("stage", req.getOrDefault("action", "")).trim();
+        if (stage.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Hoạt động canh tác không được để trống"));
+        }
+
+        String time = req.getOrDefault("time", "").trim();
+        if (time.isBlank()) {
+            time = LocalDate.now().format(VN_DATE_FMT);
+        }
+        String materials = req.getOrDefault("materials", "").trim();
+        String rawNote = req.getOrDefault("note", "").trim();
+        String combinedNote;
+        if (!materials.isBlank() && !rawNote.isBlank()) {
+            combinedNote = "Vật tư: " + materials + " - " + rawNote;
+        } else if (!materials.isBlank()) {
+            combinedNote = "Vật tư: " + materials;
+        } else if (!rawNote.isBlank()) {
+            combinedNote = rawNote;
+        } else {
+            combinedNote = "Cập nhật từ Sổ Nhật Ký Canh Tác";
+        }
+
+        Map<String, String> entry = new LinkedHashMap<>();
+        entry.put("stage", stage);
+        entry.put("time", time);
+        entry.put("note", combinedNote);
+
+        TraceabilityRecord record = traceabilityRecordRepository
+                .findByBatchCodeIgnoreCase(lot.getCode())
+                .orElseGet(() -> buildTraceabilityRecord(lot));
+
+        List<Map<String, String>> timeline = new ArrayList<>();
+        if (record.getTimelineJson() != null && !record.getTimelineJson().isBlank()) {
+            try {
+                timeline = objectMapper.readValue(
+                        record.getTimelineJson(),
+                        new TypeReference<List<Map<String, String>>>() {}
+                );
+            } catch (Exception ignored) {
+                timeline = new ArrayList<>();
+            }
+        }
+        timeline.add(entry);
+
+        try {
+            record.setTimelineJson(objectMapper.writeValueAsString(timeline));
+            traceabilityRecordRepository.save(record);
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Không thể cập nhật nhật ký QR: " + ex.getMessage()));
+        }
+
+        return ResponseEntity.ok(ApiResponse.ok("Đã đồng bộ nhật ký canh tác lên mã QR!", entry));
     }
 
     @DeleteMapping("/batches/{code}")

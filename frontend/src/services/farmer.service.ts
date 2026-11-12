@@ -52,6 +52,20 @@ export const farmerService = {
     return res.data.data;
   },
 
+  async addBatchLog(
+    code: string,
+    entry: { stage: string; time: string; note?: string; materials?: string }
+  ): Promise<{ stage: string; time: string; note: string }> {
+    const res = await api.post<{ success: boolean; message?: string; data?: { stage: string; time: string; note: string } }>(
+      `/farmer/batches/${encodeURIComponent(code)}/logs`,
+      entry
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể đồng bộ nhật ký canh tác lên QR");
+    }
+    return res.data.data;
+  },
+
   async deleteBatch(code: string): Promise<void> {
     await api.delete(`/farmer/batches/${code}`);
   },

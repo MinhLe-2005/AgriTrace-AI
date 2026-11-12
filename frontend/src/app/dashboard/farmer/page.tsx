@@ -102,6 +102,7 @@ export type CertificationItem = {
 const STORAGE_KEYS = {
   farms: "agritrace_farmer_farms_v1",
   selectedFarmId: "agritrace_farmer_selected_farm_v1",
+  logs: "agritrace_farmer_logs_v1",
 } as const;
 
 const DEFAULT_FARMS: FarmItem[] = [
@@ -199,6 +200,59 @@ const DEFAULT_BATCHES: BatchItem[] = [
     cultivation: "Nhà màng công nghệ cao",
     transportDestination: "Vườn đang chăm sóc (Chưa vận chuyển)",
     transportStatus: "Chưa vận chuyển",
+  },
+];
+
+const DEFAULT_LOGS: FarmingLogItem[] = [
+  {
+    id: "l1",
+    farmCode: "NT-DT-02",
+    batchCode: "XC-2026-02",
+    date: "15/07/2026",
+    stage: "Bón phân",
+    action: "Bón phân hữu cơ vi sinh đợt 2",
+    materialsUsed: "Phân bón trùn quế hữu cơ O-Micro",
+    notes: "Tỷ lệ bón 2kg/gốc, tưới ẩm đất",
+  },
+  {
+    id: "l2",
+    farmCode: "NT-DT-02",
+    batchCode: "XC-2026-02",
+    date: "20/08/2026",
+    stage: "Phun sinh học",
+    action: "Bao trái và phun dung dịch xua đuổi ruồi vàng thảo mộc",
+    materialsUsed: "Chế phẩm sinh học tỏi - ớt - gừng lên men",
+    notes: "Cách ly an toàn 100% không dùng hóa chất độc hại",
+  },
+  {
+    id: "l3",
+    farmCode: "NT-DT-02",
+    batchCode: "XC-2026-02",
+    date: "27/10/2026",
+    stage: "Thu hoạch",
+    action: "Thu hoạch đợt 2 sáng sớm, phân loại trái",
+    materialsUsed: "Dụng cụ khử trùng, thùng lót giấy mềm",
+    notes: "Trái đạt chuẩn độ ngọt, chuyển gửi Admin duyệt",
+  },
+  {
+    id: "l4",
+    farmCode: "NT-DL-01",
+    batchCode: "SR-2026-01",
+    date: "10/09/2026",
+    stage: "Tưới tiêu",
+    action: "Tưới nước nhỏ giọt tự động kiểm soát EC và pH",
+    materialsUsed: "Nguồn nước sạch ngầm",
+    notes: "Độ pH ổn định 6.2",
+  },
+  {
+    id: "l5",
+    farmCode: "NT-DL-01",
+    batchCode: "DT-2026-03",
+    date: "12/10/2026",
+    stage: "Tưới tiêu",
+    action: "Tưới dinh dưỡng nhỏ giọt công nghệ Israel cho dâu tây",
+    materialsUsed: "Dung dịch dinh dưỡng hữu cơ vi lượng A-B",
+    notes: "Kiểm tra độ ẩm giá thể mùn dừa đạt 75%",
   },
 ];
 
@@ -413,9 +467,15 @@ export default function FarmerPortalPage() {
     } catch {
       // Ignore storage access errors
     }
+    const savedLogs = readStoredJson<FarmingLogItem[]>(STORAGE_KEYS.logs);
+    if (Array.isArray(savedLogs) && savedLogs.length > 0) {
+      setFarmingLogs(savedLogs);
+    }
+
     setFormPlantingDate(getLocalIsoDate(-30));
     setFormHarvestDate(getLocalIsoDate(0));
     setFormExpiryDate(getLocalIsoDate(14));
+    setLogDate(getLocalIsoDate(0));
     setStorageLoaded(true);
 
     farmerService
@@ -491,60 +551,10 @@ export default function FarmerPortalPage() {
   // =========================================================================
   // 3. DỮ LIỆU NHẬT KÝ CANH TÁC
   // =========================================================================
-  const [farmingLogs, setFarmingLogs] = useState<FarmingLogItem[]>([
-    {
-      id: "l1",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "15/07/2026",
-      stage: "Bón phân",
-      action: "Bón phân hữu cơ vi sinh đợt 2",
-      materialsUsed: "Phân bón trùn quế hữu cơ O-Micro",
-      notes: "Tỷ lệ bón 2kg/gốc, tưới ẩm đất",
-    },
-    {
-      id: "l2",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "20/08/2026",
-      stage: "Phun sinh học",
-      action: "Bao trái và phun dung dịch xua đuổi ruồi vàng thảo mộc",
-      materialsUsed: "Chế phẩm sinh học tỏi - ớt - gừng lên men",
-      notes: "Cách ly an toàn 100% không dùng hóa chất độc hại",
-    },
-    {
-      id: "l3",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "27/10/2026",
-      stage: "Thu hoạch",
-      action: "Thu hoạch đợt 2 sáng sớm, phân loại trái",
-      materialsUsed: "Dụng cụ khử trùng, thùng lót giấy mềm",
-      notes: "Trái đạt chuẩn độ ngọt, chuyển gửi Admin duyệt",
-    },
-    {
-      id: "l4",
-      farmCode: "NT-DL-01",
-      batchCode: "SR-2026-01",
-      date: "10/09/2026",
-      stage: "Tưới tiêu",
-      action: "Tưới nước nhỏ giọt tự động kiểm soát EC và pH",
-      materialsUsed: "Nguồn nước sạch ngầm",
-      notes: "Độ pH ổn định 6.2",
-    },
-    {
-      id: "l5",
-      farmCode: "NT-DL-01",
-      batchCode: "DT-2026-03",
-      date: "12/10/2026",
-      stage: "Tưới tiêu",
-      action: "Tưới dinh dưỡng nhỏ giọt công nghệ Israel cho dâu tây",
-      materialsUsed: "Dung dịch dinh dưỡng hữu cơ vi lượng A-B",
-      notes: "Kiểm tra độ ẩm giá thể mùn dừa đạt 75%",
-    },
-  ]);
+  const [farmingLogs, setFarmingLogs] = useState<FarmingLogItem[]>(DEFAULT_LOGS);
 
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
   const [selectedFarmForLog, setSelectedFarmForLog] = useState("NT-DT-02");
   const [selectedBatchForLog, setSelectedBatchForLog] = useState("XC-2026-02");
   const [logDate, setLogDate] = useState(todayStr);
@@ -671,6 +681,15 @@ export default function FarmerPortalPage() {
       // Ignore storage errors
     }
   }, [selectedFarmId, storageLoaded]);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.logs, JSON.stringify(farmingLogs));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [farmingLogs, storageLoaded]);
 
   // =========================================================================
   // HANDLERS
@@ -920,11 +939,29 @@ export default function FarmerPortalPage() {
     }
   };
 
+  const openCreateLogModal = (farmCode?: string, batchCode?: string) => {
+    const initialFarm =
+      farmCode || (selectedLogFarm !== "ALL" ? selectedLogFarm : currentFarm?.code || farms[0]?.code || "NT-DL-01");
+    setSelectedFarmForLog(initialFarm);
+    if (batchCode) {
+      setSelectedBatchForLog(batchCode);
+    } else {
+      const matchingBatches = batches.filter((b) => b.farmCode === initialFarm);
+      setSelectedBatchForLog(matchingBatches[0]?.code || "");
+    }
+    setLogDate(getLocalIsoDate(0));
+    setLogStage("Bón phân");
+    setLogAction("");
+    setLogMaterials("");
+    setLogNotes("");
+    setIsLogModalOpen(true);
+  };
+
   // Ghi nhật ký canh tác
-  const handleCreateLog = (e: React.FormEvent) => {
+  const handleCreateLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBatchForLog) {
-      toast.error("Vui lòng chọn lô thu hoạch của nông trại!");
+      toast.error("Nông trại này chưa có lô thu hoạch. Vui lòng tạo lô trước!");
       return;
     }
     if (!logAction.trim()) {
@@ -932,28 +969,54 @@ export default function FarmerPortalPage() {
       return;
     }
 
-    const formatDisplayDate = (dStr: string) => {
-      const p = dStr.split("-");
-      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dStr;
-    };
-
+    const formattedDate = formatDisplayDate(logDate);
     const newLog: FarmingLogItem = {
       id: "l_" + Date.now(),
       farmCode: selectedFarmForLog,
       batchCode: selectedBatchForLog,
-      date: formatDisplayDate(logDate),
+      date: formattedDate,
       stage: logStage,
       action: logAction.trim(),
       materialsUsed: logMaterials.trim(),
       notes: logNotes.trim(),
     };
 
+    setIsSubmittingLog(true);
+    let syncedToQr = false;
+    try {
+      await farmerService.addBatchLog(selectedBatchForLog, {
+        stage: logStage,
+        time: formattedDate,
+        materials: logMaterials.trim(),
+        note: logNotes.trim() ? `${logAction.trim()} - ${logNotes.trim()}` : logAction.trim(),
+      });
+      syncedToQr = true;
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status !== 404) {
+        console.warn("Đồng bộ nhật ký lên QR không thành công:", err);
+      }
+    } finally {
+      setIsSubmittingLog(false);
+    }
+
     setFarmingLogs([newLog, ...farmingLogs]);
     setIsLogModalOpen(false);
     setLogAction("");
     setLogMaterials("");
     setLogNotes("");
-    toast.success(`Đã ghi nhật ký canh tác cho lô ${selectedBatchForLog}!`);
+    if (syncedToQr) {
+      toast.success(`Đã ghi nhật ký & đồng bộ mã QR cho lô ${selectedBatchForLog}!`);
+    } else {
+      toast.info(`Đã lưu nhật ký tại máy cho lô ${selectedBatchForLog}!`);
+    }
+  };
+
+  const handleDeleteLog = (id: string, actionName: string) => {
+    if (confirm(`Bạn có chắc muốn xóa ghi chép "${actionName}"?`)) {
+      setFarmingLogs((prev) => prev.filter((item) => item.id !== id));
+      toast.info("Đã xóa ghi chép nhật ký!");
+    }
   };
 
   // Upload ảnh nông sản
@@ -1518,11 +1581,7 @@ export default function FarmerPortalPage() {
                           <td className="py-3 px-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => {
-                                  setSelectedFarmForLog(b.farmCode);
-                                  setSelectedBatchForLog(b.code);
-                                  setIsLogModalOpen(true);
-                                }}
+                                onClick={() => openCreateLogModal(b.farmCode, b.code)}
                                 className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer"
                               >
                                 <FileText size={12} /> Nhật ký
@@ -1572,13 +1631,7 @@ export default function FarmerPortalPage() {
               </p>
             </div>
             <button
-              onClick={() => {
-                const initialFarm = selectedLogFarm !== "ALL" ? selectedLogFarm : farms[0]?.code || "NT-DT-02";
-                setSelectedFarmForLog(initialFarm);
-                const matchingBatches = batches.filter((b) => b.farmCode === initialFarm);
-                setSelectedBatchForLog(matchingBatches[0]?.code || batches[0]?.code || "");
-                setIsLogModalOpen(true);
-              }}
+              onClick={() => openCreateLogModal()}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Ghi Chép Mới
@@ -1688,9 +1741,19 @@ export default function FarmerPortalPage() {
                           </span>
                         </div>
 
-                        <span className="text-gray-400 flex items-center gap-1 text-[11px] font-medium">
-                          <Clock size={12} /> {log.date}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 flex items-center gap-1 text-[11px] font-medium">
+                            <Clock size={12} /> {log.date}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteLog(log.id, log.action)}
+                            className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
+                            title="Xóa ghi chép"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Tên hành động canh tác */}
@@ -2592,6 +2655,12 @@ export default function FarmerPortalPage() {
                 />
               </div>
 
+              {!selectedBatchForLog && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium">
+                  ⚠️ Nông trại đang chọn chưa có lô thu hoạch. Hãy tạo lô ở Tab Quản Lý Lô Thu Hoạch trước khi ghi nhật ký.
+                </div>
+              )}
+
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -2602,9 +2671,10 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  disabled={!selectedBatchForLog || isSubmittingLog}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <Save size={15} /> Lưu Nhật Ký
+                  <Save size={15} /> {isSubmittingLog ? "Đang lưu..." : "Lưu Nhật Ký"}
                 </button>
               </div>
             </form>
