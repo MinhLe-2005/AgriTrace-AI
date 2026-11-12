@@ -99,43 +99,74 @@ export type CertificationItem = {
   daysLeft: number;
 };
 
+const STORAGE_KEYS = {
+  farms: "agritrace_farmer_farms_v1",
+  selectedFarmId: "agritrace_farmer_selected_farm_v1",
+} as const;
+
+const DEFAULT_FARMS: FarmItem[] = [
+  {
+    id: "f1",
+    code: "NT-DL-01",
+    name: "Nông Trại Xanh Đà Lạt",
+    owner: "Bác Nguyễn Văn Hùng",
+    phone: "0912 345 678",
+    address: "Xã Xuân Thọ, TP. Đà Lạt",
+    province: "Lâm Đồng",
+    areaHectares: 4.5,
+    certStandard: "VietGAP & GlobalGAP",
+    rating: 4.9,
+    activeBatchCount: 3,
+    isDefault: true,
+  },
+  {
+    id: "f2",
+    code: "NT-DT-02",
+    name: "Vườn Cây Ăn Trái Cao Lãnh",
+    owner: "Bác Nguyễn Văn Hùng",
+    phone: "0912 345 678",
+    address: "Xã Mỹ Xương, Huyện Cao Lãnh",
+    province: "Đồng Tháp",
+    areaHectares: 3.2,
+    certStandard: "VietGAP Trồng trọt",
+    rating: 4.8,
+    activeBatchCount: 1,
+    isDefault: false,
+  },
+];
+
+function getNextFarmCode(farmList: FarmItem[]): string {
+  const used = new Set(farmList.map((f) => f.code.toUpperCase()));
+  let idx = farmList.length + 1;
+  while (idx < 999) {
+    const candidate = `NT-VN-${String(idx).padStart(2, "0")}`;
+    if (!used.has(candidate)) {
+      return candidate;
+    }
+    idx += 1;
+  }
+  return `NT-VN-${String(Date.now()).slice(-4)}`;
+}
+
+function readStoredJson<T>(key: string): T | null {
+  try {
+    const rawVal = localStorage.getItem(key);
+    if (!rawVal) return null;
+    return JSON.parse(rawVal) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function FarmerPortalPage() {
+  const [storageLoaded, setStorageLoaded] = useState(false);
   // 5 Tab nghiệp vụ rõ ràng, tách riêng "Quản Lý Nông Trại" lên vị trí nổi bật
   const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs">("farms");
 
   // =========================================================================
   // 1. DỮ LIỆU QUẢN LÝ NÔNG TRẠI (Quản lý nhiều nông trại canh tác)
   // =========================================================================
-  const [farms, setFarms] = useState<FarmItem[]>([
-    {
-      id: "f1",
-      code: "NT-DL-01",
-      name: "Nông Trại Xanh Đà Lạt",
-      owner: "Bác Nguyễn Văn Hùng",
-      phone: "0912 345 678",
-      address: "Xã Xuân Thọ, TP. Đà Lạt",
-      province: "Lâm Đồng",
-      areaHectares: 4.5,
-      certStandard: "VietGAP & GlobalGAP",
-      rating: 4.9,
-      activeBatchCount: 3,
-      isDefault: true,
-    },
-    {
-      id: "f2",
-      code: "NT-DT-02",
-      name: "Vườn Cây Ăn Trái Cao Lãnh",
-      owner: "Bác Nguyễn Văn Hùng",
-      phone: "0912 345 678",
-      address: "Xã Mỹ Xương, Huyện Cao Lãnh",
-      province: "Đồng Tháp",
-      areaHectares: 3.2,
-      certStandard: "VietGAP Trồng trọt",
-      rating: 4.8,
-      activeBatchCount: 1,
-      isDefault: false,
-    },
-  ]);
+  const [farms, setFarms] = useState<FarmItem[]>(DEFAULT_FARMS);
 
   // Nông trại đang được chọn làm việc
   const [selectedFarmId, setSelectedFarmId] = useState<string>("f1");
@@ -144,13 +175,13 @@ export default function FarmerPortalPage() {
   // Modal Thêm Nông Trại Mới
   const [isAddFarmModalOpen, setIsAddFarmModalOpen] = useState(false);
   const [newFarmName, setNewFarmName] = useState("");
-  const [newFarmCode, setNewFarmCode] = useState("NT-LH-03");
-  const [newFarmOwner, setNewFarmOwner] = useState(farms[0]?.owner || "Bác Nguyễn Văn Hùng");
-  const [newFarmPhone, setNewFarmPhone] = useState(farms[0]?.phone || "0912 345 678");
+  const [newFarmCode, setNewFarmCode] = useState("NT-VN-03");
+  const [newFarmOwner, setNewFarmOwner] = useState(DEFAULT_FARMS[0].owner);
+  const [newFarmPhone, setNewFarmPhone] = useState(DEFAULT_FARMS[0].phone);
   const [newFarmAddress, setNewFarmAddress] = useState("");
   const [newFarmProvince, setNewFarmProvince] = useState("Lâm Đồng");
   const [newFarmArea, setNewFarmArea] = useState("2.5");
-  const [newFarmCert, setNewFarmCert] = useState("VietGAP");
+  const [newFarmCert, setNewFarmCert] = useState("VietGAP Trồng trọt");
 
   // Modal Sửa Nông Trại
   const [editingFarm, setEditingFarm] = useState<FarmItem | null>(null);
@@ -231,6 +262,21 @@ export default function FarmerPortalPage() {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 
   useEffect(() => {
+    const savedFarms = readStoredJson<FarmItem[]>(STORAGE_KEYS.farms);
+    const effectiveFarms = Array.isArray(savedFarms) && savedFarms.length > 0 ? savedFarms : DEFAULT_FARMS;
+    if (savedFarms && savedFarms.length > 0) {
+      setFarms(savedFarms);
+    }
+    try {
+      const savedSelectedId = localStorage.getItem(STORAGE_KEYS.selectedFarmId);
+      if (savedSelectedId && effectiveFarms.some((f) => f.id === savedSelectedId)) {
+        setSelectedFarmId(savedSelectedId);
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+    setStorageLoaded(true);
+
     farmerService
       .getBatches()
       .then((data) => {
@@ -465,27 +511,71 @@ export default function FarmerPortalPage() {
     },
   ]);
 
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.farms, JSON.stringify(farms));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [farms, storageLoaded]);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.selectedFarmId, selectedFarmId);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [selectedFarmId, storageLoaded]);
+
   // =========================================================================
   // HANDLERS
   // =========================================================================
 
+  const openAddFarmModal = () => {
+    setNewFarmCode(getNextFarmCode(farms));
+    setNewFarmName("");
+    setNewFarmOwner(currentFarm?.owner || "Bác Nguyễn Văn Hùng");
+    setNewFarmPhone(currentFarm?.phone || "0912 345 678");
+    setNewFarmAddress("");
+    setNewFarmProvince("Lâm Đồng");
+    setNewFarmArea("2.5");
+    setNewFarmCert("VietGAP Trồng trọt");
+    setIsAddFarmModalOpen(true);
+  };
+
   // Thêm Nông Trại mới
   const handleCreateFarm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFarmName.trim()) {
-      toast.error("Vui lòng nhập tên nông trại!");
+    const codeUpper = newFarmCode.trim().toUpperCase();
+    const areaNum = Number(newFarmArea);
+    if (!codeUpper) {
+      toast.error("Vui lòng nhập mã nông trại!");
+      return;
+    }
+    if (farms.some((f) => f.code.toUpperCase() === codeUpper)) {
+      toast.error(`Mã nông trại ${codeUpper} đã tồn tại!`);
+      return;
+    }
+    if (!newFarmName.trim() || !newFarmAddress.trim()) {
+      toast.error("Vui lòng nhập đầy đủ tên và địa chỉ nông trại!");
+      return;
+    }
+    if (!Number.isFinite(areaNum) || areaNum <= 0) {
+      toast.error("Quy mô diện tích phải lớn hơn 0 ha!");
       return;
     }
 
     const newFarm: FarmItem = {
       id: "f_" + Date.now(),
-      code: newFarmCode.trim().toUpperCase(),
+      code: codeUpper,
       name: newFarmName.trim(),
-      owner: newFarmOwner.trim(),
+      owner: newFarmOwner.trim() || "Chủ nông trại",
       phone: newFarmPhone.trim(),
       address: newFarmAddress.trim(),
-      province: newFarmProvince.trim(),
-      areaHectares: Number(newFarmArea) || 1.0,
+      province: newFarmProvince.trim() || "Việt Nam",
+      areaHectares: areaNum,
       certStandard: newFarmCert,
       rating: 5.0,
       activeBatchCount: 0,
@@ -502,10 +592,25 @@ export default function FarmerPortalPage() {
   const handleUpdateFarm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingFarm) return;
+    if (!editingFarm.name.trim()) {
+      toast.error("Tên nông trại không được để trống!");
+      return;
+    }
+    if (!Number.isFinite(editingFarm.areaHectares) || editingFarm.areaHectares <= 0) {
+      toast.error("Diện tích phải lớn hơn 0 ha!");
+      return;
+    }
 
-    setFarms(farms.map((f) => (f.id === editingFarm.id ? editingFarm : f)));
+    const updated: FarmItem = {
+      ...editingFarm,
+      name: editingFarm.name.trim(),
+      owner: editingFarm.owner.trim(),
+      phone: editingFarm.phone.trim(),
+      address: editingFarm.address.trim(),
+    };
+    setFarms(farms.map((f) => (f.id === updated.id ? updated : f)));
     setEditingFarm(null);
-    toast.success(`Đã cập nhật thông tin trang trại "${editingFarm.name}"!`);
+    toast.success(`Đã cập nhật thông tin trang trại "${updated.name}"!`);
   };
 
   // Xóa Nông Trại
@@ -514,10 +619,18 @@ export default function FarmerPortalPage() {
       toast.error("Hệ thống yêu cầu duy trì ít nhất 1 nông trại!");
       return;
     }
+    const targetFarm = farms.find((f) => f.id === id);
     if (confirm(`Bạn có chắc muốn xóa nông trại "${name}"?`)) {
-      setFarms(farms.filter((f) => f.id !== id));
-      if (selectedFarmId === id) {
-        setSelectedFarmId(farms[0].id);
+      const remaining = farms.filter((f) => f.id !== id);
+      setFarms(remaining);
+      if (selectedFarmId === id && remaining[0]) {
+        setSelectedFarmId(remaining[0].id);
+      }
+      if (targetFarm) {
+        if (selectedBatchFarm === targetFarm.code) setSelectedBatchFarm("ALL");
+        if (selectedLogFarm === targetFarm.code) setSelectedLogFarm("ALL");
+        if (selectedProductFarm === targetFarm.code) setSelectedProductFarm("ALL");
+        if (selectedCertFarm === targetFarm.code) setSelectedCertFarm("ALL");
       }
       toast.info(`Đã xóa nông trại ${name}`);
     }
@@ -763,11 +876,7 @@ export default function FarmerPortalPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              const rand = Math.floor(Math.random() * 80) + 20;
-              setNewFarmCode(`NT-VN-0${farms.length + 1}`);
-              setIsAddFarmModalOpen(true);
-            }}
+            onClick={openAddFarmModal}
             className="px-3.5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-emerald-700/60 transition-all cursor-pointer"
           >
             <Plus size={15} /> Thêm Nông Trại
@@ -872,10 +981,7 @@ export default function FarmerPortalPage() {
               </p>
             </div>
             <button
-              onClick={() => {
-                setNewFarmCode(`NT-VN-0${farms.length + 1}`);
-                setIsAddFarmModalOpen(true);
-              }}
+              onClick={openAddFarmModal}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Nông Trại Mới
@@ -1885,6 +1991,16 @@ export default function FarmerPortalPage() {
                     <option value="Hữu cơ Organic USDA">Hữu cơ Organic USDA</option>
                     <option value="OCOP 4 Sao Đặc sản">OCOP 4 Sao Đặc sản địa phương</option>
                     <option value="Chưa chứng nhận">Chưa có chứng nhận</option>
+                    {![
+                      "VietGAP Trồng trọt",
+                      "GlobalGAP Xuất khẩu",
+                      "VietGAP & GlobalGAP",
+                      "Hữu cơ Organic USDA",
+                      "OCOP 4 Sao Đặc sản",
+                      "Chưa chứng nhận",
+                    ].includes(editingFarm.certStandard) && (
+                      <option value={editingFarm.certStandard}>{editingFarm.certStandard}</option>
+                    )}
                   </select>
                 </div>
               </div>
