@@ -2,6 +2,7 @@ package com.example.myfullstackapp.controller;
 
 import com.example.myfullstackapp.dto.ApiResponse;
 import com.example.myfullstackapp.dto.user.UserCreateRequest;
+import com.example.myfullstackapp.dto.user.AdminAccountLockRequest;
 import com.example.myfullstackapp.dto.user.UserResponse;
 import com.example.myfullstackapp.dto.user.UserUpdateRequest;
 import com.example.myfullstackapp.security.AppUserDetails;
@@ -43,6 +44,18 @@ public class UserController {
     public ApiResponse<UserResponse> update(@PathVariable UUID id, @Valid @RequestBody UserUpdateRequest request,
                                              @AuthenticationPrincipal AppUserDetails principal) {
         return ApiResponse.ok("User updated", userService.update(id, request, principal.getId()));
+    }
+
+    /** Lock or unlock another account without changing its active status or roles. */
+    @PutMapping("/{id}/lock")
+    public ApiResponse<UserResponse> setAccountLock(
+            @PathVariable UUID id,
+            @Valid @RequestBody AdminAccountLockRequest request,
+            @AuthenticationPrincipal AppUserDetails principal
+    ) {
+        return ApiResponse.ok(
+                request.locked() ? "Tài khoản đã được khoá" : "Tài khoản đã được mở khoá",
+                userService.setAccountLock(id, request, principal.getId()));
     }
 
     @DeleteMapping("/{id}")

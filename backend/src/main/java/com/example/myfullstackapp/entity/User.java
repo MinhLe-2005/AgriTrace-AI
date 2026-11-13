@@ -44,6 +44,29 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Builder.Default
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
+    @Builder.Default
+    @Column(name = "self_locked", nullable = false)
+    private boolean selfLocked = false;
+
+    /**
+     * An administrator-imposed lock is deliberately separate from a user's
+     * self-lock.  A user must never be able to clear an administrator's lock
+     * through the self-service unlock endpoint.
+     */
+    @Builder.Default
+    @Column(name = "admin_locked", nullable = false)
+    private boolean adminLocked = false;
+
+    @Column(name = "lock_reason", length = 500)
+    private String lockReason;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     @Builder.Default
