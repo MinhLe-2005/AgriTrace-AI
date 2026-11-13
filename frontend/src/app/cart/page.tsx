@@ -138,7 +138,7 @@ function CartContent() {
         const res = await paymentService.checkPaymentStatus(completedOrderId);
         if (res && res.status === "PAID") {
           clearInterval(interval);
-          toast.success("Ting ting! Hệ thống đã nhận được tiền chuyển khoản payOS thành công!");
+          toast.success("Ting ting! Hệ thống đã nhận được chuyển khoản VietQR thành công!");
           setShowPayosModal(false);
           clearCart();
           router.push(`/checkout/success?orderCode=${completedOrderId}`);
@@ -336,7 +336,7 @@ function CartContent() {
       if (completedOrderId) {
         await paymentService.simulatePaymentSuccess(completedOrderId);
       }
-      toast.success("Xác nhận thanh toán payOS thành công! Đơn hàng chuyển sang ĐÃ THANH TOÁN.");
+      toast.success("Xác nhận chuyển khoản VietQR thành công! Đơn hàng chuyển sang ĐÃ THANH TOÁN.");
       setShowPayosModal(false);
       clearCart();
       setCurrentStep(4);
@@ -946,9 +946,9 @@ function CartContent() {
                   {[
                     {
                       key: "payos",
-                      title: "Cổng Thanh Toán payOS (Quét QR Napas 247)",
-                      desc: "Mã VietQR động tạo tức thì, quét nhanh bằng 40+ app Ngân Hàng",
-                      badge: "Khuyên dùng - payOS",
+                      title: "Chuyển Khoản Quét Mã VietQR 24/7",
+                      desc: "Mã QR ngân hàng tạo tự động, quét nhanh bằng mọi ứng dụng Ngân hàng",
+                      badge: "Khuyên dùng • Tự động",
                     },
                     {
                       key: "vnpay",
@@ -1097,7 +1097,9 @@ function CartContent() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Phương thức:</span>
-                  <span className="font-semibold text-gray-900 uppercase">{paymentMethod}</span>
+                  <span className="font-semibold text-gray-900">
+                    {paymentMethod === "payos" ? "Chuyển khoản VietQR 24/7" : paymentMethod.toUpperCase()}
+                  </span>
                 </div>
                 <div className="pt-2 border-t border-gray-200 flex justify-between text-sm">
                   <span className="font-bold text-gray-900">Tổng thanh toán:</span>
@@ -1134,10 +1136,10 @@ function CartContent() {
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                    payOS
+                    QR
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-sm">Thanh Toán payOS (VietQR)</h3>
+                    <h3 className="font-bold text-gray-900 text-sm">Quét Mã Chuyển Khoản VietQR 24/7</h3>
                     <p className="text-[11px] text-gray-500">Đơn hàng #{payosData.orderCode}</p>
                   </div>
                 </div>
@@ -1210,7 +1212,7 @@ function CartContent() {
                       rel="noreferrer"
                       className="flex-1 py-2 text-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold"
                     >
-                      Mở cổng payOS ↗
+                      Mở trang thanh toán ↗
                     </a>
                   )}
                   <button

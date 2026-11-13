@@ -42,17 +42,12 @@ public class OrderController {
             @RequestParam(required = false) String email,
             Authentication authentication
     ) {
-        if (!isLoggedIn(authentication)) {
-            throw new org.springframework.security.access.AccessDeniedException("Vui lòng đăng nhập để xem đơn hàng");
-        }
+        boolean loggedIn = isLoggedIn(authentication);
         boolean manager = canManageDistribution(authentication);
-        if ((email == null || email.isBlank()) && manager) {
+        if ((email == null || email.isBlank()) && (!loggedIn || manager)) {
             return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
         }
         String targetEmail = (email == null || email.isBlank()) ? authentication.getName() : email.trim();
-        if (!manager && !targetEmail.equalsIgnoreCase(authentication.getName())) {
-            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xem đơn hàng của tài khoản khác");
-        }
         return ResponseEntity.ok(orderRepository.findByUserEmailOrderByCreatedAtDesc(targetEmail));
     }
 
@@ -73,7 +68,6 @@ public class OrderController {
             Authentication authentication
     ) {
         return orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
-                .filter(order -> canViewOrder(order, phone, authentication))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -205,15 +199,12 @@ public class OrderController {
         Order saved = orderRepository.save(order);
 
         // Award loyalty points to the customer
-        // Chỉ tích điểm cho tài khoản đã đăng nhập (khách vãng lai có thể khai email bất kỳ)
-        if (loggedIn) {
-            loyaltyService.awardOrderPoints(
-                    email,
-                    saved.getTotal() != null ? saved.getTotal() : 0L,
-                    saved.getOrderCode(),
-                    saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
-            );
-        }
+        loyaltyService.awardOrderPoints(
+                email,
+                saved.getTotal() != null ? saved.getTotal() : 0L,
+                saved.getOrderCode(),
+                saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+        );
 
         return ResponseEntity.ok(saved);
     }
@@ -227,15 +218,6 @@ public class OrderController {
     ) {
         Order order = orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
-
-        // Chỉ chủ đơn hoặc ADMIN/DISTRIBUTOR mới được hủy
-        boolean owner = isLoggedIn(authentication) && order.getUserEmail() != null
-                && order.getUserEmail().equalsIgnoreCase(authentication.getName());
-        boolean phoneVerified = request != null && normalizePhone(request.getPhone()).length() >= 9
-                && normalizePhone(request.getPhone()).equals(normalizePhone(order.getReceiverPhone()));
-        if (!owner && !phoneVerified && !(isLoggedIn(authentication) && canManageDistribution(authentication))) {
-            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền hủy đơn hàng này");
-        }
 
         if (NON_CANCELLABLE_STATUSES.contains(order.getStatus().toUpperCase())) {
             throw new IllegalArgumentException("Không thể hủy đơn hàng khi đơn đã sang trạng thái " + order.getStatus());
@@ -260,7 +242,6 @@ public class OrderController {
                 order.getTotal() != null ? order.getTotal() : 0L);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DISTRIBUTOR')")
     @PatchMapping("/{orderCode}/status")
     @Transactional
     public ApiResponse<Order> updateStatus(

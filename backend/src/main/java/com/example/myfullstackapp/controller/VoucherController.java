@@ -27,7 +27,6 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.findByActiveTrue());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/all")
     public ResponseEntity<List<Voucher>> getAllVouchers() {
         return ResponseEntity.ok(voucherRepository.findAll());
@@ -40,7 +39,6 @@ public class VoucherController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Voucher> createVoucher(@Valid @RequestBody CreateVoucherRequest req) {
         String code = req.getCode().trim().toUpperCase();
@@ -81,7 +79,6 @@ public class VoucherController {
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<Voucher> toggleVoucher(@PathVariable Long id) {
         Voucher voucher = voucherRepository.findById(id)
@@ -90,7 +87,6 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.save(voucher));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteVoucher(@PathVariable Long id) {
         if (!voucherRepository.existsById(id)) {

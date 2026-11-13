@@ -61,8 +61,12 @@ api.interceptors.response.use(
     }
 
     if (typeof window !== "undefined") {
-      if (status === 403) toast.error("Bạn không có quyền thực hiện thao tác này.");
-      else if (status && status >= 400 && status !== 401 && status !== 404) toast.error(messageFromError(error));
+      const reqUrl = request?.url ?? "";
+      const isBackgroundGet = request?.method?.toLowerCase() === "get" && (reqUrl.includes("/loyalty/me") || reqUrl.includes("/orders"));
+      if (!isBackgroundGet) {
+        if (status === 403) toast.error("Bạn không có quyền thực hiện thao tác này.");
+        else if (status && status >= 400 && status !== 401 && status !== 404) toast.error(messageFromError(error));
+      }
     }
     return Promise.reject(error);
   }

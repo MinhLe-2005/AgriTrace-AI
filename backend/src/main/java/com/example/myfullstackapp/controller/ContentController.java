@@ -31,25 +31,21 @@ public class ContentController {
         return contentService.listCampaigns();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/campaigns")
     public Campaign createCampaign(@Valid @RequestBody CampaignRequest req) {
         return contentService.createCampaign(req);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/campaigns/{id}")
     public Campaign updateCampaign(@PathVariable String id, @Valid @RequestBody CampaignRequest req) {
         return contentService.updateCampaign(id, req);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/campaigns/{id}/toggle")
     public Campaign toggleCampaign(@PathVariable String id) {
         return contentService.toggleCampaign(id);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/campaigns/{id}")
     public ResponseEntity<Void> deleteCampaign(@PathVariable String id) {
         contentService.deleteCampaign(id);
@@ -63,31 +59,26 @@ public class ContentController {
         return contentService.listBlogPosts(false);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/blog-posts/all")
     public List<BlogPost> listAllBlogPosts() {
         return contentService.listBlogPosts(true);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/blog-posts")
     public BlogPost createBlogPost(@Valid @RequestBody BlogPostRequest req) {
         return contentService.createBlogPost(req);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/blog-posts/{id}")
     public BlogPost updateBlogPost(@PathVariable String id, @Valid @RequestBody BlogPostRequest req) {
         return contentService.updateBlogPost(id, req);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/blog-posts/{id}/toggle")
     public BlogPost toggleBlogPost(@PathVariable String id) {
         return contentService.toggleBlogPost(id);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/blog-posts/{id}")
     public ResponseEntity<Void> deleteBlogPost(@PathVariable String id) {
         contentService.deleteBlogPost(id);
