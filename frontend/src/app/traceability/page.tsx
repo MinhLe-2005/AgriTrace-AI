@@ -43,6 +43,7 @@ import { useState, useRef, useEffect } from "react";
 import jsQR from "jsqr";
 import { catalogService, ApiTraceability } from "@/services/catalog.service";
 import { farmerService, ApiHarvestLot } from "@/services/farmer.service";
+import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
 
@@ -1033,6 +1034,14 @@ function resolveTraceabilityData(
 
 export default function TraceabilityPage() {
   const searchParams = useSearchParams();
+  const { user } = useAuthStore();
+  const hasRole = (role: string) =>
+    Boolean(user?.roles?.some((r) => r === role || r === `ROLE_${role}`));
+  const isAdmin = hasRole("ADMIN");
+  const isFarmer = hasRole("FARMER");
+  const isWarehouse = hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF");
+  const isDistributor = hasRole("DISTRIBUTOR");
+
   const initialBatch = searchParams.get("batch") || searchParams.get("lot") || "XL-2026-08";
 
   const [batchCode, setBatchCode] = useState(initialBatch);
@@ -1328,13 +1337,33 @@ export default function TraceabilityPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/farmer"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold text-xs transition-colors shadow-2xs"
-            >
-              <Leaf size={14} className="text-emerald-700" />
-              <span>Tạo Lô Thu Hoạch (Nông Dân)</span>
-            </Link>
+            {(isFarmer || isAdmin) && (
+              <Link
+                href="/dashboard/farmer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold text-xs transition-colors shadow-2xs"
+              >
+                <Leaf size={14} className="text-emerald-700" />
+                <span>Tạo Lô Thu Hoạch (Nông Dân)</span>
+              </Link>
+            )}
+            {(isWarehouse || isAdmin) && (
+              <Link
+                href="/dashboard/warehouse"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 font-bold text-xs transition-colors shadow-2xs"
+              >
+                <Warehouse size={14} className="text-blue-700" />
+                <span>Nghiệm Thu Nhập Kho (FEFO)</span>
+              </Link>
+            )}
+            {(isDistributor || isAdmin) && (
+              <Link
+                href="/dashboard/distributor/receive"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 font-bold text-xs transition-colors shadow-2xs"
+              >
+                <Truck size={14} className="text-amber-700" />
+                <span>Tiếp Nhận Vận Chuyển</span>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -1806,13 +1835,20 @@ export default function TraceabilityPage() {
                   Tại màn hình Nông Dân, chủ trang trại ghi nhật ký canh tác (phân bón vi sinh, đo nhiệt độ/độ ẩm). Khi thu hái, tạo Lô hàng mới (Harvest Lot), đính kèm số chứng nhận VietGAP. Hệ thống sinh mã UUID và in tem QR GS1 dán lên kiện hàng.
                 </p>
               </div>
-              <Link
-                href="/dashboard/farmer"
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 font-bold text-xs transition-colors shadow-2xs"
-              >
-                <span>Xem Màn Hình Nhập Nông Dân</span>
-                <ChevronRight size={13} />
-              </Link>
+              {isFarmer || isAdmin ? (
+                <Link
+                  href="/dashboard/farmer"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 font-bold text-xs transition-colors shadow-2xs"
+                >
+                  <span>Vào Cổng Nông Dân</span>
+                  <ChevronRight size={13} />
+                </Link>
+              ) : (
+                <div className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-100/60 text-emerald-900 border border-emerald-200/80 font-semibold text-[11px]">
+                  <ShieldCheck size={13} className="text-emerald-700 shrink-0" />
+                  <span>Chỉ dành cho tài khoản Nông Dân đã xác thực</span>
+                </div>
+              )}
             </div>
 
             {/* Vai trò 2: Thủ Kho */}
@@ -1833,13 +1869,20 @@ export default function TraceabilityPage() {
                   Khi xe chở nông sản tới kho lạnh, thủ kho dùng máy quét tem QR để xác thực thông tin, kiểm tra nhiệt độ tiếp nhận (2°C - 5°C), xếp vào ô kệ (Zone Bin) và kích hoạt thuật toán xuất kho tự động theo hạn sử dụng (FEFO).
                 </p>
               </div>
-              <Link
-                href="/dashboard/warehouse"
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-blue-800 border border-blue-300 hover:bg-blue-100 font-bold text-xs transition-colors shadow-2xs"
-              >
-                <span>Xem Màn Hình Nghiệm Thu Kho</span>
-                <ChevronRight size={13} />
-              </Link>
+              {isWarehouse || isAdmin ? (
+                <Link
+                  href="/dashboard/warehouse"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-blue-800 border border-blue-300 hover:bg-blue-100 font-bold text-xs transition-colors shadow-2xs"
+                >
+                  <span>Vào Cổng Nghiệm Thu Kho</span>
+                  <ChevronRight size={13} />
+                </Link>
+              ) : (
+                <div className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-100/60 text-blue-900 border border-blue-200/80 font-semibold text-[11px]">
+                  <ShieldCheck size={13} className="text-blue-700 shrink-0" />
+                  <span>Chỉ dành cho Nhân Viên Kho Lạnh nội bộ</span>
+                </div>
+              )}
             </div>
 
             {/* Vai trò 3: Nhà Phân Phối */}
@@ -1860,13 +1903,20 @@ export default function TraceabilityPage() {
                   Tài xế quét mã QR nhận đơn xuất kho, nhập biển số xe tải lạnh và bật thiết bị cảm biến nhiệt độ IoT gắn trong thùng xe. Nhiệt độ và vị trí GPS được cập nhật liên tục về hệ thống quản trị trung tâm.
                 </p>
               </div>
-              <Link
-                href="/dashboard/distributor"
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-amber-900 border border-amber-300 hover:bg-amber-100 font-bold text-xs transition-colors shadow-2xs"
-              >
-                <span>Xem Màn Hình Vận Chuyển</span>
-                <ChevronRight size={13} />
-              </Link>
+              {isDistributor || isAdmin ? (
+                <Link
+                  href="/dashboard/distributor"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-amber-900 border border-amber-300 hover:bg-amber-100 font-bold text-xs transition-colors shadow-2xs"
+                >
+                  <span>Vào Cổng Vận Chuyển</span>
+                  <ChevronRight size={13} />
+                </Link>
+              ) : (
+                <div className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-100/60 text-amber-900 border border-amber-200/80 font-semibold text-[11px]">
+                  <ShieldCheck size={13} className="text-amber-700 shrink-0" />
+                  <span>Chỉ dành cho Đối Tác Vận Chuyển Xe Lạnh</span>
+                </div>
+              )}
             </div>
 
             {/* Vai trò 4: Cơ Quan Giám Định */}

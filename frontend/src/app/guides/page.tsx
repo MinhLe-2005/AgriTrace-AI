@@ -25,9 +25,20 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useAuthStore } from "@/stores/auth-store";
 
 export default function GuidesPage() {
+  const { user } = useAuthStore();
   const [activeRole, setActiveRole] = useState<"customer" | "farmer" | "warehouse" | "distributor">("customer");
+
+  const checkRole = (r: string) =>
+    Boolean(user?.roles?.some((x) => x === r || x === `ROLE_${r}`));
+  const canAccessActiveRole =
+    checkRole("ADMIN") ||
+    activeRole === "customer" ||
+    (activeRole === "farmer" && checkRole("FARMER")) ||
+    (activeRole === "warehouse" && (checkRole("WAREHOUSE") || checkRole("WAREHOUSE_STAFF"))) ||
+    (activeRole === "distributor" && checkRole("DISTRIBUTOR"));
 
   const ROLES_TABS = [
     { key: "customer" as const, label: "Khách Hàng (Customer)", icon: Users, color: "text-purple-600", desc: "Mua sắm, quét QR, dùng voucher & tích điểm" },
@@ -215,21 +226,28 @@ export default function GuidesPage() {
               </p>
             </div>
 
-            <Link
-              href={
-                activeRole === "customer"
-                  ? "/products"
-                  : activeRole === "farmer"
-                  ? "/dashboard/farmer"
-                  : activeRole === "warehouse"
-                  ? "/dashboard/warehouse"
-                  : "/dashboard/distributor"
-              }
-              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 text-[#1a7a3a] text-xs font-bold hover:bg-emerald-100 transition-colors"
-            >
-              <span>Vào Cổng Thực Hành</span>
-              <ArrowRight size={13} />
-            </Link>
+            {canAccessActiveRole ? (
+              <Link
+                href={
+                  activeRole === "customer"
+                    ? "/products"
+                    : activeRole === "farmer"
+                    ? "/dashboard/farmer"
+                    : activeRole === "warehouse"
+                    ? "/dashboard/warehouse"
+                    : "/dashboard/distributor"
+                }
+                className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 text-[#1a7a3a] text-xs font-bold hover:bg-emerald-100 transition-colors"
+              >
+                <span>Vào Cổng Thực Hành</span>
+                <ArrowRight size={13} />
+              </Link>
+            ) : (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold">
+                <ShieldCheck size={14} className="text-emerald-700" />
+                <span>Dành riêng cho {ROLES_TABS.find((r) => r.key === activeRole)?.label}</span>
+              </span>
+            )}
           </div>
 
           <div className="space-y-8">

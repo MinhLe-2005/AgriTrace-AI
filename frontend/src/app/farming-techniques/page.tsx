@@ -21,6 +21,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface FarmingGuide {
   id: string;
@@ -97,6 +98,10 @@ const FARMING_DATA: FarmingGuide[] = [
 ];
 
 export default function FarmingTechniquesPage() {
+  const { user } = useAuthStore();
+  const isFarmerOrAdmin = Boolean(
+    user?.roles?.some((r) => ["FARMER", "ROLE_FARMER", "ADMIN", "ROLE_ADMIN"].includes(r))
+  );
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGuide, setSelectedGuide] = useState<string>("technique-1");
@@ -282,17 +287,33 @@ export default function FarmingTechniquesPage() {
               </div>
             </div>
 
-            {/* Link to Farmer Portal */}
+            {/* Link to Farmer Portal or Products based on Actor */}
             <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-xs text-gray-500 text-center sm:text-left">
-                Bạn là nông dân muốn đưa hồ sơ canh tác của nông trại mình lên hệ thống AgriTrace AI?
-              </div>
-              <Link
-                href="/dashboard/farmer"
-                className="px-5 py-2.5 rounded-xl bg-[#1a7a3a] text-white font-semibold text-xs hover:bg-[#156e34] transition-colors whitespace-nowrap shadow-xs"
-              >
-                Vào Cổng Nông Dân (Farmer Portal)
-              </Link>
+              {isFarmerOrAdmin ? (
+                <>
+                  <div className="text-xs text-gray-500 text-center sm:text-left">
+                    Cập nhật nhật ký canh tác, bón phân và xuất lô thu hoạch trực tiếp trên cổng Nông Trại của bạn.
+                  </div>
+                  <Link
+                    href="/dashboard/farmer"
+                    className="px-5 py-2.5 rounded-xl bg-[#1a7a3a] text-white font-semibold text-xs hover:bg-[#156e34] transition-colors whitespace-nowrap shadow-xs"
+                  >
+                    Vào Cổng Nông Dân (Farmer Portal)
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <div className="text-xs text-gray-500 text-center sm:text-left">
+                    Toàn bộ nông sản trên AgriTrace đều tuân thủ nghiêm ngặt quy trình canh tác VietGAP & GlobalGAP này.
+                  </div>
+                  <Link
+                    href="/products"
+                    className="px-5 py-2.5 rounded-xl bg-[#1a7a3a] text-white font-semibold text-xs hover:bg-[#156e34] transition-colors whitespace-nowrap shadow-xs"
+                  >
+                    Mua Nông Sản Đạt Chuẩn VietGAP →
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

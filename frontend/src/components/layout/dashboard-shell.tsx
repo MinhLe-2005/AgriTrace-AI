@@ -161,14 +161,30 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, hasHydrated, clearSession, refreshToken } = useAuthStore();
 
+  const checkRole = (role: string) =>
+    Boolean(user?.roles?.some((r) => r === role || r === `ROLE_${role}`));
+
+  const isAdmin = checkRole("ADMIN");
+  const isFarmer = checkRole("FARMER");
+  const isWarehouse = checkRole("WAREHOUSE") || checkRole("WAREHOUSE_STAFF");
+  const isDistributor = checkRole("DISTRIBUTOR");
+
   const isAdminRoute = pathname.startsWith("/dashboard/admin") || pathname.startsWith("/dashboard/users");
-  const isAdmin = Boolean(user?.roles?.includes("ADMIN"));
-  const forbidden = Boolean(user) && isAdminRoute && !isAdmin;
+  const isFarmerRoute = pathname.startsWith("/dashboard/farmer");
+  const isWarehouseRoute = pathname.startsWith("/dashboard/warehouse");
+  const isDistributorRoute = pathname.startsWith("/dashboard/distributor");
+
+  const forbidden =
+    Boolean(user) &&
+    ((isAdminRoute && !isAdmin) ||
+      (isFarmerRoute && !isFarmer && !isAdmin) ||
+      (isWarehouseRoute && !isWarehouse && !isAdmin) ||
+      (isDistributorRoute && !isDistributor && !isAdmin));
 
   useEffect(() => {
     if (hasHydrated && !user) router.replace("/login");
     else if (hasHydrated && forbidden) {
-      toast.error("Bạn không có quyền truy cập trang quản trị.");
+      toast.error("Tài khoản của bạn không có quyền truy cập vào cổng nghiệp vụ của vai trò này.");
       router.replace("/dashboard");
     }
   }, [hasHydrated, router, user, forbidden]);
