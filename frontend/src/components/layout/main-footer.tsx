@@ -277,66 +277,6 @@ export function MainFooter() {
           </div>
         </div>
 
-        {/* ─── Khu Vực Cổng Vận Hành Nội Bộ & Đối Tác Chuỗi Cung Ứng (Tinh Tế, Gọn Gàng) ─── */}
-        <div className="pt-6 border-t border-white/10 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-              Cổng Vận Hành Chuỗi Cung Ứng Nội Bộ & B2B:
-            </span>
-            <Link
-              href="/login"
-              className="text-[11px] font-semibold text-emerald-400 hover:text-white transition-colors flex items-center gap-1"
-            >
-              <span>Đăng nhập cổng chuyên dụng</span>
-              <ChevronRight size={12} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            {actors.map((actor) => {
-              const Icon = actor.icon;
-              if (actor.allowed) {
-                return (
-                  <Link
-                    key={actor.role}
-                    href={actor.href}
-                    className="px-3 py-2 rounded-xl bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/40 hover:border-emerald-400 transition-all flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Icon size={14} className="text-emerald-400 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-semibold text-white text-xs truncate group-hover:text-emerald-300">
-                          {actor.role}
-                        </div>
-                        <div className="text-[10px] text-emerald-300/80 truncate">{actor.sub}</div>
-                      </div>
-                    </div>
-                    <ChevronRight size={12} className="text-emerald-400 group-hover:text-white shrink-0 ml-1" />
-                  </Link>
-                );
-              }
-              return (
-                <div
-                  key={actor.role}
-                  title={`Yêu cầu đăng nhập bằng tài khoản ${actor.role}`}
-                  className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/10 opacity-60 flex items-center justify-between select-none"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Icon size={14} className="text-gray-500 shrink-0" />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-gray-300 text-xs truncate">
-                        {actor.role}
-                      </div>
-                      <div className="text-[10px] text-gray-500 truncate">{actor.sub}</div>
-                    </div>
-                  </div>
-                  <Lock size={11} className="text-gray-600 shrink-0 ml-1" />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
         {/* ─── Dòng Bản Quyền & Giấy Phép Cuối Cùng ─── */}
         <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-gray-500">
           <p>© 2026 AgriTrace Ecosystem. Nền tảng số hóa chuỗi cung ứng nông sản sạch.</p>
