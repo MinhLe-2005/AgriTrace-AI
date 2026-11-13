@@ -289,7 +289,7 @@ public class LoyaltyService {
             if (earned <= 0) return;
 
             int currentPts = membership.getCurrentPoints() != null ? membership.getCurrentPoints() : 0;
-            membership.setCurrentPoints(Math.max(0, currentPts - earned));
+            membership.setCurrentPoints(currentPts - earned);
             BigDecimal spent = membership.getTotalSpent() != null ? membership.getTotalSpent() : BigDecimal.ZERO;
             membership.setTotalSpent(spent.subtract(BigDecimal.valueOf(orderTotal)).max(BigDecimal.ZERO));
             loyaltyMembershipRepository.save(membership);
@@ -297,7 +297,7 @@ public class LoyaltyService {
             loyaltyTransactionRepository.save(LoyaltyTransaction.builder()
                     .user(membership.getUser())
                     .points(-earned)
-                    .transactionType("REDEEMED")
+                    .transactionType("REVOKED")
                     .description("Thu hồi điểm do hủy/hoàn tiền đơn hàng #" + orderCode + " (-" + earned + " điểm)")
                     .build());
             log.info("Revoked {} points from {} for cancelled order #{}", earned, email, orderCode);
