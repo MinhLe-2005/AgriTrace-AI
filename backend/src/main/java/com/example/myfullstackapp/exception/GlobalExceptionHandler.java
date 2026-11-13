@@ -27,6 +27,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.CONFLICT, msg, "CONFLICT", List.of());
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    ResponseEntity<ApiError> locked(AccountLockedException ex) {
+        return error(HttpStatus.valueOf(423), ex.getMessage(), "ACCOUNT_LOCKED", List.of());
+    }
+
     @ExceptionHandler({InvalidTokenException.class, AuthenticationException.class})
     ResponseEntity<ApiError> unauthorized(RuntimeException ex) {
         return error(HttpStatus.UNAUTHORIZED, "Tài khoản hoặc mật khẩu không chính xác", "UNAUTHORIZED", List.of());

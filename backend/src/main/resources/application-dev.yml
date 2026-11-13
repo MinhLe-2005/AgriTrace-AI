@@ -11,7 +11,8 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:Bimdiendie1@}}
     hikari:
       maximum-pool-size: 5
-      minimum-idle: 1
+      minimum-idle: 2
+      connection-timeout: 30000
   flyway:
     enabled: false
   jpa:

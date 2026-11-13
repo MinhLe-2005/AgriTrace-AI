@@ -1,6 +1,7 @@
 package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.user.UserCreateRequest;
+import com.example.myfullstackapp.dto.user.AdminAccountLockRequest;
 import com.example.myfullstackapp.dto.user.UserResponse;
 import com.example.myfullstackapp.dto.user.UserUpdateRequest;
 import com.example.myfullstackapp.entity.Role;
@@ -68,6 +69,29 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    /**
+     * Applies an administrator lock without overloading the permanent
+     * {@code active} flag. The last available administrator remains protected
+     * just as it is for deactivation and deletion.
+     */
+    @Transactional
+    public UserResponse setAccountLock(UUID id, AdminAccountLockRequest request, UUID actorId) {
+        if (request.locked() && id.equals(actorId)) {
+            throw new ConflictException("Bạn không thể khoá tài khoản quản trị đang đăng nhập");
+        }
+        User user = findUser(id);
+        if (request.locked() && isActiveAdmin(user)) {
+            ensureAnotherUnlockedActiveAdminExists();
+        }
+        user.setAdminLocked(request.locked());
+        if (request.locked()) {
+            user.setLockReason(optionalText(request.reason()));
+        } else if (!user.isSelfLocked() && user.getLockedUntil() == null) {
+            user.setLockReason(null);
+        }
+        return userMapper.toResponse(user);
+    }
+
     @Transactional(readOnly = true)
     public User getEntity(UUID id) { return findUser(id); }
 
@@ -90,5 +114,16 @@ public class UserService {
         if (userRepository.countActiveUsersWithRole(RoleName.ADMIN) <= 1) {
             throw new ConflictException("The last active administrator cannot be removed or deactivated");
         }
+    }
+
+    private void ensureAnotherUnlockedActiveAdminExists() {
+        userRepository.findActiveUsersWithRoleForUpdate(RoleName.ADMIN);
+        if (userRepository.countActiveUnlockedUsersWithRole(RoleName.ADMIN) <= 1) {
+            throw new ConflictException("Không thể khoá tài khoản quản trị viên đang hoạt động cuối cùng");
+        }
+    }
+
+    private String optionalText(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

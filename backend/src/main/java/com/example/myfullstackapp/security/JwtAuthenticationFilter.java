@@ -30,7 +30,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 String email = jwtTokenService.parse(token).getSubject();
                 UserDetails user = userDetailsService.loadUserByUsername(email);
-                if (user.isEnabled() && jwtTokenService.isValidAccessToken(token, user.getUsername())) {
+                // Reloading the account on every request makes account locks
+                // effective immediately, including for access tokens issued
+                // before the lock was applied.
+                if (user.isEnabled() && user.isAccountNonLocked()
+                        && jwtTokenService.isValidAccessToken(token, user.getUsername())) {
                     var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);

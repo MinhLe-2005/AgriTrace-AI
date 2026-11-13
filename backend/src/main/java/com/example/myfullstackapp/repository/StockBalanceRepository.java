@@ -11,6 +11,8 @@ import java.util.*;
 public interface StockBalanceRepository extends JpaRepository<StockBalance, UUID> {
     List<StockBalance> findByWarehouseIdOrderByExpiryDateAscLotIdAscLocationIdAsc(UUID warehouseId);
 
+    List<StockBalance> findByLotCodeIgnoreCaseOrderByReceivedAtAsc(String lotCode);
+
     Optional<StockBalance> findByWarehouseIdAndLocationIdAndLotId(
             UUID warehouseId, UUID locationId, String lotId);
 
