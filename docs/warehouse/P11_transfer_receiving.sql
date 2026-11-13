@@ -1,5 +1,9 @@
 -- Apply after P10. Partial receipts remain IN_TRANSIT until all dispatched goods arrive.
 BEGIN;
+-- Replace the legacy Hibernate enum check before enabling two-sided transfers.
+ALTER TABLE wh_documents DROP CONSTRAINT IF EXISTS wh_documents_status_check;
+ALTER TABLE wh_documents ADD CONSTRAINT wh_documents_status_check
+    CHECK (status IN ('DRAFT', 'CONFIRMED', 'CANCELLED', 'HANDED_OVER', 'IN_TRANSIT', 'RECEIVED'));
 ALTER TABLE wh_documents ADD COLUMN IF NOT EXISTS in_transit BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE wh_documents ADD COLUMN IF NOT EXISTS received_by VARCHAR(254);
 ALTER TABLE wh_documents ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
