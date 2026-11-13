@@ -172,6 +172,178 @@ class WarehouseOutboundIntegrationTest {
     }
 
     @Test
+    void partialDispatchKeepsOnlyTheRemainderReserved() {
+        var reservation = reservations.create(warehouseId, request(1L, "100"), "staff");
+        var first =
+                documents.create(
+                        warehouseId,
+                        Type.OUTBOUND,
+                        new DocumentInput(
+                                null, reservation.id(), "Partial", List.of(line("1", "40"))),
+                        "staff");
+        documents.confirm(warehouseId, first.id(), "staff");
+        documents.confirm(warehouseId, first.id(), "staff");
+        var partial = reservations.list(warehouseId, 0).getFirst();
+        assertEquals("PARTIALLY_CONSUMED", partial.status());
+        assertEquals(0, new BigDecimal("40").compareTo(partial.lines().getFirst().dispatchedKg()));
+        assertEquals(
+                0,
+                new BigDecimal("60")
+                        .compareTo(
+                                inventory.getBalances(warehouseId).stream()
+                                        .map(BalanceView::reservedKg)
+                                        .reduce(BigDecimal.ZERO, BigDecimal::add)));
+        var second =
+                documents.create(
+                        warehouseId,
+                        Type.OUTBOUND,
+                        new DocumentInput(
+                                null, reservation.id(), "Remainder", List.of(line("1", "60"))),
+                        "staff");
+        documents.confirm(warehouseId, second.id(), "staff");
+        assertEquals("CONSUMED", reservations.list(warehouseId, 0).getFirst().status());
+        reservations.create(warehouseId, request(1L, "50"), "staff");
+        assertThrows(
+                ConflictException.class,
+                () -> reservations.create(warehouseId, request(1L, "1"), "staff"));
+    }
+
+    @Test
+    void sameDayExpiryIsAvailableForFefoReservationAndDispatch() {
+        jdbc.update(
+                "update agri_harvest_lots set expiry_date=? where id=1",
+                InventoryService.today().toString());
+        jdbc.update(
+                "update wh_stock_balances set expiry_date=? where warehouse_id=? and lot_id='1'",
+                InventoryService.today(),
+                warehouseId);
+        var current =
+                inventory.getBalances(warehouseId).stream()
+                        .filter(b -> b.lotId().equals("1"))
+                        .findFirst()
+                        .orElseThrow();
+        assertEquals(0, new BigDecimal("100").compareTo(current.availableKg()));
+        assertEquals(
+                "1",
+                reservations
+                        .preview(warehouseId, new FefoInput("Rau", new BigDecimal("100")))
+                        .getFirst()
+                        .lotId());
+        var reservation = reservations.create(warehouseId, request(1L, "100"), "staff");
+        var receipt = outbound(reservation);
+        documents.confirm(warehouseId, receipt.id(), "staff");
+        assertEquals("CONSUMED", reservations.list(warehouseId, 0).getFirst().status());
+    }
+
+    @Test
+    void yesterdayExpiryIsExcludedFromAvailabilityAndAllocation() {
+        jdbc.update(
+                "update agri_harvest_lots set expiry_date=? where id=1",
+                InventoryService.today().minusDays(1).toString());
+        jdbc.update(
+                "update wh_stock_balances set expiry_date=? where warehouse_id=? and lot_id='1'",
+                InventoryService.today().minusDays(1),
+                warehouseId);
+        assertEquals(
+                0,
+                inventory.getBalances(warehouseId).stream()
+                        .filter(b -> b.lotId().equals("1"))
+                        .findFirst()
+                        .orElseThrow()
+                        .availableKg()
+                        .signum());
+        assertEquals(
+                "2",
+                reservations
+                        .preview(warehouseId, new FefoInput("Rau", new BigDecimal("100")))
+                        .getFirst()
+                        .lotId());
+        assertThrows(
+                ConflictException.class,
+                () ->
+                        documents.create(
+                                warehouseId,
+                                Type.OUTBOUND,
+                                new DocumentInput(null, null, "Expired", List.of(line("1", "1"))),
+                                "staff"));
+    }
+
+    @Test
+    void releasingOrExpiringAPartialReservationStillCountsDispatchedStock() {
+        var reservation = reservations.create(warehouseId, request(1L, "100"), "staff");
+        var first =
+                documents.create(
+                        warehouseId,
+                        Type.OUTBOUND,
+                        new DocumentInput(
+                                null, reservation.id(), "Partial", List.of(line("1", "40"))),
+                        "staff");
+        documents.confirm(warehouseId, first.id(), "staff");
+        reservations.release(warehouseId, reservation.id());
+        assertThrows(
+                ConflictException.class,
+                () -> reservations.create(warehouseId, request(1L, "111"), "staff"));
+        reservations.create(warehouseId, request(1L, "110"), "staff");
+    }
+
+    @Test
+    void expiredPartialReservationRetainsTheDispatchedOrderQuantity() {
+        var reservation = reservations.create(warehouseId, request(1L, "100"), "staff");
+        var receipt =
+                documents.create(
+                        warehouseId,
+                        Type.OUTBOUND,
+                        new DocumentInput(
+                                null, reservation.id(), "Partial", List.of(line("1", "40"))),
+                        "staff");
+        documents.confirm(warehouseId, receipt.id(), "staff");
+        jdbc.update(
+                "update wh_reservations set expires_at=? where id=?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(1)),
+                reservation.id());
+        assertThrows(
+                ConflictException.class,
+                () -> reservations.create(warehouseId, request(1L, "111"), "staff"));
+        reservations.create(warehouseId, request(1L, "110"), "staff");
+    }
+
+    @Test
+    void reconciliationProtectsValidAllocationsAndDoesNotLoseUnfilledDemand() {
+        var reservation = reservations.create(warehouseId, request(1L, "150"), "staff");
+        jdbc.update(
+                "update wh_stock_balances set held=true where warehouse_id=? and lot_id='1'",
+                warehouseId);
+        var reconciled = reservations.reconcile(warehouseId, reservation.id());
+        assertEquals(
+                0,
+                new BigDecimal("150")
+                        .compareTo(
+                                reconciled.lines().stream()
+                                        .map(AllocationView::quantityKg)
+                                        .reduce(BigDecimal.ZERO, BigDecimal::add)));
+        assertEquals(
+                0,
+                new BigDecimal("100")
+                        .compareTo(
+                                reconciled.lines().stream()
+                                        .filter(l -> l.lotId().equals("2"))
+                                        .map(AllocationView::quantityKg)
+                                        .reduce(BigDecimal.ZERO, BigDecimal::add)));
+        var first =
+                documents.create(
+                        warehouseId,
+                        Type.OUTBOUND,
+                        new DocumentInput(
+                                null, reservation.id(), "Eligible part", List.of(line("2", "100"))),
+                        "staff");
+        documents.confirm(warehouseId, first.id(), "staff");
+        assertEquals("PARTIALLY_CONSUMED", reservations.list(warehouseId, 0).getFirst().status());
+        assertThrows(
+                ConflictException.class,
+                () -> reservations.create(warehouseId, request(1L, "1"), "staff"));
+    }
+
+    @Test
     void fefoAllocatesEarlierExpiryAndRejectsManualSkipping() {
         var proposal =
                 reservations.preview(warehouseId, new FefoInput("Rau", new BigDecimal("150")));

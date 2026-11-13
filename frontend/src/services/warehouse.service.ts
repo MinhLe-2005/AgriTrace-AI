@@ -75,6 +75,16 @@ export const warehouseService = {
     put<WarehouseDocument>(path(id) + "/documents/" + documentId + "/confirm"),
   cancel: (id: string, documentId: string) =>
     put<WarehouseDocument>(path(id) + "/documents/" + documentId + "/cancel"),
+  receive: (
+    id: string,
+    documentId: string,
+    lines: { lineId: string; receivedKg: number }[],
+    note: string
+  ) =>
+    put<WarehouseDocument>(path(id) + "/documents/" + documentId + "/receive", {
+      lines,
+      note,
+    }),
   handover: (id: string, documentId: string, reference: string) =>
     put<WarehouseDocument>(
       path(id) + "/documents/" + documentId + "/handover",
@@ -99,6 +109,10 @@ export const warehouseService = {
     get<Reservation[]>(path(id) + "/reservations", { page }),
   release: (id: string, reservationId: string) =>
     put<Reservation>(path(id) + "/reservations/" + reservationId + "/release"),
+  reconcile: (id: string, reservationId: string) =>
+    put<Reservation>(
+      path(id) + "/reservations/" + reservationId + "/reconcile"
+    ),
   inspect: (id: string, balanceId: string, held: boolean, note: string) =>
     post<Inspection>(path(id) + "/inspections", { balanceId, held, note }),
   inspections: (id: string, page = 0) =>

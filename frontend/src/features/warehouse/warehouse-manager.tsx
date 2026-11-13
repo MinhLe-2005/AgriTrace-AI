@@ -137,7 +137,9 @@ function Status({ value }: { value: string }) {
     CONFIRMED: "Đã xác nhận",
     CANCELLED: "Đã hủy",
     HANDED_OVER: "Đã bàn giao",
+    PARTIALLY_CONSUMED: "Đã xuất một phần",
     IN_TRANSIT: "Đang vận chuyển",
+    RECEIVED: "Đã nhận đủ",
     ACTIVE: "Đang giữ",
     EXPIRED: "Hết hạn giữ",
     CONSUMED: "Đã xuất",
@@ -484,7 +486,14 @@ export function WarehouseManager() {
                 onChange={(e) => setTo(e.target.value)}
               />
             </label>
-            {(["Tổng quan", "Chứng từ", "Tồn & chất lượng", "FEFO & giữ hàng"] as string[]).includes(tab) && (
+            {(
+              [
+                "Tổng quan",
+                "Chứng từ",
+                "Tồn & chất lượng",
+                "FEFO & giữ hàng",
+              ] as string[]
+            ).includes(tab) && (
               <>
                 <Button
                   className="ml-auto"
@@ -901,7 +910,25 @@ export function WarehouseManager() {
                         {d.id.slice(0, 8)}
                       </button>
                     </td>
-                    <td>{labels[d.type]}</td>
+                    <td>
+                      {labels[d.type]}
+                      {d.type === "TRANSFER" && (
+                        <div className="text-xs text-slate-500">
+                          {d.targetWarehouseId === id
+                            ? "Chuyển đến"
+                            : "Chuyển đi"}
+                          {" · Đã nhận "}
+                          {quantity(
+                            d.lines.reduce((n, l) => n + (l.receivedKg ?? 0), 0)
+                          )}
+                          {" / "}
+                          {quantity(
+                            d.lines.reduce((n, l) => n + l.quantityKg, 0)
+                          )}
+                          {" kg"}
+                        </div>
+                      )}
+                    </td>
                     <td>{time(d.createdAt)}</td>
                     <td>
                       <Status value={d.status} />
@@ -909,11 +936,14 @@ export function WarehouseManager() {
                     <td>{d.note}</td>
                     <td>
                       <div className="flex gap-2">
-                        {d.status === "DRAFT" && (
+                        {d.status === "DRAFT" && d.warehouseId === id && (
                           <>
                             <Button
                               size="sm"
-                              disabled={actionLoadingId === `confirm-${d.id}` || actionLoadingId === `cancel-${d.id}`}
+                              disabled={
+                                actionLoadingId === `confirm-${d.id}` ||
+                                actionLoadingId === `cancel-${d.id}`
+                              }
                               onClick={() => setConfirmation(d)}
                             >
                               Xác nhận
@@ -921,57 +951,104 @@ export function WarehouseManager() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              disabled={actionLoadingId === `confirm-${d.id}` || actionLoadingId === `cancel-${d.id}`}
+                              disabled={
+                                actionLoadingId === `confirm-${d.id}` ||
+                                actionLoadingId === `cancel-${d.id}`
+                              }
                               onClick={() =>
-                                run(() => service.cancel(id, d.id), "Đã hủy phiếu.", `cancel-${d.id}`)
+                                run(
+                                  () => service.cancel(id, d.id),
+                                  "Đã hủy phiếu.",
+                                  `cancel-${d.id}`
+                                )
                               }
                             >
-                              {actionLoadingId === `cancel-${d.id}` ? "Đang hủy..." : "Hủy"}
+                              {actionLoadingId === `cancel-${d.id}`
+                                ? "Đang hủy..."
+                                : "Hủy"}
                             </Button>
                           </>
                         )}
-                        {d.status === "IN_TRANSIT" && d.targetWarehouseId === id && (
-                          <Button
-                            size="sm"
-                            disabled={actionLoadingId === `receive-${d.id}`}
-                            onClick={() =>
-                              run(
-                                () => service.confirm(id, d.id),
-                                "Đã nhận hàng chuyển kho thành công.",
-                                `receive-${d.id}`
-                              )
-                            }
-                          >
-                            {actionLoadingId === `receive-${d.id}` ? "Đang nhận..." : "Nhận hàng"}
-                          </Button>
-                        )}
-                        {(d.type === "OUTBOUND" || d.type === "TRANSFER") && d.status === "CONFIRMED" && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={() =>
-                              setAction({
-                                title: "Ghi nhận bàn giao",
-                                fields: [
-                                  {
-                                    name: "reference",
-                                    label:
-                                      "Mã biên bản / tham chiếu nhà phân phối",
-                                  },
-                                ],
-                                submit: (data) =>
-                                  service.handover(
-                                    id,
-                                    d.id,
-                                    str(data, "reference")
-                                  ),
-                              })
-                            }
-                          >
-                            Bàn giao
-                          </Button>
-                        )}
+                        {d.status === "IN_TRANSIT" &&
+                          d.targetWarehouseId === id && (
+                            <Button
+                              size="sm"
+                              disabled={actionLoadingId === `receive-${d.id}`}
+                              onClick={() =>
+                                setAction({
+                                  title: "Nhận hàng chuyển kho",
+                                  fields: [
+                                    ...d.lines.map((l) => ({
+                                      name: "receive-" + l.id,
+                                      label:
+                                        l.lotId +
+                                        " · Tổng đã nhận (kg), trước đó " +
+                                        quantity(l.receivedKg),
+                                      type: "number",
+                                      min: l.receivedKg ?? 0,
+                                      max: l.quantityKg,
+                                      step: 0.001,
+                                      value: l.quantityKg,
+                                    })),
+                                    {
+                                      name: "note",
+                                      label:
+                                        "Ghi chú nhận hàng / phần còn chờ đối soát",
+                                      optional: true,
+                                    },
+                                  ],
+                                  submit: (data) =>
+                                    service.receive(
+                                      id,
+                                      d.id,
+                                      d.lines.map((l) => ({
+                                        lineId: l.id ?? "",
+                                        receivedKg: num(
+                                          data,
+                                          "receive-" + l.id
+                                        ),
+                                      })),
+                                      str(data, "note")
+                                    ),
+                                })
+                              }
+                            >
+                              {actionLoadingId === `receive-${d.id}`
+                                ? "Đang nhận..."
+                                : "Nhận hàng"}
+                            </Button>
+                          )}
+                        {(d.type === "OUTBOUND" || d.type === "TRANSFER") &&
+                          d.warehouseId === id &&
+                          !d.handoverReference &&
+                          (d.status === "CONFIRMED" ||
+                            d.status === "IN_TRANSIT") && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={() =>
+                                setAction({
+                                  title: "Ghi nhận bàn giao",
+                                  fields: [
+                                    {
+                                      name: "reference",
+                                      label:
+                                        "Mã biên bản / tham chiếu nhà phân phối",
+                                    },
+                                  ],
+                                  submit: (data) =>
+                                    service.handover(
+                                      id,
+                                      d.id,
+                                      str(data, "reference")
+                                    ),
+                                })
+                              }
+                            >
+                              Bàn giao
+                            </Button>
+                          )}
                       </div>
                     </td>
                   </tr>
@@ -981,6 +1058,10 @@ export function WarehouseManager() {
           )}
           {tab === "FEFO & giữ hàng" && (
             <>
+              <p className="text-sm text-slate-600">
+                Hạn dùng được tính đến hết ngày ghi trên lô theo giờ Việt Nam.
+                Hàng bị giữ chất lượng vẫn cần được mở giữ trước khi xuất.
+              </p>
               <div className="flex gap-2">
                 <Button
                   onClick={() =>
@@ -1075,7 +1156,14 @@ export function WarehouseManager() {
               )}
               <ErrorNotice error={reservations.error} />
               <Table
-                head={["Mã giữ", "Đơn", "Hết hạn", "Trạng thái", "Thao tác"]}
+                head={[
+                  "Mã giữ",
+                  "Đơn",
+                  "Hết hạn",
+                  "Trạng thái",
+                  "Đã xuất / Chưa xuất (kg)",
+                  "Thao tác",
+                ]}
                 empty={!reservations.data?.length}
               >
                 {reservations.data?.map((r) => (
@@ -1087,28 +1175,90 @@ export function WarehouseManager() {
                       <Status value={r.status} />
                     </td>
                     <td>
-                      {r.status === "ACTIVE" && (
+                      {quantity(
+                        r.lines.reduce(
+                          (sum, l) => sum + (l.dispatchedKg ?? 0),
+                          0
+                        )
+                      )}
+                      {" / "}
+                      {quantity(
+                        r.lines.reduce(
+                          (sum, l) =>
+                            sum + l.quantityKg - (l.dispatchedKg ?? 0),
+                          0
+                        )
+                      )}
+                    </td>
+                    <td>
+                      {(r.status === "ACTIVE" ||
+                        r.status === "PARTIALLY_CONSUMED") && (
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             disabled={busy}
                             onClick={() =>
-                              run(
-                                () =>
-                                  service.createDocument(id, "OUTBOUND", {
-                                    reservationId: r.id,
-                                    note: "Xuất cho đơn " + r.orderId,
-                                    lines: r.lines.map((l) => ({
+                              setAction({
+                                title: "Xuất từng phần cho đơn " + r.orderId,
+                                fields: r.lines
+                                  .filter(
+                                    (l) => l.quantityKg > (l.dispatchedKg ?? 0)
+                                  )
+                                  .map((l) => ({
+                                    name: "qty-" + l.balanceId,
+                                    label:
+                                      l.lotCode +
+                                      " · " +
+                                      locationLabel(l.locationId) +
+                                      " (kg)",
+                                    type: "number",
+                                    min: 0,
+                                    step: 0.001,
+                                    max: l.quantityKg - (l.dispatchedKg ?? 0),
+                                    value: l.quantityKg - (l.dispatchedKg ?? 0),
+                                  })),
+                                submit: (data) => {
+                                  const lines = r.lines
+                                    .map((l) => ({
                                       lotId: l.lotId,
                                       locationId: l.locationId,
-                                      quantityKg: l.quantityKg,
-                                    })),
-                                  }),
-                                "Đã tạo phiếu xuất nháp từ hàng giữ."
-                              )
+                                      quantityKg: num(
+                                        data,
+                                        "qty-" + l.balanceId
+                                      ),
+                                    }))
+                                    .filter((l) => l.quantityKg > 0);
+                                  if (!lines.length)
+                                    throw new Error(
+                                      "Nhập ít nhất một lượng xuất lớn hơn 0."
+                                    );
+                                  return service.createDocument(
+                                    id,
+                                    "OUTBOUND",
+                                    {
+                                      reservationId: r.id,
+                                      note: "Xuất cho đơn " + r.orderId,
+                                      lines,
+                                    }
+                                  );
+                                },
+                              })
                             }
                           >
                             Lập phiếu xuất
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() =>
+                              run(
+                                () => service.reconcile(id, r.id),
+                                "Đã phân bổ lại; kiểm tra các lô còn bị giữ hoặc thiếu hàng trước khi xuất."
+                              )
+                            }
+                          >
+                            Phân bổ lại
                           </Button>
                           <Button
                             size="sm"
@@ -1403,20 +1553,22 @@ export function WarehouseManager() {
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
               Bạn có chắc chắn muốn xác nhận phiếu{" "}
-              <strong className="text-slate-900">{labels[confirmation.type]}</strong>{" "}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-700">
+              <strong className="text-slate-900">
+                {labels[confirmation.type]}
+              </strong>{" "}
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
                 {confirmation.id.slice(0, 8)}
               </code>{" "}
               và ghi nhận thay đổi tồn kho?
             </p>
             {confirmation.note && (
-              <p className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600 border">
+              <p className="rounded-lg border bg-slate-50 p-2.5 text-xs text-slate-600">
                 <strong>Ghi chú:</strong> {confirmation.note}
               </p>
             )}
             <div className="max-h-60 overflow-y-auto rounded-lg border">
               <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-slate-50 text-slate-500 border-b">
+                <thead className="sticky top-0 border-b bg-slate-50 text-slate-500">
                   <tr>
                     <th className="p-2">Mã lô</th>
                     <th className="p-2">Vị trí</th>
@@ -1430,13 +1582,17 @@ export function WarehouseManager() {
                   {confirmation.lines.map((l, i) => (
                     <tr key={i} className="hover:bg-slate-50/50">
                       <td className="p-2 font-mono text-slate-800">
-                        {stock.data?.find((b) => b.lotId === l.lotId)?.lotCode ??
-                          l.lotId.slice(0, 8)}
+                        {stock.data?.find((b) => b.lotId === l.lotId)
+                          ?.lotCode ?? l.lotId.slice(0, 8)}
                       </td>
-                      <td className="p-2 text-slate-700">{locationLabel(l.locationId)}</td>
+                      <td className="p-2 text-slate-700">
+                        {locationLabel(l.locationId)}
+                      </td>
                       {confirmation.type === "TRANSFER" && (
                         <td className="p-2 text-slate-700">
-                          {l.targetLocationId ? locationLabel(l.targetLocationId) : "—"}
+                          {l.targetLocationId
+                            ? locationLabel(l.targetLocationId)
+                            : "—"}
                         </td>
                       )}
                       <td className="p-2 text-right font-medium text-slate-900">
@@ -1447,12 +1603,18 @@ export function WarehouseManager() {
                 </tbody>
                 <tfoot className="border-t bg-slate-50/80 font-medium">
                   <tr>
-                    <td colSpan={confirmation.type === "TRANSFER" ? 3 : 2} className="p-2 text-slate-600">
+                    <td
+                      colSpan={confirmation.type === "TRANSFER" ? 3 : 2}
+                      className="p-2 text-slate-600"
+                    >
                       Tổng cộng ({confirmation.lines.length} dòng):
                     </td>
-                    <td className="p-2 text-right text-emerald-700 font-bold">
+                    <td className="p-2 text-right font-bold text-emerald-700">
                       {quantity(
-                        confirmation.lines.reduce((sum, l) => sum + (l.quantityKg ?? 0), 0)
+                        confirmation.lines.reduce(
+                          (sum, l) => sum + (l.quantityKg ?? 0),
+                          0
+                        )
                       )}{" "}
                       kg
                     </td>
