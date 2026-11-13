@@ -33,6 +33,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("select count(distinct u) from User u join u.roles r where u.active = true and r.name = :roleName")
     long countActiveUsersWithRole(@Param("roleName") RoleName roleName);
 
+    @Query("select count(distinct u) from User u join u.roles r where u.active = true and u.adminLocked = false and r.name = :roleName")
+    long countActiveUnlockedUsersWithRole(@Param("roleName") RoleName roleName);
+
     @Override @EntityGraph(attributePaths = "roles")
     Optional<User> findById(UUID id);
 

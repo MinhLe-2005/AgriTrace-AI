@@ -34,7 +34,7 @@ public class WarehouseMonitoringStream {
             if (set.size() >= 25)
                 throw new com.example.myfullstackapp.exception.ConflictException(
                         "Too many live connections for this warehouse");
-            var emitter = new SseEmitter(120_000L);
+            var emitter = new SseEmitter(300_000L);
             set.add(emitter);
             Runnable remove = () -> set.remove(emitter);
             emitter.onCompletion(remove);

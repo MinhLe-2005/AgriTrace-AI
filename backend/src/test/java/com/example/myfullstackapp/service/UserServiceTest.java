@@ -1,6 +1,7 @@
 package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.user.UserUpdateRequest;
+import com.example.myfullstackapp.dto.user.AdminAccountLockRequest;
 import com.example.myfullstackapp.entity.Role;
 import com.example.myfullstackapp.entity.RoleName;
 import com.example.myfullstackapp.entity.User;
@@ -88,6 +89,20 @@ class UserServiceTest {
         verify(users).countActiveUsersWithRole(RoleName.ADMIN);
         verify(users).findActiveUsersWithRoleForUpdate(RoleName.ADMIN);
         verify(mapper).toResponse(argThat(updated -> updated.getRoles().contains(userRole)));
+    }
+
+    @Test
+    void preventsLockingTheLastAvailableAdministrator() {
+        UUID adminId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        when(users.findById(adminId)).thenReturn(Optional.of(user(adminId, true, RoleName.ADMIN)));
+        when(users.findActiveUsersWithRoleForUpdate(RoleName.ADMIN)).thenReturn(List.of());
+        when(users.countActiveUnlockedUsersWithRole(RoleName.ADMIN)).thenReturn(1L);
+
+        assertThrows(ConflictException.class, () -> service.setAccountLock(
+                adminId, new AdminAccountLockRequest(true, "maintenance"), actorId));
+
+        verify(mapper, never()).toResponse(any());
     }
 
     private UserUpdateRequest update(boolean active, RoleName role) {

@@ -78,7 +78,12 @@ function ProductsContent() {
 
   const { addItem } = useCartStore();
   const { user } = useAuthStore();
-  const { getProductDiscount } = useCampaignStore();
+  // Đăng ký theo `campaigns` để danh sách giá được tính lại khi sự kiện tải xong
+  const { getProductDiscount, loadCampaigns, campaigns } = useCampaignStore();
+
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
   const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
@@ -134,7 +139,7 @@ function ProductsContent() {
         const [prods, cats, loyalty] = await Promise.all([
           catalogService.getProducts(),
           catalogService.getCategories(),
-          loyaltyService.getLoyaltyMe(user?.email),
+          user ? loyaltyService.getLoyaltyMe(user.email) : Promise.resolve(null),
         ]);
         setProducts(prods);
         setCategories(cats);
@@ -209,7 +214,7 @@ function ProductsContent() {
         campaignDiscountPercent: 0,
       };
     });
-  }, [products, getProductDiscount]);
+  }, [products, getProductDiscount, campaigns]);
 
   // Compute product count per category
   const categoryCounts = useMemo(() => {

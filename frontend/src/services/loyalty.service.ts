@@ -4,7 +4,7 @@ import type { ApiVoucher } from "./catalog.service";
 export type LoyaltyTransaction = {
   id: string;
   points: number;
-  transactionType: "EARNED" | "REDEEMED" | "BONUS";
+  transactionType: "EARNED" | "REDEEMED" | "BONUS" | "REVOKED";
   description: string;
   createdAt: string;
 };
@@ -112,11 +112,6 @@ export const loyaltyService = {
 
   async adminDeleteVoucher(id: number): Promise<boolean> {
     const res = await api.delete<{ success: boolean }>(`/vouchers/${id}`);
-    return res.data?.success || false;
-  },
-
-  async adminUpdateOrderStatus(orderCode: string, status: string): Promise<boolean> {
-    const res = await api.patch<{ success: boolean }>(`/orders/${orderCode}/status`, { status });
     return res.data?.success || false;
   },
 };

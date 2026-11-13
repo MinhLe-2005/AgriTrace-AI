@@ -151,6 +151,26 @@ export function QuickBuyModal({
     }
   }, [completedOrderCode, showPayosQr, onClose, router]);
 
+  // Real-time automatic payment confirmation polling (Auto detect when money arrives via VietQR)
+  useEffect(() => {
+    if (!showPayosQr || !completedOrderCode) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await paymentService.checkPaymentStatus(completedOrderCode);
+        if (res && res.status === "PAID") {
+          clearInterval(interval);
+          toast.success(`Ting ting! Hệ thống đã nhận được chuyển khoản VietQR cho đơn #${completedOrderCode}!`);
+          setShowPayosQr(false);
+          onClose();
+          router.push(`/checkout/success?orderCode=${completedOrderCode}`);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [showPayosQr, completedOrderCode, onClose, router]);
+
   if (!isOpen || !product) return null;
 
   const subtotal = (product.price || 0) * (qty || 1);
@@ -781,7 +801,7 @@ export function QuickBuyModal({
                     className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-600 text-emerald-800 hover:bg-emerald-50 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                   >
                     <ExternalLink size={14} />
-                    <span>Mở Cổng PayOS (Visa/ATM)</span>
+                    <span>Mở Trang Thanh Toán QR</span>
                   </a>
                 )}
                 <button
@@ -1121,7 +1141,7 @@ export function QuickBuyModal({
                   )}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-extrabold text-gray-950 text-xs">payOS (VietQR Napas 24/7)</span>
+                    <span className="font-extrabold text-gray-950 text-xs">Chuyển khoản VietQR 24/7</span>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-700 text-white shadow-2xs">
                       Khuyên Dùng
                     </span>

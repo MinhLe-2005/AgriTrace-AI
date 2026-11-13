@@ -3,6 +3,7 @@ package com.example.myfullstackapp.service;
 import com.example.myfullstackapp.config.AppProperties;
 import com.example.myfullstackapp.entity.RefreshToken;
 import com.example.myfullstackapp.entity.User;
+import com.example.myfullstackapp.exception.AccountLockedException;
 import com.example.myfullstackapp.exception.InvalidTokenException;
 import com.example.myfullstackapp.repository.RefreshTokenRepository;
 import com.example.myfullstackapp.security.JwtTokenService;
@@ -48,9 +49,27 @@ public class RefreshTokenService {
         Claims claims = jwtTokenService.parseRefreshToken(value);
         RefreshToken token = refreshTokenRepository.findByTokenIdAndRevokedFalse(tokenId(claims))
                 .orElseThrow(() -> new InvalidTokenException("Refresh token is no longer active"));
-        if (!token.getUser().isActive()) {
+        User user = token.getUser();
+        if (!user.isActive()) {
             token.setRevoked(true);
             throw new InvalidTokenException("Account is disabled");
+        }
+        if (user.isAdminLocked()) {
+            token.setRevoked(true);
+            throw new AccountLockedException("Tài khoản đã bị khoá bởi quản trị viên", null);
+        }
+        if (user.isSelfLocked()) {
+            token.setRevoked(true);
+            throw new AccountLockedException("Tài khoản đã bị khoá bởi chủ sở hữu", null);
+        }
+        if (user.getLockedUntil() != null) {
+            if (Instant.now().isBefore(user.getLockedUntil())) {
+                token.setRevoked(true);
+                throw new AccountLockedException("Tài khoản đang bị khoá tạm thời do đăng nhập sai nhiều lần", user.getLockedUntil());
+            }
+            user.setLockedUntil(null);
+            user.setFailedLoginAttempts(0);
+            user.setLockReason(null);
         }
         if (token.getExpiresAt().isBefore(Instant.now())) {
             token.setRevoked(true);

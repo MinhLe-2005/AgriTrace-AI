@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +15,10 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     List<Shipment> findByStatusOrderByCreatedAtDesc(String status);
     List<Shipment> findByDistributorEmailIgnoreCaseOrderByCreatedAtDesc(String distributorEmail);
     List<Shipment> findByDistributorEmailIgnoreCaseAndStatusOrderByCreatedAtDesc(String distributorEmail, String status);
+    List<Shipment> findByLotCodeIgnoreCaseOrderByCreatedAtAsc(String lotCode);
+
+    @Query("select s from Shipment s where lower(s.shipmentCode) in :shipmentCodes order by s.createdAt asc")
+    List<Shipment> findByShipmentCodeIgnoreCaseIn(@Param("shipmentCodes") Collection<String> shipmentCodes);
 
     /** Legacy safeguard for shipment rows created before Order ownership fields existed. */
     @Query(value = """

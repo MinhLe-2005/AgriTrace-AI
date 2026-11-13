@@ -95,6 +95,8 @@ export type ApiOrder = {
     | "REFUNDED"
     | "PENDING";
   paymentMethod: string;
+  /** Trạng thái có thể chuyển tới, do backend tính (OrderStatusRules). */
+  allowedNextStatuses?: string[];
   voucherUsed?: string;
   cancelReason?: string;
   cancelledAt?: string;
@@ -160,6 +162,18 @@ export const catalogService = {
   async getOrders(email?: string): Promise<ApiOrder[]> {
     const res = await api.get<ApiOrder[]>("/orders", { params: email ? { email } : undefined });
     return res.data;
+  },
+
+  /** Khách chưa đăng nhập phải gửi kèm SĐT người nhận; chủ đơn/admin không cần. */
+  async getOrderByCode(orderCode: string, phone?: string): Promise<ApiOrder | null> {
+    try {
+      const res = await api.get<ApiOrder>(`/orders/${encodeURIComponent(orderCode)}`, {
+        params: phone ? { phone } : undefined,
+      });
+      return res.data ?? null;
+    } catch {
+      return null;
+    }
   },
 
   async createOrder(data: {

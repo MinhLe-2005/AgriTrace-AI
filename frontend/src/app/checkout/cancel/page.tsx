@@ -21,7 +21,7 @@ function CancelContent() {
             Thanh Toán Đã Hủy
           </h1>
           <p className="text-sm text-gray-500">
-            Giao dịch thanh toán payOS cho đơn hàng {orderCode ? `#${orderCode}` : ""} đã tạm dừng hoặc bạn đã hủy giao dịch.
+            Giao dịch chuyển khoản VietQR cho đơn hàng {orderCode ? `#${orderCode}` : ""} đã tạm dừng hoặc bạn đã hủy giao dịch.
           </p>
         </div>
 

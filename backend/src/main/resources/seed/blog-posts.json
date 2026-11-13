@@ -1,0 +1,45 @@
+[
+  {
+    "id": "blog-1",
+    "title": "Thông Báo Quyết Định Trợ Giá Nông Sản Theo Mùa Vụ Thu Đông 2026: Biểu Giá Trực Tiếp Tại Vườn & Lịch Thu Hoạch Chi Tiết (QĐ #88/2026/QĐ-AGRI)",
+    "slug": "quyet-dinh-tro-gia-nong-san-mua-vu-thu-dong-2026",
+    "category": "season",
+    "categoryLabel": "Quyết định & Mùa vụ",
+    "author": "Ban Điều Phối Mùa Vụ & Liên Minh HTX",
+    "authorRole": "Hội Đồng Quản Trị Chuỗi Cung Ứng AgriTrace AI",
+    "date": "11/11/2026",
+    "readTime": "5 phút đọc",
+    "excerpt": "Công bố Quyết định số 88/2026/QĐ-AGRI về chính sách trợ giá trực tiếp 13% – 18% cho nông sản chính vụ tại Đà Lạt, Mộc Châu và Hàm Yên. Bảng tổng hợp lịch biểu tháng nào giảm món gì, cơ chế cộng dồn voucher và hướng dẫn nhận thông báo sale.",
+    "featured": true,
+    "relatedProductName": "Dâu Tây New Zealand Mộc Châu",
+    "active": true
+  },
+  {
+    "id": "blog-2",
+    "title": "Ứng Dụng Trí Tuệ Nhân Tạo (AI) Trong Dự Báo Nhu Cầu & Quản Trị Chuỗi Nông Sản 2026",
+    "slug": "ung-dung-ai-du-bao-nhu-cau-nong-san-2026",
+    "category": "ai",
+    "categoryLabel": "Công nghệ AI",
+    "author": "TS. Trần Văn Minh",
+    "authorRole": "Viện Nghiên cứu Nông nghiệp Số",
+    "date": "14/10/2026",
+    "readTime": "6 phút đọc",
+    "excerpt": "Làm thế nào để các hợp tác xã và chuỗi siêu thị dự đoán chính xác lượng rau củ tiêu thụ trong 7 ngày tới? Mô hình AI Demand Forecasting kết hợp lịch sử đơn hàng và dữ liệu mùa vụ giúp giảm tới 35% hao hụt tồn kho.",
+    "relatedProductName": "Cải Xoăn Kale Hữu Cơ",
+    "active": true
+  },
+  {
+    "id": "blog-3",
+    "title": "Cẩm Nang Quét Mã QR Truy Xuất Nguồn Gốc: Hiểu Đúng Từng Thông Số Kiểm Định",
+    "slug": "cam-nang-quet-ma-qr-truy-xuat-nguon-goc",
+    "category": "guide",
+    "categoryLabel": "Cẩm nang tiêu dùng",
+    "author": "Ban Biên Tập AgriTrace",
+    "authorRole": "Bộ phận QA/QC",
+    "date": "12/10/2026",
+    "readTime": "4 phút đọc",
+    "excerpt": "Khi quét mã QR trên quả cam hay bó rau thủy canh, những thông số nào quan trọng nhất bạn cần đối soát? Hướng dẫn đọc ngày thu hoạch, mã nông trại và chứng chỉ VietGAP trực tuyến.",
+    "relatedProductName": "Xà Lách Lô Lô Xanh Thủy Canh",
+    "active": true
+  }
+]

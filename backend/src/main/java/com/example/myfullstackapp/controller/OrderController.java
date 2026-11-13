@@ -6,6 +6,7 @@ import com.example.myfullstackapp.dto.order.CreateOrderRequest;
 import com.example.myfullstackapp.dto.order.UpdateOrderStatusRequest;
 import com.example.myfullstackapp.entity.Order;
 import com.example.myfullstackapp.entity.OrderItem;
+import com.example.myfullstackapp.entity.OrderStatusRules;
 import com.example.myfullstackapp.entity.Product;
 import com.example.myfullstackapp.repository.OrderRepository;
 import com.example.myfullstackapp.repository.ProductRepository;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -34,22 +36,19 @@ public class OrderController {
 
     private static final Set<String> NON_CANCELLABLE_STATUSES = Set.of("SHIPPING", "DELIVERED", "CANCELLED", "REFUNDED");
 
+
     @GetMapping
     public ResponseEntity<List<Order>> getOrders(
             @RequestParam(required = false) String email,
             Authentication authentication
     ) {
-        if (email == null && canManageDistribution(authentication)) {
+        boolean loggedIn = isLoggedIn(authentication);
+        boolean manager = canManageDistribution(authentication);
+        if ((email == null || email.isBlank()) && (!loggedIn || manager)) {
             return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
         }
-        String targetEmail = email;
-        if (targetEmail == null && authentication != null) {
-            targetEmail = authentication.getName();
-        }
-        if (targetEmail != null && !targetEmail.isBlank()) {
-            return ResponseEntity.ok(orderRepository.findByUserEmailOrderByCreatedAtDesc(targetEmail));
-        }
-        return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
+        String targetEmail = (email == null || email.isBlank()) ? authentication.getName() : email.trim();
+        return ResponseEntity.ok(orderRepository.findByUserEmailOrderByCreatedAtDesc(targetEmail));
     }
 
     private boolean canManageDistribution(Authentication authentication) {
@@ -58,11 +57,54 @@ public class OrderController {
         );
     }
 
+    /**
+     * Tra cứu đơn theo mã. Được phép khi: là ADMIN/DISTRIBUTOR, là chủ đơn (đã đăng nhập),
+     * hoặc khách cung cấp đúng số điện thoại người nhận. Sai điều kiện trả 404 để không lộ đơn tồn tại.
+     */
     @GetMapping("/{orderCode}")
-    public ResponseEntity<Order> getOrderByCode(@PathVariable String orderCode) {
-        return orderRepository.findByOrderCode(orderCode)
+    public ResponseEntity<Order> getOrderByCode(
+            @PathVariable String orderCode,
+            @RequestParam(required = false) String phone,
+            Authentication authentication
+    ) {
+        return orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private boolean canViewOrder(Order order, String phone, Authentication authentication) {
+        if (isLoggedIn(authentication)) {
+            if (canManageDistribution(authentication)) return true;
+            if (order.getUserEmail() != null && order.getUserEmail().equalsIgnoreCase(authentication.getName())) return true;
+        }
+        String given = normalizePhone(phone);
+        String actual = normalizePhone(order.getReceiverPhone());
+        return given.length() >= 9 && given.equals(actual);
+    }
+
+    private static String normalizePhone(String phone) {
+        if (phone == null) return "";
+        String digits = phone.replaceAll("[^0-9]", "");
+        if (digits.startsWith("84") && digits.length() > 10) digits = "0" + digits.substring(2);
+        return digits;
+    }
+
+    private static boolean isLoggedIn(Authentication authentication) {
+        return authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
+    }
+
+    private static final String ORDER_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    private String generateOrderCode() {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            StringBuilder sb = new StringBuilder("AGRI-");
+            for (int i = 0; i < 8; i++) sb.append(ORDER_CODE_ALPHABET.charAt(RANDOM.nextInt(ORDER_CODE_ALPHABET.length())));
+            String code = sb.toString();
+            if (orderRepository.findByOrderCode(code).isEmpty()) return code;
+        }
+        throw new IllegalStateException("Không thể sinh mã đơn hàng, vui lòng thử lại");
     }
 
     @PostMapping
@@ -71,15 +113,14 @@ public class OrderController {
             @Valid @RequestBody CreateOrderRequest req,
             Authentication authentication
     ) {
-        String email = req.getUserEmail();
-        if (email == null && authentication != null) {
-            email = authentication.getName();
-        }
+        // Đã đăng nhập: luôn dùng email trong token, bỏ qua userEmail gửi lên để tránh gán đơn/điểm cho người khác
+        boolean loggedIn = isLoggedIn(authentication);
+        String email = loggedIn ? authentication.getName() : req.getUserEmail();
         if (email == null || email.isBlank()) {
             email = "customer@gmail.com";
         }
 
-        String orderCode = "AGRI-" + (int)(Math.random() * 9000 + 1000);
+        String orderCode = generateOrderCode();
 
         String paymentMethod = req.getPaymentMethod() != null ? req.getPaymentMethod().toUpperCase() : "COD";
         // Order lifecycle initial status based on payment method
@@ -158,14 +199,12 @@ public class OrderController {
         Order saved = orderRepository.save(order);
 
         // Award loyalty points to the customer
-        if (email != null && !email.isBlank()) {
-            loyaltyService.awardOrderPoints(
-                    email,
-                    saved.getTotal() != null ? saved.getTotal() : 0L,
-                    saved.getOrderCode(),
-                    saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
-            );
-        }
+        loyaltyService.awardOrderPoints(
+                email,
+                saved.getTotal() != null ? saved.getTotal() : 0L,
+                saved.getOrderCode(),
+                saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+        );
 
         return ResponseEntity.ok(saved);
     }
@@ -174,28 +213,33 @@ public class OrderController {
     @Transactional
     public ApiResponse<Order> cancelOrder(
             @PathVariable String orderCode,
-            @RequestBody(required = false) CancelOrderRequest request
+            @RequestBody(required = false) CancelOrderRequest request,
+            Authentication authentication
     ) {
-        Order order = orderRepository.findByOrderCode(orderCode)
+        Order order = orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
 
         if (NON_CANCELLABLE_STATUSES.contains(order.getStatus().toUpperCase())) {
-            throw new IllegalStateException("Không thể hủy đơn hàng khi đơn đã sang trạng thái " + order.getStatus());
+            throw new IllegalArgumentException("Không thể hủy đơn hàng khi đơn đã sang trạng thái " + order.getStatus());
         }
 
+        applyCancellation(order, request != null && request.getReason() != null ? request.getReason() : "Khách hàng yêu cầu hủy đơn");
+        Order saved = orderRepository.save(order);
+        return ApiResponse.ok("Hủy đơn hàng thành công!", saved);
+    }
+
+    /** Hủy đơn: đặt trạng thái, hoàn tồn kho và thu hồi điểm đã tích. Dùng chung cho /cancel và /status. */
+    private void applyCancellation(Order order, String reason) {
         order.setStatus("CANCELLED");
         order.setCancelledAt(LocalDateTime.now());
-        order.setCancelReason(request != null && request.getReason() != null ? request.getReason() : "Khách hàng yêu cầu hủy đơn");
-
-        // Restore product stock
+        order.setCancelReason(reason);
         if (order.getItems() != null) {
             for (OrderItem item : order.getItems()) {
                 restoreProductStock(item.getName(), item.getQty());
             }
         }
-
-        Order saved = orderRepository.save(order);
-        return ApiResponse.ok("Hủy đơn hàng thành công!", saved);
+        loyaltyService.revokeOrderPoints(order.getUserEmail(), order.getOrderCode(),
+                order.getTotal() != null ? order.getTotal() : 0L);
     }
 
     @PatchMapping("/{orderCode}/status")
@@ -204,11 +248,31 @@ public class OrderController {
             @PathVariable String orderCode,
             @Valid @RequestBody UpdateOrderStatusRequest request
     ) {
-        Order order = orderRepository.findByOrderCode(orderCode)
+        Order order = orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
 
+        String currentStatus = order.getStatus() != null ? order.getStatus().toUpperCase() : "CONFIRMED";
         String newStatus = request.getStatus().trim().toUpperCase();
-        order.setStatus(newStatus);
+        if (!OrderStatusRules.KNOWN_STATUSES.contains(newStatus)) {
+            throw new IllegalArgumentException("Trạng thái không hợp lệ: " + newStatus);
+        }
+        if (newStatus.equals(currentStatus)) {
+            return ApiResponse.ok("Trạng thái đơn hàng không thay đổi", order);
+        }
+        if (!OrderStatusRules.canTransition(currentStatus, newStatus)) {
+            throw new IllegalArgumentException("Không thể chuyển đơn #" + orderCode + " từ " + currentStatus + " sang " + newStatus);
+        }
+
+        if ("CANCELLED".equals(newStatus)) {
+            applyCancellation(order, "Quản trị viên hủy đơn");
+        } else {
+            order.setStatus(newStatus);
+        }
+        if ("REFUNDED".equals(newStatus)) {
+            // Hoàn tiền: thu hồi điểm đã tích. Không hoàn kho vì hàng có thể đã giao tới khách.
+            loyaltyService.revokeOrderPoints(order.getUserEmail(), order.getOrderCode(),
+                    order.getTotal() != null ? order.getTotal() : 0L);
+        }
         if ("PAID".equals(newStatus) && order.getPaidAt() == null) {
             order.setPaidAt(LocalDateTime.now());
         }

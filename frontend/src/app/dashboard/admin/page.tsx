@@ -137,8 +137,17 @@ function AdminPortalContent() {
     getCampaignStatus,
     addBlogPost,
     updateBlogPost,
+    toggleBlogPost,
     deleteBlogPost,
+    loadCampaigns,
+    loadBlogPosts,
   } = useCampaignStore();
+
+  useEffect(() => {
+    // Admin luôn tải bản mới nhất, kể cả bài viết đang ẩn
+    loadCampaigns(true);
+    loadBlogPosts(true);
+  }, [loadCampaigns, loadBlogPosts]);
 
   const [eventSearch, setEventSearch] = useState("");
   const [eventFilter, setEventFilter] = useState<"all" | "active" | "upcoming" | "expired">("all");
@@ -264,20 +273,15 @@ function AdminPortalContent() {
   // --- Handlers: Orders ---
   async function handleUpdateOrderStatus(orderCode: string, newStatus: string) {
     try {
-      const ok = await loyaltyService.adminUpdateOrderStatus(orderCode, newStatus);
-      if (ok) {
-        toast.success(`Đã cập nhật trạng thái đơn #${orderCode} sang ${newStatus}!`);
-        setOrders((prev) =>
-          prev.map((o) => (o.orderCode === orderCode ? { ...o, status: newStatus as ApiOrder["status"] } : o))
-        );
-        if (selectedOrder?.orderCode === orderCode) {
-          setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus as ApiOrder["status"] } : null));
-        }
-      } else {
-        toast.error("Cập nhật trạng thái thất bại.");
+      // Dùng đơn backend trả về để cập nhật cả status lẫn allowedNextStatuses
+      const updated = await catalogService.updateOrderStatus(orderCode, newStatus);
+      toast.success(`Đã cập nhật trạng thái đơn #${orderCode} sang ${newStatus}!`);
+      setOrders((prev) => prev.map((o) => (o.orderCode === orderCode ? updated : o)));
+      if (selectedOrder?.orderCode === orderCode) {
+        setSelectedOrder(updated);
       }
-    } catch {
-      toast.error("Lỗi khi kết nối cập nhật đơn hàng.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -313,8 +317,8 @@ function AdminPortalContent() {
         description: "Mã ưu đãi áp dụng toàn hệ thống AgriTrace AI",
       });
       fetchVouchers();
-    } catch {
-      toast.error("Không thể tạo voucher. Mã có thể đã tồn tại.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -336,8 +340,8 @@ function AdminPortalContent() {
         toast.success(`Đã xóa voucher [${code}]!`);
         setVouchers((prev) => prev.filter((v) => v.id !== id));
       }
-    } catch {
-      toast.error("Không thể xóa voucher.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -345,6 +349,14 @@ function AdminPortalContent() {
   async function handleSendBonus(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedMember) return;
+    if (!Number.isInteger(bonusPoints) || bonusPoints === 0) {
+      toast.error("Số điểm điều chỉnh phải là số nguyên khác 0.");
+      return;
+    }
+    if (bonusPoints < 0 && selectedMember.currentPoints + bonusPoints < 0) {
+      toast.error(`Hội viên chỉ còn ${selectedMember.currentPoints} điểm, không thể trừ ${Math.abs(bonusPoints)} điểm.`);
+      return;
+    }
     try {
       const ok = await loyaltyService.adminAddBonus(
         selectedMember.user.id,
@@ -358,8 +370,8 @@ function AdminPortalContent() {
         setShowBonusModal(false);
         fetchMembers();
       }
-    } catch {
-      toast.error("Không thể cập nhật điểm thưởng.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   }
 
@@ -414,7 +426,7 @@ function AdminPortalContent() {
     setShowEventModal(true);
   };
 
-  const handleSaveEvent = (e: React.FormEvent) => {
+  const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventForm.title.trim()) {
       toast.error("Vui lòng nhập tên sự kiện!");
@@ -435,10 +447,11 @@ function AdminPortalContent() {
             .filter(Boolean)
         : [];
 
+    try {
     if (editingEventId) {
-      updateCampaign(editingEventId, {
+      await updateCampaign(editingEventId, {
         title: eventForm.title.trim(),
-        slug: eventForm.slug.trim() || eventForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: eventForm.slug.trim(),
         type: eventForm.type,
         typeLabel: eventForm.typeLabel,
         typeColor: eventForm.typeColor,
@@ -449,6 +462,8 @@ function AdminPortalContent() {
         targetType: eventForm.targetType,
         targetCategoryCodes: catCodes,
         targetProductNames: prodNames,
+        // Form không quản lý targetProductIds → xóa để seed ID cũ không còn áp giảm giá ngầm
+        targetProductIds: [],
         voucherCode: eventForm.voucherCode.trim() || undefined,
         bannerIcon: eventForm.bannerIcon.trim() || "🌿",
         badgeText: eventForm.badgeText.trim() || `Vụ mùa -${eventForm.discountPercent}%`,
@@ -458,9 +473,9 @@ function AdminPortalContent() {
       });
       toast.success(`Đã cập nhật sự kiện: ${eventForm.title}!`);
     } else {
-      addCampaign({
+      await addCampaign({
         title: eventForm.title.trim(),
-        slug: eventForm.slug.trim() || eventForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: eventForm.slug.trim(),
         type: eventForm.type,
         typeLabel: eventForm.typeLabel,
         typeColor: eventForm.typeColor,
@@ -481,12 +496,34 @@ function AdminPortalContent() {
       toast.success(`Đã tạo sự kiện khuyến mãi mới: ${eventForm.title}!`);
     }
     setShowEventModal(false);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
   };
 
-  const handleDeleteEvent = (id: string, title: string) => {
-    if (window.confirm(`Bạn có chắc muốn xóa sự kiện [${title}]? Sau khi xóa, các sản phẩm áp dụng sự kiện này sẽ tự động trở về giá niêm yết ban đầu.`)) {
-      deleteCampaign(id);
+  const handleDeleteEvent = async (id: string, title: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa sự kiện [${title}]? Sau khi xóa, các sản phẩm áp dụng sự kiện này sẽ tự động trở về giá niêm yết ban đầu.`)) return;
+    try {
+      await deleteCampaign(id);
       toast.success(`Đã xóa sự kiện [${title}]!`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const handleToggleEvent = async (id: string) => {
+    try {
+      await toggleCampaign(id);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const handleToggleBlog = async (id: string) => {
+    try {
+      await toggleBlogPost(id);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   };
 
@@ -533,17 +570,18 @@ function AdminPortalContent() {
     setShowBlogModal(true);
   };
 
-  const handleSaveBlog = (e: React.FormEvent) => {
+  const handleSaveBlog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!blogForm.title.trim()) {
       toast.error("Vui lòng nhập tiêu đề bài viết!");
       return;
     }
 
+    try {
     if (editingBlogId) {
-      updateBlogPost(editingBlogId, {
+      await updateBlogPost(editingBlogId, {
         title: blogForm.title.trim(),
-        slug: blogForm.slug.trim() || blogForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: blogForm.slug.trim(),
         category: blogForm.category,
         categoryLabel: blogForm.categoryLabel,
         author: blogForm.author.trim(),
@@ -559,9 +597,9 @@ function AdminPortalContent() {
       });
       toast.success(`Đã cập nhật bài viết blog: ${blogForm.title}!`);
     } else {
-      addBlogPost({
+      await addBlogPost({
         title: blogForm.title.trim(),
-        slug: blogForm.slug.trim() || blogForm.title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        slug: blogForm.slug.trim(),
         category: blogForm.category,
         categoryLabel: blogForm.categoryLabel,
         author: blogForm.author.trim(),
@@ -578,12 +616,18 @@ function AdminPortalContent() {
       toast.success(`Đã đăng bài viết blog mới: ${blogForm.title}!`);
     }
     setShowBlogModal(false);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
   };
 
-  const handleDeleteBlog = (id: string, title: string) => {
-    if (window.confirm(`Bạn có chắc muốn xóa bài viết [${title}]?`)) {
-      deleteBlogPost(id);
+  const handleDeleteBlog = async (id: string, title: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa bài viết [${title}]?`)) return;
+    try {
+      await deleteBlogPost(id);
       toast.success(`Đã xóa bài viết [${title}]!`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   };
 
@@ -644,7 +688,7 @@ function AdminPortalContent() {
 
   const totalRevenue = useMemo(() => {
     return orders
-      .filter((o) => o.status !== "CANCELLED")
+      .filter((o) => REVENUE_STATUSES.has(String(o.status).toUpperCase()))
       .reduce((sum, o) => sum + (o.total || 0), 0);
   }, [orders]);
 
@@ -1026,13 +1070,23 @@ function AdminPortalContent() {
                           <div className="flex items-center justify-end gap-1.5">
                             <select
                               value={order.status}
-                              onChange={(e) => handleUpdateOrderStatus(order.orderCode, e.target.value)}
-                              className="text-[11px] font-semibold border border-gray-200 rounded-lg p-1 bg-white outline-none focus:border-red-600"
+                              disabled={(order.allowedNextStatuses ?? []).length === 0}
+                              onChange={(e) => {
+                                const next = e.target.value;
+                                if (next === "CANCELLED" && !window.confirm(`Hủy đơn #${order.orderCode}? Tồn kho sẽ được hoàn và điểm thưởng của khách bị thu hồi.`)) return;
+                                handleUpdateOrderStatus(order.orderCode, next);
+                              }}
+                              className="text-[11px] font-semibold border border-gray-200 rounded-lg p-1 bg-white outline-none focus:border-red-600 disabled:opacity-50"
                             >
-                              <option value="CONFIRMED">Chờ xác nhận</option>
-                              <option value="SHIPPING">Giao xe lạnh</option>
-                              <option value="DELIVERED">Đã giao hàng</option>
-                              <option value="CANCELLED">Hủy đơn</option>
+                              {ORDER_STATUS_OPTIONS.map((opt) => (
+                                <option
+                                  key={opt.value}
+                                  value={opt.value}
+                                  disabled={opt.value !== order.status && !(order.allowedNextStatuses ?? []).includes(opt.value)}
+                                >
+                                  {opt.label}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         </td>
@@ -1462,7 +1516,7 @@ function AdminPortalContent() {
                           </td>
                           <td className="p-3.5 text-center">
                             <button
-                              onClick={() => toggleCampaign(c.id)}
+                              onClick={() => handleToggleEvent(c.id)}
                               className={cn(
                                 "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
                                 c.active
@@ -1637,9 +1691,7 @@ function AdminPortalContent() {
                         </td>
                         <td className="p-3.5 text-center">
                           <button
-                            onClick={() =>
-                              updateBlogPost(p.id, { active: !p.active })
-                            }
+                            onClick={() => handleToggleBlog(p.id)}
                             className={cn(
                               "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
                               p.active
@@ -2374,6 +2426,19 @@ function AdminPortalContent() {
     </div>
   );
 }
+
+const ORDER_STATUS_OPTIONS = [
+  { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },
+  { value: "PAID", label: "Đã thanh toán" },
+  { value: "CONFIRMED", label: "Đã xác nhận" },
+  { value: "SHIPPING", label: "Giao xe lạnh" },
+  { value: "DELIVERED", label: "Đã giao hàng" },
+  { value: "CANCELLED", label: "Hủy đơn" },
+  { value: "REFUNDED", label: "Đã hoàn tiền" },
+];
+
+/** Chỉ tính doanh thu cho đơn đã thanh toán hoặc COD đã được xác nhận. */
+const REVENUE_STATUSES = new Set(["PAID", "CONFIRMED", "SHIPPING", "DELIVERED"]);
 
 export default function AdminPortalPage() {
   return (

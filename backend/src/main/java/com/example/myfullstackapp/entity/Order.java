@@ -15,6 +15,13 @@ import java.util.List;
 @Builder
 public class Order {
 
+    /** Các trạng thái admin có thể chuyển tới (không lưu DB, chỉ trả về trong JSON). */
+    @Transient
+    public java.util.List<String> getAllowedNextStatuses() {
+        return OrderStatusRules.nextStatuses(status);
+    }
+
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

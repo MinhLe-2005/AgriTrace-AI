@@ -11,6 +11,7 @@ import com.example.myfullstackapp.service.LoyaltyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,13 +32,7 @@ public class LoyaltyController {
             @RequestParam(required = false) String email,
             Authentication authentication
     ) {
-        String targetEmail = (email != null && !email.isBlank()) ? email.trim() : null;
-        if (targetEmail == null && authentication != null && authentication.isAuthenticated()) {
-            targetEmail = authentication.getName();
-        }
-        if (targetEmail == null) {
-            targetEmail = "customer@gmail.com";
-        }
+        String targetEmail = resolveEmail(email, authentication);
 
         LoyaltyMembership membership = loyaltyService.getOrCreateMembership(targetEmail);
         if (membership == null) {
@@ -123,16 +118,31 @@ public class LoyaltyController {
             @Valid @RequestBody RedeemVoucherRequest req,
             Authentication authentication
     ) {
-        String email = req.getUserEmail();
-        if ((email == null || email.isBlank()) && authentication != null) {
-            email = authentication.getName();
-        }
-        if (email == null || email.isBlank()) {
-            email = "customer@gmail.com";
-        }
+        // Chỉ đổi điểm cho chính tài khoản đang đăng nhập (admin được chỉ định email khác)
+        String email = resolveEmail(req.getUserEmail(), authentication);
 
         Voucher voucher = loyaltyService.redeemVoucher(email, req.getPointsCost(), req.getVoucherType(), req.getTitle());
         return ApiResponse.ok("Đổi voucher thành công! Mã ưu đãi của bạn: " + voucher.getCode(), voucher);
+    }
+
+    /** Email đích = email của token hoặc email truyền vào (cho phép demo/OAuth session). */
+    private String resolveEmail(String requestedEmail, Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+            String own = authentication.getName();
+            if (requestedEmail == null || requestedEmail.isBlank() || requestedEmail.trim().equalsIgnoreCase(own)) {
+                return own;
+            }
+            boolean admin = authentication.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+            if (admin) {
+                return requestedEmail.trim();
+            }
+            return own;
+        }
+        if (requestedEmail != null && !requestedEmail.isBlank()) {
+            return requestedEmail.trim();
+        }
+        return "customer@gmail.com";
     }
 
     @GetMapping("/admin/members")
@@ -143,6 +153,6 @@ public class LoyaltyController {
     @PostMapping("/admin/bonus")
     public ApiResponse<String> adminAddBonus(@Valid @RequestBody AdminBonusPointsRequest req) {
         loyaltyService.adminAddBonusPoints(req.getUserId(), req.getPoints(), req.getReason());
-        return ApiResponse.ok("Cập nhật điểm thưởng thành công", "Đã cộng/trừ " + req.getPoints() + " điểm");
+        return ApiResponse.ok("Cập nhật điểm thưởng thành công", (req.getPoints() > 0 ? "Đã cộng " : "Đã trừ ") + Math.abs(req.getPoints()) + " điểm");
     }
 }

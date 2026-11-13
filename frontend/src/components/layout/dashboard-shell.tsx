@@ -161,11 +161,19 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, hasHydrated, clearSession, refreshToken } = useAuthStore();
 
+  const isAdminRoute = pathname.startsWith("/dashboard/admin") || pathname.startsWith("/dashboard/users");
+  const isAdmin = Boolean(user?.roles?.includes("ADMIN"));
+  const forbidden = Boolean(user) && isAdminRoute && !isAdmin;
+
   useEffect(() => {
     if (hasHydrated && !user) router.replace("/login");
-  }, [hasHydrated, router, user]);
+    else if (hasHydrated && forbidden) {
+      toast.error("Bạn không có quyền truy cập trang quản trị.");
+      router.replace("/dashboard");
+    }
+  }, [hasHydrated, router, user, forbidden]);
 
-  if (!hasHydrated || !user) {
+  if (!hasHydrated || !user || forbidden) {
     return (
       <main className="max-w-4xl mx-auto py-12 px-4">
         <LoadingSkeleton rows={6} />

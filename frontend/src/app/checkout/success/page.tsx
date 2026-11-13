@@ -29,9 +29,13 @@ function SuccessContent() {
     paymentService.simulatePaymentSuccess(orderCode).catch(() => {});
 
     catalogService
-      .getOrders()
-      .then((orders) => {
-        const found = orders.find((o) => o.orderCode === orderCode);
+      .getOrderByCode(
+        orderCode,
+        typeof window !== "undefined"
+          ? sessionStorage.getItem(`agri-order-phone:${orderCode}`) ?? undefined
+          : undefined
+      )
+      .then((found) => {
         if (found) setOrder(found);
         setLoading(false);
       })
@@ -63,7 +67,7 @@ function SuccessContent() {
 
         <div className="space-y-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
-            <Sparkles size={13} /> Thanh toán trực tuyến payOS thành công
+            <Sparkles size={13} /> Thanh toán chuyển khoản VietQR thành công
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
             Đặt Hàng Thành Công!
@@ -79,8 +83,8 @@ function SuccessContent() {
             <span className="font-mono font-bold text-gray-900 text-sm">{orderCode}</span>
           </div>
           <div className="flex justify-between items-center py-1 border-b border-gray-200/60">
-            <span className="text-gray-500">Cổng thanh toán:</span>
-            <span className="font-semibold text-emerald-700">payOS (VietQR / Napas 247)</span>
+            <span className="text-gray-500">Phương thức thanh toán:</span>
+            <span className="font-semibold text-emerald-700">Chuyển khoản VietQR 24/7</span>
           </div>
           <div className="flex justify-between items-center py-1 border-b border-gray-200/60">
             <span className="text-gray-500">Trạng thái:</span>
