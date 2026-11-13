@@ -86,14 +86,18 @@ type Order = {
   timeline: { title: string; time: string; completed: boolean }[];
 };
 
-function getOrderStatusDetails(status: string) {
+function getOrderStatusDetails(status: string, paymentMethod?: string) {
+  const isQr = (paymentMethod || "").toUpperCase() === "PAYOS" || (paymentMethod || "").toUpperCase() === "BANK";
   switch (status?.toUpperCase()) {
     case "PENDING_PAYMENT":
-      return { text: "Chờ thanh toán (payOS)", color: "bg-amber-50 text-amber-700 border-amber-200" };
+      return { text: "Chờ thanh toán (VietQR)", color: "bg-amber-50 text-amber-700 border-amber-200" };
     case "PAID":
-      return { text: "Đã thanh toán (payOS)", color: "bg-teal-50 text-teal-700 border-teal-200" };
+      return { text: "Chờ đóng gói (Đã thanh toán QR)", color: "bg-teal-50 text-teal-700 border-teal-200" };
     case "CONFIRMED":
-      return { text: "Đã xác nhận đơn", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+      return {
+        text: isQr ? "Chờ đóng gói (Đã thanh toán)" : "Chờ đóng gói (COD)",
+        color: "bg-indigo-50 text-indigo-700 border-indigo-200",
+      };
     case "PREPARING":
       return { text: "Đang đóng gói nông sản", color: "bg-purple-50 text-purple-700 border-purple-200" };
     case "SHIPPING":
@@ -106,7 +110,7 @@ function getOrderStatusDetails(status: string) {
     case "REFUNDED":
       return { text: "Đã hoàn tiền", color: "bg-gray-50 text-gray-700 border-gray-200" };
     default:
-      return { text: "Đang xử lý", color: "bg-gray-50 text-gray-700 border-gray-200" };
+      return { text: "Chờ đóng gói", color: "bg-gray-50 text-gray-700 border-gray-200" };
   }
 }
 
@@ -335,7 +339,27 @@ function CustomerDashboardContent() {
         }
         if (apiOrders && apiOrders.length > 0) {
           const mapped: Order[] = apiOrders.map((o) => {
-            const details = getOrderStatusDetails(o.status);
+            const details = getOrderStatusDetails(o.status, o.paymentMethod);
+            const rawItems =
+              o.items && o.items.length > 0
+                ? o.items.map((it) => ({
+                    name: it.name,
+                    origin: it.origin || "Nông Trại Xanh Đà Lạt",
+                    cert: it.cert || "VietGAP",
+                    qty: it.qty,
+                    price: it.price,
+                    image: it.image || "/images/products/xa-lach.jpg",
+                  }))
+                : [
+                    {
+                      name: "Combo Nông Sản Tươi Chính Vụ",
+                      origin: "Nông Trại Xanh Đà Lạt",
+                      cert: "VietGAP",
+                      qty: "1 Phần",
+                      price: Math.max(0, (o.total || 0) - (o.shippingFee || 0) + (o.discount || 0)),
+                      image: "/images/products/xa-lach.jpg",
+                    },
+                  ];
             return {
               id: o.orderCode,
               date: o.createdAt ? new Date(o.createdAt).toLocaleDateString("vi-VN") : "Hôm nay",
@@ -356,14 +380,7 @@ function CustomerDashboardContent() {
               cancelReason: o.cancelReason,
               paymentMethod: o.paymentMethod,
               paymentRef: o.paymentRef,
-              items: (o.items || []).map((it) => ({
-                name: it.name,
-                origin: it.origin || "Nông Trại Xanh",
-                cert: it.cert || "VietGAP",
-                qty: it.qty,
-                price: it.price,
-                image: it.image || "/images/products/xa-lach.jpg",
-              })),
+              items: rawItems,
               timeline: [
                 { title: "Đặt hàng thành công", time: "Ghi nhận hệ thống", completed: true },
                 { title: "Nông trại thu hái & kiểm định VietGAP", time: "Tại kho nông trại", completed: !["PENDING_PAYMENT", "CANCELLED"].includes(o.status) },
@@ -449,10 +466,10 @@ function CustomerDashboardContent() {
         const res = await paymentService.checkPaymentStatus(targetCode);
         if (res && res.status === "PAID") {
           clearInterval(interval);
-          toast.success(`Ting ting! Đơn hàng #${targetCode} đã nhận được tiền chuyển khoản thành công!`);
+          toast.success(`Ting ting! Đơn hàng #${targetCode} đã nhận được chuyển khoản VietQR thành công!`);
           setShowPayosModal(false);
           setOrders((prev) =>
-            prev.map((o) => (o.id === targetCode ? { ...o, status: "PAID", statusText: "Đã thanh toán (payOS)", statusColor: "bg-teal-50 text-teal-700 border-teal-200" } : o))
+            prev.map((o) => (o.id === targetCode ? { ...o, status: "PAID", statusText: "Chờ đóng gói (Đã thanh toán QR)", statusColor: "bg-teal-50 text-teal-700 border-teal-200" } : o))
           );
         }
       } catch {
@@ -474,7 +491,7 @@ function CustomerDashboardContent() {
       setPayosData(payLink);
       setShowPayosModal(true);
     } catch {
-      toast.error("Không thể mở cổng payOS. Vui lòng thử lại sau.");
+      toast.error("Không thể khởi tạo mã chuyển khoản VietQR. Vui lòng thử lại sau.");
     }
   }
 
@@ -483,10 +500,10 @@ function CustomerDashboardContent() {
     setIsProcessingPayos(true);
     try {
       await paymentService.simulatePaymentSuccess(payosData.orderCode);
-      toast.success("Thanh toán payOS thành công! Đơn hàng đã chuyển sang ĐÃ THANH TOÁN.");
+      toast.success("Xác nhận chuyển khoản VietQR thành công! Đơn hàng đã chuyển sang Chờ đóng gói.");
       setShowPayosModal(false);
       setOrders((prev) =>
-        prev.map((o) => (o.id === payosData.orderCode ? { ...o, status: "PAID", statusText: "Đã thanh toán (payOS)", statusColor: "bg-teal-50 text-teal-700 border-teal-200" } : o))
+        prev.map((o) => (o.id === payosData.orderCode ? { ...o, status: "PAID", statusText: "Chờ đóng gói (Đã thanh toán QR)", statusColor: "bg-teal-50 text-teal-700 border-teal-200" } : o))
       );
     } catch {
       toast.error("Không thể xác nhận thanh toán.");
@@ -626,7 +643,7 @@ function CustomerDashboardContent() {
     if (orderFilter === "DELIVERED") return ord.status === "DELIVERED" || ord.status === "COMPLETED";
     if (orderFilter === "PENDING_PAYMENT") return ord.status === "PENDING_PAYMENT";
     if (orderFilter === "PREPARING") return ["CONFIRMED", "PREPARING", "PAID"].includes(ord.status);
-    if (orderFilter === "CANCELLED") return ord.status === "CANCELLED";
+    if (orderFilter === "CANCELLED") return ord.status === "CANCELLED" || ord.status === "REFUNDED";
     return ord.status === orderFilter;
   });
 
@@ -852,25 +869,35 @@ function CustomerDashboardContent() {
             <span className="text-gray-500 font-medium mr-1">Bộ lọc trạng thái:</span>
             {(
               [
-                { key: "ALL", label: "Tất cả đơn hàng" },
-                { key: "PENDING_PAYMENT", label: "Chờ thanh toán (payOS)" },
-                { key: "PREPARING", label: "Chờ đóng gói" },
-                { key: "SHIPPING", label: "Đang giao hàng xe lạnh" },
-                { key: "DELIVERED", label: "Đã hoàn thành" },
-                { key: "CANCELLED", label: "Đã hủy" },
+                { key: "ALL", label: "Tất cả đơn hàng", count: orders.length },
+                { key: "PENDING_PAYMENT", label: "Chờ thanh toán (VietQR)", count: orders.filter((o) => o.status === "PENDING_PAYMENT").length },
+                { key: "PREPARING", label: "Chờ đóng gói", count: orders.filter((o) => ["CONFIRMED", "PREPARING", "PAID"].includes(o.status)).length },
+                { key: "SHIPPING", label: "Đang giao hàng xe lạnh", count: orders.filter((o) => o.status === "SHIPPING").length },
+                { key: "DELIVERED", label: "Đã hoàn thành", count: orders.filter((o) => o.status === "DELIVERED" || o.status === "COMPLETED").length },
+                { key: "CANCELLED", label: "Đã hủy", count: orders.filter((o) => o.status === "CANCELLED" || o.status === "REFUNDED").length },
               ] as const
             ).map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setOrderFilter(tab.key)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg font-semibold transition-colors",
+                  "px-3 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1.5",
                   orderFilter === tab.key
                     ? "bg-emerald-700 text-white shadow-xs"
                     : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
                 )}
               >
-                {tab.label}
+                <span>{tab.label}</span>
+                {tab.count > 0 && (
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                      orderFilter === tab.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -953,25 +980,25 @@ function CustomerDashboardContent() {
                       </span>
                     </div>
 
-                    {/* PayOS Button if PENDING_PAYMENT */}
+                    {/* VietQR Payment Button if PENDING_PAYMENT */}
                     {order.status === "PENDING_PAYMENT" && (
                       <button
                         onClick={() => handleOpenPayOS(order.id)}
-                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
                       >
-                        <Sparkles size={13} />
-                        <span>Thanh toán payOS</span>
+                        <QrCode size={13} />
+                        <span>Quét mã VietQR</span>
                       </button>
                     )}
 
                     {/* Cancel Button if eligible */}
-                    {["PENDING_PAYMENT", "CONFIRMED", "PREPARING"].includes(order.status) && (
+                    {["PENDING_PAYMENT", "CONFIRMED", "PREPARING", "PAID"].includes(order.status) && (
                       <button
                         onClick={() => {
                           setCancelTargetCode(order.id);
                           setShowCancelModal(true);
                         }}
-                        className="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold transition-colors"
+                        className="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold transition-colors cursor-pointer"
                       >
                         Hủy đơn
                       </button>
@@ -2083,11 +2110,11 @@ function CustomerDashboardContent() {
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                  payOS
+                  QR
                 </span>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-sm">Thanh Toán Đơn #{payosData.orderCode}</h3>
-                  <p className="text-[11px] text-gray-400">Cổng VietQR Napas 247</p>
+                  <h3 className="font-bold text-gray-900 text-sm">Quét Mã VietQR Đơn #{payosData.orderCode}</h3>
+                  <p className="text-[11px] text-gray-400">Chuyển khoản Napas 24/7 tự động</p>
                 </div>
               </div>
               <button
