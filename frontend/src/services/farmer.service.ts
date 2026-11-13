@@ -83,4 +83,18 @@ export const farmerService = {
   async deleteProduct(id: string): Promise<void> {
     await api.delete(`/products/${id}`);
   },
+  async notifyCertExpiry(payload: {
+    certName: string;
+    certNumber: string;
+    farmName: string;
+    daysLeft: number;
+    expiryDate: string;
+    toEmail?: string;
+  }): Promise<{ success: boolean; message: string; data?: Record<string, unknown> }> {
+    const res = await api.post<{ success: boolean; message: string; data?: Record<string, unknown> }>(
+      "/farmer/certificates/notify-expiry",
+      payload
+    );
+    return res.data;
+  },
 };

@@ -9,6 +9,7 @@ import {
   FileText,
   Home,
   Leaf,
+  Mail,
   MapPin,
   Package,
   Phone,
@@ -16,6 +17,7 @@ import {
   QrCode,
   RefreshCw,
   Save,
+  Send,
   Sparkles,
   Sprout,
   Trash2,
@@ -28,6 +30,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { farmerService } from "@/services/farmer.service";
 import { toast } from "@/stores/toast-store";
+import { useAuthStore } from "@/stores/auth-store";
 
 // =========================================================================
 // TYPES & DEFINITIONS
@@ -74,6 +77,7 @@ export type FarmingLogItem = {
   action: string;
   materialsUsed?: string;
   notes?: string;
+  proofImage?: string;
 };
 
 export type ProductItem = {
@@ -98,6 +102,14 @@ export type CertificationItem = {
   expiryDate: string;
   status: "VALID" | "EXPIRING_SOON" | "EXPIRED";
   daysLeft: number;
+  approvalStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED";
+  pendingRenewal?: {
+    newCertNumber: string;
+    proofImage: string;
+    requestedExpiryDate: string;
+    submittedAt: string;
+    note?: string;
+  };
 };
 
 const STORAGE_KEYS = {
@@ -105,6 +117,8 @@ const STORAGE_KEYS = {
   selectedFarmId: "agritrace_farmer_selected_farm_v1",
   logs: "agritrace_farmer_logs_v1",
   certs: "agritrace_farmer_certs_v1",
+  certEmailSent: "agritrace_cert_expiry_email_sent_v1",
+  alertEmail: "agritrace_farmer_alert_email_v1",
 } as const;
 
 const PRODUCT_CATEGORIES = [
@@ -275,7 +289,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     unit: "kg",
     description: "Xoài Cát Chu thịt dày, thơm ngọt đậm đà canh tác chuẩn VietGAP",
     origin: "Vườn Cây Ăn Trái Cao Lãnh",
-    image: "🥭",
+    image: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=400&auto=format&fit=crop&q=80",
   },
   {
     id: "p2",
@@ -286,7 +300,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     unit: "kg",
     description: "Thanh long mọng nước, vị ngọt thanh tự nhiên",
     origin: "Nông Trại Xanh Đà Lạt",
-    image: "🐉",
+    image: "https://images.unsplash.com/photo-1527325678964-54921661f888?w=400&auto=format&fit=crop&q=80",
   },
   {
     id: "p3",
@@ -297,7 +311,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     unit: "kg",
     description: "Cơm vàng hạt lép, thu hoạch độ chín hoàn hảo tại vườn",
     origin: "Nông Trại Xanh Đà Lạt",
-    image: "👑",
+    image: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=400&auto=format&fit=crop&q=80",
   },
   {
     id: "p4",
@@ -308,7 +322,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     unit: "hộp 500g",
     description: "Dâu tây canh tác giá thể xơ dừa nhà màng, vị ngọt thơm dịu",
     origin: "Nông Trại Xanh Đà Lạt",
-    image: "🍓",
+    image: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=400&auto=format&fit=crop&q=80",
   },
 ];
 
@@ -616,6 +630,8 @@ export default function FarmerPortalPage() {
   const [logAction, setLogAction] = useState("");
   const [logMaterials, setLogMaterials] = useState("");
   const [logNotes, setLogNotes] = useState("");
+  const [logProofImage, setLogProofImage] = useState("");
+  const [logProofFileName, setLogProofFileName] = useState("");
   const [selectedLogFarm, setSelectedLogFarm] = useState<string>("ALL");
 
   // =========================================================================
@@ -630,7 +646,7 @@ export default function FarmerPortalPage() {
   const [newProdPrice, setNewProdPrice] = useState("75000");
   const [newProdUnit, setNewProdUnit] = useState("kg");
   const [newProdDesc, setNewProdDesc] = useState("");
-  const [newProdImage, setNewProdImage] = useState<string>("🥭");
+  const [newProdImage, setNewProdImage] = useState<string>("");
   const [selectedProductFarm, setSelectedProductFarm] = useState<string>("ALL");
   const [selectedCertFarm, setSelectedCertFarm] = useState<string>("ALL");
 
@@ -645,6 +661,19 @@ export default function FarmerPortalPage() {
   const [newCertIssuedBy, setNewCertIssuedBy] = useState("");
   const [newCertIssueDate, setNewCertIssueDate] = useState("2026-11-12");
   const [newCertExpiryDate, setNewCertExpiryDate] = useState("2027-11-12");
+
+  // State modal gia hạn chứng nhận (+1 năm) - Chờ Admin xét duyệt
+  const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+  const [renewingCert, setRenewingCert] = useState<CertificationItem | null>(null);
+  const [renewDuration, setRenewDuration] = useState("1");
+  const [renewStartDate, setRenewStartDate] = useState("");
+  const [renewRequestedExpiryDate, setRenewRequestedExpiryDate] = useState("");
+  const [renewNewCertNumber, setRenewNewCertNumber] = useState("");
+  const [renewIssuedBy, setRenewIssuedBy] = useState("");
+  const [renewNote, setRenewNote] = useState("");
+  const [renewProofImage, setRenewProofImage] = useState("");
+  const [renewProofFileName, setRenewProofFileName] = useState("");
+  const [isSubmittingRenewal, setIsSubmittingRenewal] = useState(false);
 
   useEffect(() => {
     const savedFarms = readStoredJson<FarmItem[]>(STORAGE_KEYS.farms);
@@ -670,6 +699,13 @@ export default function FarmerPortalPage() {
     const savedCerts = readStoredJson<CertificationItem[]>(STORAGE_KEYS.certs);
     if (Array.isArray(savedCerts) && savedCerts.length > 0) {
       setCertifications(savedCerts);
+    }
+
+    try {
+      const savedAlertEmail = localStorage.getItem(STORAGE_KEYS.alertEmail);
+      if (savedAlertEmail) setCustomAlertEmail(savedAlertEmail);
+    } catch {
+      // Ignore storage errors
     }
 
     setClientNowMs(Date.now());
@@ -849,6 +885,7 @@ export default function FarmerPortalPage() {
       owner: editingFarm.owner.trim(),
       phone: editingFarm.phone.trim(),
       address: editingFarm.address.trim(),
+      province: (editingFarm.province || "").trim(),
     };
     setFarms(farms.map((f) => (f.id === updated.id ? updated : f)));
     setEditingFarm(null);
@@ -1034,7 +1071,26 @@ export default function FarmerPortalPage() {
     setLogAction("");
     setLogMaterials("");
     setLogNotes("");
+    setLogProofImage("");
+    setLogProofFileName("");
     setIsLogModalOpen(true);
+  };
+
+  const handleLogImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ảnh tải lên tối đa 5MB!");
+      return;
+    }
+    setLogProofFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === "string") {
+        setLogProofImage(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Ghi nhật ký canh tác
@@ -1059,6 +1115,7 @@ export default function FarmerPortalPage() {
       action: logAction.trim(),
       materialsUsed: logMaterials.trim(),
       notes: logNotes.trim(),
+      proofImage: logProofImage || undefined,
     };
 
     setIsSubmittingLog(true);
@@ -1085,6 +1142,8 @@ export default function FarmerPortalPage() {
     setLogAction("");
     setLogMaterials("");
     setLogNotes("");
+    setLogProofImage("");
+    setLogProofFileName("");
     if (syncedToQr) {
       toast.success(`Đã ghi nhật ký & đồng bộ mã QR cho lô ${selectedBatchForLog}!`);
     } else {
@@ -1127,7 +1186,7 @@ export default function FarmerPortalPage() {
     setNewProdPrice("75000");
     setNewProdUnit("kg");
     setNewProdDesc("");
-    setNewProdImage("🥭");
+    setNewProdImage("");
     setIsProductModalOpen(true);
   };
 
@@ -1143,6 +1202,10 @@ export default function FarmerPortalPage() {
       toast.error("Giá bán dự kiến phải lớn hơn 0 VNĐ!");
       return;
     }
+    if (!newProdImage) {
+      toast.error("Vui lòng tải lên ảnh sản phẩm!");
+      return;
+    }
 
     const targetFarm = farms.find((f) => f.code === newProdFarmCode) || currentFarm;
     const clientProdId = "p_" + Date.now();
@@ -1155,7 +1218,7 @@ export default function FarmerPortalPage() {
       unit: newProdUnit,
       description: newProdDesc.trim() || "Nông sản sạch canh tác theo quy chuẩn tự nhiên",
       origin: targetFarm.name,
-      image: newProdImage || "🌱",
+      image: newProdImage,
     };
 
     setIsSubmittingProduct(true);
@@ -1184,7 +1247,7 @@ export default function FarmerPortalPage() {
       setIsProductModalOpen(false);
       setNewProdName("");
       setNewProdDesc("");
-      setNewProdImage("🥭");
+      setNewProdImage("");
       toast.success(`Đã thêm & lưu sản phẩm "${persistedProd.name}" cho ${targetFarm.name}!`);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Không thể lưu sản phẩm lên máy chủ!"));
@@ -1256,20 +1319,191 @@ export default function FarmerPortalPage() {
     toast.success(`Đã thêm chứng nhận "${evaluated.name}"!`);
   };
 
-  const handleRenewCert = (id: string) => {
-    const target = certifications.find((c) => c.id === id);
-    if (!target) return;
+  const authUser = useAuthStore((state) => state.user);
+  const userEmail = authUser?.email || "nongdan@agritrace.vn";
+  const [customAlertEmail, setCustomAlertEmail] = useState<string>("");
+  const [isTestingEmail, setIsTestingEmail] = useState<boolean>(false);
+  const [sendingCertEmailId, setSendingCertEmailId] = useState<string | null>(null);
+
+  const activeAlertEmail = customAlertEmail.trim() || userEmail;
+
+  const handleSaveAndTestAlertEmail = async () => {
+    const targetEmail = (customAlertEmail.trim() || userEmail).trim();
+    if (!targetEmail || !/\S+@\S+\.\S+/.test(targetEmail)) {
+      toast.error("Vui lòng nhập địa chỉ email hợp lệ (VD: yourname@gmail.com)!");
+      return;
+    }
+    try {
+      setIsTestingEmail(true);
+      try {
+        localStorage.setItem(STORAGE_KEYS.alertEmail, targetEmail);
+      } catch {
+        // Ignore storage quota errors
+      }
+
+      const targetCert =
+        computedCerts.find((c) => c.daysLeft <= 5 && c.daysLeft >= 0) ||
+        computedCerts.find((c) => c.status === "EXPIRING_SOON") ||
+        computedCerts[0];
+
+      if (!targetCert) {
+        toast.info("Chưa có chứng nhận để gửi email cảnh báo!");
+        return;
+      }
+
+      const farm = farms.find((f) => f.code === targetCert.farmCode);
+      const res = await farmerService.notifyCertExpiry({
+        certName: targetCert.name,
+        certNumber: targetCert.certNumber,
+        farmName: farm ? `${farm.name} (${farm.code})` : targetCert.farmCode,
+        daysLeft: targetCert.daysLeft <= 5 ? targetCert.daysLeft : 5,
+        expiryDate: targetCert.expiryDate,
+        toEmail: targetEmail,
+      });
+
+      if (res.data?.status === "SIMULATED") {
+        toast.error(`⚠️ Chưa gửi được email thật: ${String(res.data?.note || "Chưa xác thực Gmail SMTP")}`);
+      } else {
+        toast.success(
+          res.message || `Đã gửi cảnh báo chứng nhận còn 5 ngày đến ${targetEmail} thành công!`
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg || "Không thể gửi email cảnh báo");
+    } finally {
+      setIsTestingEmail(false);
+    }
+  };
+
+  const handleSendCertExpiryEmail = async (cert: CertificationItem) => {
+    try {
+      setSendingCertEmailId(cert.id);
+      const targetEmail = activeAlertEmail;
+      const farm = farms.find((f) => f.code === cert.farmCode);
+      const res = await farmerService.notifyCertExpiry({
+        certName: cert.name,
+        certNumber: cert.certNumber,
+        farmName: farm ? `${farm.name} (${farm.code})` : cert.farmCode,
+        daysLeft: cert.daysLeft,
+        expiryDate: cert.expiryDate,
+        toEmail: targetEmail,
+      });
+      if (res.data?.status === "SIMULATED") {
+        toast.error(`⚠️ Chưa gửi được email thật: ${String(res.data?.note || "Chưa xác thực Gmail SMTP")}`);
+      } else {
+        toast.success(res.message || `Đã gửi email cảnh báo chứng nhận ${cert.certNumber} tới ${targetEmail}!`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg || "Không thể gửi email cảnh báo");
+    } finally {
+      setSendingCertEmailId(null);
+    }
+  };
+
+
+
+  const calculateRenewExpiry = (startDateStr: string, durationYears: string) => {
+    const sDate = parseVnOrIsoDate(startDateStr);
+    if (!sDate) return renewRequestedExpiryDate;
+    const dur = parseFloat(durationYears) || 1;
+    const end = new Date(sDate);
+    if (dur === 0.5) {
+      end.setMonth(end.getMonth() + 6);
+    } else {
+      end.setFullYear(end.getFullYear() + Math.round(dur));
+    }
+    end.setDate(end.getDate() - 1);
+    return `${String(end.getDate()).padStart(2, "0")}/${String(end.getMonth() + 1).padStart(2, "0")}/${end.getFullYear()}`;
+  };
+
+  const handleOpenRenewModal = (cert: CertificationItem) => {
+    setRenewingCert(cert);
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const currentExpiry = parseVnOrIsoDate(target.expiryDate);
-    const baseDate = currentExpiry && currentExpiry > todayMidnight ? new Date(currentExpiry) : todayMidnight;
-    baseDate.setFullYear(baseDate.getFullYear() + 1);
-    const renewedDateStr = `${String(baseDate.getDate()).padStart(2, "0")}/${String(baseDate.getMonth() + 1).padStart(2, "0")}/${baseDate.getFullYear()}`;
+    const currentExpiry = parseVnOrIsoDate(cert.expiryDate) || todayMidnight;
 
-    setCertifications((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, expiryDate: renewedDateStr } : c))
-    );
-    toast.success(`Đã gia hạn "${target.name}" đến ngày ${renewedDateStr}!`);
+    // Ngày bắt đầu hiệu lực mới (dự kiến): ngày tiếp theo của ngày hết hạn hiện tại
+    const nextStart = new Date(currentExpiry);
+    nextStart.setDate(nextStart.getDate() + 1);
+    const startIso = `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, "0")}-${String(nextStart.getDate()).padStart(2, "0")}`;
+    setRenewStartDate(startIso);
+
+    // Ngày hết hạn mới (dự kiến): +1 năm so với hạn cũ
+    const newEnd = new Date(currentExpiry);
+    newEnd.setFullYear(newEnd.getFullYear() + 1);
+    const newEndVn = `${String(newEnd.getDate()).padStart(2, "0")}/${String(newEnd.getMonth() + 1).padStart(2, "0")}/${newEnd.getFullYear()}`;
+
+    setRenewDuration("1");
+    setRenewRequestedExpiryDate(cert.pendingRenewal?.requestedExpiryDate || newEndVn);
+    setRenewNewCertNumber(cert.pendingRenewal?.newCertNumber || "");
+    setRenewIssuedBy(cert.issuedBy || "Tổ chức Chứng nhận Quốc tế Control Union");
+    setRenewNote(cert.pendingRenewal?.note || "");
+    setRenewProofImage(cert.pendingRenewal?.proofImage || "");
+    setRenewProofFileName(cert.pendingRenewal?.proofImage ? "Tài liệu xác minh đã tải" : "");
+    setIsRenewModalOpen(true);
+  };
+
+  const handleRenewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ảnh tải lên tối đa 5MB!");
+      return;
+    }
+    setRenewProofFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === "string") {
+        setRenewProofImage(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmitRenewal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renewingCert) return;
+
+    // Nếu để trống mã mới thì giữ nguyên mã cũ theo thiết kế modal
+    const finalCertNumber = renewNewCertNumber.trim()
+      ? renewNewCertNumber.trim().toUpperCase()
+      : renewingCert.certNumber;
+
+    setIsSubmittingRenewal(true);
+    try {
+      const updated = certifications.map((c) => {
+        if (c.id === renewingCert.id) {
+          return {
+            ...c,
+            approvalStatus: "PENDING" as const,
+            pendingRenewal: {
+              newCertNumber: finalCertNumber,
+              proofImage: renewProofImage,
+              requestedExpiryDate: renewRequestedExpiryDate,
+              submittedAt: new Date().toLocaleDateString("vi-VN"),
+              note: renewNote.trim(),
+            },
+          };
+        }
+        return c;
+      });
+
+      setCertifications(updated);
+      try {
+        localStorage.setItem(STORAGE_KEYS.certs, JSON.stringify(updated));
+      } catch {
+        // Ignore quota errors
+      }
+
+      toast.success(
+        `Đã nộp yêu cầu gia hạn cho "${renewingCert.name}" thành công! Hồ sơ đang chờ Quản trị viên (Admin) xét duyệt.`
+      );
+      setIsRenewModalOpen(false);
+    } finally {
+      setIsSubmittingRenewal(false);
+    }
   };
 
   const handleDeleteCert = (id: string, name: string) => {
@@ -1290,6 +1524,48 @@ export default function FarmerPortalPage() {
 
   const harvestStats = computeHarvestStats(batches);
   const computedCerts = certifications.map((c) => evaluateCertification(c, clientNowMs));
+
+  // Tự động kiểm tra và gửi email cảnh báo khi có chứng nhận còn <= 5 ngày
+  useEffect(() => {
+    if (!storageLoaded || computedCerts.length === 0) return;
+
+    const criticalCerts = computedCerts.filter(
+      (c) => c.daysLeft <= 5 && c.daysLeft >= 0
+    );
+    if (criticalCerts.length === 0) return;
+
+    const sentRecords = readStoredJson<Record<string, string>>(STORAGE_KEYS.certEmailSent) || {};
+    const todayStr = getLocalIsoDate(0);
+    let hasNotified = false;
+
+    criticalCerts.forEach(async (cert) => {
+      const sentKey = `${cert.certNumber}_${cert.daysLeft}_${todayStr}`;
+      if (sentRecords[sentKey]) return;
+
+      const farm = farms.find((f) => f.code === cert.farmCode);
+      try {
+        await farmerService.notifyCertExpiry({
+          certName: cert.name,
+          certNumber: cert.certNumber,
+          farmName: farm ? `${farm.name} (${farm.code})` : cert.farmCode,
+          daysLeft: cert.daysLeft,
+          expiryDate: cert.expiryDate,
+          toEmail: activeAlertEmail,
+        });
+        sentRecords[sentKey] = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEYS.certEmailSent, JSON.stringify(sentRecords));
+        if (!hasNotified) {
+          hasNotified = true;
+          toast.info(
+            `Hệ thống đã gửi email cảnh báo: Chứng nhận "${cert.name}" còn ${cert.daysLeft} ngày hết hạn!`
+          );
+        }
+      } catch (err) {
+        console.warn("Lỗi tự động gửi email cảnh báo:", err);
+      }
+    });
+  }, [computedCerts, storageLoaded, activeAlertEmail, farms]);
+
 
   const displayedProducts = products.filter((p) => {
     if (selectedProductFarm === "ALL") return true;
@@ -1972,6 +2248,30 @@ export default function FarmerPortalPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Ảnh minh chứng thực tế */}
+                      {log.proofImage && (
+                        <div className="mt-2.5 flex items-center gap-3 bg-emerald-50/60 border border-emerald-200/80 p-2 rounded-xl">
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-emerald-200 shrink-0 bg-white">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={log.proofImage}
+                              alt="Ảnh minh chứng canh tác"
+                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                              onClick={() => window.open(log.proofImage, "_blank")}
+                              title="Bấm để xem ảnh kích thước lớn"
+                            />
+                          </div>
+                          <div className="text-xs">
+                            <span className="font-bold text-emerald-900 flex items-center gap-1 text-[11px]">
+                              📸 Ảnh minh chứng thực tế tại vườn
+                            </span>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              Đã lưu ảnh bằng chứng canh tác chuẩn VietGAP. Bấm vào ảnh để mở ảnh gốc.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -2077,7 +2377,7 @@ export default function FarmerPortalPage() {
                           {p.image && (p.image.startsWith("data:") || p.image.startsWith("http") || p.image.startsWith("/")) ? (
                             <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                           ) : (
-                            <span>{p.image || "🌱"}</span>
+                            <Sprout size={24} className="text-emerald-700" />
                           )}
                         </div>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
@@ -2149,6 +2449,74 @@ export default function FarmerPortalPage() {
               <Plus size={15} /> Thêm Chứng Nhận Mới
             </button>
           </div>
+
+          {/* CẤU HÌNH EMAIL NHẬN THÔNG BÁO CẢNH BÁO KHI CÒN 5 NGÀY */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold shrink-0">
+                <Mail size={16} />
+              </div>
+              <div>
+                <span className="font-bold text-gray-900 block text-xs">
+                  Email Nhận Cảnh Báo Khi Chứng Nhận Còn 5 Ngày
+                </span>
+                <span className="text-[11px] text-gray-500">
+                  Hệ thống tự động kích hoạt gửi cảnh báo khi có chứng nhận còn ≤ 5 ngày đến hộp thư này
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <input
+                type="email"
+                value={customAlertEmail}
+                onChange={(e) => setCustomAlertEmail(e.target.value)}
+                placeholder="Nhập email của bạn (VD: yourname@gmail.com)"
+                className="px-3 py-1.5 border border-gray-300 rounded-xl text-xs w-full md:w-72 focus:outline-emerald-600 font-medium text-gray-800"
+              />
+              <button
+                type="button"
+                onClick={handleSaveAndTestAlertEmail}
+                disabled={isTestingEmail}
+                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold rounded-xl whitespace-nowrap shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+              >
+                <Send size={13} /> {isTestingEmail ? "Đang gửi..." : "Lưu & Test Gửi"}
+              </button>
+            </div>
+          </div>
+
+          {/* CẢNH BÁO KHẨN CẤP: CHỨNG NHẬN CÒN <= 5 NGÀY */}
+          {computedCerts.some((c) => c.daysLeft <= 5 && c.daysLeft >= 0) && (
+            <div className="bg-gradient-to-r from-rose-50 via-amber-50 to-orange-50 border-2 border-rose-300 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+                  <Mail size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-rose-600 text-white text-[11px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Cảnh Báo Khẩn Cấp (Còn ≤ 5 Ngày)
+                    </span>
+                    <span className="text-xs text-rose-700 font-bold">Hệ Thống Tự Động Gửi Email Thông Báo</span>
+                  </div>
+                  <p className="text-xs text-rose-950 font-medium mt-1">
+                    Có chứng nhận tiêu chuẩn nông trại sắp hết hiệu lực trong vòng 5 ngày tới. Email cảnh báo đã được hệ thống tự động gửi đến <strong>{activeAlertEmail}</strong> để kịp thời hoàn tất thủ tục gia hạn kiểm định.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstCritical = computedCerts.find((c) => c.daysLeft <= 5 && c.daysLeft >= 0);
+                    if (firstCritical) handleOpenRenewModal(firstCritical);
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw size={13} /> Gia Hạn Ngay
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Bộ lọc Chọn Nông Trại để xem Chứng Nhận */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
@@ -2230,7 +2598,15 @@ export default function FarmerPortalPage() {
                           <Home size={11} className="text-emerald-700" />
                           {certFarm ? certFarm.name : cert.farmCode}
                         </span>
-                        {cert.status === "EXPIRED" ? (
+                        {cert.approvalStatus === "PENDING" ? (
+                          <span className="bg-amber-500 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                            <Clock size={11} /> Chờ Admin xét duyệt
+                          </span>
+                        ) : cert.daysLeft <= 5 && cert.daysLeft >= 0 ? (
+                          <span className="bg-rose-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-pulse shadow-xs">
+                            <Mail size={11} /> Cảnh báo: Còn {cert.daysLeft} ngày (Đã gửi mail)
+                          </span>
+                        ) : cert.status === "EXPIRED" ? (
                           <span className="bg-rose-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             <AlertTriangle size={11} /> Đã hết hạn ({Math.abs(cert.daysLeft)} ngày)
                           </span>
@@ -2250,6 +2626,30 @@ export default function FarmerPortalPage() {
                         Số hiệu: <strong className="font-mono text-gray-800">{cert.certNumber}</strong>
                       </div>
                       <div className="text-gray-500">Đơn vị cấp: {cert.issuedBy}</div>
+
+                      {cert.approvalStatus === "PENDING" && cert.pendingRenewal && (
+                        <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-2.5 space-y-1.5 text-[11px] text-amber-950 mt-1.5">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="flex items-center gap-1 text-amber-800">
+                              <Clock size={12} /> Yêu cầu gia hạn:
+                            </span>
+                            <span className="font-mono text-emerald-900 bg-white border border-amber-200 px-1.5 py-0.5 rounded font-bold text-[10px]">
+                              {cert.pendingRenewal.newCertNumber}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-gray-600 pt-0.5">
+                            <span>Hạn mới đề xuất: <strong className="text-emerald-800">{cert.pendingRenewal.requestedExpiryDate}</strong></span>
+                            <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                              <CheckCircle2 size={11} /> Đã gửi ảnh xác minh
+                            </span>
+                          </div>
+                          {cert.pendingRenewal.note && (
+                            <p className="text-[10px] text-gray-500 italic truncate">
+                              Ghi chú: &ldquo;{cert.pendingRenewal.note}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-3 border-t border-gray-100 mt-3 space-y-2">
@@ -2258,13 +2658,37 @@ export default function FarmerPortalPage() {
                         <span className="text-rose-600 font-bold">Hết hạn: {cert.expiryDate}</span>
                       </div>
                       <div className="flex items-center justify-between pt-1">
-                        <button
-                          type="button"
-                          onClick={() => handleRenewCert(cert.id)}
-                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] rounded-lg inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <RefreshCw size={11} /> Gia hạn +1 năm
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {cert.approvalStatus === "PENDING" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRenewModal(cert)}
+                              className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-[11px] rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                              title="Xem hoặc cập nhật hồ sơ gia hạn đang chờ duyệt"
+                            >
+                              <Clock size={11} /> Đang chờ duyệt (Cập nhật)
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRenewModal(cert)}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <RefreshCw size={11} /> Gia hạn
+                            </button>
+                          )}
+                          {(cert.daysLeft <= 5 || cert.status === "EXPIRING_SOON") && (
+                            <button
+                              type="button"
+                              onClick={() => handleSendCertExpiryEmail(cert)}
+                              disabled={sendingCertEmailId === cert.id}
+                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[11px] rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                              title="Gửi email cảnh báo chứng nhận sắp hết hạn"
+                            >
+                              <Mail size={11} /> {sendingCertEmailId === cert.id ? "Đang gửi..." : "Gửi mail"}
+                            </button>
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => handleDeleteCert(cert.id, cert.name)}
@@ -2434,13 +2858,38 @@ export default function FarmerPortalPage() {
             </div>
 
             <form onSubmit={handleUpdateFarm} className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Mã Nông Trại *</label>
+                  <input
+                    type="text"
+                    value={editingFarm.code}
+                    disabled
+                    title="Mã nông trại cố định để đảm bảo tính toàn vẹn liên kết với lô hàng và chứng nhận"
+                    className="w-full px-3 py-2 border border-gray-200 bg-gray-100 text-gray-500 rounded-xl font-mono font-bold uppercase cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Quy mô (Hecta) *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editingFarm.areaHectares}
+                    onChange={(e) => setEditingFarm({ ...editingFarm, areaHectares: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-gray-700 font-bold mb-1">Tên Nông Trại</label>
+                <label className="block text-gray-700 font-bold mb-1">Tên Nông Trại *</label>
                 <input
                   type="text"
                   value={editingFarm.name}
                   onChange={(e) => setEditingFarm({ ...editingFarm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold"
+                  placeholder="VD: Vườn Xoài Cát Chu Đồng Tháp..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold text-sm"
                   required
                 />
               </div>
@@ -2466,52 +2915,54 @@ export default function FarmerPortalPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1">Quy mô (Hecta)</label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-gray-700 font-bold mb-1">Địa chỉ canh tác cụ thể</label>
                   <input
-                    type="number"
-                    step="0.1"
-                    value={editingFarm.areaHectares}
-                    onChange={(e) => setEditingFarm({ ...editingFarm, areaHectares: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold"
+                    type="text"
+                    value={editingFarm.address}
+                    onChange={(e) => setEditingFarm({ ...editingFarm, address: e.target.value })}
+                    placeholder="Xã/Thôn, Huyện..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-bold mb-1">Tiêu chuẩn canh tác</label>
-                  <select
-                    value={editingFarm.certStandard}
-                    onChange={(e) => setEditingFarm({ ...editingFarm, certStandard: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-medium"
-                  >
-                    <option value="VietGAP Trồng trọt">VietGAP Trồng trọt</option>
-                    <option value="GlobalGAP Xuất khẩu">GlobalGAP Xuất khẩu</option>
-                    <option value="VietGAP & GlobalGAP">VietGAP & GlobalGAP (Đạt cả 2 chuẩn)</option>
-                    <option value="Hữu cơ Organic USDA">Hữu cơ Organic USDA</option>
-                    <option value="OCOP 4 Sao Đặc sản">OCOP 4 Sao Đặc sản địa phương</option>
-                    <option value="Chưa chứng nhận">Chưa có chứng nhận</option>
-                    {![
-                      "VietGAP Trồng trọt",
-                      "GlobalGAP Xuất khẩu",
-                      "VietGAP & GlobalGAP",
-                      "Hữu cơ Organic USDA",
-                      "OCOP 4 Sao Đặc sản",
-                      "Chưa chứng nhận",
-                    ].includes(editingFarm.certStandard) && (
-                      <option value={editingFarm.certStandard}>{editingFarm.certStandard}</option>
-                    )}
-                  </select>
+                  <label className="block text-gray-700 font-bold mb-1">Tỉnh / Thành</label>
+                  <input
+                    type="text"
+                    value={editingFarm.province || ""}
+                    onChange={(e) => setEditingFarm({ ...editingFarm, province: e.target.value })}
+                    placeholder="Tỉnh/Thành phố"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-gray-700 font-bold mb-1">Địa chỉ cụ thể</label>
-                <input
-                  type="text"
-                  value={editingFarm.address}
-                  onChange={(e) => setEditingFarm({ ...editingFarm, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl"
-                />
+                <label className="block text-gray-700 font-bold mb-1">Tiêu chuẩn canh tác chính</label>
+                <select
+                  value={editingFarm.certStandard}
+                  onChange={(e) => setEditingFarm({ ...editingFarm, certStandard: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-medium"
+                >
+                  <option value="VietGAP Trồng trọt">VietGAP Trồng trọt</option>
+                  <option value="GlobalGAP Xuất khẩu">GlobalGAP Xuất khẩu</option>
+                  <option value="VietGAP & GlobalGAP">VietGAP & GlobalGAP (Đạt cả 2 chuẩn)</option>
+                  <option value="Hữu cơ Organic USDA">Hữu cơ Organic USDA</option>
+                  <option value="OCOP 4 Sao Đặc sản">OCOP 4 Sao Đặc sản địa phương</option>
+                  <option value="Chưa chứng nhận">Chưa có chứng nhận</option>
+                  {![
+                    "VietGAP Trồng trọt",
+                    "GlobalGAP Xuất khẩu",
+                    "VietGAP & GlobalGAP",
+                    "Hữu cơ Organic USDA",
+                    "OCOP 4 Sao Đặc sản",
+                    "Chưa chứng nhận",
+                  ].includes(editingFarm.certStandard) && (
+                    <option value={editingFarm.certStandard}>{editingFarm.certStandard}</option>
+                  )}
+                </select>
               </div>
 
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
@@ -2874,6 +3325,61 @@ export default function FarmerPortalPage() {
                 />
               </div>
 
+              {/* 8. Ảnh minh chứng thực tế */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">
+                  8. Ảnh minh chứng canh tác thực tế (Tùy chọn)
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-3.5 text-center hover:border-emerald-500 transition-colors bg-gray-50/50">
+                  {logProofImage ? (
+                    <div className="space-y-2">
+                      <div className="relative inline-block max-h-36 overflow-hidden rounded-lg border border-gray-200 shadow-xs">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={logProofImage}
+                          alt="Ảnh minh chứng"
+                          className="max-h-32 object-contain mx-auto"
+                        />
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-xs text-gray-600 font-medium truncate max-w-xs">
+                          📎 {logProofFileName || "Ảnh minh chứng canh tác"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLogProofImage("");
+                            setLogProofFileName("");
+                          }}
+                          className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-semibold text-[11px] cursor-pointer"
+                        >
+                          Xóa &amp; Chọn lại
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="mx-auto text-gray-400 mb-1" size={22} />
+                      <p className="text-gray-700 font-semibold text-xs mb-0.5">
+                        Tải ảnh chụp thực tế tại vườn / công việc canh tác
+                      </p>
+                      <p className="text-[11px] text-gray-400 mb-2">
+                        Hỗ trợ ảnh JPG, PNG, WEBP (tối đa 5MB)
+                      </p>
+                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold rounded-xl cursor-pointer text-xs">
+                        <Upload size={13} /> Chọn ảnh từ thiết bị
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {!selectedBatchForLog && (
                 <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium">
                   ⚠️ Nông trại đang chọn chưa có lô thu hoạch. Hãy tạo lô ở Tab Quản Lý Lô Thu Hoạch trước khi ghi nhật ký.
@@ -2952,31 +3458,34 @@ export default function FarmerPortalPage() {
               <div>
                 <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Upload size={13} className="text-emerald-700" /> 3. Hình ảnh nông sản (Tải ảnh hoặc Chọn biểu tượng)
+                    <Upload size={13} className="text-emerald-700" /> 3. Hình ảnh nông sản <span className="text-rose-500">*</span>
                   </span>
-                  {newProdImage && newProdImage.startsWith("data:") && (
+                  {newProdImage && (
                     <button
                       type="button"
-                      onClick={() => setNewProdImage("🌱")}
+                      onClick={() => setNewProdImage("")}
                       className="text-[11px] text-rose-600 hover:underline cursor-pointer"
                     >
-                      Gỡ ảnh chụp
+                      Xóa ảnh
                     </button>
                   )}
                 </label>
 
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                  <div className="w-16 h-16 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-3xl overflow-hidden shrink-0 shadow-xs">
-                    {newProdImage && (newProdImage.startsWith("data:") || newProdImage.startsWith("http") || newProdImage.startsWith("/")) ? (
+                <div className="flex items-center gap-4 p-3.5 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
+                  <div className="w-20 h-20 rounded-xl bg-white border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                    {newProdImage ? (
                       <img src={newProdImage} alt="Xem trước" className="w-full h-full object-cover" />
                     ) : (
-                      <span>{newProdImage || "🌱"}</span>
+                      <div className="text-center p-2">
+                        <Upload className="mx-auto text-gray-300 mb-1" size={22} />
+                        <span className="text-[10px] text-gray-400 block leading-tight">Chưa có ảnh</span>
+                      </div>
                     )}
                   </div>
 
                   <div className="flex-1 space-y-1.5">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg cursor-pointer shadow-xs transition-colors">
-                      <Upload size={13} /> Chọn ảnh từ máy tính / điện thoại
+                    <label className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors">
+                      <Upload size={14} /> Tải ảnh từ máy tính / điện thoại
                       <input
                         type="file"
                         accept="image/*"
@@ -2984,23 +3493,9 @@ export default function FarmerPortalPage() {
                         className="hidden"
                       />
                     </label>
-                    <p className="text-[10px] text-gray-400">
-                      Hỗ trợ JPG, PNG, WebP (Tối đa 5MB) hoặc chọn nhanh biểu tượng:
+                    <p className="text-[11px] text-gray-500">
+                      Tải ảnh chụp sản phẩm thực tế (Hỗ trợ định dạng JPG, PNG, WebP tối đa 5MB)
                     </p>
-                    <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                      {["🥭", "🍓", "👑", "🐉", "🥑", "🍇", "🥬", "🍊", "🍎", "🌽", "🥕", "🌱"].map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => setNewProdImage(emoji)}
-                          className={`w-6 h-6 rounded-md text-xs flex items-center justify-center cursor-pointer transition-transform hover:scale-110 ${
-                            newProdImage === emoji ? "bg-emerald-200 border-2 border-emerald-600 scale-105" : "bg-white border border-gray-200"
-                          }`}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -3183,6 +3678,218 @@ export default function FarmerPortalPage() {
                 >
                   <Save size={15} /> Lưu Chứng Nhận
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL GIA HẠN CHỨNG NHẬN - CHUẨN THEO MẪU BẠN GỬI */}
+      {isRenewModalOpen && renewingCert && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100 max-h-[92vh] flex flex-col p-6 animate-fade-in">
+            {/* Header: Gia hạn chứng nhận +1 năm */}
+            <div className="flex items-start justify-between pb-3.5 border-b border-gray-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-gray-900">Gia hạn chứng nhận</h3>
+                  <span className="bg-emerald-50 text-emerald-600 font-bold text-xs px-2 py-0.5 rounded-md">
+                    +{renewDuration === "0.5" ? "6 tháng" : `${renewDuration} năm`}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Vui lòng kiểm tra thông tin chứng nhận trước khi thực hiện gia hạn.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRenewModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form body with scroll */}
+            <form onSubmit={handleSubmitRenewal} className="py-2 space-y-4 text-xs overflow-y-auto flex-1 pr-1">
+              {/* Section 1: Thông tin chứng nhận hiện tại */}
+              <div className="space-y-2 pb-3 border-b border-gray-100">
+                <h4 className="text-xs font-bold text-gray-900 mb-2">Thông tin chứng nhận hiện tại</h4>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Tên chứng nhận</span>
+                  <span className="font-bold text-gray-900">{renewingCert.name}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Số hiệu hiện tại</span>
+                  <span className="font-bold text-gray-900">{renewingCert.certNumber}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Ngày cấp</span>
+                  <span className="font-bold text-gray-900">{renewingCert.issueDate}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Ngày hết hạn</span>
+                  <span className="font-bold text-rose-500">{renewingCert.expiryDate}</span>
+                </div>
+              </div>
+
+              {/* Section 2: Thông tin gia hạn */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-gray-900">Thông tin gia hạn</h4>
+
+                {/* Thời gian gia hạn */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">Thời gian gia hạn</label>
+                  <select
+                    value={renewDuration}
+                    onChange={(e) => {
+                      const newDur = e.target.value;
+                      setRenewDuration(newDur);
+                      setRenewRequestedExpiryDate(calculateRenewExpiry(renewStartDate, newDur));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white font-medium text-gray-800 focus:outline-emerald-600 cursor-pointer"
+                  >
+                    <option value="1">1 năm</option>
+                    <option value="2">2 năm</option>
+                    <option value="3">3 năm</option>
+                    <option value="0.5">6 tháng</option>
+                  </select>
+                </div>
+
+                {/* Ngày bắt đầu hiệu lực mới (dự kiến) */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">
+                    Ngày bắt đầu hiệu lực mới (dự kiến)
+                  </label>
+                  <input
+                    type="date"
+                    value={renewStartDate}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setRenewStartDate(newStart);
+                      setRenewRequestedExpiryDate(calculateRenewExpiry(newStart, renewDuration));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600"
+                    required
+                  />
+                </div>
+
+                {/* Ngày hết hạn mới (dự kiến) */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-0.5">
+                    Ngày hết hạn mới (dự kiến)
+                  </label>
+                  <div className="text-emerald-700 font-bold text-sm tracking-wide">
+                    {renewRequestedExpiryDate}
+                  </div>
+                </div>
+
+                {/* Mã chứng nhận mới (nếu có) */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">
+                    Mã chứng nhận mới (nếu có)
+                  </label>
+                  <input
+                    type="text"
+                    value={renewNewCertNumber}
+                    onChange={(e) => setRenewNewCertNumber(e.target.value)}
+                    placeholder="Để trống nếu giữ mã cũ"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600 placeholder:text-gray-400 font-mono"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Không tự tạo mã mới. Chỉ nhập khi tổ chức chứng nhận cấp mã khác.
+                  </p>
+                </div>
+
+                {/* Đơn vị thực hiện gia hạn */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">
+                    Đơn vị thực hiện gia hạn
+                  </label>
+                  <input
+                    type="text"
+                    value={renewIssuedBy}
+                    onChange={(e) => setRenewIssuedBy(e.target.value)}
+                    placeholder="VD: Tổ chức Chứng nhận Quốc tế Control Union"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600 placeholder:text-gray-400"
+                  />
+                </div>
+
+                {/* Ghi chú */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">Ghi chú</label>
+                  <textarea
+                    value={renewNote}
+                    onChange={(e) => setRenewNote(e.target.value)}
+                    placeholder="Nhập ghi chú về quá trình gia hạn..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600 placeholder:text-gray-400 resize-none"
+                  />
+                </div>
+
+                {/* Section 3: Tài liệu chứng minh gia hạn */}
+                <div className="border border-gray-200 rounded-2xl p-3.5 bg-white space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-gray-900 text-xs">
+                    <span className="text-gray-600">📎</span> Tài liệu chứng minh gia hạn
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Tải lên giấy chứng nhận mới hoặc biên bản đánh giá (PDF, JPG, PNG).
+                  </p>
+
+                  {renewProofImage ? (
+                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={renewProofImage} alt="Chứng từ" className="w-10 h-10 object-cover rounded-lg border border-emerald-300" />
+                        <span className="text-xs text-emerald-950 font-medium truncate max-w-xs">
+                          {renewProofFileName || "Tài liệu gia hạn đính kèm"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenewProofImage("");
+                          setRenewProofFileName("");
+                        }}
+                        className="text-xs text-rose-600 font-bold hover:underline shrink-0 ml-2 cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-full py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:text-emerald-700 hover:border-emerald-300 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer bg-white transition-all shadow-2xs hover:bg-gray-50">
+                      <span>⭡</span> Tải tài liệu lên
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleRenewImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsRenewModalOpen(false)}
+                    className="flex-1 py-2.5 rounded-full border border-gray-200 text-gray-700 font-bold text-xs hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingRenewal}
+                    className="flex-1 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>✓</span> Xác nhận gia hạn
+                  </button>
+                </div>
+                <p className="text-center text-[10px] text-gray-400 mt-2.5">
+                  Minh họa bố cục Modal, chưa phải biểu mẫu gia hạn pháp lý.
+                </p>
               </div>
             </form>
           </div>

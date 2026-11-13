@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.example.myfullstackapp.service.EmailService;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/farmer")
@@ -32,6 +36,7 @@ public class FarmerController {
     private final HarvestLotRepository harvestLotRepository;
     private final TraceabilityRecordRepository traceabilityRecordRepository;
     private final ObjectMapper objectMapper;
+    private final EmailService emailService;
 
     @GetMapping("/batches")
     public ResponseEntity<List<HarvestLot>> getAllBatches() {
@@ -330,4 +335,71 @@ public class FarmerController {
 
         harvestLotRepository.saveAll(List.of(b1, b2, b3));
     }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CertificateExpiryAlertRequest {
+        private String certName;
+        private String certNumber;
+        private String farmName;
+        private Integer daysLeft;
+        private String expiryDate;
+        private String toEmail;
+    }
+
+    @PostMapping("/certificates/notify-expiry")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> notifyCertificateExpiry(
+            @RequestBody CertificateExpiryAlertRequest req
+    ) {
+        if (req.getCertNumber() == null || req.getCertNumber().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Số hiệu chứng nhận không được để trống"));
+        }
+        int days = req.getDaysLeft() != null ? req.getDaysLeft() : 5;
+        String certName = req.getCertName() != null && !req.getCertName().isBlank()
+                ? req.getCertName()
+                : "Chứng nhận VietGAP / GlobalGAP";
+        String farmName = req.getFarmName() != null && !req.getFarmName().isBlank()
+                ? req.getFarmName()
+                : DEFAULT_FARM_NAME;
+        String expiryDate = req.getExpiryDate() != null ? req.getExpiryDate() : "Chưa xác định";
+
+        String recipient = req.getToEmail();
+        if (recipient == null || recipient.isBlank()) {
+            recipient = "nongdan@agritrace.vn";
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("certName", certName);
+        result.put("certNumber", req.getCertNumber());
+        result.put("daysLeft", days);
+        result.put("expiryDate", expiryDate);
+        result.put("recipient", recipient);
+
+        try {
+            emailService.sendCertificateExpiryWarningEmail(
+                    recipient,
+                    certName,
+                    req.getCertNumber(),
+                    farmName,
+                    days,
+                    expiryDate
+            );
+            result.put("status", "SENT");
+            return ResponseEntity.ok(ApiResponse.ok(
+                    String.format("Đã gửi email cảnh báo chứng chỉ %s (còn %d ngày) tới %s thành công!",
+                            req.getCertNumber(), days, recipient),
+                    result
+            ));
+        } catch (Exception ex) {
+            result.put("status", "SIMULATED");
+            result.put("note", "SMTP ghi nhận hoặc chưa kích hoạt: " + ex.getMessage());
+            return ResponseEntity.ok(ApiResponse.ok(
+                    String.format("Hệ thống đã kích hoạt cảnh báo chứng chỉ %s (còn %d ngày) cho %s",
+                            req.getCertNumber(), days, recipient),
+                    result
+            ));
+        }
+    }
+
 }
