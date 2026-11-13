@@ -2,7 +2,9 @@
 
 import {
   Award,
+  BookOpen,
   ClipboardList,
+  Crown,
   ChevronRight,
   Gift,
   History,
@@ -17,7 +19,9 @@ import {
   Shield,
   ShoppingBag,
   ShoppingCart,
+  Sparkles,
   Store,
+  Ticket,
   Truck,
   User,
   Users,
@@ -26,8 +30,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { LoadingSkeleton } from "@/components/ui/states";
 import { authService } from "@/services/auth.service";
@@ -74,12 +78,16 @@ const distributorNavigation: NavItem[] = [
 ];
 
 const adminNavigation: NavItem[] = [
-  { href: "/dashboard/admin", label: "Tổng Quan Hệ Thống", icon: Shield },
+  { href: "/dashboard/admin", label: "Tổng Quan & Duyệt Hồ Sơ", icon: Shield },
+  { href: "/dashboard/admin?tab=vouchers", label: "Quản Lý Voucher (Kho Ưu Đãi)", icon: Ticket },
+  { href: "/dashboard/admin?tab=events", label: "Quản Lý Sự Kiện & Mùa Vụ", icon: Sparkles },
+  { href: "/dashboard/admin?tab=blog", label: "Quản Trị Blog & Cẩm Nang", icon: BookOpen },
+  { href: "/dashboard/admin?tab=orders", label: "Quản Lý Đơn Hàng Hệ Thống", icon: ClipboardList },
+  { href: "/dashboard/admin?tab=loyalty", label: "Quản Lý Hội Viên AgriClub", icon: Crown },
   { href: "/dashboard/users", label: "Quản Lý Người Dùng", icon: Users },
   { href: "/dashboard/farmer", label: "Giám Sát Nông Trại", icon: Leaf },
   { href: "/dashboard/warehouse", label: "Giám Sát Kho Hàng", icon: Warehouse },
   { href: "/dashboard/distributor", label: "Giám Sát Vận Chuyển", icon: Truck },
-  { href: "/dashboard/customer", label: "Giám Sát Khách Hàng", icon: User },
 ];
 
 const roleLabelMap: Record<string, string> = {
@@ -99,6 +107,53 @@ const roleBadgeColor: Record<string, { bg: string; text: string; dot: string }> 
   DISTRIBUTOR: { bg: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", text: "text-amber-700" },
   CUSTOMER: { bg: "bg-emerald-50 text-emerald-800 border-emerald-200", dot: "bg-emerald-600", text: "text-emerald-700" },
 };
+
+function SidebarNavItems({
+  navItems,
+  pathname,
+  onSelect,
+}: {
+  navItems: NavItem[];
+  pathname: string;
+  onSelect: () => void;
+}) {
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab");
+
+  return (
+    <>
+      {navItems.map((item) => {
+        const [itemPath, itemQuery] = item.href.split("?");
+        const itemTab = itemQuery ? new URLSearchParams(itemQuery).get("tab") : null;
+        const active = itemTab
+          ? pathname === itemPath && currentTab === itemTab
+          : pathname === item.href && (!currentTab || pathname !== "/dashboard/admin");
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onSelect}
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              active
+                ? "bg-emerald-50 text-emerald-800 font-bold shadow-xs border border-emerald-100"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Icon
+                size={17}
+                className={active ? "text-emerald-700" : "text-gray-400"}
+              />
+              <span className="truncate">{item.label}</span>
+            </div>
+            {active && <ChevronRight size={14} className="text-emerald-700" />}
+          </Link>
+        );
+      })}
+    </>
+  );
+}
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -134,11 +189,22 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       /* ignore */
     }
     clearSession();
-    toast.info("Đã đăng xuất.");
-    router.replace("/login");
+    toast.info("Đã đăng xuất thành công.");
+    router.replace("/");
   }
 
-  const primaryRole = user.roles[0] ?? "CUSTOMER";
+  const hasRole = (role: string) =>
+    Boolean(user.roles?.some((r) => r === role || r === `ROLE_${role}`));
+
+  const primaryRole = hasRole("ADMIN")
+    ? "ADMIN"
+    : hasRole("FARMER")
+    ? "FARMER"
+    : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF")
+    ? "WAREHOUSE"
+    : hasRole("DISTRIBUTOR")
+    ? "DISTRIBUTOR"
+    : "CUSTOMER";
   const roleLabel = roleLabelMap[primaryRole] ?? "Khách hàng";
   const badgeStyle = roleBadgeColor[primaryRole] ?? roleBadgeColor.CUSTOMER;
 
@@ -219,31 +285,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             {primaryRole === "CUSTOMER" ? "Khu Vực Cá Nhân" : "Bảng Chức Năng"}
           </div>
 
-          {navItems.map((item) => {
-            const active = pathname === item.href || item.matchPrefixes?.some((prefix) => pathname.startsWith(prefix));
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  active
-                    ? "bg-emerald-50 text-emerald-800 font-bold shadow-xs border border-emerald-100"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Icon
-                    size={17}
-                    className={active ? "text-emerald-700" : "text-gray-400"}
-                  />
-                  <span className="truncate">{item.label}</span>
-                </div>
-                {active && <ChevronRight size={14} className="text-emerald-700" />}
-              </Link>
-            );
-          })}
+          <Suspense fallback={<div className="p-4 text-xs text-gray-400">Đang tải menu...</div>}>
+            <SidebarNavItems
+              navItems={navItems}
+              pathname={pathname}
+              onSelect={() => setSidebarOpen(false)}
+            />
+          </Suspense>
 
           <div className="pt-4 mt-3 border-t border-gray-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
             Lối Tắt Nhanh
@@ -289,7 +337,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               <Menu size={20} />
             </button>
             <h2 className="text-sm sm:text-base font-bold text-gray-800 truncate">
-              {primaryRole === "CUSTOMER" ? "Tài Khoản & Đơn Mua" : "Khu Vực Quản Lý"}
+              {primaryRole === "FARMER"
+                ? "Khu Vực Quản Lý Nông Trại"
+                : primaryRole === "ADMIN"
+                ? "Khu Vực Quản Trị Hệ Thống"
+                : primaryRole === "WAREHOUSE"
+                ? "Khu Vực Quản Lý Kho Bãi"
+                : primaryRole === "DISTRIBUTOR"
+                ? "Khu Vực Quản Lý Vận Chuyển"
+                : "Tài Khoản & Đơn Mua"}
             </h2>
           </div>
 

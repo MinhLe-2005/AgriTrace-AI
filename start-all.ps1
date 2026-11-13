@@ -1,4 +1,4 @@
-# ===================================================================
+﻿# ===================================================================
 # AgriTrace AI - Local Quick Start Script (PowerShell)
 # Khoi dong toan bo he thong: PostgreSQL (Cloud/Local) + Spring Boot + Next.js
 # ===================================================================
@@ -74,7 +74,23 @@ $bPortListening = Test-NetConnection -ComputerName 127.0.0.1 -Port 8080 -Informa
 if ($bPortListening) {
     Write-Host "  -> Port 8080 da dang chay san." -ForegroundColor Green
 } else {
-    Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'AgriTrace-Backend'; `$env:SPRING_PROFILES_ACTIVE = 'dev'; & '$mvnCmd' spring-boot:run" -WorkingDirectory $BackendDir
+    $backendCmd = @"
+`$Host.UI.RawUI.WindowTitle = 'AgriTrace-Backend';
+if (Test-Path .env) {
+    Get-Content .env | ForEach-Object {
+        `$l = `$_.Trim();
+        if (`$l -and -not `$l.StartsWith('#')) {
+            `$p = `$l.Split('=', 2);
+            if (`$p.Length -eq 2) {
+                [System.Environment]::SetEnvironmentVariable(`$p[0].Trim(), `$p[1].Trim(), 'Process');
+            }
+        }
+    }
+}
+`$env:SPRING_PROFILES_ACTIVE = 'dev';
+& '$mvnCmd' spring-boot:run '-Dspring-boot.run.profiles=dev'
+"@
+    Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", $backendCmd -WorkingDirectory $BackendDir
 }
 
 # 3. Khoi dong Frontend Next.js (Port 3000)

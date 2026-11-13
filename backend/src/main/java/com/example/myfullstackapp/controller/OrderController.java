@@ -30,6 +30,7 @@ public class OrderController {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final com.example.myfullstackapp.service.LoyaltyService loyaltyService;
 
     private static final Set<String> NON_CANCELLABLE_STATUSES = Set.of("SHIPPING", "DELIVERED", "CANCELLED", "REFUNDED");
 
@@ -155,6 +156,17 @@ public class OrderController {
         }
 
         Order saved = orderRepository.save(order);
+
+        // Award loyalty points to the customer
+        if (email != null && !email.isBlank()) {
+            loyaltyService.awardOrderPoints(
+                    email,
+                    saved.getTotal() != null ? saved.getTotal() : 0L,
+                    saved.getOrderCode(),
+                    saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+            );
+        }
+
         return ResponseEntity.ok(saved);
     }
 

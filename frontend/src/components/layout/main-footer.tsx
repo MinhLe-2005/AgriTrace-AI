@@ -203,17 +203,22 @@ export function MainFooter() {
             </h4>
             <ul className="space-y-2 text-gray-400">
               <li>
+                <Link href="/events" className="hover:text-emerald-400 transition-colors flex items-center gap-1 text-emerald-300 font-bold">
+                  <span>🔥 Sự kiện & Trợ giá mùa vụ</span>
+                </Link>
+              </li>
+              <li>
                 <Link href="/about" className="hover:text-emerald-400 transition-colors">
                   Về chúng tôi & Tiêu chuẩn nông trại
                 </Link>
               </li>
               <li>
-                <Link href="/cart" className="hover:text-emerald-400 transition-colors">
+                <Link href="/terms#coldchain" className="hover:text-emerald-400 transition-colors">
                   Chính sách giao hàng xe lạnh 24H
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard/customer?tab=orders" className="hover:text-emerald-400 transition-colors">
+                <Link href="/terms#returns" className="hover:text-emerald-400 transition-colors">
                   Quy định đổi trả hàng miễn phí
                 </Link>
               </li>
@@ -223,8 +228,8 @@ export function MainFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-emerald-400 transition-colors">
-                  Trung tâm trợ giúp & Khiếu nại
+                <Link href="/faq" className="hover:text-emerald-400 transition-colors">
+                  Trung tâm trợ giúp & Khiếu nại (FAQ)
                 </Link>
               </li>
             </ul>
@@ -300,7 +305,7 @@ export function MainFooter() {
         <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-gray-500">
           <p>© 2026 AgriTrace Ecosystem. Nền tảng số hóa chuỗi cung ứng nông sản sạch.</p>
           <div className="flex items-center gap-4 text-gray-400">
-            <Link href="/about" className="hover:text-white transition-colors">
+            <Link href="/terms" className="hover:text-white transition-colors">
               Điều khoản dịch vụ
             </Link>
             <span>·</span>

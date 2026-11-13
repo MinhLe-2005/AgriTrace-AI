@@ -23,11 +23,43 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.findByActiveTrue());
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<List<Voucher>> getAllVouchers() {
+        return ResponseEntity.ok(voucherRepository.findAll());
+    }
+
     @GetMapping("/{code}")
     public ResponseEntity<Voucher> getVoucherByCode(@PathVariable String code) {
         return voucherRepository.findByCodeIgnoreCaseAndActiveTrue(code)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping
+    public ResponseEntity<Voucher> createVoucher(@RequestBody Voucher req) {
+        if (req.getCode() == null || req.getCode().isBlank()) {
+            throw new IllegalArgumentException("Mã voucher không được để trống");
+        }
+        req.setCode(req.getCode().trim().toUpperCase());
+        if (req.getActive() == null) req.setActive(true);
+        if (req.getBadgeColor() == null || req.getBadgeColor().isBlank()) {
+            req.setBadgeColor("bg-emerald-100 text-emerald-800");
+        }
+        return ResponseEntity.ok(voucherRepository.save(req));
+    }
+
+    @PatchMapping("/{id}/toggle")
+    public ResponseEntity<Voucher> toggleVoucher(@PathVariable Long id) {
+        Voucher voucher = voucherRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy voucher ID: " + id));
+        voucher.setActive(!Boolean.TRUE.equals(voucher.getActive()));
+        return ResponseEntity.ok(voucherRepository.save(voucher));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> deleteVoucher(@PathVariable Long id) {
+        voucherRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Đã xóa voucher thành công"));
     }
 
     @GetMapping("/validate")
@@ -61,13 +93,22 @@ public class VoucherController {
         }
 
         // Min order check
-        long minOrder = switch (cleanCode) {
-            case "VIPGOLD" -> 300000L;
-            case "FREESHIP", "FREESHIP25" -> 150000L;
-            case "AGRI30" -> 100000L;
-            case "VIETGAP10" -> 120000L;
-            default -> 0L;
-        };
+        long minOrder = 0L;
+        if (opt.isPresent() && opt.get().getMinOrder() != null && !opt.get().getMinOrder().isBlank()) {
+            try {
+                minOrder = Long.parseLong(opt.get().getMinOrder().replaceAll("[^0-9]", ""));
+            } catch (Exception ignored) {
+                minOrder = 0L;
+            }
+        } else {
+            minOrder = switch (cleanCode) {
+                case "VIPGOLD" -> 300000L;
+                case "FREESHIP", "FREESHIP25" -> 150000L;
+                case "AGRI30" -> 100000L;
+                case "VIETGAP10" -> 120000L;
+                default -> 0L;
+            };
+        }
 
         if (subtotal > 0 && subtotal < minOrder) {
             return ResponseEntity.ok(Map.of(
@@ -78,13 +119,32 @@ public class VoucherController {
         }
 
         // Discount computation
-        long discountAmount = switch (cleanCode) {
-            case "VIPGOLD" -> 50000L;
-            case "FREESHIP", "FREESHIP25" -> 25000L;
-            case "AGRI30" -> Math.min(50000L, Math.max(30000L, (long)(subtotal * 0.3)));
-            case "VIETGAP10" -> 15000L;
-            default -> 20000L;
-        };
+        long discountAmount = 20000L;
+        if (opt.isPresent() && opt.get().getDiscount() != null && !opt.get().getDiscount().isBlank()) {
+            String d = opt.get().getDiscount().trim();
+            if (d.endsWith("%")) {
+                try {
+                    double pct = Double.parseDouble(d.replace("%", "").trim()) / 100.0;
+                    discountAmount = (long)(subtotal * pct);
+                } catch (Exception ignored) {
+                    discountAmount = 20000L;
+                }
+            } else {
+                try {
+                    discountAmount = Long.parseLong(d.replaceAll("[^0-9]", ""));
+                } catch (Exception ignored) {
+                    discountAmount = 20000L;
+                }
+            }
+        } else {
+            discountAmount = switch (cleanCode) {
+                case "VIPGOLD" -> 50000L;
+                case "FREESHIP", "FREESHIP25" -> 25000L;
+                case "AGRI30" -> Math.min(50000L, Math.max(30000L, (long)(subtotal * 0.3)));
+                case "VIETGAP10" -> 15000L;
+                default -> 20000L;
+            };
+        }
 
         String type = (cleanCode.contains("FREESHIP")) ? "freeship" : "discount";
 

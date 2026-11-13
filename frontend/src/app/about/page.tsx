@@ -1,5 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Award,
+  Building2,
   CheckCircle2,
   Cpu,
   HeartHandshake,
@@ -8,14 +13,31 @@ import {
   QrCode,
   ShieldCheck,
   Sparkles,
-  TrendingUp,
+  Sprout,
+  ThermometerSnowflake,
   Truck,
+  UserCheck,
   Users,
+  ArrowRight,
 } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
+import { useAuthStore } from "@/stores/auth-store";
+import { PartnerModal, type PartnerType } from "@/components/about/partner-modal";
 
 export default function AboutPage() {
+  const { user } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
+  const [partnerModalType, setPartnerModalType] = useState<PartnerType>("distributor");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const openPartnerModal = (type: PartnerType) => {
+    setPartnerModalType(type);
+    setPartnerModalOpen(true);
+  };
+
   const CORE_VALUES = [
     {
       icon: ShieldCheck,
@@ -87,6 +109,13 @@ export default function AboutPage() {
               >
                 <QrCode size={16} className="text-emerald-600" /> Trải Nghiệm Quét QR
               </Link>
+              <button
+                type="button"
+                onClick={() => openPartnerModal("distributor")}
+                className="px-6 py-3 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-sm hover:bg-emerald-100 transition-all flex items-center gap-2"
+              >
+                <Truck size={16} className="text-emerald-700" /> Đăng Ký Đối Tác
+              </button>
             </div>
           </div>
         </div>
@@ -182,8 +211,57 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ─── Dedicated Cold Chain Section (Anchor: #coldchain) ─── */}
+      <section id="coldchain" className="scroll-mt-24 py-16 sm:py-20 bg-gradient-to-b from-blue-50/40 via-white to-gray-50/50 border-t border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold mb-3 tracking-wide">
+              <ThermometerSnowflake size={15} /> TIÊU CHUẨN CHUỖI CUNG ỨNG LẠNH 2°C - 5°C
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+              Giữ Trọn Độ Tươi Giòn & Hàm Lượng Dinh Dưỡng
+            </h2>
+            <p className="mt-3 text-gray-600 text-sm sm:text-base leading-relaxed">
+              Khác biệt cốt lõi của AgriTrace AI là cam kết duy trì nhiệt độ ổn định xuyên suốt từ lúc thu hái tại nông trại đến tận cửa nhà khách hàng, triệt tiêu nguy cơ úa hỏng và vi khuẩn sinh sôi.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl p-6 border border-blue-100 shadow-xs hover:shadow-md transition-all">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+                <ThermometerSnowflake size={24} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-base mb-2">Cảm Biến IoT Giám Sát 24/7</h3>
+              <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
+                Từng thùng xe lạnh đều lắp đặt cảm biến nhiệt độ & độ ẩm tự động gửi dữ liệu về hệ thống. Cảnh báo rung tức thì nếu nhiệt độ vượt ngưỡng an toàn.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-xs hover:shadow-md transition-all">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+                <Truck size={24} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-base mb-2">Đội Xe Chuyên Dụng & Màng Thở</h3>
+              <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
+                Đội ngũ đối tác vận tải xe lạnh cam kết không chở chung hàng tạp hóa. Nông sản được bọc màng thở sinh học ngăn đọng sương và giữ nguyên vị ngọt ngào.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-amber-100 shadow-xs hover:shadow-md transition-all">
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+                <ShieldCheck size={24} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-base mb-2">Quy Trình Kho Lạnh Chuẩn FEFO</h3>
+              <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
+                Kho trung chuyển vận hành theo nguyên tắc First-Expired, First-Out kết hợp thuật toán AI gợi ý xuất kho trước các lô có hạn dùng ngắn nhất.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ─── Core Values ─── */}
-      <section className="py-16 sm:py-20 bg-gray-50/60 border-t border-gray-100">
+      <section className="py-16 sm:py-20 bg-gray-50/60 border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
@@ -212,7 +290,7 @@ export default function AboutPage() {
       </section>
 
       {/* ─── Partner Farms ─── */}
-      <section className="py-16 sm:py-20 bg-white">
+      <section className="py-16 sm:py-20 bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <div className="inline-flex items-center gap-1 text-xs font-bold text-[#1a7a3a] tracking-wider uppercase mb-2">
@@ -247,31 +325,264 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ─── Bottom CTA ─── */}
-      <section className="py-14 bg-gradient-to-r from-[#156e34] to-[#25a854] text-white text-center">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-4">
-          <h2 className="text-2xl sm:text-3xl font-extrabold">
-            Cùng Chúng Tôi Lan Tỏa Nông Sản Sạch Việt Nam
-          </h2>
-          <p className="text-emerald-100 text-sm sm:text-base leading-relaxed">
-            Dù bạn là người tiêu dùng muốn tìm bữa ăn an toàn, hay là nông dân mong muốn đưa thương hiệu nông sản vươn xa — AgriTrace AI luôn đồng hành cùng bạn.
-          </p>
-          <div className="pt-2 flex flex-wrap justify-center gap-3">
-            <Link
-              href="/register"
-              className="px-6 py-3 rounded-xl bg-white text-[#1a7a3a] font-bold text-sm hover:bg-gray-100 shadow-md transition-all"
-            >
-              Đăng Ký Tài Khoản Miễn Phí
-            </Link>
-            <Link
-              href="/chat"
-              className="px-6 py-3 rounded-xl bg-emerald-800 text-white font-semibold text-sm hover:bg-emerald-900 border border-emerald-400/40 transition-all"
-            >
-              Liên Hệ Hợp Tác
-            </Link>
+      {/* ─── Brand New: B2B Partnership Section (Anchor: #partnership) ─── */}
+      <section id="partnership" className="scroll-mt-24 py-16 sm:py-24 bg-gradient-to-b from-gray-50/50 via-white to-emerald-50/30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-100 text-[#156e34] text-xs font-bold mb-3 tracking-wide">
+              <Users size={14} /> MỞ RỘNG HỢP TÁC DOANH NGHIỆP & B2B
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+              Cùng Xây Dựng Hệ Sinh Thái Nông Nghiệp Bền Vững
+            </h2>
+            <p className="mt-3 text-gray-600 text-sm sm:text-base leading-relaxed">
+              AgriTrace AI chào đón các đối tác đội xe vận tải lạnh, chủ nông trường canh tác an toàn và các đơn vị tiêu thụ sỉ đồng hành cùng mở rộng quy mô toàn quốc.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-7">
+            {/* Distributor Card */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-emerald-200/90 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative group">
+              <div className="absolute top-5 right-5 text-emerald-100 group-hover:text-emerald-200 transition-colors">
+                <Truck size={40} />
+              </div>
+              <div>
+                <span className="inline-block px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-3">
+                  Đối Tác Vận Tải Lạnh
+                </span>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Đội Xe & Nhà Phân Phối</h3>
+                <p className="text-xs sm:text-sm text-gray-600 mb-5 leading-relaxed">
+                  Gia nhập mạng lưới vận chuyển chuyên nghiệp nhận phân phối đơn hàng nông sản VietGAP với nguồn doanh thu ổn định.
+                </p>
+
+                <div className="space-y-2.5 text-xs text-gray-700 mb-6">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Tiếp nhận đơn giao hàng liên tục theo tuyến đường đã đăng ký</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Đối soát tự động, hoa hồng chiết khấu hấp dẫn thanh toán hàng tuần</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Cấp tài khoản Distributor quản lý giao nhận và quét mã QR</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Hỗ trợ thiết bị kiểm soát nhiệt độ thùng xe 2°C - 5°C</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => openPartnerModal("distributor")}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <span>Đăng Ký Làm Nhà Phân Phối</span>
+                <ArrowRight size={15} />
+              </button>
+            </div>
+
+            {/* Farmer Card */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-emerald-200/90 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative group">
+              <div className="absolute top-5 right-5 text-emerald-100 group-hover:text-emerald-200 transition-colors">
+                <Sprout size={40} />
+              </div>
+              <div>
+                <span className="inline-block px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold mb-3">
+                  Đối Tác Canh Tác
+                </span>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Nông Trại & Hợp Tác Xã</h3>
+                <p className="text-xs sm:text-sm text-gray-600 mb-5 leading-relaxed">
+                  Bao tiêu đầu ra bền vững cho rau củ quả đạt chuẩn VietGAP, GlobalGAP, Organic mà không qua thương lái ép giá.
+                </p>
+
+                <div className="space-y-2.5 text-xs text-gray-700 mb-6">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Bao tiêu sản lượng mùa vụ với giá bán công khai minh bạch</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Miễn phí cấp hệ thống tem QR định danh GS1 và nhật ký điện tử</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Tiếp cận trực tiếp hơn 15.000 khách hàng tiêu dùng thông minh</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Trợ lý AI dự báo nhu cầu thị trường trước 7 ngày gieo trồng</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => openPartnerModal("farmer")}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-800 to-green-800 hover:from-emerald-900 hover:to-green-900 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <span>Đăng Ký Nông Trại Đối Tác</span>
+                <ArrowRight size={15} />
+              </button>
+            </div>
+
+            {/* B2B Wholesale Card */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-emerald-200/90 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative group">
+              <div className="absolute top-5 right-5 text-emerald-100 group-hover:text-emerald-200 transition-colors">
+                <Building2 size={40} />
+              </div>
+              <div>
+                <span className="inline-block px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-bold mb-3">
+                  Tiêu Thụ Sỉ & Doanh Nghiệp
+                </span>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Bếp Ăn, Nhà Hàng & Siêu Thị</h3>
+                <p className="text-xs sm:text-sm text-gray-600 mb-5 leading-relaxed">
+                  Cung ứng số lượng lớn nông sản sạch ổn định quanh năm, kiểm nghiệm dư lượng BVTV = 0 kèm hóa đơn VAT.
+                </p>
+
+                <div className="space-y-2.5 text-xs text-gray-700 mb-6">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Nguồn hàng dồi dào, ổn định giá cả không biến động theo mùa</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Xuất hóa đơn VAT đỏ đầy đủ và phiếu kiểm nghiệm an toàn</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Giao hàng bằng xe lạnh tận nơi đúng giờ sáng sớm</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Chiết khấu B2B lên đến 25% cho hợp đồng dài hạn</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => openPartnerModal("b2b")}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-700 to-emerald-700 hover:from-amber-800 hover:to-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <span>Liên Hệ Báo Giá Sỉ B2B</span>
+                <ArrowRight size={15} />
+              </button>
+            </div>
           </div>
         </div>
       </section>
+
+      {/* ─── Smart Context-Aware Bottom CTA ─── */}
+      <section className="py-14 sm:py-18 bg-gradient-to-r from-[#115e2b] via-[#1a7a3a] to-[#25a854] text-white text-center relative overflow-hidden">
+        {/* Ambient background decoration */}
+        <div className="absolute -top-24 -left-24 w-72 h-72 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10 space-y-4">
+          {mounted && user ? (
+            /* Logged-In User Experience */
+            <div className="space-y-4 animate-fade-in">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-semibold border border-white/30">
+                <UserCheck size={14} className="text-emerald-200" />
+                <span>
+                  Xin chào, <strong className="underline decoration-emerald-300">{user.name}</strong> • Tài khoản:{" "}
+                  {user.roles?.includes("DISTRIBUTOR")
+                    ? "Nhà Phân Phối"
+                    : user.roles?.includes("FARMER")
+                    ? "Nông Trại Đối Tác"
+                    : user.roles?.includes("ADMIN")
+                    ? "Quản Trị Viên"
+                    : "Khách Hàng Thân Thiết"}
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+                Cùng AgriTrace Mở Rộng Chuỗi Nông Sản Sạch
+              </h2>
+              <p className="text-emerald-100 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+                Bạn đã đăng nhập tài khoản hệ thống. Hãy tiếp tục chọn mua rau củ quả chuẩn VietGAP hôm nay hoặc đăng ký nâng cấp trở thành Nhà Phân Phối / Nông Trại đối tác của chúng tôi.
+              </p>
+
+              <div className="pt-3 flex flex-wrap justify-center items-center gap-3">
+                <Link
+                  href="/products"
+                  className="px-6 py-3 rounded-xl bg-white text-[#1a7a3a] font-bold text-sm hover:bg-gray-100 shadow-lg shadow-black/10 transition-all flex items-center gap-2"
+                >
+                  <span>🛒 Khám Phá Nông Sản Hôm Nay</span>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => openPartnerModal("distributor")}
+                  className="px-6 py-3 rounded-xl bg-emerald-900/80 hover:bg-emerald-950 text-white font-semibold text-sm border border-emerald-300/40 shadow-sm transition-all flex items-center gap-2"
+                >
+                  <Truck size={15} className="text-emerald-300" />
+                  <span>Đăng Ký Làm Nhà Phân Phối</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openPartnerModal("farmer")}
+                  className="px-6 py-3 rounded-xl bg-emerald-900/80 hover:bg-emerald-950 text-white font-semibold text-sm border border-emerald-300/40 shadow-sm transition-all flex items-center gap-2"
+                >
+                  <Sprout size={15} className="text-emerald-300" />
+                  <span>Đăng Ký Đối Tác Nông Trại</span>
+                </button>
+
+                <Link
+                  href="/dashboard/customer"
+                  className="px-4 py-3 rounded-xl text-emerald-100 hover:text-white text-xs font-semibold underline underline-offset-4 transition-all"
+                >
+                  Xem đơn mua & ví voucher →
+                </Link>
+              </div>
+            </div>
+          ) : (
+            /* Guest (Not Logged In) Experience */
+            <div className="space-y-4">
+              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+                Cùng Chúng Tôi Lan Tỏa Nông Sản Sạch Việt Nam
+              </h2>
+              <p className="text-emerald-100 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+                Dù bạn là người tiêu dùng muốn tìm bữa ăn an toàn, hay là nông dân, nhà phân phối mong muốn đưa thương hiệu nông sản vươn xa — AgriTrace AI luôn đồng hành cùng bạn.
+              </p>
+              <div className="pt-3 flex flex-wrap justify-center items-center gap-3">
+                <Link
+                  href="/register"
+                  className="px-6 py-3 rounded-xl bg-white text-[#1a7a3a] font-bold text-sm hover:bg-gray-100 shadow-md transition-all"
+                >
+                  Đăng Ký Tài Khoản Miễn Phí
+                </Link>
+                <Link
+                  href="/login"
+                  className="px-6 py-3 rounded-xl bg-emerald-800 text-white font-semibold text-sm hover:bg-emerald-900 border border-emerald-400/40 transition-all"
+                >
+                  Đăng Nhập
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => openPartnerModal("distributor")}
+                  className="px-6 py-3 rounded-xl bg-teal-800/90 text-white font-semibold text-sm hover:bg-teal-900 border border-teal-300/40 transition-all flex items-center gap-2"
+                >
+                  <Truck size={15} />
+                  <span>Đăng Ký Đối Tác B2B</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ─── Interactive Partner Registration Modal ─── */}
+      <PartnerModal
+        isOpen={partnerModalOpen}
+        onClose={() => setPartnerModalOpen(false)}
+        initialType={partnerModalType}
+      />
     </div>
   );
 }

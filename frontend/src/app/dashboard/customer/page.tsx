@@ -7,6 +7,7 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Copy,
   Edit3,
@@ -27,6 +28,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Sprout,
   Star,
   Tag,
   Trash2,
@@ -42,6 +44,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { getApiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
 import { catalogService } from "@/services/catalog.service";
+import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { reviewService } from "@/services/review.service";
 import { useAuthStore } from "@/stores/auth-store";
@@ -314,17 +317,22 @@ function CustomerDashboardContent() {
   }
 
   // Live Supabase data
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<SavedVoucher[]>(mockSavedVouchers);
-  const totalLoyaltyPoints = orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
+  const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
+  const totalLoyaltyPoints = loyaltyProfile?.currentPoints ?? orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
 
   useEffect(() => {
     async function loadSupabaseCustomerData() {
       try {
-        const [apiOrders, apiVouchers] = await Promise.all([
+        const [apiOrders, apiVouchers, apiLoyalty] = await Promise.all([
           catalogService.getOrders(user?.email),
           catalogService.getVouchers(),
+          loyaltyService.getLoyaltyMe(user?.email),
         ]);
+        if (apiLoyalty) {
+          setLoyaltyProfile(apiLoyalty);
+        }
         if (apiOrders && apiOrders.length > 0) {
           const mapped: Order[] = apiOrders.map((o) => {
             const details = getOrderStatusDetails(o.status);
@@ -369,6 +377,8 @@ function CustomerDashboardContent() {
             };
           });
           setOrders(mapped);
+        } else {
+          setOrders([]);
         }
         if (apiVouchers && apiVouchers.length > 0) {
           const mappedVouchers: SavedVoucher[] = apiVouchers.map((v) => ({
@@ -402,7 +412,8 @@ function CustomerDashboardContent() {
       setActiveTab(tabParam);
     }
     if (orderParam) {
-      const match = orders.find((o) => o.id === orderParam);
+      const cleanParam = orderParam.replace(/^#/, "").trim().toLowerCase();
+      const match = orders.find((o) => o.id?.replace(/^#/, "").trim().toLowerCase() === cleanParam);
       if (match) setSelectedOrder(match);
     }
   }, [tabParam, orderParam, orders]);
@@ -548,7 +559,7 @@ function CustomerDashboardContent() {
   const [isSubmittingPw, setIsSubmittingPw] = useState(false);
 
   // Notifications filter
-  const [notifFilter, setNotifFilter] = useState<"ALL" | "UNREAD" | "ORDER" | "VOUCHER">("ALL");
+  const [notifFilter, setNotifFilter] = useState<"ALL" | "UNREAD" | "ORDER" | "VOUCHER" | "SEASON">("ALL");
 
   function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -630,6 +641,7 @@ function CustomerDashboardContent() {
     if (notifFilter === "UNREAD") return !n.read;
     if (notifFilter === "ORDER") return n.type === "order";
     if (notifFilter === "VOUCHER") return n.type === "voucher";
+    if (notifFilter === "SEASON") return n.type === "season" || n.type === "promo";
     return true;
   });
 
@@ -999,6 +1011,27 @@ function CustomerDashboardContent() {
                 </div>
               </div>
             ))}
+
+            {filteredOrders.length === 0 && (
+              <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center space-y-4 shadow-xs">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto shadow-2xs">
+                  <ShoppingBag size={28} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-bold text-gray-900">Chưa có đơn hàng nào</h4>
+                  <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                    Đơn hàng sẽ hiển thị tại đây sau khi bạn đặt mua thành công. Hãy khám phá ngay các loại nông sản đạt chuẩn VietGAP!
+                  </p>
+                </div>
+                <Link
+                  href="/products"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-xs"
+                >
+                  <span>Khám phá nông sản sạch</span>
+                  <ChevronRight size={14} />
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1168,13 +1201,14 @@ function CustomerDashboardContent() {
           </div>
 
           {/* Notification Filter */}
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             {(
               [
                 { key: "ALL", label: "Tất cả" },
                 { key: "UNREAD", label: `Chưa đọc (${unreadCount})` },
                 { key: "ORDER", label: "Đơn hàng" },
-                { key: "VOUCHER", label: "Voucher & Quà tặng" },
+                { key: "VOUCHER", label: "Voucher & Điểm" },
+                { key: "SEASON", label: "Mùa vụ & Khuyến mãi" },
               ] as const
             ).map((tab) => (
               <button
@@ -1215,6 +1249,10 @@ function CustomerDashboardContent() {
                           ? "bg-blue-100 text-blue-700"
                           : n.type === "voucher"
                           ? "bg-amber-100 text-amber-700"
+                          : n.type === "promo"
+                          ? "bg-rose-100 text-rose-700"
+                          : n.type === "season"
+                          ? "bg-orange-100 text-orange-700"
                           : "bg-emerald-100 text-emerald-700"
                       )}
                     >
@@ -1222,6 +1260,10 @@ function CustomerDashboardContent() {
                         <Truck size={17} />
                       ) : n.type === "voucher" ? (
                         <Gift size={17} />
+                      ) : n.type === "promo" ? (
+                        <Sparkles size={17} />
+                      ) : n.type === "season" ? (
+                        <Sprout size={17} />
                       ) : (
                         <ShieldCheck size={17} />
                       )}
@@ -1590,13 +1632,16 @@ function CustomerDashboardContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-white shadow-md">
             <div>
               <span className="text-xs uppercase tracking-wider text-amber-100 font-bold">
-                Hạng hội viên hiện tại
+                Hạng hội viên AgriClub của bạn
               </span>
               <h2 className="text-2xl font-extrabold mt-0.5 flex items-center gap-2">
-                Hội Viên Vàng (Gold Member)
+                Hội Viên {loyaltyProfile?.tier || "Vàng"} ({loyaltyProfile?.pointsMultiplier ? `${loyaltyProfile.pointsMultiplier}x` : "1.5x"} Điểm)
               </h2>
               <p className="text-xs text-amber-100 mt-1">
-                Tích lũy thêm 252 điểm nữa để thăng hạng <strong>Kim Cương</strong> nhận chiết khấu 10% trọn đời.
+                Tổng chi tiêu tích lũy: <strong>{(loyaltyProfile?.totalSpent ?? 0).toLocaleString("vi-VN")} đ</strong>
+                {loyaltyProfile?.nextTier && loyaltyProfile.nextTier !== "MAX" && (
+                  <span> · Mục tiêu hạng {loyaltyProfile.nextTier}: {loyaltyProfile.nextTierThreshold.toLocaleString("vi-VN")} đ</span>
+                )}
               </p>
             </div>
             <div className="text-right sm:text-right">
@@ -1605,14 +1650,28 @@ function CustomerDashboardContent() {
             </div>
           </div>
 
+          {/* Action button to redeem voucher */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
+            <div>
+              <span className="font-bold text-emerald-950 block">Bạn có {totalLoyaltyPoints} điểm tích lũy chưa sử dụng</span>
+              <span className="text-emerald-700">Đổi điểm lấy mã giảm giá 10k, 30k hoặc Freeship xe lạnh cho đơn hàng tiếp theo.</span>
+            </div>
+            <Link
+              href="/loyalty#redeem-section"
+              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold transition-colors shrink-0 shadow-xs"
+            >
+              Đến Quầy Đổi Voucher →
+            </Link>
+          </div>
+
           <div className="space-y-3">
-            <h3 className="text-sm font-bold text-gray-800">Đặc quyền hội viên Vàng của bạn:</h3>
+            <h3 className="text-sm font-bold text-gray-800">Đặc quyền hội viên hiện tại:</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1">
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
                   <Gift className="w-3.5 h-3.5 text-emerald-600" /> Tặng voucher hàng tháng
                 </p>
-                <p className="text-gray-500 text-[11px]">Nhận 3 mã giảm giá độc quyền vào đầu mỗi tháng.</p>
+                <p className="text-gray-500 text-[11px]">Nhận mã giảm giá độc quyền theo cấp bậc vào đầu mỗi tháng.</p>
               </div>
               <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1">
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
@@ -1624,9 +1683,36 @@ function CustomerDashboardContent() {
                 <p className="font-bold text-gray-900 flex items-center gap-1.5">
                   <Award className="w-3.5 h-3.5 text-amber-600" /> Đổi điểm nhận quà
                 </p>
-                <p className="text-gray-500 text-[11px]">Dùng 100 điểm để đổi voucher giảm 50.000đ khi mua rau củ.</p>
+                <p className="text-gray-500 text-[11px]">Dùng điểm để đổi mã giảm giá mua rau củ quả và freeship.</p>
               </div>
             </div>
+          </div>
+
+          {/* Transaction History in Customer Dashboard */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <Award className="w-4 h-4 text-emerald-600" />
+              Lịch sử biến động điểm gần nhất:
+            </h3>
+            {(!loyaltyProfile?.recentTransactions || loyaltyProfile.recentTransactions.length === 0) ? (
+              <div className="text-center py-6 text-xs text-gray-400 bg-gray-50 rounded-xl">
+                Chưa có lịch sử biến động điểm nào.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                {loyaltyProfile.recentTransactions.map((tx) => (
+                  <div key={tx.id} className="p-3 flex items-center justify-between text-xs hover:bg-gray-50 transition-colors">
+                    <div>
+                      <div className="font-semibold text-gray-900">{tx.description}</div>
+                      <div className="text-[11px] text-gray-400">{tx.createdAt ? new Date(tx.createdAt).toLocaleString("vi-VN") : "Hôm nay"}</div>
+                    </div>
+                    <div className={cn("font-bold text-sm font-mono", tx.points > 0 ? "text-emerald-600" : "text-purple-600")}>
+                      {tx.points > 0 ? `+${tx.points}` : `${tx.points}`} điểm
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1635,8 +1721,8 @@ function CustomerDashboardContent() {
       {/* MODAL: XEM CHI TIẾT ĐƠN HÀNG                              */}
       {/* ========================================================= */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-7 space-y-6 animate-scale-up">
+        <div onClick={() => setSelectedOrder(null)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-7 space-y-6 animate-scale-up cursor-default">
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-gray-100">
               <div>
@@ -1842,8 +1928,8 @@ function CustomerDashboardContent() {
       {/* MODAL: HỦY ĐƠN HÀNG                                       */}
       {/* ========================================================= */}
       {showCancelModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4">
+        <div onClick={() => setShowCancelModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4 cursor-default">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
@@ -1901,8 +1987,8 @@ function CustomerDashboardContent() {
       {/* MODAL: ĐÁNH GIÁ SẢN PHẨM SAU KHI NHẬN HÀNG                 */}
       {/* ========================================================= */}
       {showReviewModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <form onSubmit={handleSubmitReview} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-emerald-100 space-y-4">
+        <div onClick={() => setShowReviewModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">
+          <form onSubmit={handleSubmitReview} onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-emerald-100 space-y-4 cursor-default">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
@@ -1992,8 +2078,8 @@ function CustomerDashboardContent() {
       {/* MODAL: THANH TOÁN LẠI PAYOS CHO ĐƠN CHỜ                   */}
       {/* ========================================================= */}
       {showPayosModal && payosData && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-emerald-100 space-y-4">
+        <div onClick={() => setShowPayosModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-emerald-100 space-y-4 cursor-default">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">

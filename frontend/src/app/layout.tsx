@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { type ReactNode } from "react";
 
 import "@/app/globals.css";
+import { GeminiFloatingBubble } from "@/components/ai-chat/gemini-floating-bubble";
 import { PublicLayoutWrapper } from "@/components/layout/public-layout";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/toaster";
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <Providers>
           <PublicLayoutWrapper>{children}</PublicLayoutWrapper>
         </Providers>
+        <GeminiFloatingBubble />
         <Toaster />
       </body>
     </html>

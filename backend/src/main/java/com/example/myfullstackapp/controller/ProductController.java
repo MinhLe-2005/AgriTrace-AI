@@ -44,12 +44,25 @@ public class ProductController {
     }
 
     @PostMapping
-    public ResponseEntity<Product> createProduct(@RequestBody Product req) {
+    public ResponseEntity<?> createProduct(@RequestBody Product req) {
+        if (req.getName() == null || req.getName().isBlank()) {
+            return ResponseEntity.badRequest().body("Tên sản phẩm không được để trống");
+        }
+        if (req.getPrice() == null || req.getPrice() <= 0) {
+            return ResponseEntity.badRequest().body("Giá sản phẩm phải lớn hơn 0");
+        }
         if (req.getId() == null || req.getId().isBlank()) {
             req.setId("p_" + System.currentTimeMillis());
         }
+        req.setName(req.getName().trim());
         if (req.getOldPrice() == null) {
             req.setOldPrice(req.getPrice());
+        }
+        if (req.getUnit() == null || req.getUnit().isBlank()) {
+            req.setUnit("1 kg");
+        }
+        if (req.getActive() == null) {
+            req.setActive(true);
         }
         Product saved = productRepository.save(req);
         return ResponseEntity.ok(saved);
@@ -57,7 +70,9 @@ public class ProductController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable String id) {
-        productRepository.deleteById(id);
+        if (productRepository.existsById(id)) {
+            productRepository.deleteById(id);
+        }
         return ResponseEntity.noContent().build();
     }
 }

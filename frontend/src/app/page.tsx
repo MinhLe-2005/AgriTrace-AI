@@ -708,9 +708,12 @@ export default function HomePage() {
       {/* MODAL CHI TIẾT SẢN PHẨM & TRUY XUẤT NHANH                 */}
       {/* ========================================================= */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+        <div
+          onClick={() => setSelectedProduct(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in cursor-pointer"
+        >
           <div
-            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header / Close */}
