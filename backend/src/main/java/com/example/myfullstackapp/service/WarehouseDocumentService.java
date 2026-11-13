@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
 
@@ -626,7 +627,7 @@ public class WarehouseDocumentService {
         return switch (lot.unit().toUpperCase(Locale.ROOT)) {
             case "KG" -> lot.initialQuantity();
             case "T", "TON", "TONNE" -> lot.initialQuantity().multiply(new BigDecimal("1000"));
-            case "G" -> lot.initialQuantity().divide(new BigDecimal("1000"));
+            case "G" -> lot.initialQuantity().divide(new BigDecimal("1000"), 6, RoundingMode.HALF_UP);
             default ->
                     throw new WarehouseIntegrationException(
                             "Lot unit needs an agreed weight conversion to KG: " + lot.unit());

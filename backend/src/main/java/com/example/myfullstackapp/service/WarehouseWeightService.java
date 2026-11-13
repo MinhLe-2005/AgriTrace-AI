@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.util.*;
@@ -25,7 +26,7 @@ public class WarehouseWeightService {
         String normalized = normalize(unit);
         return switch (normalized) {
             case "kg" -> count;
-            case "g" -> count.divide(new BigDecimal("1000"));
+            case "g" -> count.divide(new BigDecimal("1000"), 6, RoundingMode.HALF_UP);
             case "t", "ton", "tấn" -> count.multiply(new BigDecimal("1000"));
             default ->
                     count.multiply(

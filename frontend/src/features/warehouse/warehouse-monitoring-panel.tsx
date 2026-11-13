@@ -75,25 +75,28 @@ export function WarehouseLiveBadge({
     </span>
   );
 }
-function ReadingChart({
-  rows,
+function SingleSvgChart({
+  points,
+  values,
+  unit,
+  color,
+  start,
+  end,
   maxGap,
+  label,
 }: {
-  rows: SensorReading[];
+  points: SensorReading[];
+  values: number[];
+  unit: string;
+  color: string;
+  start: number;
+  end: number;
   maxGap: number;
+  label: string;
 }) {
-  const points = [...rows].reverse();
-  if (points.length < 2)
-    return (
-      <p className="text-sm text-slate-500">
-        Cần ít nhất hai bản đo để vẽ biểu đồ.
-      </p>
-    );
-  const temperatures = points.map((p) => p.temperature),
-    minimum = Math.min(...temperatures) - 1,
-    maximum = Math.max(...temperatures) + 1;
-  const start = Date.parse(points[0].recordedAt),
-    end = Date.parse(points[points.length - 1].recordedAt);
+  const minimum = Math.min(...values) - (unit === "%" ? 2 : 1);
+  const maximum = Math.max(...values) + (unit === "%" ? 2 : 1);
+  const range = Math.max(0.01, maximum - minimum);
   const segments: string[][] = [];
   points.forEach((point, index) => {
     if (
@@ -103,15 +106,24 @@ function ReadingChart({
     )
       segments.push([]);
     segments[segments.length - 1].push(
-      `${20 + ((Date.parse(point.recordedAt) - start) / Math.max(1, end - start)) * 680},${150 - ((point.temperature - minimum) / (maximum - minimum)) * 120}`
+      `${20 + ((Date.parse(point.recordedAt) - start) / Math.max(1, end - start)) * 680},${
+        150 - ((values[index] - minimum) / range) * 120
+      }`
     );
   });
+
   return (
-    <div className="rounded-xl border bg-white p-3">
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs font-medium">
+        <span style={{ color }}>{label}</span>
+        <span className="text-slate-500 font-normal">
+          Min: {Math.min(...values).toFixed(1)} {unit} · Max: {Math.max(...values).toFixed(1)} {unit}
+        </span>
+      </div>
       <svg
         viewBox="0 0 720 180"
         role="img"
-        aria-label="Lịch sử nhiệt độ theo thời gian"
+        aria-label={label}
         className="w-full"
       >
         <line x1="20" y1="150" x2="700" y2="150" stroke="#cbd5e1" />
@@ -120,23 +132,119 @@ function ReadingChart({
             key={index}
             points={segment.join(" ")}
             fill="none"
-            stroke="#047857"
+            stroke={color}
             strokeWidth="2"
           />
         ))}
-        <text x="20" y="18" fontSize="12">
-          {maximum.toFixed(1)} °C
+        <text x="20" y="18" fontSize="12" fill="#475569">
+          {maximum.toFixed(1)} {unit}
         </text>
-        <text x="20" y="170" fontSize="11">
+        <text x="20" y="140" fontSize="11" fill="#94a3b8">
+          {minimum.toFixed(1)} {unit}
+        </text>
+        <text x="20" y="170" fontSize="11" fill="#64748b">
           {formatTime(points[0].recordedAt)}
         </text>
-        <text x="700" y="170" textAnchor="end" fontSize="11">
+        <text x="700" y="170" textAnchor="end" fontSize="11" fill="#64748b">
           {formatTime(points[points.length - 1].recordedAt)}
         </text>
       </svg>
-      <p className="text-xs text-slate-500">
+    </div>
+  );
+}
+
+function ReadingChart({
+  rows,
+  maxGap,
+}: {
+  rows: SensorReading[];
+  maxGap: number;
+}) {
+  const [metric, setMetric] = useState<"both" | "temperature" | "humidity">("both");
+  const points = [...rows].reverse();
+  if (points.length < 2)
+    return (
+      <p className="text-sm text-slate-500">
+        Cần ít nhất hai bản đo để vẽ biểu đồ.
+      </p>
+    );
+  const temperatures = points.map((p) => p.temperature);
+  const humidities = points.map((p) => p.humidity);
+  const start = Date.parse(points[0].recordedAt);
+  const end = Date.parse(points[points.length - 1].recordedAt);
+
+  return (
+    <div className="rounded-xl border bg-white p-3 space-y-3">
+      <div className="flex items-center justify-between border-b pb-2">
+        <h4 className="text-sm font-semibold text-slate-800">
+          Biểu đồ cảm biến theo thời gian
+        </h4>
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setMetric("both")}
+            className={`rounded px-2.5 py-1 transition-colors ${
+              metric === "both"
+                ? "bg-white text-slate-900 shadow-sm font-medium"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Cả hai
+          </button>
+          <button
+            type="button"
+            onClick={() => setMetric("temperature")}
+            className={`rounded px-2.5 py-1 transition-colors ${
+              metric === "temperature"
+                ? "bg-white text-emerald-700 shadow-sm font-medium"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Nhiệt độ (°C)
+          </button>
+          <button
+            type="button"
+            onClick={() => setMetric("humidity")}
+            className={`rounded px-2.5 py-1 transition-colors ${
+              metric === "humidity"
+                ? "bg-white text-sky-700 shadow-sm font-medium"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Độ ẩm (%)
+          </button>
+        </div>
+      </div>
+
+      {(metric === "both" || metric === "temperature") && (
+        <SingleSvgChart
+          points={points}
+          values={temperatures}
+          unit="°C"
+          color="#047857"
+          start={start}
+          end={end}
+          maxGap={maxGap}
+          label="Nhiệt độ môi trường (°C)"
+        />
+      )}
+
+      {(metric === "both" || metric === "humidity") && (
+        <SingleSvgChart
+          points={points}
+          values={humidities}
+          unit="%"
+          color="#0284c7"
+          start={start}
+          end={end}
+          maxGap={maxGap}
+          label="Độ ẩm không khí (%)"
+        />
+      )}
+
+      <p className="text-xs text-slate-500 pt-1 border-t">
         Tối đa 2.000 bản đo gần nhất trong khoảng chọn. Đường bị ngắt khi khoảng
-        cách giữa hai bản đo vượt cấu hình tín hiệu.
+        cách giữa hai bản đo vượt cấu hình tín hiệu ({maxGap}s).
       </p>
     </div>
   );
