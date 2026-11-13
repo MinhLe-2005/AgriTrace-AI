@@ -38,7 +38,11 @@ import { cn } from "@/utils/cn";
 
 export default function EventsPage() {
   const router = useRouter();
-  const { campaigns, getCampaignStatus } = useCampaignStore();
+  const { campaigns, getCampaignStatus, loadCampaigns } = useCampaignStore();
+
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<

@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+
+import { contentService } from "@/services/content.service";
 
 export type CampaignType = "harvest" | "seasonal" | "flash_sale" | "holiday" | "farmer_aid";
 
@@ -48,19 +49,25 @@ export interface AdminBlogPost {
 interface CampaignStore {
   campaigns: CampaignItem[];
   blogPosts: AdminBlogPost[];
-  hasHydrated: boolean;
-  setHasHydrated: (val: boolean) => void;
+  campaignsLoaded: boolean;
+  blogPostsLoaded: boolean;
 
-  // Campaign Actions (Admin CRUD)
-  addCampaign: (campaign: Omit<CampaignItem, "id" | "createdAt">) => void;
-  updateCampaign: (id: string, updates: Partial<CampaignItem>) => void;
-  deleteCampaign: (id: string) => void;
-  toggleCampaign: (id: string) => void;
+  /** Tải sự kiện từ backend (bỏ qua nếu đã tải, trừ khi force). */
+  loadCampaigns: (force?: boolean) => Promise<void>;
+  /** Tải bài viết; includeInactive=true dành cho admin. */
+  loadBlogPosts: (includeInactive?: boolean) => Promise<void>;
+
+  // Campaign Actions (Admin CRUD) – gọi API, ném lỗi nếu thất bại
+  addCampaign: (campaign: Omit<CampaignItem, "id" | "createdAt">) => Promise<CampaignItem>;
+  updateCampaign: (id: string, updates: Partial<CampaignItem>) => Promise<CampaignItem>;
+  deleteCampaign: (id: string) => Promise<void>;
+  toggleCampaign: (id: string) => Promise<void>;
 
   // Blog Actions (Admin CRUD)
-  addBlogPost: (post: Omit<AdminBlogPost, "id">) => void;
-  updateBlogPost: (id: string, updates: Partial<AdminBlogPost>) => void;
-  deleteBlogPost: (id: string) => void;
+  addBlogPost: (post: Omit<AdminBlogPost, "id">) => Promise<AdminBlogPost>;
+  updateBlogPost: (id: string, updates: Partial<AdminBlogPost>) => Promise<AdminBlogPost>;
+  toggleBlogPost: (id: string) => Promise<void>;
+  deleteBlogPost: (id: string) => Promise<void>;
 
   // Query helpers
   getActiveCampaigns: () => CampaignItem[];
@@ -81,217 +88,104 @@ interface CampaignStore {
   } | null;
 }
 
-const memoryStorage = {
-  getItem: () => null,
-  setItem: () => undefined,
-  removeItem: () => undefined,
-};
+function stripMeta<T extends { id?: string; createdAt?: string }>(item: T) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id, createdAt, ...rest } = item;
+  return rest;
+}
 
-// Initial Seasonal Campaigns
-const initialCampaigns: CampaignItem[] = [
-  {
-    id: "camp-dau-tay",
-    title: "Mùa Thu Hoạch Dâu Tây New Zealand Mộc Châu",
-    slug: "mua-thu-hoach-dau-tay-moc-chau",
-    type: "harvest",
-    typeLabel: "Chính Vụ Thu Hoạch",
-    typeColor: "bg-rose-100 text-rose-900 border-rose-300",
-    startDate: "2026-10-01",
-    endDate: "2026-12-31", // ACTIVE
-    discountPercent: 14,
-    discountAmount: 25000,
-    targetType: "product",
-    targetProductIds: ["dddd2222-dddd-2222-dddd-222222222222", "LOT-DT-2026-11"],
-    targetProductNames: ["Dâu Tây", "Dâu Tây New Zealand", "Mộc Châu"],
-    targetCategoryCodes: [],
-    voucherCode: "DAUTAY25",
-    bannerIcon: "🍓",
-    badgeText: "Vụ mùa -14%",
-    description: "Dâu tây New Zealand trồng nhà kính công nghệ cao tại cao nguyên Mộc Châu bước vào chính vụ quả chín đỏ mọng. Trợ giá trực tiếp 14% tại vườn (giảm 25.000đ/Hộp 500g).",
-    fullContent: "Được canh tác theo tiêu chuẩn GlobalGAP trong nhà màng tự động tại cao nguyên Mộc Châu ở độ cao 1.050m. Quả chín tự nhiên, không chất bảo quản, vận chuyển xe lạnh 2°C - 5°C trong 24H.",
-    active: true,
-    createdAt: "2026-10-01T08:00:00Z",
-  },
-  {
-    id: "camp-rau-da-lat",
-    title: "Chiến Dịch Trợ Giá Rau Ăn Lá Thủy Canh Đà Lạt",
-    slug: "tro-gia-rau-an-la-thuy-canh-da-lat",
-    type: "harvest",
-    typeLabel: "Trợ Giá Nông Dân",
-    typeColor: "bg-emerald-100 text-emerald-900 border-emerald-300",
-    startDate: "2026-10-01",
-    endDate: "2026-12-31", // ACTIVE
-    discountPercent: 17,
-    discountAmount: 15000,
-    targetType: "category",
-    targetCategoryCodes: ["rau_la"],
-    targetProductIds: ["dddd5555-dddd-5555-dddd-555555555555", "dddd1111-dddd-1111-dddd-111111111111", "SP-KL-05", "LOT-XL-2026-08"],
-    targetProductNames: ["Cải Xoăn", "Kale", "Xà Lách", "Lô Lô"],
-    voucherCode: "AGRI30",
-    bannerIcon: "🥗",
-    badgeText: "Vụ mùa -17%",
-    description: "Năng suất cải xoăn kale và xà lách lô lô xanh thủy canh NFT tại Đà Lạt đạt đỉnh vụ Thu Đông. Trợ giá trực tiếp 13% - 17% (tiết kiệm 10k - 15k/KG) và cam kết giao lạnh trong 24H.",
-    fullContent: "Hợp tác xã Thủy canh Nông Trại Xanh Đà Lạt thu hoạch rộ 85 tấn rau xanh mỗi tuần. Áp dụng mức trợ giá xuất xưởng trực tiếp cho toàn bộ khách hàng tiêu dùng.",
-    active: true,
-    createdAt: "2026-10-01T08:00:00Z",
-  },
-  {
-    id: "camp-cam-sanh",
-    title: "Đại Tiệc Cam Sành Hàm Yên & Bố Hạ Chính Vụ",
-    slug: "dai-tiec-cam-sanh-ham-yen",
-    type: "harvest",
-    typeLabel: "Chính Vụ Thu Hoạch",
-    typeColor: "bg-amber-100 text-amber-900 border-amber-300",
-    startDate: "2026-09-01",
-    endDate: "2026-12-15", // ACTIVE
-    discountPercent: 18,
-    discountAmount: 10000,
-    targetType: "product",
-    targetProductIds: ["dddd3333-dddd-3333-dddd-333333333333", "SP-CS-03"],
-    targetProductNames: ["Cam Sành", "Cam Sành Hàm Yên"],
-    targetCategoryCodes: [],
-    voucherCode: "CAMXANH",
-    bannerIcon: "🍊",
-    badgeText: "Vụ mùa -18%",
-    description: "Vườn cam sành VietGAP Hàm Yên chín vàng mọng nước, giàu Vitamin C tăng sức đề kháng. Trợ giá 18% trực tiếp tại vườn (tiết kiệm 10.000đ/KG).",
-    fullContent: "Cam sành chính vụ vỏ mỏng, tép vàng giòn, hàm lượng đường tự nhiên cao. Được hái mới lúc sáng sớm tại Tuyên Quang và chuyển về kho lạnh trung tâm trong ngày.",
-    active: true,
-    createdAt: "2026-09-01T08:00:00Z",
-  },
-  {
-    id: "camp-bo-sap",
-    title: "Tuần Lễ Xả Kho Tươi Cuối Vụ Bơ Sáp 034 Tây Nguyên",
-    slug: "tuan-le-xa-kho-bo-sap-034",
-    type: "flash_sale",
-    typeLabel: "Xả Kho Tươi Cuối Vụ",
-    typeColor: "bg-gray-100 text-gray-800 border-gray-300",
-    startDate: "2026-10-01",
-    endDate: "2026-10-31", // EXPIRED (Chứng minh khi hết hạn ngày kết thúc thì tự động dừng giảm giá!)
-    discountPercent: 17,
-    discountAmount: 15000,
-    targetType: "product",
-    targetProductIds: ["dddd6666-dddd-6666-dddd-666666666666", "SP-BO-06"],
-    targetProductNames: ["Bơ Sáp 034", "Bơ"],
-    targetCategoryCodes: [],
-    voucherCode: "BOSAP15",
-    bannerIcon: "🥑",
-    badgeText: "Đã kết thúc",
-    description: "Đợt bơ sáp 034 cuối cùng của niên vụ 2026. Ưu tiên xuất kho nhanh theo nguyên tắc FEFO bảo quản lạnh.",
-    fullContent: "Chiến dịch đã kết thúc ngày 31/10/2026. Sản phẩm bơ sáp hiện đã trở về biểu giá niêm yết thông thường.",
-    active: true,
-    createdAt: "2026-10-01T08:00:00Z",
-  },
-];
-
-// Initial Admin Blog Posts
-const initialBlogPosts: AdminBlogPost[] = [
-  {
-    id: "blog-1",
-    title: "Thông Báo Quyết Định Trợ Giá Nông Sản Theo Mùa Vụ Thu Đông 2026: Biểu Giá Trực Tiếp Tại Vườn & Lịch Thu Hoạch Chi Tiết (QĐ #88/2026/QĐ-AGRI)",
-    slug: "quyet-dinh-tro-gia-nong-san-mua-vu-thu-dong-2026",
-    category: "season",
-    categoryLabel: "Quyết định & Mùa vụ",
-    author: "Ban Điều Phối Mùa Vụ & Liên Minh HTX",
-    authorRole: "Hội Đồng Quản Trị Chuỗi Cung Ứng AgriTrace AI",
-    date: "11/11/2026",
-    readTime: "5 phút đọc",
-    excerpt: "Công bố Quyết định số 88/2026/QĐ-AGRI về chính sách trợ giá trực tiếp 13% – 18% cho nông sản chính vụ tại Đà Lạt, Mộc Châu và Hàm Yên. Bảng tổng hợp lịch biểu tháng nào giảm món gì, cơ chế cộng dồn voucher và hướng dẫn nhận thông báo sale.",
-    featured: true,
-    relatedProductName: "Dâu Tây New Zealand Mộc Châu",
-    active: true,
-  },
-  {
-    id: "blog-2",
-    title: "Ứng Dụng Trí Tuệ Nhân Tạo (AI) Trong Dự Báo Nhu Cầu & Quản Trị Chuỗi Nông Sản 2026",
-    slug: "ung-dung-ai-du-bao-nhu-cau-nong-san-2026",
-    category: "ai",
-    categoryLabel: "Công nghệ AI",
-    author: "TS. Trần Văn Minh",
-    authorRole: "Viện Nghiên cứu Nông nghiệp Số",
-    date: "14/10/2026",
-    readTime: "6 phút đọc",
-    excerpt: "Làm thế nào để các hợp tác xã và chuỗi siêu thị dự đoán chính xác lượng rau củ tiêu thụ trong 7 ngày tới? Mô hình AI Demand Forecasting kết hợp lịch sử đơn hàng và dữ liệu mùa vụ giúp giảm tới 35% hao hụt tồn kho.",
-    relatedProductName: "Cải Xoăn Kale Hữu Cơ",
-    active: true,
-  },
-  {
-    id: "blog-3",
-    title: "Cẩm Nang Quét Mã QR Truy Xuất Nguồn Gốc: Hiểu Đúng Từng Thông Số Kiểm Định",
-    slug: "cam-nang-quet-ma-qr-truy-xuat-nguon-goc",
-    category: "guide",
-    categoryLabel: "Cẩm nang tiêu dùng",
-    author: "Ban Biên Tập AgriTrace",
-    authorRole: "Bộ phận QA/QC",
-    date: "12/10/2026",
-    readTime: "4 phút đọc",
-    excerpt: "Khi quét mã QR trên quả cam hay bó rau thủy canh, những thông số nào quan trọng nhất bạn cần đối soát? Hướng dẫn đọc ngày thu hoạch, mã nông trại và chứng chỉ VietGAP trực tuyến.",
-    relatedProductName: "Xà Lách Lô Lô Xanh Thủy Canh",
-    active: true,
-  },
-];
+// Lần tải sự kiện đang chạy, dùng chung để nhiều trang mount cùng lúc không gọi API trùng.
+// campaignsRequestSeq đảm bảo chỉ phản hồi của lần gọi mới nhất được ghi vào store.
+let campaignsInFlight: Promise<void> | null = null;
+let campaignsRequestSeq = 0;
 
 function getCurrentISODate(): string {
   const now = new Date();
   return now.toISOString().split("T")[0]; // YYYY-MM-DD
 }
 
-export const useCampaignStore = create<CampaignStore>()(
-  persist(
-    (set, get) => ({
-      campaigns: initialCampaigns,
-      blogPosts: initialBlogPosts,
-      hasHydrated: false,
-      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+export const useCampaignStore = create<CampaignStore>()((set, get) => ({
+      campaigns: [],
+      blogPosts: [],
+      campaignsLoaded: false,
+      blogPostsLoaded: false,
+
+      loadCampaigns: async (force = false) => {
+        if (get().campaignsLoaded && !force) return;
+        if (campaignsInFlight && !force) return campaignsInFlight;
+        const seq = ++campaignsRequestSeq;
+        const request = contentService
+          .listCampaigns()
+          .then((campaigns) => {
+            if (seq === campaignsRequestSeq) set({ campaigns, campaignsLoaded: true });
+          })
+          .catch((err) => {
+            console.error("Failed to load campaigns:", err);
+          })
+          .finally(() => {
+            if (campaignsInFlight === request) campaignsInFlight = null;
+          });
+        campaignsInFlight = request;
+        return request;
+      },
+
+      loadBlogPosts: async (includeInactive = false) => {
+        try {
+          const blogPosts = await contentService.listBlogPosts(includeInactive);
+          set({ blogPosts, blogPostsLoaded: true });
+        } catch (err) {
+          console.error("Failed to load blog posts:", err);
+        }
+      },
 
       // ── Admin Campaign Actions ──
-      addCampaign: (campaignData) => {
-        const id = `camp-${Date.now()}`;
-        const newCamp: CampaignItem = {
-          ...campaignData,
-          id,
-          createdAt: new Date().toISOString(),
-        };
-        set((state) => ({ campaigns: [newCamp, ...state.campaigns] }));
+      addCampaign: async (campaignData) => {
+        const created = await contentService.createCampaign(campaignData);
+        set((state) => ({ campaigns: [created, ...state.campaigns] }));
+        return created;
       },
 
-      updateCampaign: (id, updates) => {
-        set((state) => ({
-          campaigns: state.campaigns.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-        }));
+      updateCampaign: async (id, updates) => {
+        const current = get().campaigns.find((c) => c.id === id);
+        if (!current) throw new Error("Không tìm thấy sự kiện cần cập nhật");
+        const saved = await contentService.updateCampaign(id, stripMeta({ ...current, ...updates }));
+        set((state) => ({ campaigns: state.campaigns.map((c) => (c.id === id ? saved : c)) }));
+        return saved;
       },
 
-      deleteCampaign: (id) => {
-        set((state) => ({
-          campaigns: state.campaigns.filter((c) => c.id !== id),
-        }));
+      deleteCampaign: async (id) => {
+        await contentService.deleteCampaign(id);
+        set((state) => ({ campaigns: state.campaigns.filter((c) => c.id !== id) }));
       },
 
-      toggleCampaign: (id) => {
-        set((state) => ({
-          campaigns: state.campaigns.map((c) => (c.id === id ? { ...c, active: !c.active } : c)),
-        }));
+      toggleCampaign: async (id) => {
+        const saved = await contentService.toggleCampaign(id);
+        set((state) => ({ campaigns: state.campaigns.map((c) => (c.id === id ? saved : c)) }));
       },
 
       // ── Admin Blog Actions ──
-      addBlogPost: (postData) => {
-        const id = `blog-${Date.now()}`;
-        const newPost: AdminBlogPost = {
-          ...postData,
-          id,
-        };
-        set((state) => ({ blogPosts: [newPost, ...state.blogPosts] }));
+      addBlogPost: async (postData) => {
+        const created = await contentService.createBlogPost(postData);
+        set((state) => ({ blogPosts: [created, ...state.blogPosts] }));
+        return created;
       },
 
-      updateBlogPost: (id, updates) => {
-        set((state) => ({
-          blogPosts: state.blogPosts.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-        }));
+      updateBlogPost: async (id, updates) => {
+        const current = get().blogPosts.find((p) => p.id === id);
+        if (!current) throw new Error("Không tìm thấy bài viết cần cập nhật");
+        const saved = await contentService.updateBlogPost(id, stripMeta({ ...current, ...updates }));
+        set((state) => ({ blogPosts: state.blogPosts.map((p) => (p.id === id ? saved : p)) }));
+        return saved;
       },
 
-      deleteBlogPost: (id) => {
-        set((state) => ({
-          blogPosts: state.blogPosts.filter((p) => p.id !== id),
-        }));
+      toggleBlogPost: async (id) => {
+        const saved = await contentService.toggleBlogPost(id);
+        set((state) => ({ blogPosts: state.blogPosts.map((p) => (p.id === id ? saved : p)) }));
+      },
+
+      deleteBlogPost: async (id) => {
+        await contentService.deleteBlogPost(id);
+        set((state) => ({ blogPosts: state.blogPosts.filter((p) => p.id !== id) }));
       },
 
       // ── Query Helpers ──
@@ -372,12 +266,13 @@ export const useCampaignStore = create<CampaignStore>()(
           voucherCode: bestMatch.voucherCode,
         };
       },
-    }),
-    {
-      name: "agritrace-campaign-storage-v3",
-      storage: createJSONStorage(() => (typeof window === "undefined" ? memoryStorage : localStorage)),
-      partialize: (state) => ({ campaigns: state.campaigns, blogPosts: state.blogPosts }),
-      onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
-    }
-  )
-);
+}));
+
+// Dọn dữ liệu cũ lưu cục bộ từ phiên bản trước (nay dữ liệu nằm ở backend)
+if (typeof window !== "undefined") {
+  try {
+    localStorage.removeItem("agritrace-campaign-storage-v3");
+  } catch {
+    /* ignore */
+  }
+}

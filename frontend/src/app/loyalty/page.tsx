@@ -151,7 +151,8 @@ export default function LoyaltyPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const data = await loyaltyService.getLoyaltyMe(user?.email);
+        if (!user) return;
+        const data = await loyaltyService.getLoyaltyMe(user.email);
         if (data) {
           setProfile(data);
         }
@@ -558,10 +559,12 @@ export default function LoyaltyPage() {
                               ? "bg-emerald-100 text-emerald-800"
                               : tx.transactionType === "BONUS"
                               ? "bg-amber-100 text-amber-800"
+                              : tx.transactionType === "REVOKED"
+                              ? "bg-rose-100 text-rose-800"
                               : "bg-purple-100 text-purple-800"
                           )}
                         >
-                          {tx.transactionType === "EARNED" ? "TÍCH ĐIỂM" : tx.transactionType === "BONUS" ? "THƯỞNG" : "ĐỔI QUÀ"}
+                          {tx.transactionType === "EARNED" ? "TÍCH ĐIỂM" : tx.transactionType === "BONUS" ? "THƯỞNG" : tx.transactionType === "REVOKED" ? "THU HỒI" : "ĐỔI QUÀ"}
                         </span>
                       </div>
                       <div className="text-[11px] text-gray-400 mt-0.5">

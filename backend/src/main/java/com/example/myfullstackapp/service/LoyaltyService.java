@@ -220,12 +220,19 @@ public class LoyaltyService {
 
     @Transactional
     public void adminAddBonusPoints(UUID userId, int points, String reason) {
+        if (points == 0) {
+            throw new IllegalArgumentException("Số điểm điều chỉnh phải khác 0");
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với ID: " + userId));
 
         LoyaltyMembership membership = loyaltyMembershipRepository.findByUserId(userId)
                 .orElseGet(() -> getOrCreateMembership(user.getEmail()));
 
+        if (membership.getCurrentPoints() + points < 0) {
+            throw new IllegalArgumentException("Không thể trừ " + (-points) + " điểm: hội viên chỉ còn "
+                    + membership.getCurrentPoints() + " điểm");
+        }
         membership.setCurrentPoints(membership.getCurrentPoints() + points);
         if (points > 0) {
             membership.setLifetimePoints(membership.getLifetimePoints() + points);
@@ -240,6 +247,46 @@ public class LoyaltyService {
                 .build());
 
         log.info("Admin updated points for user {}: {} pts, reason: {}", user.getEmail(), points, reason);
+    }
+
+    /**
+     * Thu hồi điểm đã tích của một đơn khi đơn bị hủy/hoàn tiền: trừ đúng số điểm EARNED của đơn
+     * và trừ lại tổng chi tiêu. Hạng thành viên giữ nguyên để tránh hạ hạng đột ngột.
+     * Gọi nhiều lần cho cùng một đơn chỉ thu hồi một lần.
+     */
+    @Transactional
+    public void revokeOrderPoints(String email, String orderCode, long orderTotal) {
+        if (email == null || email.isBlank() || orderCode == null) return;
+        LoyaltyMembership membership = getOrCreateMembership(email);
+        if (membership == null) return;
+
+        String marker = "#" + orderCode + " ";
+        List<LoyaltyTransaction> txs = loyaltyTransactionRepository.findByUserEmailIgnoreCaseOrderByCreatedAtDesc(email);
+        boolean alreadyRevoked = txs.stream().anyMatch(t -> "REVOKED".equals(t.getTransactionType())
+                && t.getDescription() != null && t.getDescription().contains(marker));
+        if (alreadyRevoked) return;
+        int earned = txs.stream()
+                .filter(t -> "EARNED".equals(t.getTransactionType())
+                        && t.getDescription() != null && t.getDescription().contains(marker))
+                .mapToInt(LoyaltyTransaction::getPoints)
+                .sum();
+        if (earned <= 0) return;
+
+        // Thu hồi đủ số điểm đã tích. Nếu khách đã tiêu điểm này, số dư có thể âm
+        // (nợ điểm) và sẽ bù dần bằng điểm của các đơn sau; redeem sẽ bị chặn khi số dư âm.
+        int deducted = earned;
+        membership.setCurrentPoints(membership.getCurrentPoints() - deducted);
+        BigDecimal spent = membership.getTotalSpent() != null ? membership.getTotalSpent() : BigDecimal.ZERO;
+        membership.setTotalSpent(spent.subtract(BigDecimal.valueOf(orderTotal)).max(BigDecimal.ZERO));
+        loyaltyMembershipRepository.save(membership);
+
+        loyaltyTransactionRepository.save(LoyaltyTransaction.builder()
+                .user(membership.getUser())
+                .points(-deducted)
+                .transactionType("REVOKED")
+                .description("Thu hồi điểm do hủy đơn hàng #" + orderCode + " ")
+                .build());
+        log.info("Revoked {} points from {} for cancelled order #{}", deducted, email, orderCode);
     }
 
     public List<LoyaltyMembership> getAllMembersForAdmin() {

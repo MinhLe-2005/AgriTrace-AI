@@ -292,6 +292,12 @@ function CartContent() {
 
       const res = await catalogService.createOrder(orderPayload);
       setCompletedOrderId(res.orderCode);
+      try {
+        // Cho phép khách vãng lai xem lại đơn ở trang checkout/success (backend yêu cầu SĐT)
+        sessionStorage.setItem(`agri-order-phone:${res.orderCode}`, receiverPhone);
+      } catch {
+        /* ignore */
+      }
 
       if (paymentMethod === "payos") {
         try {
