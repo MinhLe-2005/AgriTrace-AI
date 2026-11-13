@@ -216,7 +216,13 @@ function AdminPortalContent() {
     setOrdersLoading(true);
     try {
       const data = await catalogService.getOrders();
-      setOrders(data || []);
+      const sorted = [...(data || [])].sort((a, b) => {
+        const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (tA !== tB) return tB - tA;
+        return (b.id || 0) - (a.id || 0);
+      });
+      setOrders(sorted);
     } catch {
       toast.error("Không tải được danh sách đơn hàng.");
     } finally {
@@ -1043,12 +1049,39 @@ function AdminPortalContent() {
                             </div>
                           ) : null}
                         </td>
-                        <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded-md font-semibold text-[10px] bg-gray-100 text-gray-700">
-                            {order.paymentMethod || "COD"}
-                          </span>
+                        <td className="p-3.5 space-y-1">
+                          <div>
+                            <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-gray-100 text-gray-800 border border-gray-200">
+                              {(order.paymentMethod || "COD").toUpperCase() === "PAYOS"
+                                ? "VietQR 24/7"
+                                : "Tiền mặt (COD)"}
+                            </span>
+                          </div>
+                          <div>
+                            {order.status === "CANCELLED" ? (
+                              <span className="text-[10px] font-bold text-gray-400">Đã hủy thanh toán</span>
+                            ) : (order.paymentMethod || "COD").toUpperCase() === "PAYOS" ? (
+                              order.status === "PENDING_PAYMENT" ? (
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block">
+                                  ⏳ Chưa TT (Giữ hàng 30p)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block">
+                                  ✅ Đã thanh toán QR
+                                </span>
+                              )
+                            ) : order.status === "DELIVERED" || order.status === "COMPLETED" || !!order.paidAt ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block">
+                                ✅ Đã thu tiền COD
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 inline-block">
+                                💵 Chưa TT (Thu hộ COD)
+                              </span>
+                            )}
+                          </div>
                           {order.voucherUsed && (
-                            <div className="text-[10px] text-purple-700 mt-1 font-mono">
+                            <div className="text-[10px] text-purple-700 font-mono">
                               🎟️ {order.voucherUsed}
                             </div>
                           )}
@@ -1069,18 +1102,18 @@ function AdminPortalContent() {
                             )}
                           >
                             {order.status === "DELIVERED" || order.status === "COMPLETED"
-                              ? "Đã giao thành công"
+                              ? "✅ Đã giao thành công"
                               : order.status === "SHIPPING"
-                              ? "Đang giao xe lạnh"
+                              ? "🚚 Đang giao xe lạnh"
                               : order.status === "CANCELLED"
-                              ? "Đã hủy đơn"
+                              ? "❌ Đã hủy đơn"
                               : order.status === "REFUNDED"
-                              ? "Đã hoàn tiền"
+                              ? "↩️ Đã hoàn tiền"
                               : order.status === "PAID"
-                              ? "Chờ đóng gói (Đã TT QR)"
+                              ? "📦 Chờ đóng gói"
                               : order.status === "PENDING_PAYMENT"
-                              ? "Chờ thanh toán (VietQR)"
-                              : "Chờ đóng gói (COD)"}
+                              ? "⏳ Chờ TT (Giữ hàng 30p)"
+                              : "📦 Chờ đóng gói"}
                           </span>
                         </td>
                         <td className="p-3.5 text-right">

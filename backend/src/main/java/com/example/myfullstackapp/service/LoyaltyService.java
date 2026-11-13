@@ -88,8 +88,20 @@ public class LoyaltyService {
     @Transactional
     public void awardOrderPoints(String email, long amount, String orderCode, int basePoints) {
         try {
+            if (email == null || email.isBlank() || orderCode == null || orderCode.isBlank()) return;
             LoyaltyMembership membership = getOrCreateMembership(email);
             if (membership == null) return;
+
+            String marker = "#" + orderCode + " ";
+            List<LoyaltyTransaction> existingTxs = loyaltyTransactionRepository.findByUserEmailIgnoreCaseOrderByCreatedAtDesc(email);
+            boolean alreadyEarned = existingTxs.stream().anyMatch(t ->
+                    "EARNED".equalsIgnoreCase(t.getTransactionType())
+                            && t.getDescription() != null
+                            && t.getDescription().contains(marker));
+            if (alreadyEarned) {
+                log.debug("Points already awarded for order #{}, skipping duplicate award", orderCode);
+                return;
+            }
 
             double multiplier = switch (membership.getTier().toUpperCase()) {
                 case "SILVER" -> 1.2;
@@ -256,37 +268,42 @@ public class LoyaltyService {
      */
     @Transactional
     public void revokeOrderPoints(String email, String orderCode, long orderTotal) {
-        if (email == null || email.isBlank() || orderCode == null) return;
-        LoyaltyMembership membership = getOrCreateMembership(email);
-        if (membership == null) return;
+        try {
+            if (email == null || email.isBlank() || orderCode == null) return;
+            LoyaltyMembership membership = getOrCreateMembership(email);
+            if (membership == null) return;
 
-        String marker = "#" + orderCode + " ";
-        List<LoyaltyTransaction> txs = loyaltyTransactionRepository.findByUserEmailIgnoreCaseOrderByCreatedAtDesc(email);
-        boolean alreadyRevoked = txs.stream().anyMatch(t -> "REVOKED".equals(t.getTransactionType())
-                && t.getDescription() != null && t.getDescription().contains(marker));
-        if (alreadyRevoked) return;
-        int earned = txs.stream()
-                .filter(t -> "EARNED".equals(t.getTransactionType())
-                        && t.getDescription() != null && t.getDescription().contains(marker))
-                .mapToInt(LoyaltyTransaction::getPoints)
-                .sum();
-        if (earned <= 0) return;
+            String marker = "#" + orderCode + " ";
+            List<LoyaltyTransaction> txs = loyaltyTransactionRepository.findByUserEmailIgnoreCaseOrderByCreatedAtDesc(email);
+            boolean alreadyRevoked = txs.stream().anyMatch(t ->
+                    ("REVOKED".equalsIgnoreCase(t.getTransactionType()) || "REDEEMED".equalsIgnoreCase(t.getTransactionType()))
+                            && t.getDescription() != null
+                            && t.getDescription().contains("Thu hồi điểm")
+                            && t.getDescription().contains(marker));
+            if (alreadyRevoked) return;
+            int earned = txs.stream()
+                    .filter(t -> "EARNED".equalsIgnoreCase(t.getTransactionType())
+                            && t.getDescription() != null && t.getDescription().contains(marker))
+                    .mapToInt(t -> t.getPoints() != null ? t.getPoints() : 0)
+                    .sum();
+            if (earned <= 0) return;
 
-        // Thu hồi đủ số điểm đã tích. Nếu khách đã tiêu điểm này, số dư có thể âm
-        // (nợ điểm) và sẽ bù dần bằng điểm của các đơn sau; redeem sẽ bị chặn khi số dư âm.
-        int deducted = earned;
-        membership.setCurrentPoints(membership.getCurrentPoints() - deducted);
-        BigDecimal spent = membership.getTotalSpent() != null ? membership.getTotalSpent() : BigDecimal.ZERO;
-        membership.setTotalSpent(spent.subtract(BigDecimal.valueOf(orderTotal)).max(BigDecimal.ZERO));
-        loyaltyMembershipRepository.save(membership);
+            int currentPts = membership.getCurrentPoints() != null ? membership.getCurrentPoints() : 0;
+            membership.setCurrentPoints(Math.max(0, currentPts - earned));
+            BigDecimal spent = membership.getTotalSpent() != null ? membership.getTotalSpent() : BigDecimal.ZERO;
+            membership.setTotalSpent(spent.subtract(BigDecimal.valueOf(orderTotal)).max(BigDecimal.ZERO));
+            loyaltyMembershipRepository.save(membership);
 
-        loyaltyTransactionRepository.save(LoyaltyTransaction.builder()
-                .user(membership.getUser())
-                .points(-deducted)
-                .transactionType("REVOKED")
-                .description("Thu hồi điểm do hủy đơn hàng #" + orderCode + " ")
-                .build());
-        log.info("Revoked {} points from {} for cancelled order #{}", deducted, email, orderCode);
+            loyaltyTransactionRepository.save(LoyaltyTransaction.builder()
+                    .user(membership.getUser())
+                    .points(-earned)
+                    .transactionType("REDEEMED")
+                    .description("Thu hồi điểm do hủy/hoàn tiền đơn hàng #" + orderCode + " (-" + earned + " điểm)")
+                    .build());
+            log.info("Revoked {} points from {} for cancelled order #{}", earned, email, orderCode);
+        } catch (Exception e) {
+            log.error("Failed to revoke points for cancelled order #{}: {}", orderCode, e.getMessage());
+        }
     }
 
     public List<LoyaltyMembership> getAllMembersForAdmin() {
