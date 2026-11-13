@@ -85,8 +85,12 @@ export function GeminiChatWidget({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const handleActionClick = (url: string) => {
-    toast.success("Đang chuyển đến sản phẩm...");
-    router.push(url);
+    toast.success("Đang mở sản phẩm & cửa sổ đặt mua...");
+    const targetUrl =
+      url.includes("buy=") || url.includes("detail=")
+        ? `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`
+        : url;
+    router.push(targetUrl);
     if (isFloating && onClose) {
       onClose();
     }

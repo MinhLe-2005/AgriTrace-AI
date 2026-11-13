@@ -37,6 +37,6 @@ public class OrderItem {
     @Column(nullable = false)
     private Long price;
 
-    @Column(length = 255)
+    @Column(columnDefinition = "TEXT")
     private String image;
 }

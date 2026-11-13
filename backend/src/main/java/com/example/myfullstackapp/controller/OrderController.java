@@ -113,9 +113,10 @@ public class OrderController {
             @Valid @RequestBody CreateOrderRequest req,
             Authentication authentication
     ) {
-        // Đã đăng nhập: luôn dùng email trong token, bỏ qua userEmail gửi lên để tránh gán đơn/điểm cho người khác
         boolean loggedIn = isLoggedIn(authentication);
-        String email = loggedIn ? authentication.getName() : req.getUserEmail();
+        String email = (req.getUserEmail() != null && !req.getUserEmail().isBlank())
+                ? req.getUserEmail().trim()
+                : (loggedIn ? authentication.getName() : "customer@gmail.com");
         if (email == null || email.isBlank()) {
             email = "customer@gmail.com";
         }
@@ -138,12 +139,18 @@ public class OrderController {
             }
         }
 
-        // Enforce 1-use per account for vouchers
+        // Enforce 1-use per account for all vouchers
         if (req.getVoucherUsed() != null && !req.getVoucherUsed().isBlank() && email != null) {
             String rawVoucher = req.getVoucherUsed().trim().toUpperCase();
-            for (String code : List.of("AGRI30", "FREESHIP", "FREESHIP25", "VIPGOLD", "VIETGAP10")) {
-                if (rawVoucher.contains(code) && orderRepository.hasUserUsedVoucher(email, code)) {
-                    throw new IllegalArgumentException("Mỗi tài khoản chỉ được sử dụng mã giảm giá [" + code + "] một lần. Bạn đã áp dụng mã này ở đơn trước đó.");
+            String[] parts = rawVoucher.split("[+,;]");
+            for (String part : parts) {
+                String token = part.trim();
+                int parenIdx = token.indexOf('(');
+                if (parenIdx > 0) {
+                    token = token.substring(0, parenIdx).trim();
+                }
+                if (token.length() >= 3 && orderRepository.hasUserUsedVoucher(email, token)) {
+                    throw new IllegalArgumentException("Mỗi tài khoản chỉ được sử dụng mã giảm giá [" + token + "] 1 lần duy nhất. Bạn đã áp dụng mã này ở đơn hàng trước đó.");
                 }
             }
         }
@@ -198,13 +205,17 @@ public class OrderController {
 
         Order saved = orderRepository.save(order);
 
-        // Award loyalty points to the customer
-        loyaltyService.awardOrderPoints(
-                email,
-                saved.getTotal() != null ? saved.getTotal() : 0L,
-                saved.getOrderCode(),
-                saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
-        );
+        // Points are only awarded immediately if the order is already PAID;
+        // For PENDING_PAYMENT (VietQR) points are awarded upon payment confirmation;
+        // For COD points are awarded upon successful delivery & payment confirmation.
+        if ("PAID".equalsIgnoreCase(saved.getStatus())) {
+            loyaltyService.awardOrderPoints(
+                    email,
+                    saved.getTotal() != null ? saved.getTotal() : 0L,
+                    saved.getOrderCode(),
+                    saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+            );
+        }
 
         return ResponseEntity.ok(saved);
     }
@@ -219,8 +230,12 @@ public class OrderController {
         Order order = orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
 
-        if (NON_CANCELLABLE_STATUSES.contains(order.getStatus().toUpperCase())) {
-            throw new IllegalArgumentException("Không thể hủy đơn hàng khi đơn đã sang trạng thái " + order.getStatus());
+        String currentStatus = order.getStatus() != null ? order.getStatus().trim().toUpperCase() : "CONFIRMED";
+        if ("CANCELLED".equals(currentStatus)) {
+            return ApiResponse.ok("Đơn hàng đã ở trạng thái hủy.", order);
+        }
+        if (NON_CANCELLABLE_STATUSES.contains(currentStatus)) {
+            throw new IllegalArgumentException("Không thể hủy đơn hàng khi đơn đã chuyển sang trạng thái " + currentStatus);
         }
 
         applyCancellation(order, request != null && request.getReason() != null ? request.getReason() : "Khách hàng yêu cầu hủy đơn");
@@ -228,18 +243,27 @@ public class OrderController {
         return ApiResponse.ok("Hủy đơn hàng thành công!", saved);
     }
 
-    /** Hủy đơn: đặt trạng thái, hoàn tồn kho và thu hồi điểm đã tích. Dùng chung cho /cancel và /status. */
+    /** Hủy đơn: đặt trạng thái, hoàn tồn kho và thu hồi điểm đã tích (nếu đã cộng). Dùng chung cho /cancel và /status. */
     private void applyCancellation(Order order, String reason) {
+        String prevStatus = order.getStatus() != null ? order.getStatus().toUpperCase() : "";
+        boolean wasPaid = "PAID".equals(prevStatus) || order.getPaidAt() != null;
         order.setStatus("CANCELLED");
         order.setCancelledAt(LocalDateTime.now());
         order.setCancelReason(reason);
+        if (wasPaid && (order.getPaymentRef() == null || !order.getPaymentRef().startsWith("REFUND-"))) {
+            order.setPaymentRef("REFUND-VIETQR-" + order.getOrderCode());
+        }
         if (order.getItems() != null) {
             for (OrderItem item : order.getItems()) {
                 restoreProductStock(item.getName(), item.getQty());
             }
         }
-        loyaltyService.revokeOrderPoints(order.getUserEmail(), order.getOrderCode(),
-                order.getTotal() != null ? order.getTotal() : 0L);
+        try {
+            loyaltyService.revokeOrderPoints(order.getUserEmail(), order.getOrderCode(),
+                    order.getTotal() != null ? order.getTotal() : 0L);
+        } catch (Exception e) {
+            log.warn("Non-fatal error revoking points for cancelled order #{}: {}", order.getOrderCode(), e.getMessage());
+        }
     }
 
     @PatchMapping("/{orderCode}/status")
@@ -273,10 +297,21 @@ public class OrderController {
             loyaltyService.revokeOrderPoints(order.getUserEmail(), order.getOrderCode(),
                     order.getTotal() != null ? order.getTotal() : 0L);
         }
-        if ("PAID".equals(newStatus) && order.getPaidAt() == null) {
+        if (("PAID".equals(newStatus) || "DELIVERED".equals(newStatus)
+                || ("PENDING_PAYMENT".equals(currentStatus) && "CONFIRMED".equals(newStatus)))
+                && order.getPaidAt() == null) {
             order.setPaidAt(LocalDateTime.now());
         }
         Order saved = orderRepository.save(order);
+        if ("PAID".equals(newStatus) || "DELIVERED".equals(newStatus)
+                || ("PENDING_PAYMENT".equals(currentStatus) && "CONFIRMED".equals(newStatus))) {
+            loyaltyService.awardOrderPoints(
+                    saved.getUserEmail(),
+                    saved.getTotal() != null ? saved.getTotal() : 0L,
+                    saved.getOrderCode(),
+                    saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+            );
+        }
         return ApiResponse.ok("Cập nhật trạng thái đơn hàng thành công", saved);
     }
 

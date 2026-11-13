@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type NotificationType = "order" | "voucher" | "promo" | "season" | "system";
 
@@ -14,6 +15,14 @@ export type NotificationItem = {
 
 type NotificationStore = {
   notifications: NotificationItem[];
+  addNotification: (item: {
+    id?: string;
+    title: string;
+    message: string;
+    type: NotificationType;
+    createdAt?: string;
+    link?: string;
+  }) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   deleteNotification: (id: string) => void;
@@ -85,20 +94,44 @@ const initialNotifications: NotificationItem[] = [
   },
 ];
 
-export const useNotificationStore = create<NotificationStore>((set) => ({
-  notifications: initialNotifications,
-  markAsRead: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      ),
-    })),
-  markAllAsRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
-    })),
-  deleteNotification: (id) =>
-    set((state) => ({
-      notifications: state.notifications.filter((n) => n.id !== id),
-    })),
-}));
+export const useNotificationStore = create<NotificationStore>()(
+  persist(
+    (set) => ({
+      notifications: initialNotifications,
+      addNotification: (item) =>
+        set((state) => {
+          const newId = item.id || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          const filtered = state.notifications.filter((n) => n.id !== newId);
+          const newNotif: NotificationItem = {
+            id: newId,
+            title: item.title,
+            message: item.message,
+            type: item.type,
+            createdAt: item.createdAt || "Vừa xong",
+            read: false,
+            link: item.link,
+          };
+          return {
+            notifications: [newNotif, ...filtered],
+          };
+        }),
+      markAsRead: (id) =>
+        set((state) => ({
+          notifications: state.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n
+          ),
+        })),
+      markAllAsRead: () =>
+        set((state) => ({
+          notifications: state.notifications.map((n) => ({ ...n, read: true })),
+        })),
+      deleteNotification: (id) =>
+        set((state) => ({
+          notifications: state.notifications.filter((n) => n.id !== id),
+        })),
+    }),
+    {
+      name: "agritrace-notifications-v2",
+    }
+  )
+);

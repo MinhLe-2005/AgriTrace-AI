@@ -37,6 +37,7 @@ import { useState, useEffect } from "react";
 import { catalogService, type ApiProduct } from "@/services/catalog.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { useAuthStore } from "@/stores/auth-store";
+import { useNotificationStore } from "@/stores/notification-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
 
@@ -68,6 +69,7 @@ export function QuickBuyModal({
 }: QuickBuyModalProps) {
   const router = useRouter();
   const { user } = useAuthStore();
+  const { addNotification } = useNotificationStore();
 
   const [qty, setQty] = useState(initialQty);
   const [receiverName, setReceiverName] = useState(user?.name || "Lê Quang Minh");
@@ -81,6 +83,7 @@ export function QuickBuyModal({
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
   const [voucherError, setVoucherError] = useState<string | null>(null);
   const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
+  const [usedVoucherCodes, setUsedVoucherCodes] = useState<string[]>([]);
 
   const [paymentMethod, setPaymentMethod] = useState<"payos" | "cod">("payos");
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -92,10 +95,11 @@ export function QuickBuyModal({
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [isViewingTerms, setIsViewingTerms] = useState(false);
 
-  // payOS VietQR Modal state
+  // payOS VietQR Modal state & 30-minute hold countdown
   const [showPayosQr, setShowPayosQr] = useState(false);
   const [payosData, setPayosData] = useState<PaymentLinkResponse | null>(null);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [holdSecondsLeft, setHoldSecondsLeft] = useState(1800); // 30 minutes = 1800 seconds
   const [activeVouchers, setActiveVouchers] = useState<{ code: string; label: string; desc: string }[]>(QUICK_VOUCHERS);
   const [hasCopiedContent, setHasCopiedContent] = useState(false);
 
@@ -110,6 +114,7 @@ export function QuickBuyModal({
       setCompletedOrderCode(null);
       setShowPayosQr(false);
       setPayosData(null);
+      setHoldSecondsLeft(1800);
       setAgreeTerms(true);
       setIsViewingTerms(false);
       setHasCopiedContent(false);
@@ -117,6 +122,11 @@ export function QuickBuyModal({
       if (user?.name) setReceiverName(user.name);
       if (user?.phone) setReceiverPhone(user.phone);
       if (user?.address) setReceiverAddress(user.address);
+
+      // Fetch used vouchers for this user account (1-use per account)
+      catalogService.getUsedVouchers(user?.email || "customer@gmail.com").then((used) => {
+        setUsedVoucherCodes(used);
+      }).catch(() => {});
 
       // Fetch active vouchers from backend to show live redeemed vouchers too
       catalogService.getVouchers().then((list) => {
@@ -140,13 +150,22 @@ export function QuickBuyModal({
     }
   }, [isOpen, initialQty, user]);
 
+  // 30-minute hold countdown timer when VietQR is open
+  useEffect(() => {
+    if (!showPayosQr) return;
+    const timer = setInterval(() => {
+      setHoldSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showPayosQr]);
+
   // Auto redirect to customer dashboard order details when order completes
   useEffect(() => {
     if (completedOrderCode && !showPayosQr) {
       const timer = setTimeout(() => {
         onClose();
         router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
-      }, 2000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [completedOrderCode, showPayosQr, onClose, router]);
@@ -159,17 +178,32 @@ export function QuickBuyModal({
         const res = await paymentService.checkPaymentStatus(completedOrderCode);
         if (res && res.status === "PAID") {
           clearInterval(interval);
-          toast.success(`Ting ting! Hệ thống đã nhận được chuyển khoản VietQR cho đơn #${completedOrderCode}!`);
+          const pts = Math.max(10, Math.round(((product?.price || 0) * (qty || 1)) / 5000));
+          addNotification({
+            id: `notif-paid-${completedOrderCode}`,
+            title: `✅ Thanh toán VietQR thành công đơn #${completedOrderCode}`,
+            message: `Hệ thống đã nhận chuyển khoản cho đơn #${completedOrderCode}. Đơn hàng đã chuyển sang Chờ đóng gói kho lạnh!`,
+            type: "order",
+            link: `/dashboard/customer?tab=orders&order=${completedOrderCode}`,
+          });
+          addNotification({
+            id: `notif-points-${completedOrderCode}`,
+            title: `🎁 Tích điểm thành công: +${pts} điểm AgriClub!`,
+            message: `Chúc mừng! Bạn vừa được cộng +${pts} điểm thưởng từ đơn #${completedOrderCode} vào Ví Hội Viên AgriClub. Đủ điểm có thể đổi ngay Voucher giảm giá!`,
+            type: "voucher",
+            link: `/dashboard/customer?tab=points`,
+          });
+          toast.success(`Ting ting! Đã nhận thanh toán VietQR & cộng +${pts} điểm thưởng cho đơn #${completedOrderCode}!`);
           setShowPayosQr(false);
           onClose();
-          router.push(`/checkout/success?orderCode=${completedOrderCode}`);
+          router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
         }
       } catch {
         // ignore polling errors
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [showPayosQr, completedOrderCode, onClose, router]);
+  }, [showPayosQr, completedOrderCode, onClose, router, addNotification]);
 
   if (!isOpen || !product) return null;
 
@@ -186,10 +220,53 @@ export function QuickBuyModal({
   const total = Math.max(0, subtotal + shippingFee - (appliedVoucher?.type === "discount" ? appliedVoucher.discount : 0));
   const pointsEarned = Math.max(10, Math.round(total / 5000));
 
+  function formatCountdown(sec: number) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  function handleSafeClose() {
+    if (showPayosQr && completedOrderCode) {
+      toast.info(
+        `Đơn hàng #${completedOrderCode} đã được lưu ở trạng thái Chờ thanh toán (Giữ hàng 30 phút).`
+      );
+      onClose();
+      router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
+      return;
+    }
+    onClose();
+  }
+
+  function redirectToLoginForOrder() {
+    if (typeof window !== "undefined" && product) {
+      const targetCode = product.batchCode || product.id || product.name;
+      sessionStorage.setItem(
+        "agri_post_login_redirect",
+        `/products?buy=${encodeURIComponent(targetCode)}`
+      );
+    }
+    toast.info("Vui lòng đăng nhập tài khoản để đặt hàng, áp dụng Voucher (1 lượt/tài khoản) và tích điểm AgriClub!");
+    onClose();
+    router.push("/login");
+  }
+
   async function handleApplyVoucher(codeToApply?: string) {
+    if (!user) {
+      redirectToLoginForOrder();
+      return;
+    }
     const targetCode = (codeToApply || voucherInput).trim().toUpperCase();
     if (!targetCode) {
       setVoucherError("Vui lòng nhập mã ưu đãi.");
+      return;
+    }
+
+    if (usedVoucherCodes.includes(targetCode)) {
+      const msg = `Mỗi tài khoản chỉ được dùng mã [${targetCode}] 1 lần duy nhất. Bạn đã sử dụng mã này ở đơn hàng trước.`;
+      setAppliedVoucher(null);
+      setVoucherError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -200,7 +277,7 @@ export function QuickBuyModal({
       const res = await catalogService.validateVoucher({
         code: targetCode,
         subtotal,
-        email: user?.email,
+        email: user?.email || "customer@gmail.com",
       });
 
       if (!res.valid) {
@@ -233,6 +310,10 @@ export function QuickBuyModal({
   }
 
   function handleGoToStep2() {
+    if (!user) {
+      redirectToLoginForOrder();
+      return;
+    }
     setCurrentStep(2);
   }
 
@@ -322,7 +403,24 @@ export function QuickBuyModal({
       const generatedOrderCode = res.orderCode || `AGRI-${Math.floor(1000 + Math.random() * 9000)}`;
       setCompletedOrderCode(generatedOrderCode);
 
+      if (voucherText) {
+        catalogService.markVoucherUsedLocal(user?.email || "customer@gmail.com", voucherText);
+        if (appliedVoucher) {
+          setUsedVoucherCodes((prev) => Array.from(new Set([...prev, appliedVoucher.code.toUpperCase()])));
+        }
+      }
+
       if (paymentMethod === "payos") {
+        setHoldSecondsLeft(1800);
+        addNotification({
+          id: `notif-pending-${generatedOrderCode}`,
+          title: `⏳ Đơn #${generatedOrderCode} đang chờ thanh toán (Giữ hàng 30 phút)`,
+          message: `Kho lạnh đang giữ tạm ${qty} ${product.unit} ${product.name} trong 30 phút. Vui lòng hoàn tất quét VietQR (${total.toLocaleString("vi-VN")}đ) để xuất kho!`,
+          type: "order",
+          link: `/dashboard/customer?tab=orders&order=${generatedOrderCode}`,
+        });
+        toast.info(`Đã giữ hàng 30 phút cho đơn #${generatedOrderCode}! Vui lòng quét mã VietQR.`);
+
         try {
           const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
           const payLink = await paymentService.createPayOSPaymentLink(
@@ -354,12 +452,19 @@ export function QuickBuyModal({
         }
       }
 
-      // COD: Auto redirect directly to the order details page
-      toast.success(`Đặt hàng COD thành công! Mã đơn #${generatedOrderCode}. Đang chuyển đến đơn hàng...`);
+      // COD: Push bell notification & auto redirect directly to the order details page
+      addNotification({
+        id: `notif-cod-${generatedOrderCode}`,
+        title: `📦 Đặt đơn COD #${generatedOrderCode} thành công (Chờ tích +${pointsEarned} điểm)`,
+        message: `Đơn hàng ${qty} ${product.unit} ${product.name} (${total.toLocaleString("vi-VN")}đ) đã chuyển xuống kho lạnh đóng gói. Bạn sẽ được cộng +${pointsEarned} điểm AgriClub ngay khi nhận hàng & thanh toán COD!`,
+        type: "order",
+        link: `/dashboard/customer?tab=orders&order=${generatedOrderCode}`,
+      });
+      toast.success(`Đặt hàng COD thành công! Mã đơn #${generatedOrderCode}. Đang mở chi tiết đơn hàng...`);
       setTimeout(() => {
         onClose();
         router.push(`/dashboard/customer?tab=orders&order=${generatedOrderCode}`);
-      }, 900);
+      }, 800);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Có lỗi xảy ra khi tạo đơn hàng.";
       toast.error(errMsg);
@@ -373,15 +478,44 @@ export function QuickBuyModal({
     setIsCheckingPayment(true);
     try {
       await paymentService.simulatePaymentSuccess(completedOrderCode);
-      toast.success(`Xác nhận thanh toán VietQR thành công! Đang chuyển đến đơn hàng #${completedOrderCode}...`);
+      addNotification({
+        id: `notif-paid-${completedOrderCode}`,
+        title: `✅ Đã thanh toán VietQR đơn #${completedOrderCode}`,
+        message: `Hệ thống đã nhận ${total.toLocaleString("vi-VN")}đ cho đơn #${completedOrderCode}. Đơn hàng đang được đóng gói tại kho lạnh 2-5°C!`,
+        type: "order",
+        link: `/dashboard/customer?tab=orders&order=${completedOrderCode}`,
+      });
+      addNotification({
+        id: `notif-points-${completedOrderCode}`,
+        title: `🎁 Tích điểm thành công: +${pointsEarned} điểm AgriClub!`,
+        message: `Chúc mừng! Bạn vừa được cộng +${pointsEarned} điểm thưởng từ đơn #${completedOrderCode} vào Ví Hội Viên AgriClub. Bấm để kiểm tra điểm & đổi Voucher giảm giá!`,
+        type: "voucher",
+        link: `/dashboard/customer?tab=points`,
+      });
+      toast.success(`Thanh toán VietQR thành công & cộng +${pointsEarned} điểm AgriClub! Đang mở đơn #${completedOrderCode}...`);
     } catch {
-      toast.success(`Đã ghi nhận thanh toán! Đang chuyển đến đơn hàng #${completedOrderCode}...`);
+      addNotification({
+        id: `notif-paid-${completedOrderCode}`,
+        title: `✅ Đã thanh toán VietQR đơn #${completedOrderCode}`,
+        message: `Hệ thống đã ghi nhận thanh toán cho đơn #${completedOrderCode}. Đơn hàng đang chờ đóng gói kho lạnh!`,
+        type: "order",
+        link: `/dashboard/customer?tab=orders&order=${completedOrderCode}`,
+      });
+      addNotification({
+        id: `notif-points-${completedOrderCode}`,
+        title: `🎁 Tích điểm thành công: +${pointsEarned} điểm AgriClub!`,
+        message: `Chúc mừng! Bạn vừa được cộng +${pointsEarned} điểm thưởng từ đơn #${completedOrderCode} vào Ví Hội Viên AgriClub!`,
+        type: "voucher",
+        link: `/dashboard/customer?tab=points`,
+      });
+      toast.success(`Đã ghi nhận thanh toán & cộng +${pointsEarned} điểm AgriClub! Đang chuyển đến đơn #${completedOrderCode}...`);
     } finally {
       setIsCheckingPayment(false);
+      setShowPayosQr(false);
       setTimeout(() => {
         onClose();
         router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
-      }, 900);
+      }, 700);
     }
   }
 
@@ -396,7 +530,7 @@ export function QuickBuyModal({
 
   return (
     <div
-      onClick={onClose}
+      onClick={handleSafeClose}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto cursor-pointer"
     >
       <div
@@ -441,7 +575,7 @@ export function QuickBuyModal({
             </div>
           )}
           <button
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Đóng"
           >
@@ -706,9 +840,29 @@ export function QuickBuyModal({
             </div>
           ) : showPayosQr && payosData ? (
             /* ═════════════════════════════════════════════════════════════ */
-            /* payOS VietQR Payment State                                   */
+            /* payOS VietQR Payment State (30-Min Inventory Hold)            */
             /* ═════════════════════════════════════════════════════════════ */
             <div className="space-y-4 text-center animate-in fade-in duration-200">
+              {/* 30-Minute Inventory Hold Countdown Banner */}
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-left flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <Clock size={16} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-amber-950 flex items-center gap-1.5">
+                      <span>Giữ hàng tồn kho tối đa 30 phút (Đơn #{completedOrderCode})</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-snug mt-0.5">
+                      Kho lạnh đang tạm khóa số lượng nông sản cho đơn của bạn. Đã gửi thông báo nhắc thanh toán lên chuông 🔔.
+                    </p>
+                  </div>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-amber-900 text-amber-100 font-mono font-black text-sm shrink-0 shadow-xs">
+                  {formatCountdown(holdSecondsLeft)}
+                </div>
+              </div>
+
               <div className="bg-gradient-to-b from-emerald-50 to-teal-50/40 rounded-2xl p-4 border border-emerald-200 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950">
@@ -827,13 +981,10 @@ export function QuickBuyModal({
               <div className="text-center pt-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    onClose();
-                    router.push(`/dashboard/customer?tab=orders&order=${completedOrderCode}`);
-                  }}
-                  className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer"
+                  onClick={handleSafeClose}
+                  className="text-xs text-amber-800 hover:text-amber-950 font-semibold underline cursor-pointer"
                 >
-                  Để thanh toán sau & Chuyển sang xem đơn hàng
+                  ⏳ Thanh toán sau (Giữ hàng 30 phút trong Đơn Mua) →
                 </button>
               </div>
             </div>
@@ -842,6 +993,27 @@ export function QuickBuyModal({
             /* BƯỚC 1: XÁC NHẬN NÔNG SẢN & ÁP DỤNG MÃ VOUCHER                */
             /* ═════════════════════════════════════════════════════════════ */
             <div className="space-y-4 animate-in fade-in duration-150">
+              {!user && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5 text-amber-950">
+                    <div className="font-extrabold flex items-center gap-1.5">
+                      <ShieldCheck size={15} className="text-amber-600 shrink-0" />
+                      <span>Vui lòng Đăng nhập tài khoản để Đặt mua & Tích điểm (+{pointsEarned} điểm)</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-snug">
+                      Đăng nhập giúp lưu đơn hàng vào tài khoản của bạn, áp dụng Voucher (1 lượt/tài khoản) và theo dõi đơn VietQR.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={redirectToLoginForOrder}
+                    className="px-3.5 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer"
+                  >
+                    Đăng nhập ngay →
+                  </button>
+                </div>
+              )}
+
               {/* Product Card with Stepper */}
               <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-white border border-emerald-100 flex items-center justify-between gap-3 shadow-2xs">
                 <div className="flex items-center gap-3.5 min-w-0">
@@ -898,7 +1070,7 @@ export function QuickBuyModal({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 uppercase tracking-wide">
                     <Tag size={14} className="text-amber-600" />
-                    <span>Áp Dụng Mã Ưu Đãi (Voucher)</span>
+                    <span>Áp Dụng Mã Ưu Đãi (Mỗi mã 1 lần/Tài khoản)</span>
                   </div>
                   {appliedVoucher && (
                     <button
@@ -966,21 +1138,33 @@ export function QuickBuyModal({
                 {!appliedVoucher && (
                   <div className="space-y-1.5 pt-1">
                     <span className="text-gray-500 text-[11px] font-semibold block">
-                      Mã ưu đãi có sẵn (Bấm để áp dụng nhanh):
+                      Mã ưu đãi có sẵn (Mỗi tài khoản chỉ được dùng 1 lần/mã):
                     </span>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {activeVouchers.map((v) => (
-                        <button
-                          key={v.code}
-                          type="button"
-                          onClick={() => handleApplyVoucher(v.code)}
-                          className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-950 hover:bg-amber-100 hover:border-amber-400 font-bold text-xs shrink-0 transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1.5"
-                        >
-                          <Tag size={12} className="text-amber-600" />
-                          <span>{v.code}</span>
-                          <span className="text-[10px] font-normal text-amber-800">({v.label})</span>
-                        </button>
-                      ))}
+                      {activeVouchers.map((v) => {
+                        const isUsed = usedVoucherCodes.includes(v.code.toUpperCase());
+                        return (
+                          <button
+                            key={v.code}
+                            type="button"
+                            disabled={isUsed}
+                            onClick={() => handleApplyVoucher(v.code)}
+                            className={cn(
+                              "px-2.5 py-1.5 rounded-xl border font-bold text-xs shrink-0 transition-all shadow-2xs flex items-center gap-1.5",
+                              isUsed
+                                ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed line-through"
+                                : "border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-950 hover:bg-amber-100 hover:border-amber-400 cursor-pointer active:scale-95"
+                            )}
+                            title={isUsed ? `Bạn đã sử dụng mã ${v.code} ở đơn trước (Giới hạn 1 lần/tài khoản)` : `Áp dụng mã ${v.code}`}
+                          >
+                            <Tag size={12} className={isUsed ? "text-gray-400" : "text-amber-600"} />
+                            <span>{v.code}</span>
+                            <span className={cn("text-[10px] font-normal", isUsed ? "text-gray-400 no-underline" : "text-amber-800")}>
+                              {isUsed ? "(Đã dùng 1/1)" : `(${v.label})`}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

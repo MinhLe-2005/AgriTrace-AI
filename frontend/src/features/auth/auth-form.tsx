@@ -136,8 +136,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
         } else if (roles.includes("FARMER")) {
           router.replace("/dashboard/farmer");
         } else {
-          // Khách hàng / User thông thường -> chuyển về Trang chủ
-          router.replace("/");
+          let redirectUrl = "/";
+          if (typeof window !== "undefined") {
+            const savedRedirect = sessionStorage.getItem("agri_post_login_redirect");
+            if (savedRedirect && savedRedirect.startsWith("/")) {
+              redirectUrl = savedRedirect;
+              sessionStorage.removeItem("agri_post_login_redirect");
+            }
+          }
+          router.replace(redirectUrl);
         }
       } catch (error) {
         toast.error(getApiErrorMessage(error));
