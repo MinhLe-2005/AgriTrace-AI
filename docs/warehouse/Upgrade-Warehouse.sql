@@ -5,3 +5,4 @@
 \ir P10_partial_reservations.sql
 \ir P11_transfer_receiving.sql
 \ir P12_inventory_indexes.sql
+\ir P13_legacy_schema_alignment.sql

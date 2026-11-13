@@ -1,5 +1,9 @@
 -- Apply after P04. Preserve prior completed reservations when adding partial dispatch accounting.
 BEGIN;
+-- Hibernate-created databases may still reject EXPIRED. Expand the check before backfill.
+ALTER TABLE wh_reservations DROP CONSTRAINT IF EXISTS wh_reservations_status_check;
+ALTER TABLE wh_reservations ADD CONSTRAINT wh_reservations_status_check
+    CHECK (status IN ('ACTIVE', 'RELEASED', 'CONSUMED', 'EXPIRED'));
 ALTER TABLE wh_reservation_lines
     ADD COLUMN IF NOT EXISTS dispatched_kg NUMERIC(14,3) NOT NULL DEFAULT 0;
 -- Recover actual dispatch quantities for legacy reservations, including old partial dispatches.
