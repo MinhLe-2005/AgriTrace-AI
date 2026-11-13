@@ -23,7 +23,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class UserController {
     private final UserService userService;
 
@@ -43,7 +42,7 @@ public class UserController {
     @PutMapping("/{id}")
     public ApiResponse<UserResponse> update(@PathVariable UUID id, @Valid @RequestBody UserUpdateRequest request,
                                              @AuthenticationPrincipal AppUserDetails principal) {
-        return ApiResponse.ok("User updated", userService.update(id, request, principal.getId()));
+        return ApiResponse.ok("User updated", userService.update(id, request, principal != null ? principal.getId() : null));
     }
 
     /** Lock or unlock another account without changing its active status or roles. */
@@ -55,12 +54,12 @@ public class UserController {
     ) {
         return ApiResponse.ok(
                 request.locked() ? "Tài khoản đã được khoá" : "Tài khoản đã được mở khoá",
-                userService.setAccountLock(id, request, principal.getId()));
+                userService.setAccountLock(id, request, principal != null ? principal.getId() : null));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id, @AuthenticationPrincipal AppUserDetails principal) {
-        userService.delete(id, principal.getId());
+        userService.delete(id, principal != null ? principal.getId() : null);
     }
 }

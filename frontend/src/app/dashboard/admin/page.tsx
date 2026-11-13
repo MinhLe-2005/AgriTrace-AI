@@ -196,7 +196,12 @@ function AdminPortalContent() {
     active: true,
   });
 
-  // Load Member 4 data on tab change or mount
+  useEffect(() => {
+    // Luôn tải danh sách đơn hàng từ lúc vào Admin để KPI Doanh thu ở tab Tổng quan hiện đúng ngay
+    fetchOrders();
+  }, []);
+
+  // Load Member 4 data on tab change
   useEffect(() => {
     if (activeTab === "orders") {
       fetchOrders();
@@ -681,7 +686,13 @@ function AdminPortalContent() {
         o.receiverName?.toLowerCase().includes(orderSearch.toLowerCase()) ||
         o.receiverPhone?.includes(orderSearch) ||
         o.userEmail?.toLowerCase().includes(orderSearch.toLowerCase());
-      const matchStatus = orderFilter === "ALL" || o.status?.toUpperCase() === orderFilter;
+      const st = o.status?.toUpperCase() || "";
+      const matchStatus =
+        orderFilter === "ALL" ||
+        (orderFilter === "CONFIRMED" && ["CONFIRMED", "PAID", "PREPARING", "PENDING_PAYMENT"].includes(st)) ||
+        (orderFilter === "DELIVERED" && ["DELIVERED", "COMPLETED"].includes(st)) ||
+        (orderFilter === "CANCELLED" && ["CANCELLED", "REFUNDED"].includes(st)) ||
+        st === orderFilter;
       return matchSearch && matchStatus;
     });
   }, [orders, orderSearch, orderFilter]);
@@ -923,7 +934,7 @@ function AdminPortalContent() {
               <div className="text-2xl font-black text-amber-600">
                 {totalRevenue.toLocaleString("vi-VN")} đ
               </div>
-              <div className="text-[11px] text-gray-400 mt-1">COD + PayOS VietQR</div>
+              <div className="text-[11px] text-gray-400 mt-1">COD + VietQR 24/7</div>
             </div>
           </div>
 
@@ -1046,24 +1057,30 @@ function AdminPortalContent() {
                           <span
                             className={cn(
                               "px-2.5 py-1 rounded-full text-[11px] font-bold border inline-block",
-                              order.status === "DELIVERED"
+                              order.status === "DELIVERED" || order.status === "COMPLETED"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                 : order.status === "SHIPPING"
                                 ? "bg-blue-50 text-blue-700 border-blue-200"
-                                : order.status === "CANCELLED"
+                                : order.status === "CANCELLED" || order.status === "REFUNDED"
                                 ? "bg-rose-50 text-rose-700 border-rose-200"
+                                : order.status === "PAID"
+                                ? "bg-teal-50 text-teal-700 border-teal-200"
                                 : "bg-amber-50 text-amber-700 border-amber-200"
                             )}
                           >
-                            {order.status === "DELIVERED"
+                            {order.status === "DELIVERED" || order.status === "COMPLETED"
                               ? "Đã giao thành công"
                               : order.status === "SHIPPING"
                               ? "Đang giao xe lạnh"
                               : order.status === "CANCELLED"
                               ? "Đã hủy đơn"
+                              : order.status === "REFUNDED"
+                              ? "Đã hoàn tiền"
                               : order.status === "PAID"
-                              ? "Đã thanh toán (payOS)"
-                              : "Chờ xác nhận"}
+                              ? "Chờ đóng gói (Đã TT QR)"
+                              : order.status === "PENDING_PAYMENT"
+                              ? "Chờ thanh toán (VietQR)"
+                              : "Chờ đóng gói (COD)"}
                           </span>
                         </td>
                         <td className="p-3.5 text-right">
@@ -2428,17 +2445,17 @@ function AdminPortalContent() {
 }
 
 const ORDER_STATUS_OPTIONS = [
-  { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },
-  { value: "PAID", label: "Đã thanh toán" },
-  { value: "CONFIRMED", label: "Đã xác nhận" },
-  { value: "SHIPPING", label: "Giao xe lạnh" },
-  { value: "DELIVERED", label: "Đã giao hàng" },
-  { value: "CANCELLED", label: "Hủy đơn" },
+  { value: "PENDING_PAYMENT", label: "Chờ thanh toán (VietQR)" },
+  { value: "PAID", label: "Chờ đóng gói (Đã TT QR)" },
+  { value: "CONFIRMED", label: "Chờ đóng gói (COD)" },
+  { value: "SHIPPING", label: "Đang giao xe lạnh" },
+  { value: "DELIVERED", label: "Đã giao thành công" },
+  { value: "CANCELLED", label: "Đã hủy đơn" },
   { value: "REFUNDED", label: "Đã hoàn tiền" },
 ];
 
 /** Chỉ tính doanh thu cho đơn đã thanh toán hoặc COD đã được xác nhận. */
-const REVENUE_STATUSES = new Set(["PAID", "CONFIRMED", "SHIPPING", "DELIVERED"]);
+const REVENUE_STATUSES = new Set(["PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED"]);
 
 export default function AdminPortalPage() {
   return (
