@@ -3,12 +3,17 @@ package com.example.myfullstackapp.controller;
 import com.example.myfullstackapp.dto.ApiResponse;
 import com.example.myfullstackapp.dto.distributor.*;
 import com.example.myfullstackapp.service.DistributorShipmentService;
+import com.example.myfullstackapp.service.DistributorShipmentStream;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -19,10 +24,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DistributorShipmentController {
     private final DistributorShipmentService distributorShipmentService;
+    private final DistributorShipmentStream shipmentStream;
 
     @GetMapping("/dashboard")
     public ApiResponse<DistributorDashboardResponse> dashboard(Authentication authentication) {
         return ApiResponse.ok("Distributor dashboard retrieved", distributorShipmentService.dashboard(actor(authentication), isAdmin(authentication)));
+    }
+
+    /** Authenticated server-sent stream for dashboard and shipment screens. */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> stream(Authentication authentication) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header("X-Accel-Buffering", "no")
+                .body(shipmentStream.subscribe(actor(authentication), isAdmin(authentication)));
     }
 
     @GetMapping("/shipments")

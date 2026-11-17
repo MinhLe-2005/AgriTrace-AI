@@ -1,0 +1,4 @@
+ALTER TABLE agri_shipment_tracking_events
+    ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS accuracy_meters DOUBLE PRECISION;
