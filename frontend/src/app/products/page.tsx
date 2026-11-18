@@ -1086,7 +1086,7 @@ function ProductsContent() {
                               className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline mt-0.5 text-left cursor-pointer group/promo"
                               title="Bấm để xem căn cứ & lịch biểu trợ giá mùa vụ"
                             >
-                              <span>🌾 {(p as any).campaignTitle || "Vụ mùa chính vụ"} · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ</span>
+                              <span>🌾 {(p as { campaignTitle?: string }).campaignTitle || "Vụ mùa chính vụ"} · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ</span>
                               <Info size={11} className="text-amber-600 group-hover/promo:scale-110 transition-transform shrink-0" />
                             </button>
                           )}
