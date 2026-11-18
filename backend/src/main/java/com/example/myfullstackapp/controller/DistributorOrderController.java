@@ -23,7 +23,7 @@ import java.util.Locale;
 @PreAuthorize("hasAnyRole('DISTRIBUTOR', 'ADMIN')")
 @RequiredArgsConstructor
 public class DistributorOrderController {
-    private static final List<String> OPERATIONAL_STATUSES = List.of("CONFIRMED", "PENDING", "SHIPPING", "DELIVERED", "COMPLETED");
+    private static final List<String> OPERATIONAL_STATUSES = List.of("CONFIRMED", "PENDING", "PAID", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED");
     private final OrderRepository orderRepository;
 
     @GetMapping

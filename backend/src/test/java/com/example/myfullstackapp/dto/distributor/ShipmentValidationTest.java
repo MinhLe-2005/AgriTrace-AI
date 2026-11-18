@@ -13,7 +13,7 @@ class ShipmentValidationTest {
     @Test
     void acceptsDeepFrozenTemperatureWithinSharedRange() {
         CreateTrackingEventRequest request = new CreateTrackingEventRequest(
-                "Cold store", -25.0, 75.0, "ON_SCHEDULE", null);
+                "Cold store", -25.0, 75.0, "ON_SCHEDULE", null, 10.762622, 106.660172, 12.0);
 
         assertTrue(validator.validate(request).isEmpty());
     }
@@ -21,9 +21,17 @@ class ShipmentValidationTest {
     @Test
     void rejectsOutOfRangeTelemetryAndBlankStatusLocation() {
         UpdateShipmentStatusRequest request = new UpdateShipmentStatusRequest(
-                "IN_TRANSIT", " ", -31.0, 101.0, null, null);
+                "IN_TRANSIT", " ", -31.0, 101.0, null, null, 91.0, 181.0, -1.0);
 
-        assertEquals(3, validator.validate(request).size());
+        assertEquals(6, validator.validate(request).size());
+    }
+
+    @Test
+    void rejectsIncompleteGpsCoordinate() {
+        CreateTrackingEventRequest request = new CreateTrackingEventRequest(
+                "Toll station", 4.0, null, "ON_SCHEDULE", null, 10.762622, null, 12.0);
+
+        assertEquals(1, validator.validate(request).size());
     }
 
     @Test
