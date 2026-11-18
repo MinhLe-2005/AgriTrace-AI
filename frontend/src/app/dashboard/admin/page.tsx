@@ -196,7 +196,12 @@ function AdminPortalContent() {
     active: true,
   });
 
-  // Load Member 4 data on tab change or mount
+  useEffect(() => {
+    // Luôn tải danh sách đơn hàng từ lúc vào Admin để KPI Doanh thu ở tab Tổng quan hiện đúng ngay
+    fetchOrders();
+  }, []);
+
+  // Load Member 4 data on tab change
   useEffect(() => {
     if (activeTab === "orders") {
       fetchOrders();
@@ -211,7 +216,13 @@ function AdminPortalContent() {
     setOrdersLoading(true);
     try {
       const data = await catalogService.getOrders();
-      setOrders(data || []);
+      const sorted = [...(data || [])].sort((a, b) => {
+        const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (tA !== tB) return tB - tA;
+        return (b.id || 0) - (a.id || 0);
+      });
+      setOrders(sorted);
     } catch {
       toast.error("Không tải được danh sách đơn hàng.");
     } finally {
@@ -681,7 +692,13 @@ function AdminPortalContent() {
         o.receiverName?.toLowerCase().includes(orderSearch.toLowerCase()) ||
         o.receiverPhone?.includes(orderSearch) ||
         o.userEmail?.toLowerCase().includes(orderSearch.toLowerCase());
-      const matchStatus = orderFilter === "ALL" || o.status?.toUpperCase() === orderFilter;
+      const st = o.status?.toUpperCase() || "";
+      const matchStatus =
+        orderFilter === "ALL" ||
+        (orderFilter === "CONFIRMED" && ["CONFIRMED", "PAID", "PREPARING", "PENDING_PAYMENT"].includes(st)) ||
+        (orderFilter === "DELIVERED" && ["DELIVERED", "COMPLETED"].includes(st)) ||
+        (orderFilter === "CANCELLED" && ["CANCELLED", "REFUNDED"].includes(st)) ||
+        st === orderFilter;
       return matchSearch && matchStatus;
     });
   }, [orders, orderSearch, orderFilter]);
@@ -923,7 +940,7 @@ function AdminPortalContent() {
               <div className="text-2xl font-black text-amber-600">
                 {totalRevenue.toLocaleString("vi-VN")} đ
               </div>
-              <div className="text-[11px] text-gray-400 mt-1">COD + PayOS VietQR</div>
+              <div className="text-[11px] text-gray-400 mt-1">COD + VietQR 24/7</div>
             </div>
           </div>
 
@@ -1032,12 +1049,39 @@ function AdminPortalContent() {
                             </div>
                           ) : null}
                         </td>
-                        <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded-md font-semibold text-[10px] bg-gray-100 text-gray-700">
-                            {order.paymentMethod || "COD"}
-                          </span>
+                        <td className="p-3.5 space-y-1">
+                          <div>
+                            <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-gray-100 text-gray-800 border border-gray-200">
+                              {(order.paymentMethod || "COD").toUpperCase() === "PAYOS"
+                                ? "VietQR 24/7"
+                                : "Tiền mặt (COD)"}
+                            </span>
+                          </div>
+                          <div>
+                            {order.status === "CANCELLED" ? (
+                              <span className="text-[10px] font-bold text-gray-400">Đã hủy thanh toán</span>
+                            ) : (order.paymentMethod || "COD").toUpperCase() === "PAYOS" ? (
+                              order.status === "PENDING_PAYMENT" ? (
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block">
+                                  ⏳ Chưa TT (Giữ hàng 30p)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block">
+                                  ✅ Đã thanh toán QR
+                                </span>
+                              )
+                            ) : order.status === "DELIVERED" || order.status === "COMPLETED" || !!order.paidAt ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block">
+                                ✅ Đã thu tiền COD
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 inline-block">
+                                💵 Chưa TT (Thu hộ COD)
+                              </span>
+                            )}
+                          </div>
                           {order.voucherUsed && (
-                            <div className="text-[10px] text-purple-700 mt-1 font-mono">
+                            <div className="text-[10px] text-purple-700 font-mono">
                               🎟️ {order.voucherUsed}
                             </div>
                           )}
@@ -1046,24 +1090,30 @@ function AdminPortalContent() {
                           <span
                             className={cn(
                               "px-2.5 py-1 rounded-full text-[11px] font-bold border inline-block",
-                              order.status === "DELIVERED"
+                              order.status === "DELIVERED" || order.status === "COMPLETED"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                 : order.status === "SHIPPING"
                                 ? "bg-blue-50 text-blue-700 border-blue-200"
-                                : order.status === "CANCELLED"
+                                : order.status === "CANCELLED" || order.status === "REFUNDED"
                                 ? "bg-rose-50 text-rose-700 border-rose-200"
+                                : order.status === "PAID"
+                                ? "bg-teal-50 text-teal-700 border-teal-200"
                                 : "bg-amber-50 text-amber-700 border-amber-200"
                             )}
                           >
-                            {order.status === "DELIVERED"
-                              ? "Đã giao thành công"
+                            {order.status === "DELIVERED" || order.status === "COMPLETED"
+                              ? "✅ Đã giao thành công"
                               : order.status === "SHIPPING"
-                              ? "Đang giao xe lạnh"
+                              ? "🚚 Đang giao xe lạnh"
                               : order.status === "CANCELLED"
-                              ? "Đã hủy đơn"
+                              ? "❌ Đã hủy đơn"
+                              : order.status === "REFUNDED"
+                              ? "↩️ Đã hoàn tiền"
                               : order.status === "PAID"
-                              ? "Đã thanh toán (payOS)"
-                              : "Chờ xác nhận"}
+                              ? "📦 Chờ đóng gói"
+                              : order.status === "PENDING_PAYMENT"
+                              ? "⏳ Chờ TT (Giữ hàng 30p)"
+                              : "📦 Chờ đóng gói"}
                           </span>
                         </td>
                         <td className="p-3.5 text-right">
@@ -2428,17 +2478,17 @@ function AdminPortalContent() {
 }
 
 const ORDER_STATUS_OPTIONS = [
-  { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },
-  { value: "PAID", label: "Đã thanh toán" },
-  { value: "CONFIRMED", label: "Đã xác nhận" },
-  { value: "SHIPPING", label: "Giao xe lạnh" },
-  { value: "DELIVERED", label: "Đã giao hàng" },
-  { value: "CANCELLED", label: "Hủy đơn" },
+  { value: "PENDING_PAYMENT", label: "Chờ thanh toán (VietQR)" },
+  { value: "PAID", label: "Chờ đóng gói (Đã TT QR)" },
+  { value: "CONFIRMED", label: "Chờ đóng gói (COD)" },
+  { value: "SHIPPING", label: "Đang giao xe lạnh" },
+  { value: "DELIVERED", label: "Đã giao thành công" },
+  { value: "CANCELLED", label: "Đã hủy đơn" },
   { value: "REFUNDED", label: "Đã hoàn tiền" },
 ];
 
 /** Chỉ tính doanh thu cho đơn đã thanh toán hoặc COD đã được xác nhận. */
-const REVENUE_STATUSES = new Set(["PAID", "CONFIRMED", "SHIPPING", "DELIVERED"]);
+const REVENUE_STATUSES = new Set(["PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED"]);
 
 export default function AdminPortalPage() {
   return (

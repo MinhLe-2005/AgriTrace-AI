@@ -26,48 +26,64 @@ import {
   Youtube,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuthStore } from "@/stores/auth-store";
 
 export function MainFooter() {
+  const { user } = useAuthStore();
+  const hasRole = (role: string) =>
+    Boolean(user?.roles?.some((r) => r === role || r === `ROLE_${role}`));
+  const isAdmin = hasRole("ADMIN");
+
   const actors = [
     {
+      roleKey: "ADMIN",
       role: "Quản Trị Viên",
       sub: "Admin Portal",
       href: "/dashboard/admin",
       icon: Shield,
       badge: "Admin",
       badgeColor: "bg-red-500/20 text-red-300 border-red-500/30",
+      allowed: isAdmin,
     },
     {
+      roleKey: "FARMER",
       role: "Nông Dân",
       sub: "Farmer Portal",
       href: "/dashboard/farmer",
       icon: Sprout,
       badge: "Nông Trại",
       badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+      allowed: isAdmin || hasRole("FARMER"),
     },
     {
+      roleKey: "WAREHOUSE",
       role: "Thủ Kho",
       sub: "Warehouse FEFO",
       href: "/dashboard/warehouse",
       icon: Warehouse,
       badge: "Kho Lạnh",
       badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+      allowed: isAdmin || hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF"),
     },
     {
+      roleKey: "DISTRIBUTOR",
       role: "Nhà Phân Phối",
       sub: "Cold Logistics",
       href: "/dashboard/distributor",
       icon: Truck,
       badge: "Vận Chuyển",
       badgeColor: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+      allowed: isAdmin || hasRole("DISTRIBUTOR"),
     },
     {
+      roleKey: "CUSTOMER",
       role: "Khách Hàng",
       sub: "Customer Account",
       href: "/dashboard/customer",
       icon: ShoppingBag,
       badge: "Tài Khoản",
       badgeColor: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+      allowed: Boolean(user),
     },
   ];
 
@@ -258,46 +274,6 @@ export function MainFooter() {
                 <span>cskh@agritrace.vn</span>
               </li>
             </ul>
-          </div>
-        </div>
-
-        {/* ─── Khu Vực Cổng Vận Hành Nội Bộ & Đối Tác Chuỗi Cung Ứng (Tinh Tế, Gọn Gàng) ─── */}
-        <div className="pt-6 border-t border-white/10 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-              Cổng Vận Hành Chuỗi Cung Ứng Nội Bộ & B2B:
-            </span>
-            <Link
-              href="/login"
-              className="text-[11px] font-semibold text-emerald-400 hover:text-white transition-colors flex items-center gap-1"
-            >
-              <span>Đăng nhập cổng chuyên dụng</span>
-              <ChevronRight size={12} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            {actors.map((actor) => {
-              const Icon = actor.icon;
-              return (
-                <Link
-                  key={actor.role}
-                  href={actor.href}
-                  className="px-3 py-2 rounded-xl bg-white/5 hover:bg-emerald-900/40 border border-white/10 hover:border-emerald-500/50 transition-all flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Icon size={14} className="text-emerald-400 shrink-0" />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-white text-xs truncate group-hover:text-emerald-300">
-                        {actor.role}
-                      </div>
-                      <div className="text-[10px] text-gray-500 truncate">{actor.sub}</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={12} className="text-gray-500 group-hover:text-white shrink-0 ml-1" />
-                </Link>
-              );
-            })}
           </div>
         </div>
 

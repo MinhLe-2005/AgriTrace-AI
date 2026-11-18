@@ -30,6 +30,7 @@ public class PayOSService {
 
     private final AppProperties appProperties;
     private final OrderRepository orderRepository;
+    private final LoyaltyService loyaltyService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -188,7 +189,13 @@ public class PayOSService {
                 order.setStatus("PAID");
                 order.setPaidAt(LocalDateTime.now());
                 order.setPaymentRef(data.getReference() != null ? data.getReference() : "PAYOS-" + data.getOrderCode());
-                orderRepository.save(order);
+                Order saved = orderRepository.save(order);
+                loyaltyService.awardOrderPoints(
+                        saved.getUserEmail(),
+                        saved.getTotal() != null ? saved.getTotal() : 0L,
+                        saved.getOrderCode(),
+                        saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+                );
                 log.info("Order #{} marked as PAID via payOS webhook", order.getOrderCode());
                 return true;
             }
@@ -205,7 +212,14 @@ public class PayOSService {
         order.setStatus("PAID");
         order.setPaidAt(LocalDateTime.now());
         order.setPaymentRef("PAYOS-DEMO-" + System.currentTimeMillis());
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        loyaltyService.awardOrderPoints(
+                saved.getUserEmail(),
+                saved.getTotal() != null ? saved.getTotal() : 0L,
+                saved.getOrderCode(),
+                saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+        );
+        return saved;
     }
 
     @Transactional
@@ -242,7 +256,13 @@ public class PayOSService {
                                 order.setStatus("PAID");
                                 order.setPaidAt(LocalDateTime.now());
                                 order.setPaymentRef("PAYOS-" + queryId);
-                                orderRepository.save(order);
+                                Order saved = orderRepository.save(order);
+                                loyaltyService.awardOrderPoints(
+                                        saved.getUserEmail(),
+                                        saved.getTotal() != null ? saved.getTotal() : 0L,
+                                        saved.getOrderCode(),
+                                        saved.getPointsAwarded() != null && saved.getPointsAwarded() > 0 ? saved.getPointsAwarded() : 20
+                                );
                                 log.info("Order #{} confirmed PAID via live payOS status check!", orderCode);
                                 return "PAID";
                             }

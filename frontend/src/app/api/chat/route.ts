@@ -94,27 +94,170 @@ QUY TẮC BẮT BUỘC VỀ PHẠM VI (SCOPE GUARDRAIL):
 - Nếu người dùng hỏi các chủ đề ngoài lề (lập trình, chính trị, showbiz, tài chính...), hãy lịch sự từ chối và hướng họ quay lại nông sản sạch AgriTrace.
 - Luôn giữ thái độ thân thiện, xưng hô "Dạ chào bạn!", "AgriTrace AI xin chia sẻ...", câu từ tự nhiên, mạch lạc, dùng gạch đầu dòng và in đậm rõ ràng.`;
 
+function normalizeVi(str: string): string {
+  return (str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+const PRODUCT_ACTION_CATALOG = [
+  {
+    keywords: ["dau", "dau tay", "strawberry", "moc chau", "dt-mc"],
+    buyAction: "[[ACTION: ⚡ Mua Ngay Dâu Tây Mộc Châu (Mở Cửa Sổ Đặt Mua) | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]",
+    detailAction: "[[ACTION: 🔍 Xem Chi Tiết & Tem QR Lô Dâu Tây | /products?search=Dâu+Tây&detail=DT-MC-2026-11]]",
+    fallbackReply:
+      "Dạ chào bạn! 🍓 **Dâu Tây New Zealand Mộc Châu** hiện đang vào chính vụ Đông - Xuân ngon nhất năm tại **Hợp Tác Xã Nông Sản Sạch Mộc Châu**:\n\n- **Giá ưu đãi:** **180.000 đ / Hộp 500g** (Giảm 14% so với giá gốc 210.000 đ)\n- **Mã lô truy xuất GS1:** **DT-MC-2026-11** (Đạt chuẩn **GlobalGAP / VietGAP**, kiểm định NIFC không tồn dư BVTV)\n- **Chuỗi lạnh:** Thu hái lúc 05:30 sáng và vận chuyển xe lạnh chuyên dụng **2°C - 5°C**\n\nBạn bấm ngay vào nút bên dưới để **mở thẳng cửa sổ Đặt Mua Dâu Tây (có áp Voucher giảm giá)** nhé!",
+  },
+  {
+    keywords: ["cam", "cam sanh", "ham yen", "cs-hy", "sp-cs"],
+    buyAction: "[[ACTION: ⚡ Mua Ngay Cam Sành Hàm Yên (Mở Cửa Sổ Đặt Mua) | /products?search=Cam+Sành&buy=CS-HY-2026-03]]",
+    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cam Sành Hàm Yên | /products?search=Cam+Sành&detail=CS-HY-2026-03]]",
+    fallbackReply:
+      "Dạ chào bạn! 🍊 **Cam Sành Hàm Yên Tép Vàng Mọng Nước** đang vào vụ thu hoạch rộ ngọt thanh, giàu Vitamin C:\n\n- **Giá ưu đãi:** **45.000 đ / KG** (Giá gốc 55.000 đ)\n- **Mã lô GS1:** **CS-HY-2026-03** — Đạt chuẩn **VietGAP**\n- **Nguồn gốc:** HTX Cam Sành Hàm Yên, Tuyên Quang\n\nBạn bấm nút bên dưới để **mở ngay cửa sổ Mua Cam Sành** nhé!",
+  },
+  {
+    keywords: ["xa lach", "lo lo", "rau", "thuy canh", "xl-2026"],
+    buyAction: "[[ACTION: ⚡ Mua Ngay Xà Lách Thủy Canh (Mở Cửa Sổ Đặt Mua) | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]",
+    detailAction: "[[ACTION: 🔍 Tra Cứu Tem QR Lô Xà Lách XL-2026-08 | /traceability?batch=LOT-XL-2026-08]]",
+    fallbackReply:
+      "Dạ chào bạn! 🥬 **Xà Lách Lô Lô Xanh Thủy Canh** được thu hoạch mới lúc 05:30 sáng nay tại Nông Trại Xanh Thủy Canh Đà Lạt:\n\n- **Giá ưu đãi:** **35.000 đ / KG** (Giòn ngọt, không đắng, chuẩn GlobalGAP #GG-VN-2024-910)\n- **Kiểm định:** Quatest 1 tồn dư BVTV = 0, bảo quản chuỗi lạnh 2°C - 5°C\n\nBạn bấm nút bên dưới để **mở thẳng cửa sổ Đặt Mua Xà Lách** nhé!",
+  },
+  {
+    keywords: ["kale", "cai xoan", "cai kale", "sp-kl"],
+    buyAction: "[[ACTION: ⚡ Mua Ngay Cải Xoăn Kale Hữu Cơ (Mở Cửa Sổ Đặt Mua) | /products?search=Cải+Xoăn&buy=SP-KL-05]]",
+    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cải Xoăn Kale | /products?search=Cải+Xoăn&detail=SP-KL-05]]",
+    fallbackReply:
+      "Dạ chào bạn! 🥬 **Cải Xoăn Kale Hữu Cơ Dinh Dưỡng** (Đà Lạt) rất giàu Vitamin A-C-K, cực tốt cho salad và nước ép detox:\n\n- **Giá ưu đãi:** **65.000 đ / KG** (Chuẩn canh tác Organic BioCert)\n- **Mã lô:** **SP-KL-05**\n\nBạn bấm nút bên dưới để **vào mua ngay Cải Xoăn Kale** nhé!",
+  },
+  {
+    keywords: ["bo", "bo sap", "034", "sp-bo"],
+    buyAction: "[[ACTION: ⚡ Mua Ngay Bơ Sáp 034 Cao Nguyên | /products?search=Bơ+Sáp&buy=SP-BO-06]]",
+    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Bơ Sáp 034 | /products?search=Bơ+Sáp&detail=SP-BO-06]]",
+    fallbackReply:
+      "Dạ chào bạn! 🥑 **Bơ Sáp 034 Đặc Sản Cao Nguyên** (Bảo Lộc, Lâm Đồng) cơm vàng dày, hạt lép, dẻo béo tự nhiên:\n\n- **Giá ưu đãi:** **75.000 đ / KG** (Chuẩn VietGAP)\n- **Mã lô:** **SP-BO-06**\n\nBạn bấm nút bên dưới để **mở ngay cửa sổ Đặt Mua Bơ Sáp 034** nhé!",
+  },
+  {
+    keywords: ["ca chua", "cherry", "sp-cc"],
+    buyAction: "[[ACTION: ⚡ Mua Ngay Cà Chua Bi Cherry | /products?search=Cà+Chua&buy=SP-CC-04]]",
+    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cà Chua Bi Cherry | /products?search=Cà+Chua&detail=SP-CC-04]]",
+    fallbackReply:
+      "Dạ chào bạn! 🍅 **Cà Chua Bi Cherry Đỏ Ngọt** (Nông Trại Thủy Canh Đà Lạt) quả chùm tròn mọng, ngọt thanh:\n\n- **Giá ưu đãi:** **50.000 đ / KG** (Chuẩn VietGAP)\n- **Mã lô:** **SP-CC-04**\n\nBạn bấm nút bên dưới để **đặt mua ngay Cà Chua Bi Cherry** nhé!",
+  },
+  {
+    keywords: ["ca rot", "baby", "cr-dl"],
+    buyAction: "[[ACTION: ⚡ Mua Ngay Cà Rốt Baby Đà Lạt | /products?search=Cà+Rốt&buy=CR-DL-2026-07]]",
+    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cà Rốt Baby | /products?search=Cà+Rốt&detail=CR-DL-2026-07]]",
+    fallbackReply:
+      "Dạ chào bạn! 🥕 **Cà Rốt Baby Giòn Ngọt Đà Lạt** củ nhỏ non mềm, giàu Beta-Carotene:\n\n- **Mã lô:** **CR-DL-2026-07** (Chuẩn VietGAP Đà Lạt)\n\nBạn bấm nút bên dưới để **mở ngay cửa sổ Đặt Mua Cà Rốt Baby** nhé!",
+  },
+];
+
+function ensureGuaranteedActionButtons(userMessage: string, replyText: string): string {
+  const normUser = normalizeVi(userMessage);
+  const normReply = normalizeVi(replyText);
+  let updatedReply = replyText.trim();
+
+  let matchedAnyProduct = false;
+  for (const item of PRODUCT_ACTION_CATALOG) {
+    const userMentions = item.keywords.some((kw) => normUser.includes(kw));
+    const replyMentions = item.keywords.some((kw) => normReply.includes(kw));
+    if (userMentions || (replyMentions && normUser.includes("mua"))) {
+      matchedAnyProduct = true;
+      // Extract the URL path from buyAction to see if AI already included a buy link for this product
+      const buyUrlMatch = item.buyAction.match(/\|\s*(.*?)\]\]/);
+      const buyUrl = buyUrlMatch ? buyUrlMatch[1].trim() : "";
+      if (buyUrl && !updatedReply.includes(buyUrl)) {
+        updatedReply += `\n\n${item.buyAction}`;
+      }
+      const detailUrlMatch = item.detailAction.match(/\|\s*(.*?)\]\]/);
+      const detailUrl = detailUrlMatch ? detailUrlMatch[1].trim() : "";
+      if (detailUrl && !updatedReply.includes(detailUrl)) {
+        updatedReply += `\n${item.detailAction}`;
+      }
+    }
+  }
+
+  // If no [[ACTION:...]] at all exists in the reply, append helpful default actions
+  if (!/\[\[ACTION:/i.test(updatedReply)) {
+    if (normUser.includes("voucher") || normUser.includes("diem") || normUser.includes("ma giam")) {
+      updatedReply += `\n\n[[ACTION: 🎁 Mở Kho Voucher & Đổi Điểm AgriClub | /dashboard/customer?tab=vouchers]]`;
+    } else if (normUser.includes("don hang") || normUser.includes("don mua") || normUser.includes("thanh toan")) {
+      updatedReply += `\n\n[[ACTION: 📦 Xem Đơn Mua Của Tôi | /dashboard/customer?tab=orders]]`;
+    } else if (!matchedAnyProduct) {
+      updatedReply += `\n\n[[ACTION: ⚡ Mua Ngay Dâu Tây Mộc Châu | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]\n[[ACTION: ⚡ Mua Ngay Cam Sành Hàm Yên | /products?search=Cam+Sành&buy=CS-HY-2026-03]]\n[[ACTION: 🛒 Xem Toàn Bộ Cửa Hàng Nông Sản | /products]]`;
+    }
+  }
+
+  return updatedReply;
+}
+
+function buildSmartFallbackReply(userMessage: string): string {
+  const normUser = normalizeVi(userMessage);
+  for (const item of PRODUCT_ACTION_CATALOG) {
+    if (item.keywords.some((kw) => normUser.includes(kw))) {
+      return `${item.fallbackReply}\n\n${item.buyAction}\n${item.detailAction}\n[[ACTION: 🎁 Kho Voucher Giảm Giá | /dashboard/customer?tab=vouchers]]`;
+    }
+  }
+
+  if (normUser.includes("voucher") || normUser.includes("ma giam") || normUser.includes("diem")) {
+    return (
+      "Dạ chào bạn! 🎁 Trên **AgriTrace AI**, mỗi mã Voucher ưu đãi được áp dụng **1 lần cho mỗi tài khoản** để đảm bảo quyền lợi công bằng cho mọi hội viên AgriClub:\n\n" +
+      "- **AGRI30K**: Giảm ngay 30.000đ cho đơn từ 150.000đ\n" +
+      "- **FREESHIP25**: Miễn phí vận chuyển xe lạnh chuyên dụng 25.000đ\n\n" +
+      "Bạn bấm vào nút bên dưới để kiểm tra Ví Voucher hoặc đặt mua nông sản ngay nhé!\n\n" +
+      "[[ACTION: 🎁 Mở Kho Voucher Đã Lưu | /dashboard/customer?tab=vouchers]]\n" +
+      "[[ACTION: ⚡ Mua Ngay Dâu Tây (Áp Voucher) | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]"
+    );
+  }
+
+  if (normUser.includes("don") || normUser.includes("giao hang") || normUser.includes("thanh toan")) {
+    return (
+      "Dạ chào bạn! 📦 Hệ thống **AgriTrace** quản lý minh bạch tách biệt **Trạng thái Thanh toán** và **Trạng thái Vận chuyển xe lạnh**:\n\n" +
+      "- **Thanh toán VietQR 24/7**: Giữ hàng tồn kho tối đa **30 phút** khi đang chờ quét mã QR, tự động chuyển sang **Đã thanh toán** ngay khi hoàn tất.\n" +
+      "- **Thanh toán Tiền mặt (COD)**: Hiển thị *Chưa thanh toán (Thu hộ COD)* trong lúc đóng gói/vận chuyển và tự động xác nhận *Đã thanh toán* ngay khi giao hàng thành công.\n\n" +
+      "[[ACTION: 📦 Kiểm Tra Đơn Mua Của Tôi | /dashboard/customer?tab=orders]]\n" +
+      "[[ACTION: 🛒 Tiếp Tục Mua Nông Sản | /products]]"
+    );
+  }
+
+  return (
+    "Dạ chào bạn! 🌱 **AgriTrace AI** sẵn sàng hỗ trợ bạn chọn mua nông sản sạch chuẩn VietGAP/GlobalGAP đang vào chính vụ ngon nhất hôm nay:\n\n" +
+    "- 🍓 **Dâu Tây New Zealand Mộc Châu**: **180.000 đ / Hộp 500g** (Lô `DT-MC-2026-11`)\n" +
+    "- 🍊 **Cam Sành Hàm Yên Tép Vàng**: **45.000 đ / KG** (Lô `CS-HY-2026-03`)\n" +
+    "- 🥬 **Xà Lách Thủy Canh Lô Lô Xanh**: **35.000 đ / KG** (Lô `LOT-XL-2026-08`)\n" +
+    "- 🥬 **Cải Xoăn Kale Hữu Cơ Đà Lạt**: **65.000 đ / KG** (Lô `SP-KL-05`)\n\n" +
+    "Bạn muốn đặt mua món nào chỉ cần bấm thẳng vào nút tương ứng bên dưới để mở ngay cửa sổ đặt hàng nhé!\n\n" +
+    "[[ACTION: ⚡ Mua Ngay Dâu Tây Mộc Châu | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]\n" +
+    "[[ACTION: ⚡ Mua Ngay Cam Sành Hàm Yên | /products?search=Cam+Sành&buy=CS-HY-2026-03]]\n" +
+    "[[ACTION: ⚡ Mua Ngay Xà Lách Thủy Canh | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]\n" +
+    "[[ACTION: 🛒 Xem Tất Cả Nông Sản | /products]]"
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { messages, apiKey: userApiKey } = body;
 
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json({ error: "Messages array is required." }, { status: 400 });
+    }
+
+    const lastUserMessage =
+      [...messages].reverse().find((m: { role: string; content: string }) => m.role === "user")?.content || "";
+
     // Check API Key: Priority 1 = User provided key, Priority 2 = Server ENV
     const apiKey = userApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || process.env.NEXT_PUBLIC_GEMINI_API_KEY?.trim();
 
     if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: "NO_API_KEY",
-          message:
-            "Chưa cấu hình Google Gemini API Key. Vui lòng thêm biến GEMINI_API_KEY vào tệp .env.local hoặc nhập trực tiếp API Key trên giao diện cài đặt.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: "Messages array is required." }, { status: 400 });
+      return NextResponse.json({
+        reply: buildSmartFallbackReply(lastUserMessage),
+        model: "agritrace-smart-advisor",
+      });
     }
 
     // Convert messages to Gemini contents format
@@ -123,15 +266,12 @@ export async function POST(req: NextRequest) {
       parts: [{ text: m.content }],
     }));
 
-    // List of models to try in order of preference
+    // List of valid Gemini models to try in order of speed & availability
     const candidateModels = [
-      "gemini-3.5-flash-lite",
-      "gemini-3.1-flash-lite",
-      "gemini-flash-lite-latest",
-      "gemini-3.8-flash",
-      "gemini-3.7-flash",
-      "gemini-3.5-flash",
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
       "gemini-flash-latest",
+      "gemini-1.5-flash",
     ];
     let lastError: unknown = null;
     let replyText = "";
@@ -147,7 +287,7 @@ export async function POST(req: NextRequest) {
           },
           contents,
           generationConfig: {
-            temperature: 0.7,
+            temperature: 0.6,
             maxOutputTokens: 1000,
           },
         };
@@ -162,9 +302,11 @@ export async function POST(req: NextRequest) {
           const data = await res.json();
           replyText =
             data.candidates?.[0]?.content?.parts?.[0]?.text ||
-            "Xin lỗi, tôi chưa thể xử lý câu trả lời này. Bạn vui lòng thử lại nhé!";
-          usedModel = model;
-          break;
+            "";
+          if (replyText) {
+            usedModel = model;
+            break;
+          }
         } else {
           const errData = await res.json().catch(() => ({}));
           lastError = errData;
@@ -176,19 +318,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (!replyText) {
-      console.error("All Gemini models failed:", lastError);
-      return NextResponse.json(
-        {
-          error: "API_ERROR",
-          message: "Không thể kết nối đến Google Gemini API. Vui lòng kiểm tra lại API Key hoặc hạn mức của bạn.",
-          details: lastError,
-        },
-        { status: 502 }
-      );
+      console.warn("All Gemini models failed or quota exceeded, using AgriTrace smart advisor fallback:", lastError);
+      return NextResponse.json({
+        reply: buildSmartFallbackReply(lastUserMessage),
+        model: "agritrace-smart-advisor",
+      });
     }
 
     return NextResponse.json({
-      reply: replyText,
+      reply: ensureGuaranteedActionButtons(lastUserMessage, replyText),
       model: usedModel,
     });
   } catch (error: unknown) {

@@ -32,6 +32,29 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.findAll());
     }
 
+    @GetMapping("/used")
+    public ResponseEntity<List<String>> getUsedVouchers(@RequestParam(required = false) String email) {
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<String> rawStrings = orderRepository.findUsedVoucherStringsByUser(email.trim());
+        java.util.Set<String> codes = new java.util.LinkedHashSet<>();
+        for (String raw : rawStrings) {
+            if (raw == null || raw.isBlank()) continue;
+            for (String part : raw.toUpperCase().split("[+,;]")) {
+                String token = part.trim();
+                int parenIdx = token.indexOf('(');
+                if (parenIdx > 0) {
+                    token = token.substring(0, parenIdx).trim();
+                }
+                if (token.length() >= 3) {
+                    codes.add(token);
+                }
+            }
+        }
+        return ResponseEntity.ok(new java.util.ArrayList<>(codes));
+    }
+
     @GetMapping("/{code}")
     public ResponseEntity<Voucher> getVoucherByCode(@PathVariable String code) {
         return voucherRepository.findByCodeIgnoreCaseAndActiveTrue(code)
