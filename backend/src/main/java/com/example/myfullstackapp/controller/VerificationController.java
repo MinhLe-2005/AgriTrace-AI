@@ -29,6 +29,17 @@ public class VerificationController {
         return ApiResponse.ok("Verification requests retrieved", service.list(status, type));
     }
 
+    @GetMapping("/my")
+    public ApiResponse<List<VerificationResponse>> myRequests(
+            @RequestParam(required = false) String email,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal AppUserDetails principal
+    ) {
+        return ApiResponse.ok(
+                "My verification requests retrieved",
+                service.listMyRequests(principal != null ? principal.getId() : null, email != null ? email : (principal != null ? principal.getUsername() : null))
+        );
+    }
+
     @PostMapping("/{id}/approve")
     public ApiResponse<VerificationResponse> approve(@PathVariable UUID id, @Valid @RequestBody VerificationDecision input, @org.springframework.security.core.annotation.AuthenticationPrincipal AppUserDetails principal) {
         return ApiResponse.ok("Verification approved", service.decide(id, input, VerificationStatus.APPROVED, principal != null ? principal.getId() : null));

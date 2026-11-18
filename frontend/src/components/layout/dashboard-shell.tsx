@@ -48,6 +48,7 @@ type NavItem = {
 
 const customerNavigation: NavItem[] = [
   { href: "/dashboard/customer", label: "Đơn Mua Của Tôi", icon: ShoppingBag },
+  { href: "/dashboard", label: "Hồ Sơ Vị Trí & Phê Duyệt", icon: Shield },
   { href: "/vouchers", label: "Kho Voucher & Ưu Đãi", icon: Gift },
   { href: "/loyalty", label: "Điểm & Hạng Hội Viên", icon: Award },
   { href: "/traceability", label: "Truy Xuất Mã QR", icon: QrCode },
