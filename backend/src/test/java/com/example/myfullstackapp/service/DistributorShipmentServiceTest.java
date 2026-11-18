@@ -2,6 +2,7 @@ package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.distributor.CreateShipmentRequest;
 import com.example.myfullstackapp.dto.distributor.CreateTrackingEventRequest;
+import com.example.myfullstackapp.dto.distributor.UpdateShipmentStatusRequest;
 import com.example.myfullstackapp.entity.Order;
 import com.example.myfullstackapp.entity.Shipment;
 import com.example.myfullstackapp.exception.ConflictException;
@@ -12,6 +13,7 @@ import com.example.myfullstackapp.repository.ShipmentRepository;
 import com.example.myfullstackapp.repository.ShipmentTrackingEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,7 +36,7 @@ class DistributorShipmentServiceTest {
         trackingEvents = mock(ShipmentTrackingEventRepository.class);
         receipts = mock(ShipmentReceiptRepository.class);
         orders = mock(OrderRepository.class);
-        service = new DistributorShipmentService(shipments, trackingEvents, receipts, orders, mock(HarvestLotRepository.class));
+        service = new DistributorShipmentService(shipments, trackingEvents, receipts, orders, mock(HarvestLotRepository.class), mock(ApplicationEventPublisher.class));
         when(trackingEvents.findByShipmentIdOrderByEventTimeAsc(any())).thenReturn(List.of());
         when(receipts.findByShipmentId(any())).thenReturn(Optional.empty());
     }
@@ -47,10 +49,26 @@ class DistributorShipmentServiceTest {
         when(shipments.findByShipmentCodeIgnoreCase("SHIP-1")).thenReturn(Optional.of(shipment));
 
         service.addTrackingEvent("SHIP-1", new CreateTrackingEventRequest(
-                "Toll station", 4.1, 82.0, "ON_SCHEDULE", "Cold chain stable"), "distributor@example.com", false);
+                "Toll station", 4.1, 82.0, "ON_SCHEDULE", "Cold chain stable", 10.762622, 106.660172, 15.0), "distributor@example.com", false);
 
         assertEquals("IN_TRANSIT", shipment.getStatus());
-        verify(trackingEvents).save(argThat(event -> "ON_SCHEDULE".equals(event.getStatus())));
+        verify(trackingEvents).save(argThat(event -> "ON_SCHEDULE".equals(event.getStatus())
+                && Double.valueOf(10.762622).equals(event.getLatitude())
+                && Double.valueOf(106.660172).equals(event.getLongitude())
+                && Double.valueOf(15.0).equals(event.getAccuracyMeters())));
+    }
+
+    @Test
+    void rejectsDuplicateLifecycleStatusAndKeepsItForTrackingUpdates() {
+        Shipment shipment = Shipment.builder().id(1L).shipmentCode("SHIP-1").distributorEmail("distributor@example.com")
+                .status("IN_TRANSIT").driverName("Driver").vehicleNumber("51A-123.45").origin("A").destination("B")
+                .productSummary("Produce").build();
+        when(shipments.findByShipmentCodeIgnoreCase("SHIP-1")).thenReturn(Optional.of(shipment));
+
+        assertThrows(IllegalArgumentException.class, () -> service.updateStatus("SHIP-1",
+                new UpdateShipmentStatusRequest("IN_TRANSIT", "Toll station", 4.1, null, "Position ping", null, null, null, null),
+                "distributor@example.com", false));
+        verify(trackingEvents, never()).save(any());
     }
 
     @Test
@@ -64,5 +82,21 @@ class DistributorShipmentServiceTest {
 
         assertThrows(ConflictException.class, () -> service.create(request, "distributor@example.com"));
         verify(shipments, never()).save(any());
+    }
+
+    @Test
+    void allowsShipmentClaimWhenOrderIsPaid() {
+        Order order = Order.builder().orderCode("ORD-PAID").status("PAID").build();
+        when(shipments.findByShipmentCodeIgnoreCase(any())).thenReturn(Optional.empty());
+        when(orders.findAllByOrderCodeInForUpdate(List.of("ORD-PAID"))).thenReturn(List.of(order));
+        when(shipments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateShipmentRequest request = new CreateShipmentRequest("SHIP-3", List.of("ORD-PAID"), "Driver", "0900000000",
+                "51A-123.45", "Warehouse", "Customer", "Produce", null, 4.0, null, null);
+
+        var response = service.create(request, "distributor@example.com");
+        assertEquals("SHIP-3", response.shipmentCode());
+        assertEquals("distributor@example.com", order.getDistributorEmail());
+        assertEquals("SHIP-3", order.getShipmentCode());
     }
 }

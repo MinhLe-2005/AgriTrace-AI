@@ -1,6 +1,7 @@
 package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.distributor.*;
+import com.example.myfullstackapp.event.DistributorShipmentChanged;
 import com.example.myfullstackapp.entity.Shipment;
 import com.example.myfullstackapp.entity.ShipmentReceipt;
 import com.example.myfullstackapp.entity.ShipmentTrackingEvent;
@@ -14,6 +15,7 @@ import com.example.myfullstackapp.repository.OrderRepository;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,7 @@ public class DistributorShipmentService {
     private final ShipmentReceiptRepository shipmentReceiptRepository;
     private final OrderRepository orderRepository;
     private final HarvestLotRepository harvestLotRepository;
+    private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public DistributorDashboardResponse dashboard(String actorEmail, boolean isAdmin) {
@@ -98,7 +101,7 @@ public class DistributorShipmentService {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
         return trackingEventRepository.findByShipmentIdOrderByEventTimeDesc(shipment.getId()).stream()
                 .map(event -> new TrackingEventResponse(event.getId(), event.getLocation(), event.getTemperatureC(), event.getHumidityPercent(),
-                        event.getStatus(), event.getNote(), event.getEventTime()))
+                        event.getLatitude(), event.getLongitude(), event.getAccuracyMeters(), event.getStatus(), event.getNote(), event.getEventTime()))
                 .toList();
     }
 
@@ -131,7 +134,9 @@ public class DistributorShipmentService {
                 .build();
         Shipment saved = shipmentRepository.save(shipment);
         orderRepository.saveAll(claimedOrders);
-        recordEvent(saved, saved.getOrigin(), saved.getTemperatureC(), null, "PREPARING", "Đã tạo phiếu vận chuyển, chờ xuất phát.", Instant.now());
+        recordEvent(saved, saved.getOrigin(), saved.getTemperatureC(), null, null, null, null,
+                "PREPARING", "Đã tạo phiếu vận chuyển, chờ xuất phát.", Instant.now());
+        publishChange(saved);
         return toResponse(saved);
     }
 
@@ -151,6 +156,7 @@ public class DistributorShipmentService {
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
         if (request.dispatchTime() != null) shipment.setDispatchTime(parseInstant(request.dispatchTime()));
         if (request.estimatedArrival() != null) shipment.setEstimatedArrival(parseInstant(request.estimatedArrival()));
+        publishChange(shipment);
         return toResponse(shipment);
     }
 
@@ -158,6 +164,7 @@ public class DistributorShipmentService {
     public ShipmentResponse updateStatus(String shipmentCode, UpdateShipmentStatusRequest request, String actorEmail, boolean isAdmin) {
         Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
         String status = normalizeStatus(request.status());
+        if ("RECEIVED".equals(status)) throw new IllegalArgumentException("Chỉ có thể xác nhận đã tiếp nhận bằng quét QR bàn giao");
         assertStatusTransition(shipment.getStatus(), status);
         Instant now = Instant.now();
         shipment.setStatus(status);
@@ -166,8 +173,10 @@ public class DistributorShipmentService {
         Instant actualArrival = parseInstant(request.actualArrival());
         if (actualArrival != null) shipment.setActualArrival(actualArrival);
         if (("DELIVERED".equals(status) || "RECEIVED".equals(status)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
-        recordEvent(shipment, Optional.ofNullable(optionalText(request.location())).orElse(shipment.getDestination()), request.temperatureC(), request.humidityPercent(), status, optionalText(request.note()), now);
+        recordEvent(shipment, Optional.ofNullable(optionalText(request.location())).orElse(shipment.getDestination()), request.temperatureC(), request.humidityPercent(),
+                request.latitude(), request.longitude(), request.accuracyMeters(), status, optionalText(request.note()), now);
         synchronizeOrderStatuses(shipment, status);
+        publishChange(shipment);
         return toResponse(shipment);
     }
 
@@ -178,14 +187,19 @@ public class DistributorShipmentService {
         String eventStatus = suppliedStatus == null ? shipment.getStatus() : normalizeTrackingOrShipmentStatus(suppliedStatus);
         Instant now = Instant.now();
         if (suppliedStatus != null && VALID_STATUSES.contains(eventStatus)) {
-            assertStatusTransition(shipment.getStatus(), eventStatus);
-            shipment.setStatus(eventStatus);
-            if ("IN_TRANSIT".equals(eventStatus) && shipment.getDispatchTime() == null) shipment.setDispatchTime(now);
+            if ("RECEIVED".equals(eventStatus)) throw new IllegalArgumentException("Chỉ có thể xác nhận đã tiếp nhận bằng quét QR bàn giao");
+            if (!Objects.equals(shipment.getStatus(), eventStatus)) {
+                assertStatusTransition(shipment.getStatus(), eventStatus);
+                shipment.setStatus(eventStatus);
+                if ("IN_TRANSIT".equals(eventStatus) && shipment.getDispatchTime() == null) shipment.setDispatchTime(now);
+            }
         }
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
         if (("DELIVERED".equals(eventStatus) || "RECEIVED".equals(eventStatus)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
-        recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(), eventStatus, optionalText(request.note()), now);
+        recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(),
+                request.latitude(), request.longitude(), request.accuracyMeters(), eventStatus, optionalText(request.note()), now);
         synchronizeOrderStatuses(shipment, eventStatus);
+        publishChange(shipment);
         return toResponse(shipment);
     }
 
@@ -206,9 +220,10 @@ public class DistributorShipmentService {
         assertStatusTransition(shipment.getStatus(), "RECEIVED");
         shipment.setStatus("RECEIVED");
         if (shipment.getActualArrival() == null) shipment.setActualArrival(receivedAt);
-        recordEvent(shipment, shipment.getDestination(), shipment.getTemperatureC(), null, "RECEIVED",
+        recordEvent(shipment, shipment.getDestination(), shipment.getTemperatureC(), null, null, null, null, "RECEIVED",
                 "Tiếp nhận QR bởi " + receipt.getReceiverName() + (receipt.getNote() == null ? "" : ": " + receipt.getNote()), receivedAt);
         synchronizeOrderStatuses(shipment, "RECEIVED");
+        publishChange(shipment);
         return toResponse(shipment);
     }
 
@@ -234,12 +249,15 @@ public class DistributorShipmentService {
     }
 
     private ShipmentTrackingEvent recordEvent(Shipment shipment, String location, Double temperatureC, Double humidityPercent,
-                                               String status, String note, Instant eventTime) {
+                                               Double latitude, Double longitude, Double accuracyMeters, String status, String note, Instant eventTime) {
         return trackingEventRepository.save(ShipmentTrackingEvent.builder()
                 .shipment(shipment)
                 .location(location)
                 .temperatureC(temperatureC)
                 .humidityPercent(humidityPercent)
+                .latitude(latitude)
+                .longitude(longitude)
+                .accuracyMeters(accuracyMeters)
                 .status(status)
                 .note(note)
                 .eventTime(eventTime)
@@ -273,10 +291,15 @@ public class DistributorShipmentService {
     }
 
     private long pendingDeliveryOrders(String actorEmail, boolean isAdmin) {
-        return isAdmin
+        long confirmed = isAdmin
                 ? orderRepository.countByStatusIgnoreCase("CONFIRMED")
                 : orderRepository.countByStatusIgnoreCaseAndDistributorEmailIsNull("CONFIRMED")
                 + orderRepository.countByStatusIgnoreCaseAndDistributorEmailIgnoreCase("CONFIRMED", actorEmail);
+        long paid = isAdmin
+                ? orderRepository.countByStatusIgnoreCase("PAID")
+                : orderRepository.countByStatusIgnoreCaseAndDistributorEmailIsNull("PAID")
+                + orderRepository.countByStatusIgnoreCaseAndDistributorEmailIgnoreCase("PAID", actorEmail);
+        return confirmed + paid;
     }
 
     /**
@@ -289,7 +312,8 @@ public class DistributorShipmentService {
         List<com.example.myfullstackapp.entity.Order> orders = orderRepository.findAllByOrderCodeInForUpdate(orderCodes);
         if (orders.size() != orderCodes.size()) throw new ResourceNotFoundException("Có đơn hàng không tồn tại");
         for (com.example.myfullstackapp.entity.Order order : orders) {
-            if (!Set.of("CONFIRMED", "PENDING", "SHIPPING").contains(order.getStatus())) {
+            String status = order.getStatus() == null ? "" : order.getStatus().trim().toUpperCase(Locale.ROOT);
+            if (!Set.of("CONFIRMED", "PENDING", "PAID", "PROCESSING", "SHIPPING").contains(status)) {
                 throw new IllegalArgumentException("Đơn hàng không còn đủ điều kiện tạo vận chuyển: " + order.getOrderCode());
             }
             if (order.getDistributorEmail() != null && !actorEmail.equalsIgnoreCase(order.getDistributorEmail())) {
@@ -334,7 +358,7 @@ public class DistributorShipmentService {
     private ShipmentResponse toResponse(Shipment shipment) {
         List<TrackingEventResponse> trackingEvents = trackingEventRepository.findByShipmentIdOrderByEventTimeAsc(shipment.getId()).stream()
                 .map(event -> new TrackingEventResponse(event.getId(), event.getLocation(), event.getTemperatureC(), event.getHumidityPercent(),
-                        event.getStatus(), event.getNote(), event.getEventTime()))
+                        event.getLatitude(), event.getLongitude(), event.getAccuracyMeters(), event.getStatus(), event.getNote(), event.getEventTime()))
                 .toList();
         ShipmentReceiptResponse receipt = shipmentReceiptRepository.findByShipmentId(shipment.getId())
                 .map(item -> new ShipmentReceiptResponse(item.getReceiverName(), item.getReceiverPhone(), item.getNote(), item.getQrValue(), item.getReceivedAt()))
@@ -354,7 +378,9 @@ public class DistributorShipmentService {
     }
 
     private void assertStatusTransition(String currentStatus, String nextStatus) {
-        if (Objects.equals(currentStatus, nextStatus)) return;
+        if (Objects.equals(currentStatus, nextStatus)) {
+            throw new IllegalArgumentException("Chuyến hàng đang ở trạng thái " + currentStatus + "; hãy ghi nhận hành trình nếu chỉ cập nhật vị trí hoặc cảm biến");
+        }
         Map<String, Set<String>> allowedTransitions = Map.of(
                 "PREPARING", Set.of("IN_TRANSIT", "CANCELLED"),
                 "IN_TRANSIT", Set.of("DELIVERED", "CANCELLED"),
@@ -365,6 +391,10 @@ public class DistributorShipmentService {
         if (!allowedTransitions.getOrDefault(currentStatus, Set.of()).contains(nextStatus)) {
             throw new IllegalArgumentException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + nextStatus);
         }
+    }
+
+    private void publishChange(Shipment shipment) {
+        events.publishEvent(new DistributorShipmentChanged(shipment.getShipmentCode(), shipment.getDistributorEmail(), Instant.now()));
     }
 
     private String generatedShipmentCode() {
