@@ -97,7 +97,31 @@ function AdminPortalContent() {
     () => verifications.data?.filter((request) => request.status === "PENDING" || request.status === "UNDER_REVIEW") ?? [],
     [verifications.data]
   );
-  const busy = verificationMutations.approve.isPending || verificationMutations.reject.isPending;
+  const busy =
+    verificationMutations.approve.isPending ||
+    verificationMutations.reject.isPending ||
+    verificationMutations.requestChanges.isPending;
+
+  const [verificationFilterStatus, setVerificationFilterStatus] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL">("PENDING");
+  const [verificationFilterType, setVerificationFilterType] = useState<"ALL" | "FARMER" | "WAREHOUSE" | "DISTRIBUTOR">("ALL");
+  const [decisionTarget, setDecisionTarget] = useState<{
+    request: VerificationRequest;
+    action: "approve" | "reject" | "changes";
+  } | null>(null);
+  const [decisionReason, setDecisionReason] = useState("");
+
+  const filteredVerificationRequests = useMemo(() => {
+    const all = verifications.data ?? [];
+    return all.filter((req) => {
+      const matchStatus =
+        verificationFilterStatus === "ALL" ||
+        (verificationFilterStatus === "PENDING" && (req.status === "PENDING" || req.status === "UNDER_REVIEW")) ||
+        (verificationFilterStatus === "APPROVED" && req.status === "APPROVED") ||
+        (verificationFilterStatus === "REJECTED" && (req.status === "REJECTED" || req.status === "CHANGES_REQUESTED"));
+      const matchType = verificationFilterType === "ALL" || req.type === verificationFilterType;
+      return matchStatus && matchType;
+    });
+  }, [verifications.data, verificationFilterStatus, verificationFilterType]);
 
   // Member 4: Orders, Vouchers, and Loyalty States
   const [orders, setOrders] = useState<ApiOrder[]>([]);
@@ -255,27 +279,47 @@ function AdminPortalContent() {
   }
 
   // --- Handlers: Verification ---
-  async function decide(request: VerificationRequest, decision: "approve" | "reject") {
-    const defaultReason = decision === "approve" ? "Hồ sơ hợp lệ." : "";
-    const reason = window.prompt(
-      decision === "approve" ? "Lý do phê duyệt:" : "Nhập lý do từ chối:",
-      defaultReason
-    );
-    if (reason === null) return;
-    if (!reason.trim()) {
-      toast.error("Vui lòng nhập lý do xử lý hồ sơ.");
+  function openDecisionModal(request: VerificationRequest, action: "approve" | "reject" | "changes") {
+    const defaultReason =
+      action === "approve"
+        ? `Hồ sơ năng lực hợp lệ. Đồng ý phê duyệt và cấp quyền truy cập vị trí ${
+            request.type === "FARMER"
+              ? "Nông dân / Trang trại"
+              : request.type === "WAREHOUSE"
+              ? "Nhân viên Kho lạnh"
+              : "Nhà phân phối / Đội xe lạnh"
+          }.`
+        : action === "changes"
+        ? "Vui lòng bổ sung rõ hơn mã số chứng chỉ hoặc hình ảnh giấy phép xác minh năng lực."
+        : "Hồ sơ minh chứng chưa đáp ứng tiêu chuẩn vận hành chuỗi cung ứng AgriTrace.";
+    setDecisionReason(defaultReason);
+    setDecisionTarget({ request, action });
+  }
+
+  async function handleConfirmDecision(e: React.FormEvent) {
+    e.preventDefault();
+    if (!decisionTarget) return;
+    if (!decisionReason.trim()) {
+      toast.error("Vui lòng nhập nhận xét / lý do xử lý hồ sơ.");
       return;
     }
 
+    const { request, action } = decisionTarget;
     try {
-      const input = { id: request.id, reason: reason.trim() };
-      if (decision === "approve") {
+      const input = { id: request.id, reason: decisionReason.trim() };
+      if (action === "approve") {
         await verificationMutations.approve.mutateAsync(input);
-        toast.success(`Đã phê duyệt hồ sơ của ${request.subjectName}.`);
+        toast.success(`Đã phê duyệt & cấp quyền ${request.type} cho tài khoản ${request.subjectName}!`);
+      } else if (action === "changes") {
+        await verificationMutations.requestChanges.mutateAsync(input);
+        toast.success(`Đã gửi yêu cầu bổ sung hồ sơ cho ${request.subjectName}.`);
       } else {
         await verificationMutations.reject.mutateAsync(input);
         toast.success(`Đã từ chối hồ sơ của ${request.subjectName}.`);
       }
+      setDecisionTarget(null);
+      void verifications.refetch();
+      void users.refetch();
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
@@ -842,63 +886,216 @@ function AdminPortalContent() {
           </div>
 
           <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
-            <div className="flex items-center justify-between border-b border-gray-100 p-4">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-                <UserCheck size={18} className="text-[#1a7a3a]" />
-                Hồ sơ xác minh đang chờ xử lý ({pendingCount})
-              </h2>
-              <span className="text-xs text-gray-400">Nông dân & Nhà phân phối</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 p-4">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                  <UserCheck size={18} className="text-[#1a7a3a]" />
+                  Xét Duyệt Hồ Sơ Vị Trí & Cấp Quyền Hệ Thống
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Khi bấm <strong>Phê duyệt</strong>, hệ thống sẽ tự động cấp quyền vào đúng vị trí (Nông dân / Thủ kho / Nhà phân phối) cho tài khoản ứng tuyển.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { key: "PENDING", label: `Chờ duyệt (${pendingRequests.length})` },
+                    {
+                      key: "APPROVED",
+                      label: `Đã duyệt (${(verifications.data ?? []).filter((r) => r.status === "APPROVED").length})`,
+                    },
+                    {
+                      key: "REJECTED",
+                      label: `Từ chối / Bổ sung (${
+                        (verifications.data ?? []).filter(
+                          (r) => r.status === "REJECTED" || r.status === "CHANGES_REQUESTED"
+                        ).length
+                      })`,
+                    },
+                    { key: "ALL", label: `Tất cả (${(verifications.data ?? []).length})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setVerificationFilterStatus(tab.key)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
+                      verificationFilterStatus === tab.key
+                        ? "bg-emerald-700 text-white shadow-xs"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => void verifications.refetch()}
+                  className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 cursor-pointer"
+                  title="Làm mới danh sách hồ sơ"
+                >
+                  <RefreshCw size={14} className={verifications.isFetching ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter by Role Type */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-2.5 text-xs">
+              <span className="font-semibold text-gray-500">Vị trí ứng tuyển:</span>
+              {(
+                [
+                  { key: "ALL", label: "Tất cả vị trí" },
+                  { key: "FARMER", label: "🌾 Nông dân / Trang trại" },
+                  { key: "WAREHOUSE", label: "🏭 Nhân viên Kho lạnh" },
+                  { key: "DISTRIBUTOR", label: "🚚 Nhà phân phối / Xe lạnh" },
+                ] as const
+              ).map((roleTab) => (
+                <button
+                  key={roleTab.key}
+                  type="button"
+                  onClick={() => setVerificationFilterType(roleTab.key)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer",
+                    verificationFilterType === roleTab.key
+                      ? "bg-white text-emerald-900 border border-emerald-300 shadow-2xs"
+                      : "text-gray-600 hover:bg-white/70"
+                  )}
+                >
+                  {roleTab.label}
+                </button>
+              ))}
             </div>
 
             {verifications.isPending ? (
               <div className="p-4"><LoadingSkeleton rows={3} /></div>
             ) : verifications.isError ? (
               <div className="p-4"><ErrorState onRetry={() => verifications.refetch()} /></div>
-            ) : pendingRequests.length === 0 ? (
-              <div className="p-8 text-center text-xs text-gray-400">Không còn hồ sơ xác minh nào đang chờ xử lý.</div>
+            ) : filteredVerificationRequests.length === 0 ? (
+              <div className="p-10 text-center text-xs text-gray-400">
+                Không có hồ sơ xác minh nào trong bộ lọc này.
+              </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {pendingRequests.map((request) => {
+                {filteredVerificationRequests.map((request) => {
                   const href = documentHref(request.documentUrl);
+                  const isImageDoc = request.documentUrl?.startsWith("data:image/");
+                  const roleBadge =
+                    request.type === "FARMER"
+                      ? { label: "🌾 Nông dân (FARMER)", cls: "bg-emerald-50 text-emerald-800 border-emerald-200" }
+                      : request.type === "WAREHOUSE"
+                      ? { label: "🏭 Nhân viên Kho (WAREHOUSE)", cls: "bg-blue-50 text-blue-800 border-blue-200" }
+                      : { label: "🚚 Nhà phân phối (DISTRIBUTOR)", cls: "bg-amber-50 text-amber-800 border-amber-200" };
+                  const statusBadge =
+                    request.status === "APPROVED"
+                      ? { label: "Đã phê duyệt & Cấp quyền", cls: "bg-emerald-100 text-emerald-900" }
+                      : request.status === "REJECTED"
+                      ? { label: "Đã từ chối", cls: "bg-rose-100 text-rose-800" }
+                      : request.status === "CHANGES_REQUESTED"
+                      ? { label: "Yêu cầu bổ sung", cls: "bg-amber-100 text-amber-900" }
+                      : { label: "Chờ xét duyệt", cls: "bg-amber-50 text-amber-800 border border-amber-300" };
+
                   return (
-                    <article key={request.id} className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm text-gray-900">{request.subjectName}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {request.subjectEmail} · {request.organizationName} · {request.type}
+                    <article key={request.id} className="flex flex-col justify-between gap-4 p-5 lg:flex-row lg:items-start hover:bg-gray-50/40 transition-colors">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-extrabold text-sm text-gray-900">{request.subjectName}</span>
+                          <span className="text-xs text-gray-500">({request.subjectEmail})</span>
+                          <span className={cn("px-2.5 py-0.5 rounded-full text-[11px] font-bold border", roleBadge.cls)}>
+                            {roleBadge.label}
+                          </span>
+                          <span className={cn("px-2.5 py-0.5 rounded-full text-[11px] font-bold", statusBadge.cls)}>
+                            {statusBadge.label}
+                          </span>
                         </div>
-                        <div className="mt-1 text-xs text-gray-600">
-                          Loại giấy tờ: {request.documentType} · Gửi lúc: {submittedAt(request.createdAt)}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-gray-50/80 p-3 rounded-xl border border-gray-100">
+                          <div>
+                            <span className="text-gray-400 font-semibold">Đơn vị / Nông trại / Kho / Đội xe: </span>
+                            <strong className="text-gray-900">{request.organizationName}</strong>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-semibold">Loại chứng chỉ / Giấy tờ: </span>
+                            <strong className="text-gray-900">{request.documentType}</strong>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <span className="text-gray-400 font-semibold">Thời gian gửi: </span>
+                            <span className="text-gray-700">{submittedAt(request.createdAt)}</span>
+                            {request.reviewedAt && (
+                              <span className="text-gray-500 ml-3">
+                                · Đã xử lý lúc: {submittedAt(request.reviewedAt)}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {request.note && <p className="mt-1 break-words text-xs text-gray-600">Ghi chú: {request.note}</p>}
-                        <div className="mt-1 text-xs">
-                          Hồ sơ:{" "}
-                          {href ? (
-                            <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-emerald-700 underline">
-                              Mở tài liệu
+
+                        {request.note && (
+                          <p className="break-words text-xs text-gray-700 bg-white p-2.5 rounded-lg border border-gray-100">
+                            <strong className="text-gray-900">Năng lực & Kinh nghiệm:</strong> {request.note}
+                          </p>
+                        )}
+
+                        <div className="text-xs">
+                          <span className="font-semibold text-gray-700">Minh chứng đính kèm: </span>
+                          {isImageDoc ? (
+                            <div className="mt-1.5">
+                              <img
+                                src={request.documentUrl}
+                                alt="Hồ sơ đính kèm"
+                                className="max-h-40 rounded-xl border border-gray-200 object-contain bg-white p-1"
+                              />
+                            </div>
+                          ) : href ? (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-emerald-700 font-semibold underline">
+                              Mở tài liệu ({request.documentUrl})
                             </a>
                           ) : (
-                            <span className="break-all text-gray-500">{request.documentUrl}</span>
+                            <span className="break-all font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
+                              {request.documentUrl}
+                            </span>
                           )}
                         </div>
+
+                        {request.decisionReason && (
+                          <div className="text-xs text-gray-600 italic bg-gray-100/80 px-3 py-1.5 rounded-lg">
+                            <strong>Nhận xét của Admin:</strong> {request.decisionReason}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void decide(request, "approve")}
-                          className="rounded-lg bg-[#1a7a3a] px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#156e34] disabled:opacity-50"
-                        >
-                          Duyệt
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void decide(request, "reject")}
-                          className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-50"
-                        >
-                          Từ chối
-                        </button>
+
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {request.status !== "APPROVED" && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => openDecisionModal(request, "approve")}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a7a3a] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#156e34] disabled:opacity-50 cursor-pointer"
+                          >
+                            <Check size={14} />
+                            <span>Phê duyệt & Cấp quyền</span>
+                          </button>
+                        )}
+                        {(request.status === "PENDING" || request.status === "UNDER_REVIEW") && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => openDecisionModal(request, "changes")}
+                            className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 cursor-pointer"
+                          >
+                            <span>Yêu cầu bổ sung</span>
+                          </button>
+                        )}
+                        {request.status !== "REJECTED" && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => openDecisionModal(request, "reject")}
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+                          >
+                            <X size={14} />
+                            <span>Từ chối</span>
+                          </button>
+                        )}
                       </div>
                     </article>
                   );
@@ -906,6 +1103,94 @@ function AdminPortalContent() {
               </div>
             )}
           </section>
+
+          {/* Modal Xác Nhận Duyệt / Từ Chối Hồ Sơ Vị Trí */}
+          {decisionTarget && (
+            <div
+              onClick={() => setDecisionTarget(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+            >
+              <form
+                onSubmit={handleConfirmDecision}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 animate-fade-in"
+              >
+                <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900">
+                      {decisionTarget.action === "approve"
+                        ? "✅ Phê Duyệt Hồ Sơ & Mở Khóa Vị Trí"
+                        : decisionTarget.action === "changes"
+                        ? "⚠️ Yêu Cầu Ứng Viên Bổ Sung Hồ Sơ"
+                        : "❌ Từ Chối Hồ Sơ Đăng Ký Vị Trí"}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Ứng viên: <strong>{decisionTarget.request.subjectName}</strong> ({decisionTarget.request.subjectEmail}) · Vị trí:{" "}
+                      <strong>{decisionTarget.request.type}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDecisionTarget(null)}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {decisionTarget.action === "approve" && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
+                    Khi xác nhận phê duyệt, tài khoản <strong>{decisionTarget.request.subjectEmail}</strong> sẽ được{" "}
+                    <strong>cấp quyền {decisionTarget.request.type}</strong> tự động và có thể truy cập ngay vào Bảng điều khiển của vị trí này.
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Nhận xét / Lý do phản hồi gửi tới ứng viên <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={decisionReason}
+                    onChange={(e) => setDecisionReason(e.target.value)}
+                    placeholder="Nhập nhận xét hoặc lý do phê duyệt / từ chối..."
+                    className="w-full rounded-xl border border-gray-200 p-3 text-xs sm:text-sm outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setDecisionTarget(null)}
+                    className="rounded-xl px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className={cn(
+                      "rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs cursor-pointer disabled:opacity-50",
+                      decisionTarget.action === "approve"
+                        ? "bg-emerald-700 hover:bg-emerald-800"
+                        : decisionTarget.action === "changes"
+                        ? "bg-amber-600 hover:bg-amber-700"
+                        : "bg-rose-600 hover:bg-rose-700"
+                    )}
+                  >
+                    {busy
+                      ? "Đang xử lý..."
+                      : decisionTarget.action === "approve"
+                      ? "Xác nhận Phê duyệt & Cấp quyền"
+                      : decisionTarget.action === "changes"
+                      ? "Gửi yêu cầu bổ sung"
+                      : "Xác nhận Từ chối"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       )}
 

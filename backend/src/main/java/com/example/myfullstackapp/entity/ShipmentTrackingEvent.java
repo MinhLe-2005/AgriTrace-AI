@@ -28,6 +28,11 @@ public class ShipmentTrackingEvent {
     private Double temperatureC;
     private Double humidityPercent;
 
+    /** WGS-84 coordinates supplied by the driver's GPS device, when available. */
+    private Double latitude;
+    private Double longitude;
+    private Double accuracyMeters;
+
     @Column(nullable = false, length = 32)
     private String status;
 

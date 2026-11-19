@@ -7,6 +7,9 @@ public record TrackingEventResponse(
         String location,
         Double temperatureC,
         Double humidityPercent,
+        Double latitude,
+        Double longitude,
+        Double accuracyMeters,
         String status,
         String note,
         Instant eventTime

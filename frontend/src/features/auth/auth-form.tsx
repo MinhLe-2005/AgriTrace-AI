@@ -24,17 +24,25 @@ import {
   MailCheck,
   RefreshCw,
   AlertCircle,
-  Phone
+  Phone,
+  FileText,
+  Building2,
+  Upload,
+  Clock
 } from "lucide-react";
 
 import { getApiErrorMessage } from "@/lib/api";
 import { loginSchema, registerSchema } from "@/lib/validation";
 import { authService } from "@/services/auth.service";
+import { verificationsService } from "@/services/verifications.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
+import type { VerificationType } from "@/types/verification";
 import { cn } from "@/utils/cn";
+import { compressImageFile } from "@/utils/image-compress";
 
 type Mode = "login" | "register";
+type RegisterRoleOption = "CUSTOMER" | VerificationType;
 type FormValues = {
   name: string;
   username: string;
@@ -43,6 +51,81 @@ type FormValues = {
   password: string;
   confirmPassword: string;
 };
+
+const REGISTER_ROLES: {
+  id: RegisterRoleOption;
+  label: string;
+  subtitle: string;
+  badge: string;
+  icon: typeof ShoppingBag;
+  orgLabel: string;
+  orgPlaceholder: string;
+  docOptions: string[];
+  noteLabel: string;
+  notePlaceholder: string;
+}[] = [
+  {
+    id: "CUSTOMER",
+    label: "Khách hàng",
+    subtitle: "Mua sắm & Truy xuất QR",
+    badge: "Kích hoạt ngay",
+    icon: ShoppingBag,
+    orgLabel: "",
+    orgPlaceholder: "",
+    docOptions: [],
+    noteLabel: "",
+    notePlaceholder: "",
+  },
+  {
+    id: "FARMER",
+    label: "Nông dân / Trang trại",
+    subtitle: "Canh tác & Cấp mã QR lô hàng",
+    badge: "Cần duyệt hồ sơ",
+    icon: Sprout,
+    orgLabel: "Tên Nông trại / Hợp tác xã canh tác",
+    orgPlaceholder: "VD: Nông trại Xanh Đà Lạt / HTX Rau Sạch Mộc Châu",
+    docOptions: [
+      "Chứng nhận VietGAP",
+      "Chứng nhận GlobalGAP",
+      "Chứng nhận Hữu cơ (Organic)",
+      "Giấy phép Hợp tác xã / Hộ nông nghiệp",
+    ],
+    noteLabel: "Năng lực canh tác, diện tích & nông sản chủ lực",
+    notePlaceholder: "VD: Diện tích 2.5ha tại Đà Lạt, sản lượng 10 tấn/tháng (Xà lách thủy canh, Dâu tây, Cà chua bi)...",
+  },
+  {
+    id: "WAREHOUSE",
+    label: "Nhân viên Kho lạnh",
+    subtitle: "Kiểm định QC & Xuất nhập FEFO",
+    badge: "Cần duyệt hồ sơ",
+    icon: Package,
+    orgLabel: "Kho lạnh đăng ký công tác / Bộ phận",
+    orgPlaceholder: "VD: Kho Lạnh Trung Tâm Đà Lạt - Bộ phận Kiểm định QC",
+    docOptions: [
+      "Chứng chỉ Vận hành Kho lạnh & Bảo quản FEFO",
+      "Hồ sơ Nhân sự / CCCD & Hợp đồng lao động",
+      "Chứng nhận An toàn Vệ sinh Thực phẩm",
+    ],
+    noteLabel: "Kinh nghiệm chuyên môn kho vận & Ca trực đăng ký",
+    notePlaceholder: "VD: 2 năm kinh nghiệm vận hành kho lạnh nông sản 2°C - 5°C, kiểm soát cảm biến IoT & quy trình FEFO...",
+  },
+  {
+    id: "DISTRIBUTOR",
+    label: "Nhà phân phối / Xe lạnh",
+    subtitle: "Vận chuyển lạnh & Giao hàng",
+    badge: "Cần duyệt hồ sơ",
+    icon: Truck,
+    orgLabel: "Tên Đội xe lạnh / Đơn vị vận chuyển",
+    orgPlaceholder: "VD: Đội Xe Lạnh AgriTrans Express / Hợp tác xã Vận tải",
+    docOptions: [
+      "Giấy phép Kinh doanh Vận tải bằng xe ô tô",
+      "Giấy Đăng kiểm Xe tải lạnh & Thiết bị giám sát nhiệt độ IoT",
+      "Bằng lái xe & Hồ sơ đối tác giao nhận chặng cuối",
+    ],
+    noteLabel: "Thông tin phương tiện xe lạnh, tải trọng & tuyến đường",
+    notePlaceholder: "VD: Sở hữu 2 xe tải lạnh 1.5 - 2.5 tấn (thùng mát 2°C - 5°C), chuyên tuyến Đà Lạt - TP.HCM & nội thành...",
+  },
+];
 
 const DEMO_ACCOUNTS = [
   { username: "customer", label: "Khách hàng", role: "Mua sắm & Truy xuất", icon: ShoppingBag },
@@ -60,6 +143,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
+
+  // Role & Dossier states (for register)
+  const [selectedRole, setSelectedRole] = useState<RegisterRoleOption>("CUSTOMER");
+  const [organizationName, setOrganizationName] = useState("");
+  const [documentType, setDocumentType] = useState("Chứng nhận VietGAP");
+  const [documentUrl, setDocumentUrl] = useState("");
+  const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [dossierNote, setDossierNote] = useState("");
+  const [dossierError, setDossierError] = useState<string | null>(null);
+  const docFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // OTP flow states (for register)
   const [step, setStep] = useState<"form" | "otp">("form");
@@ -136,6 +230,24 @@ export function AuthForm({ mode }: { mode: Mode }) {
         } else if (roles.includes("FARMER")) {
           router.replace("/dashboard/farmer");
         } else {
+          try {
+            const myReqs = await verificationsService.myRequests(session.user.email);
+            if (myReqs && myReqs.length > 0) {
+              const latest = myReqs[0];
+              if (latest.status === "PENDING" || latest.status === "UNDER_REVIEW") {
+                toast.info("Hồ sơ đăng ký vị trí của bạn đang chờ Ban Quản Trị phê duyệt.");
+                router.replace("/dashboard");
+                return;
+              }
+              if (latest.status === "REJECTED" || latest.status === "CHANGES_REQUESTED") {
+                toast.info("Hồ sơ vị trí của bạn có phản hồi từ Ban Quản Trị. Vui lòng kiểm tra.");
+                router.replace("/dashboard");
+                return;
+              }
+            }
+          } catch {
+            // ignore and fallback to normal redirect
+          }
           let redirectUrl = "/";
           if (typeof window !== "undefined") {
             const savedRedirect = sessionStorage.getItem("agri_post_login_redirect");
@@ -150,6 +262,29 @@ export function AuthForm({ mode }: { mode: Mode }) {
         toast.error(getApiErrorMessage(error));
       }
     } else {
+      // Validate role dossier if a partner/staff role is selected
+      if (selectedRole !== "CUSTOMER") {
+        if (!organizationName.trim() || organizationName.trim().length < 3) {
+          const msg = "Vui lòng nhập tên đơn vị / nông trại / kho lạnh / đội xe để xét duyệt.";
+          setDossierError(msg);
+          toast.error(msg);
+          return;
+        }
+        if (!documentUrl.trim()) {
+          const msg = "Vui lòng nhập mã số giấy phép / link minh chứng hoặc tải ảnh hồ sơ xác minh.";
+          setDossierError(msg);
+          toast.error(msg);
+          return;
+        }
+        if (!dossierNote.trim() || dossierNote.trim().length < 10) {
+          const msg = "Vui lòng mô tả ngắn gọn năng lực / kinh nghiệm / phương tiện (tối thiểu 10 ký tự).";
+          setDossierError(msg);
+          toast.error(msg);
+          return;
+        }
+      }
+      setDossierError(null);
+
       // Register mode -> Call backend send OTP email!
       setIsSendingOtp(true);
       try {
@@ -260,6 +395,29 @@ export function AuthForm({ mode }: { mode: Mode }) {
       });
 
       setSession(session);
+
+      // 3. Nếu người dùng chọn vai trò Nông dân / Thủ kho / Nhà phân phối -> Gửi hồ sơ chờ duyệt!
+      if (selectedRole !== "CUSTOMER") {
+        try {
+          await verificationsService.submit({
+            type: selectedRole,
+            organizationName: organizationName.trim(),
+            documentType: documentType.trim(),
+            documentUrl: documentUrl.trim(),
+            note: `[SĐT: ${pendingData.phone}] ${dossierNote.trim()}`,
+            subjectEmail: pendingData.email,
+          });
+        } catch (verifyErr) {
+          console.error("Failed to submit verification dossier:", verifyErr);
+        }
+        const roleObj = REGISTER_ROLES.find((r) => r.id === selectedRole);
+        toast.success(
+          `Đăng ký tài khoản & gửi hồ sơ vị trí "${roleObj?.label || selectedRole}" thành công! Vui lòng chờ Ban Quản Trị phê duyệt để vào vị trí.`
+        );
+        router.replace("/dashboard");
+        return;
+      }
+
       toast.success("Xác thực OTP thành công! Chào mừng bạn gia nhập AgriTrace.");
       router.replace("/");
     } catch (error) {
@@ -293,6 +451,34 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setValue("email", username, { shouldValidate: true });
     setValue("password", "123456", { shouldValidate: true });
   }
+
+  function handleSelectRole(role: RegisterRoleOption) {
+    setSelectedRole(role);
+    setDossierError(null);
+    const roleConfig = REGISTER_ROLES.find((r) => r.id === role);
+    if (roleConfig && roleConfig.docOptions.length > 0) {
+      setDocumentType(roleConfig.docOptions[0]);
+    }
+  }
+
+  async function handleDocFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingDoc(true);
+    try {
+      const compressedDataUrl = await compressImageFile(file, 900, 0.78);
+      setDocumentUrl(compressedDataUrl);
+      setUploadedDocName(file.name);
+      setDossierError(null);
+      toast.success(`Đã đính kèm ảnh minh chứng: ${file.name}`);
+    } catch {
+      toast.error("Không thể xử lý tệp ảnh. Vui lòng chọn ảnh JPG/PNG hoặc nhập link tài liệu.");
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  }
+
+  const activeRoleConfig = REGISTER_ROLES.find((r) => r.id === selectedRole) || REGISTER_ROLES[0];
 
   // ==========================================
   // VIEW: STEP 2 - OTP VERIFICATION
@@ -421,6 +607,66 @@ export function AuthForm({ mode }: { mode: Mode }) {
   // ==========================================
   return (
     <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {/* 0. Chọn Vai Trò Đăng Ký (Register only) */}
+      {!isLogin && (
+        <div className="space-y-2.5 pb-1">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+              Vai trò đăng ký tham gia
+            </label>
+            <span className="text-[11px] font-medium text-emerald-700">
+              {selectedRole === "CUSTOMER" ? "Kích hoạt mua sắm ngay" : "Cần nộp hồ sơ & chờ Admin duyệt"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {REGISTER_ROLES.map((roleOpt) => {
+              const Icon = roleOpt.icon;
+              const isSelected = selectedRole === roleOpt.id;
+              return (
+                <button
+                  key={roleOpt.id}
+                  type="button"
+                  onClick={() => handleSelectRole(roleOpt.id)}
+                  className={cn(
+                    "flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer",
+                    isSelected
+                      ? "border-emerald-600 bg-emerald-50/90 ring-2 ring-emerald-500/20 shadow-xs"
+                      : "border-gray-200 bg-white hover:border-emerald-300 hover:bg-gray-50/60"
+                  )}
+                >
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span
+                      className={cn(
+                        "flex h-7 w-7 items-center justify-center rounded-lg",
+                        isSelected ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-600"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                        roleOpt.id === "CUSTOMER"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : isSelected
+                          ? "bg-amber-100 text-amber-800 border border-amber-300"
+                          : "bg-gray-100 text-gray-600"
+                      )}
+                    >
+                      {roleOpt.badge}
+                    </span>
+                  </div>
+                  <span className={cn("text-xs font-bold", isSelected ? "text-emerald-950" : "text-gray-800")}>
+                    {roleOpt.label}
+                  </span>
+                  <span className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">{roleOpt.subtitle}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 1. Họ và tên (Register only) */}
       {!isLogin && (
         <Field label="Họ và tên" error={errors.name?.message}>
@@ -579,6 +825,135 @@ export function AuthForm({ mode }: { mode: Mode }) {
             </button>
           </div>
         </Field>
+      )}
+
+      {/* 6. Hồ Sơ Năng Lực Xét Duyệt Vị Trí (Khi chọn Nông dân / Kho lạnh / Nhà phân phối) */}
+      {!isLogin && selectedRole !== "CUSTOMER" && (
+        <div className="rounded-2xl border-2 border-amber-300/80 bg-amber-50/40 p-4 space-y-3.5 animate-fade-in">
+          <div className="flex items-start justify-between gap-2 border-b border-amber-200/70 pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white shrink-0">
+                <FileText className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-950">
+                  Hồ sơ ứng tuyển: {activeRoleConfig.label}
+                </h3>
+                <p className="text-[11px] text-amber-800">
+                  Ban Quản Trị sẽ thẩm định hồ sơ này trước khi mở khóa quyền truy cập vị trí.
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-300 shrink-0">
+              <Clock className="h-3 w-3" /> Chờ duyệt
+            </span>
+          </div>
+
+          {/* Tên tổ chức / nông trại / kho / đội xe */}
+          <Field label={activeRoleConfig.orgLabel}>
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
+                <Building2 className="h-4 w-4" />
+              </div>
+              <input
+                type="text"
+                value={organizationName}
+                onChange={(e) => {
+                  setOrganizationName(e.target.value);
+                  setDossierError(null);
+                }}
+                placeholder={activeRoleConfig.orgPlaceholder}
+                className="w-full h-10 pl-10 pr-3.5 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
+              />
+            </div>
+          </Field>
+
+          {/* Loại giấy tờ / Chứng chỉ */}
+          <Field label="Loại giấy tờ / Chứng chỉ năng lực">
+            <select
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value)}
+              className="w-full h-10 px-3.5 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
+            >
+              {activeRoleConfig.docOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {/* Mã số giấy phép / Link hồ sơ hoặc Tải ảnh */}
+          <Field label="Mã số chứng nhận / Link tài liệu hoặc Ảnh chụp hồ sơ">
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={documentUrl.startsWith("data:image/") ? `[Đã đính kèm ảnh: ${uploadedDocName || "Chứng chỉ xác minh"}]` : documentUrl}
+                  onChange={(e) => {
+                    setUploadedDocName(null);
+                    setDocumentUrl(e.target.value);
+                    setDossierError(null);
+                  }}
+                  placeholder="Nhập mã số giấy phép, link Google Drive hoặc bấm tải ảnh..."
+                  className="flex-1 h-10 px-3.5 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
+                />
+                <input
+                  ref={docFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleDocFileChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={isUploadingDoc}
+                  onClick={() => docFileInputRef.current?.click()}
+                  className="px-3 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  <span>{isUploadingDoc ? "Đang tải..." : "Tải ảnh"}</span>
+                </button>
+              </div>
+              {documentUrl.startsWith("data:image/") && (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 text-xs text-emerald-900">
+                  <span className="truncate font-medium">✅ Đã đính kèm ảnh: {uploadedDocName || "Hồ sơ minh chứng"}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocumentUrl("");
+                      setUploadedDocName(null);
+                    }}
+                    className="text-rose-600 hover:underline font-semibold ml-2 shrink-0"
+                  >
+                    Xóa ảnh
+                  </button>
+                </div>
+              )}
+            </div>
+          </Field>
+
+          {/* Ghi chú năng lực / kinh nghiệm */}
+          <Field label={activeRoleConfig.noteLabel}>
+            <textarea
+              rows={2}
+              value={dossierNote}
+              onChange={(e) => {
+                setDossierNote(e.target.value);
+                setDossierError(null);
+              }}
+              placeholder={activeRoleConfig.notePlaceholder}
+              className="w-full p-3 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
+            />
+          </Field>
+
+          {dossierError && (
+            <div className="flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{dossierError}</span>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Submit Button */}

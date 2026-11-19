@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
+import { verificationsService } from "@/services/verifications.service";
 
 export type PartnerType = "distributor" | "farmer" | "b2b";
 
@@ -108,9 +109,30 @@ export function PartnerModal({ isOpen, onClose, initialType = "distributor" }: P
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const code = `AGRI-B2B-${Math.floor(100000 + Math.random() * 900000)}`;
-      
+
+      if ((activeTab === "farmer" || activeTab === "distributor") && (user?.email || formData.email)) {
+        try {
+          await verificationsService.submit({
+            type: activeTab === "farmer" ? "FARMER" : "DISTRIBUTOR",
+            organizationName:
+              activeTab === "farmer"
+                ? formData.farmName.trim() || `Nông trại của ${formData.fullName.trim()}`
+                : formData.fleetName.trim() || `Đội xe của ${formData.fullName.trim()}`,
+            documentType: activeTab === "farmer" ? formData.certification : formData.vehicleType,
+            documentUrl: `Mã hồ sơ: ${code} | SĐT: ${formData.phone}`,
+            note:
+              activeTab === "farmer"
+                ? `Vùng canh tác: ${formData.farmLocation} | Diện tích: ${formData.farmAcreage} | Nông sản: ${formData.primaryCrops} | Ghi chú: ${formData.notes}`
+                : `Quy mô: ${formData.fleetSize} | Dải nhiệt: ${formData.tempRange} | Tuyến: ${formData.coverageZone} | Ghi chú: ${formData.notes}`,
+            subjectEmail: user?.email || formData.email.trim(),
+          });
+        } catch {
+          // fallback if email does not have a registered account yet
+        }
+      }
+
       try {
         const existing = JSON.parse(localStorage.getItem("agritrace_partner_applications") || "[]");
         existing.unshift({

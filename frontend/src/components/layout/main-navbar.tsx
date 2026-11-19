@@ -37,19 +37,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 
 import { authService } from "@/services/auth.service";
+import { verificationsService } from "@/services/verifications.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCartStore } from "@/stores/cart-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { toast } from "@/stores/toast-store";
+import type { VerificationRequest } from "@/types/verification";
 import { cn } from "@/utils/cn";
 
 export function MainNavbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, clearSession, refreshToken } = useAuthStore();
+  const { user, clearSession, refreshToken, updateUser } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [myVerification, setMyVerification] = useState<VerificationRequest | null>(null);
 
   // Desktop Hover Mega Dropdowns state
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
@@ -98,6 +101,40 @@ export function MainNavbar() {
 
   const hasRole = (role: string) =>
     Boolean(user?.roles?.some((r) => r === role || r === `ROLE_${role}`));
+
+  const isSpecialRole =
+    hasRole("ADMIN") ||
+    hasRole("FARMER") ||
+    hasRole("WAREHOUSE") ||
+    hasRole("WAREHOUSE_STAFF") ||
+    hasRole("DISTRIBUTOR");
+
+  useEffect(() => {
+    if (!user || isSpecialRole) {
+      setMyVerification(null);
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      try {
+        const me = await authService.getMe().catch(() => null);
+        if (mounted && me && me.roles && me.roles.length > (user.roles?.length || 0)) {
+          updateUser({ roles: me.roles, companyName: me.companyName });
+        }
+        const reqs = await verificationsService.myRequests(user.email);
+        if (mounted && reqs && reqs.length > 0) {
+          setMyVerification(reqs[0]);
+        } else if (mounted) {
+          setMyVerification(null);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id, user?.email, isSpecialRole, pathname, updateUser]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/90 shadow-xs">
@@ -843,14 +880,43 @@ export function MainNavbar() {
                   <span>Vận Chuyển</span>
                 </Link>
               ) : (
-                <Link
-                  href="/dashboard/customer?tab=orders"
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                  title="Xem đơn mua của bạn"
-                >
-                  <ShoppingBag size={14} strokeWidth={1.75} />
-                  <span>Đơn Mua</span>
-                </Link>
+                <div className="flex items-center gap-1.5">
+                  {myVerification && (myVerification.status === "PENDING" || myVerification.status === "UNDER_REVIEW") && (
+                    <Link
+                      href="/dashboard"
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors"
+                      title="Xem tiến trình phê duyệt hồ sơ vị trí"
+                    >
+                      <ShieldCheck size={14} className="text-amber-600" />
+                      <span>
+                        Chờ duyệt:{" "}
+                        {myVerification.type === "FARMER"
+                          ? "Nông dân"
+                          : myVerification.type === "WAREHOUSE"
+                          ? "Thủ kho"
+                          : "Vận chuyển"}
+                      </span>
+                    </Link>
+                  )}
+                  {myVerification && (myVerification.status === "REJECTED" || myVerification.status === "CHANGES_REQUESTED") && (
+                    <Link
+                      href="/dashboard"
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-300 transition-colors"
+                      title="Bổ sung lại hồ sơ vị trí"
+                    >
+                      <ShieldCheck size={14} className="text-rose-600" />
+                      <span>Hồ sơ vị trí: Cần bổ sung</span>
+                    </Link>
+                  )}
+                  <Link
+                    href="/dashboard/customer?tab=orders"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                    title="Xem đơn mua của bạn"
+                  >
+                    <ShoppingBag size={14} strokeWidth={1.75} />
+                    <span>Đơn Mua</span>
+                  </Link>
+                </div>
               )}
 
               {/* User Dropdown */}
@@ -1000,6 +1066,24 @@ export function MainNavbar() {
                         </>
                       ) : (
                         <>
+                          <Link
+                            href="/dashboard"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-emerald-800 hover:bg-emerald-50 font-bold transition-colors"
+                          >
+                            <ShieldCheck size={14} className="text-emerald-700" />
+                            <span>
+                              {myVerification
+                                ? `Hồ sơ vị trí (${
+                                    myVerification.status === "PENDING" || myVerification.status === "UNDER_REVIEW"
+                                      ? "Chờ duyệt"
+                                      : myVerification.status === "APPROVED"
+                                      ? "Đã duyệt"
+                                      : "Cần bổ sung"
+                                  })`
+                                : "Ứng tuyển Vị trí & Đối tác"}
+                            </span>
+                          </Link>
                           <Link
                             href="/dashboard/customer?tab=profile"
                             onClick={() => setUserOpen(false)}

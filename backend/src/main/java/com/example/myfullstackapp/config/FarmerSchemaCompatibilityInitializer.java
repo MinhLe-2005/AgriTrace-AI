@@ -35,6 +35,9 @@ public class FarmerSchemaCompatibilityInitializer implements ApplicationRunner {
                 try (Statement st = conn.createStatement()) {
                     st.execute("ALTER TABLE IF EXISTS agri_products ALTER COLUMN image TYPE TEXT");
                     st.execute("ALTER TABLE IF EXISTS agri_order_items ALTER COLUMN image TYPE TEXT");
+                    st.execute("ALTER TABLE IF EXISTS verification_requests DROP CONSTRAINT IF EXISTS verification_requests_type_check");
+                    st.execute("ALTER TABLE IF EXISTS verification_requests ALTER COLUMN document_url TYPE TEXT");
+                    st.execute("INSERT INTO roles (name) VALUES ('ADMIN'), ('USER'), ('FARMER'), ('WAREHOUSE'), ('DISTRIBUTOR'), ('CUSTOMER') ON CONFLICT (name) DO NOTHING");
                     st.execute("ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0");
                     st.execute("ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ");
                     st.execute("ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS self_locked BOOLEAN NOT NULL DEFAULT FALSE");

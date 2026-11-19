@@ -1,13 +1,13 @@
 export type ShipmentStatus =
-  | "PREPARING"
-  | "IN_TRANSIT"
-  | "DELIVERED"
-  | "RECEIVED"
-  | "CANCELLED";
+  "PREPARING" | "IN_TRANSIT" | "DELIVERED" | "RECEIVED" | "CANCELLED";
 
 export type TrackingEvent = {
   id?: string | number;
   location: string;
+  /** WGS84 coordinates supplied by the driver's approved GPS device/browser. */
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
   temperatureC?: number;
   humidityPercent?: number;
   status: ShipmentStatus;
@@ -66,6 +66,10 @@ export type DistributorDashboardStats = {
   deliveredToday: number;
   pendingReceipts: number;
   averageTemperatureC?: number;
+  pendingDeliveryOrders?: number;
+  deliveredThisMonth?: number;
+  overdueShipments?: number;
+  expiringLots?: number;
 };
 
 export const shipmentStatusLabel: Record<ShipmentStatus, string> = {
@@ -83,6 +87,22 @@ export const shipmentStatusClass: Record<ShipmentStatus, string> = {
   RECEIVED: "bg-emerald-50 text-emerald-800 border-emerald-200",
   CANCELLED: "bg-rose-50 text-rose-700 border-rose-200",
 };
+
+/** Lifecycle status may only move forward; tracking updates do not change it. */
+export const shipmentStatusTransitions: Record<
+  ShipmentStatus,
+  ShipmentStatus[]
+> = {
+  PREPARING: ["IN_TRANSIT", "CANCELLED"],
+  IN_TRANSIT: ["DELIVERED", "CANCELLED"],
+  DELIVERED: ["RECEIVED"],
+  RECEIVED: [],
+  CANCELLED: [],
+};
+
+export function nextShipmentStatuses(status: ShipmentStatus) {
+  return shipmentStatusTransitions[status];
+}
 
 export function toShipmentStatus(value: string | undefined): ShipmentStatus {
   const normalized = value?.toUpperCase();

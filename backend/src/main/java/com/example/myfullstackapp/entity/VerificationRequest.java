@@ -35,10 +35,10 @@ public class VerificationRequest {
     @Column(nullable = false, length = 150)
     private String organizationName;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 100)
     private String documentType;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String documentUrl;
 
     @Column(length = 1000)
