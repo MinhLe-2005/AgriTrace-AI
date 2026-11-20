@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { getApiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
@@ -48,6 +48,7 @@ import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service"
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { reviewService } from "@/services/review.service";
 import { useAuthStore } from "@/stores/auth-store";
+import { useCartStore } from "@/stores/cart-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -371,8 +372,10 @@ const mockSavedVouchers: SavedVoucher[] = [
 ];
 
 function CustomerDashboardContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user, updateUser } = useAuthStore();
+  const { addItem } = useCartStore();
   const { notifications, addNotification, markAsRead, markAllAsRead, deleteNotification } = useNotificationStore();
 
   const tabParam = searchParams.get("tab");
@@ -606,8 +609,38 @@ function CustomerDashboardContent() {
     }
   }, [tabParam, orderParam, orders]);
 
-  // Order filter
+  // Order filter & search
   const [orderFilter, setOrderFilter] = useState<string>("ALL");
+  const [orderSearchText, setOrderSearchText] = useState<string>("");
+
+  function handleReorder(order: Order) {
+    if (!order.items || order.items.length === 0) {
+      router.push("/products");
+      return;
+    }
+    order.items.forEach((item, idx) => {
+      let parsedQty = 1;
+      if (item.qty) {
+        const num = parseInt(item.qty.replace(/[^0-9]/g, ""), 10);
+        if (!isNaN(num) && num > 0) parsedQty = num;
+      }
+      addItem(
+        {
+          id: `reorder-${order.id}-${idx}`,
+          name: item.name,
+          price: Math.round((item.price || 50000) / parsedQty),
+          unit: "Phần",
+          farm: item.origin || "Đà Lạt, Lâm Đồng",
+          cert: item.cert || "VietGAP",
+          image: item.image || "/images/products/rau-cu-combo.png",
+          batchCode: order.lotCode || "XL-2026-08",
+        },
+        parsedQty
+      );
+    });
+    toast.success(`Đã thêm ${order.items.length} món từ đơn #${order.id} vào giỏ hàng!`);
+    router.push("/cart");
+  }
 
   // Review modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -1110,6 +1143,13 @@ function CustomerDashboardContent() {
   }
 
   const filteredOrders = orders.filter((ord) => {
+    if (orderSearchText.trim()) {
+      const q = orderSearchText.trim().toLowerCase();
+      const matchCode = ord.id?.toLowerCase().includes(q);
+      const matchLot = ord.lotCode?.toLowerCase().includes(q);
+      const matchItem = ord.items?.some((it) => it.name.toLowerCase().includes(q));
+      if (!matchCode && !matchLot && !matchItem) return false;
+    }
     if (orderFilter === "ALL") return true;
     if (orderFilter === "SHIPPING") return ord.status === "SHIPPING";
     if (orderFilter === "DELIVERED") return ord.status === "DELIVERED" || ord.status === "COMPLETED";
@@ -1340,6 +1380,34 @@ function CustomerDashboardContent() {
       {/* ========================================================= */}
       {activeTab === "orders" && (
         <div className="space-y-4 animate-fade-in-up">
+          {/* Order Search Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={orderSearchText}
+                onChange={(e) => setOrderSearchText(e.target.value)}
+                placeholder="Tìm theo mã đơn (#AGRI...), lô hàng hoặc tên món..."
+                className="w-full pl-8 pr-8 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 shadow-2xs"
+              />
+              {orderSearchText && (
+                <button
+                  type="button"
+                  onClick={() => setOrderSearchText("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {orderSearchText && (
+              <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shrink-0">
+                Tìm thấy {filteredOrders.length} đơn
+              </span>
+            )}
+          </div>
+
           {/* Order Filter bar */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-gray-500 font-medium mr-1">Bộ lọc trạng thái:</span>
@@ -1590,13 +1658,13 @@ function CustomerDashboardContent() {
                         <span>Xem chi tiết</span>
                       </button>
 
-                      <Link
-                        href="/products"
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                      <button
+                        onClick={() => handleReorder(order)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
                         <RefreshCw size={13} />
                         <span>Mua lại</span>
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2613,13 +2681,17 @@ function CustomerDashboardContent() {
               >
                 Đóng
               </button>
-              <Link
-                href="/products"
-                className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs"
+              <button
+                onClick={() => {
+                  const ord = selectedOrder;
+                  setSelectedOrder(null);
+                  if (ord) handleReorder(ord);
+                }}
+                className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <RefreshCw size={13} />
                 <span>Đặt mua lại</span>
-              </Link>
+              </button>
             </div>
           </div>
         </div>
