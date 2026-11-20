@@ -65,7 +65,7 @@ export default function DistributorHistoryPage() {
                 <div className="flex flex-wrap items-center gap-2"><span className="font-mono font-bold text-sm text-amber-900">{shipment.shipmentCode}</span><ShipmentStatusBadge status={shipment.status} /></div>
                 <p className="text-xs font-semibold text-gray-800">{shipment.productSummary}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500"><span className="flex items-center gap-1"><MapPin size={13} className="text-amber-600" />{shipment.destination}</span><span className="flex items-center gap-1"><Thermometer size={13} className="text-blue-600" />{shipmentTemperature(shipment)}</span><span>Hoàn tất: {shipmentDate(shipment.actualArrival ?? shipment.receipt?.receivedAt)}</span></div>
-                {shipment.receipt && <p className="text-[11px] text-emerald-700 font-medium">Đã tiếp nhận bởi {shipment.receipt.receiverName}</p>}
+                {shipment.receipt && <p className="text-[11px] text-emerald-700 font-medium">Đã tiếp nhận bởi {shipment.receipt.receiverName}{shipment.receipt.receiverPhone ? ` · ${shipment.receipt.receiverPhone}` : ""}</p>}
               </div>
               <Link href={`/dashboard/distributor/shipments/${encodeURIComponent(shipment.shipmentCode)}`} className="shrink-0 text-xs font-bold text-amber-700 hover:underline">Xem biên nhận & hành trình →</Link>
             </div>

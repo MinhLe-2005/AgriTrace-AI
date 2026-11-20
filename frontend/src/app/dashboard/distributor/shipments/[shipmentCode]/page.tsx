@@ -868,6 +868,11 @@ export default function ShipmentDetailPage() {
                 {shipment.receipt.receiverName} ·{" "}
                 {shipmentDate(shipment.receipt.receivedAt)}
               </p>
+              {shipment.receipt.receiverPhone && (
+                <p className="mt-1 text-emerald-800">
+                  Số điện thoại: {shipment.receipt.receiverPhone}
+                </p>
+              )}
               {shipment.receipt.note && (
                 <p className="mt-1 text-emerald-800">{shipment.receipt.note}</p>
               )}
