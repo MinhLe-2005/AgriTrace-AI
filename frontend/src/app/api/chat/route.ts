@@ -251,14 +251,19 @@ export async function POST(req: NextRequest) {
       [...messages].reverse().find((m: { role: string; content: string }) => m.role === "user")?.content || "";
 
     // Check API Key: Priority 1 = User provided key, Priority 2 = Server ENV
-    const apiKey = userApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || process.env.NEXT_PUBLIC_GEMINI_API_KEY?.trim();
+    const rawKey = userApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || process.env.NEXT_PUBLIC_GEMINI_API_KEY?.trim();
+    const isAiStudioKey = typeof rawKey === "string" && rawKey.startsWith("AIza");
 
-    if (!apiKey) {
+    // If key is missing or not a valid Google AI Studio key (e.g. Antigravity internal token),
+    // immediately return instant smart advisor reply in < 50ms without hanging the chat!
+    if (!rawKey || !isAiStudioKey) {
       return NextResponse.json({
         reply: buildSmartFallbackReply(lastUserMessage),
         model: "agritrace-smart-advisor",
       });
     }
+
+    const apiKey = rawKey;
 
     // Convert messages to Gemini contents format
     const contents = messages.map((m: { role: string; content: string }) => ({
@@ -266,14 +271,11 @@ export async function POST(req: NextRequest) {
       parts: [{ text: m.content }],
     }));
 
-    // List of valid Gemini models to try in order of speed & availability
+    // List of valid Gemini models to try in order of speed
     const candidateModels = [
-      "gemini-2.5-flash",
       "gemini-2.0-flash",
-      "gemini-flash-latest",
       "gemini-1.5-flash",
     ];
-    let lastError: unknown = null;
     let replyText = "";
     let usedModel = "";
 
@@ -296,6 +298,7 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(4000), // Max 4 seconds timeout to ensure instant response
         });
 
         if (res.ok) {
@@ -308,17 +311,15 @@ export async function POST(req: NextRequest) {
             break;
           }
         } else {
-          const errData = await res.json().catch(() => ({}));
-          lastError = errData;
-          console.warn(`Gemini model ${model} returned error:`, errData);
+          // If 400/403/429, don't keep hammering subsequent models
+          break;
         }
-      } catch (err) {
-        lastError = err;
+      } catch {
+        break;
       }
     }
 
     if (!replyText) {
-      console.warn("All Gemini models failed or quota exceeded, using AgriTrace smart advisor fallback:", lastError);
       return NextResponse.json({
         reply: buildSmartFallbackReply(lastUserMessage),
         model: "agritrace-smart-advisor",

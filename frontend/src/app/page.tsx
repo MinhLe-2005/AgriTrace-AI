@@ -5,6 +5,8 @@ import {
   Award,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Copy,
   Eye,
@@ -30,7 +32,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QuickBuyModal } from "@/components/cart/quick-buy-modal";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   catalogService,
   ApiCategory,
@@ -70,6 +72,16 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const addItem = useCartStore((s) => s.addItem);
+  const productCarouselRef = useRef<HTMLDivElement | null>(null);
+
+  function scrollProducts(direction: "left" | "right") {
+    if (!productCarouselRef.current) return;
+    const scrollAmount = 320;
+    productCarouselRef.current.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  }
 
   useEffect(() => {
     const iv = setInterval(() => setWordIdx((i) => (i + 1) % heroWords.length), 2800);
@@ -290,20 +302,20 @@ export default function HomePage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-16 py-12">
         {/* ========================================================= */}
-        {/* PHẦN 1: DANH MỤC NÔNG SẢN TƯƠI TUYỂN CHỌN (SUPABASE)       */}
+        {/* PHẦN 1: DANH MỤC NÔNG SẢN TƯƠI TUYỂN CHỌN                 */}
         {/* ========================================================= */}
         <section>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
             <div>
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
                 <Sparkles size={14} className="text-emerald-600" />
-                <span>Nông sản tươi sạch từ Supabase Database</span>
+                <span>100% Nông sản tươi sạch từ trang trại</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mt-1">
                 Danh Mục Nông Sản Tuyển Chọn
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Dữ liệu danh mục lưu trữ trực tiếp trên cơ sở dữ liệu Supabase.
+                Nông sản đạt chuẩn VietGAP & GlobalGAP thu hoạch mỗi sáng tại Đà Lạt & Mộc Châu.
               </p>
             </div>
             <Link
@@ -362,45 +374,74 @@ export default function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* PHẦN 2: SẢN PHẨM MỚI THU HOẠCH & FLASH DEALS (SUPABASE)   */}
+        {/* PHẦN 2: SẢN PHẨM MỚI THU HOẠCH & CAROUSEL QUAY LUI TỚI     */}
         {/* ========================================================= */}
         <section>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
                 <Clock size={14} className="text-emerald-600" />
-                <span>Dữ liệu thực từ Supabase PostgreSQL</span>
+                <span>Thu hoạch lúc 05:30 sáng nay · Chuỗi lạnh 2°C - 5°C</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mt-1">
-                Sản Phẩm Mới Thu Hoạch ({products.length} sản phẩm)
+                Sản Phẩm Tươi Mới Trong Ngày ({products.length} sản phẩm)
               </h2>
             </div>
 
-            {/* Filter Tabs */}
-            <div className="flex gap-1 p-1 bg-gray-100 rounded-xl text-xs font-semibold text-gray-500 overflow-x-auto">
-              {[
-                { id: "all", l: "Tất cả" },
-                { id: "rau", l: "Rau ăn lá" },
-                { id: "cu-qua", l: "Củ quả tươi" },
-                { id: "trai-cay", l: "Trái cây vụ này" },
-                { id: "nam", l: "Nấm sạch" },
-              ].map((t) => (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filter Tabs */}
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl text-xs font-semibold text-gray-500 overflow-x-auto">
+                {[
+                  { id: "all", l: "Tất cả" },
+                  { id: "rau", l: "Rau ăn lá" },
+                  { id: "cu-qua", l: "Củ quả tươi" },
+                  { id: "trai-cay", l: "Trái cây vụ này" },
+                  { id: "nam", l: "Nấm sạch" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                      tab === t.id
+                        ? "bg-white text-emerald-800 font-bold shadow-xs"
+                        : "hover:text-gray-900"
+                    }`}
+                  >
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+
+              {/* Prev / Next Carousel Controls (Quay lui tới) */}
+              <div className="flex items-center gap-1.5 shrink-0 ml-1">
                 <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                    tab === t.id
-                      ? "bg-white text-emerald-800 font-bold shadow-xs"
-                      : "hover:text-gray-900"
-                  }`}
+                  type="button"
+                  onClick={() => scrollProducts("left")}
+                  className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                  title="Quay lui sang trái"
+                  aria-label="Quay lui"
                 >
-                  {t.l}
+                  <ChevronLeft size={16} />
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => scrollProducts("right")}
+                  className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                  title="Quay tới sang phải"
+                  aria-label="Quay tới"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Carousel container with horizontal scroll & snap */}
+          <div
+            ref={productCarouselRef}
+            className="flex gap-5 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
             {shown.map((p) => {
               const discountPercent =
                 p.oldPrice > p.price
@@ -411,7 +452,7 @@ export default function HomePage() {
                 <div
                   key={p.id}
                   onClick={() => setSelectedProduct(p)}
-                  className="group bg-white rounded-2xl border border-gray-200/90 hover:border-emerald-400 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
+                  className="w-[280px] sm:w-[305px] shrink-0 snap-start group bg-white rounded-2xl border border-gray-200/90 hover:border-emerald-400 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
                 >
                   <div>
                     {/* Product Image & Badges */}
@@ -495,7 +536,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={(e) => handleAddCart(p, e)}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center justify-center gap-1.5"
+                      className="py-2 px-3 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <ShoppingBag size={13} />
                       <span>+ Giỏ</span>
@@ -503,7 +544,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={(e) => handleBuyNow(p, e)}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-xs transition-colors flex items-center justify-center gap-1"
+                      className="py-2 px-3 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <span>Mua ngay</span>
                       <ArrowRight size={13} />
@@ -512,6 +553,26 @@ export default function HomePage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Banner dẫn tới xem tất cả sản phẩm */}
+          <div className="mt-6 pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 bg-emerald-50/70 border border-emerald-200/70 rounded-2xl p-4 sm:p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Package size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Toàn bộ nông sản đạt chuẩn VietGAP & GlobalGAP</h4>
+                <p className="text-xs text-gray-600">Đầy đủ rau ăn lá thủy canh, củ quả tươi, trái cây vụ mùa và nấm sạch thu hoạch trực tiếp tại vườn.</p>
+              </div>
+            </div>
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all shrink-0 cursor-pointer"
+            >
+              <span>Xem tất cả sản phẩm ({products.length})</span>
+              <ArrowRight size={14} />
+            </Link>
           </div>
         </section>
 
@@ -611,14 +672,14 @@ export default function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* PHẦN 4: KHO VOUCHER & MÃ ƯU ĐÃI (SUPABASE)                */}
+        {/* PHẦN 4: KHO VOUCHER & MÃ ƯU ĐÃI NÔNG SẢN                  */}
         {/* ========================================================= */}
         <section>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
             <div>
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
                 <Tag size={14} className="text-emerald-600" />
-                <span>Ưu đãi từ Supabase Database</span>
+                <span>Ưu đãi độc quyền nông sản sạch</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mt-1">
                 Mã Giảm Giá Hôm Nay
