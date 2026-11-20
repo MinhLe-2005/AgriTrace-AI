@@ -114,16 +114,23 @@ export function MainNavbar() {
       setMyVerification(null);
       return;
     }
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      setMyVerification(null);
+      return;
+    }
     let mounted = true;
     (async () => {
       try {
-        const me = await authService.getMe().catch(() => null);
-        if (mounted && me && me.roles && me.roles.length > (user.roles?.length || 0)) {
-          updateUser({ roles: me.roles, companyName: me.companyName });
-        }
-        const reqs = await verificationsService.myRequests(user.email);
+        const reqs = await verificationsService.myRequests(user.email).catch(() => []);
         if (mounted && reqs && reqs.length > 0) {
           setMyVerification(reqs[0]);
+          if (reqs[0].status === "APPROVED") {
+            const me = await authService.getMe().catch(() => null);
+            if (mounted && me && me.roles && me.roles.length > (user.roles?.length || 0)) {
+              updateUser({ roles: me.roles, companyName: me.companyName });
+            }
+          }
         } else if (mounted) {
           setMyVerification(null);
         }
@@ -134,7 +141,7 @@ export function MainNavbar() {
     return () => {
       mounted = false;
     };
-  }, [user?.id, user?.email, isSpecialRole, pathname, updateUser]);
+  }, [user?.id, user?.email, isSpecialRole, updateUser]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/90 shadow-xs">

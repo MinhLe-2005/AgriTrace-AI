@@ -77,8 +77,10 @@ public class AccountController {
     }
 
     private String actor(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null) {
-            throw new AccessDeniedException("Vui lòng đăng nhập để tiếp tục");
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null
+                || "anonymousUser".equals(authentication.getPrincipal())
+                || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
+            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Vui lòng đăng nhập để tiếp tục");
         }
         return authentication.getName();
     }
