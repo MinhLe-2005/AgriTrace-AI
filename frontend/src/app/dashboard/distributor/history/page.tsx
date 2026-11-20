@@ -4,36 +4,21 @@ import { CalendarCheck2, ClipboardCheck, History, MapPin, Search, Thermometer, T
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DistributorPageHeader, MetricCard, ShipmentStatusBadge, shipmentDate, shipmentTemperature } from "@/components/distributor/distributor-ui";
-import { subscribeToDistributorChanges } from "@/features/distributor/realtime";
+import { distributorSeedShipments } from "@/features/distributor/mock-data";
+import { getLocalShipments, mergeShipments } from "@/features/distributor/storage";
 import type { DistributorShipment } from "@/features/distributor/types";
 import { distributorService } from "@/services/distributor.service";
 
 export default function DistributorHistoryPage() {
-  const [shipments, setShipments] = useState<DistributorShipment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [shipments, setShipments] = useState<DistributorShipment[]>(() => mergeShipments(distributorSeedShipments, getLocalShipments()));
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    let isCurrent = true;
-    const refreshHistory = async () => {
-      try {
-        const remote = await distributorService.getHistory();
-        if (isCurrent) setShipments(remote);
-      } catch {
-        // Do not show demo/cache shipments: every history link must resolve on the server.
-      } finally {
-        if (isCurrent) setIsLoading(false);
-      }
-    };
-    void refreshHistory();
-    return () => {
-      isCurrent = false;
-    };
+    distributorService
+      .getHistory()
+      .then((remote) => setShipments(mergeShipments(distributorSeedShipments, remote, getLocalShipments())))
+      .catch(() => undefined);
   }, []);
-
-  useEffect(() => subscribeToDistributorChanges(() => {
-    distributorService.getHistory().then(setShipments).catch(() => undefined);
-  }), []);
 
   const completed = useMemo(() => shipments.filter((item) => item.status === "DELIVERED" || item.status === "RECEIVED"), [shipments]);
   const visible = useMemo(() => {
@@ -71,7 +56,7 @@ export default function DistributorHistoryPage() {
             </div>
           ))}
         </div>
-        {visible.length === 0 && <p className="p-8 text-center text-sm text-gray-500">{isLoading ? "Đang tải lịch sử vận chuyển..." : "Chưa có chuyến vận chuyển hoàn tất phù hợp."}</p>}
+        {visible.length === 0 && <p className="p-8 text-center text-sm text-gray-500">Chưa có chuyến vận chuyển hoàn tất phù hợp.</p>}
       </section>
     </div>
   );
