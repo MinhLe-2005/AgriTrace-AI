@@ -350,11 +350,8 @@ export function MainNavbar() {
                 : "text-gray-700 hover:text-rose-700 hover:bg-gray-100/80"
             )}
           >
-            <Flame size={14} className="text-rose-500 fill-rose-500 animate-pulse" />
+            <Flame size={14} className="text-rose-500 fill-rose-500" />
             <span>Sự Kiện & Giảm Giá</span>
-            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-500 text-white shadow-2xs">
-              HOT
-            </span>
           </Link>
 
           {/* 4. Truy Xuất QR Dropdown */}
@@ -481,9 +478,6 @@ export function MainNavbar() {
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-gray-900 group-hover:text-rose-800 block">
                           Sự Kiện & Mùa Vụ Khuyến Mãi
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-500 text-white">
-                          HOT
                         </span>
                       </div>
                       <span className="text-[10px] text-gray-500">Trợ giá vụ mùa tại vườn, đếm ngược thời gian sale</span>
