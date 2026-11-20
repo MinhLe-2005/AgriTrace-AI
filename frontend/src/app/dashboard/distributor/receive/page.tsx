@@ -6,9 +6,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { DistributorPageHeader, ShipmentStatusBadge, shipmentTemperature } from "@/components/distributor/distributor-ui";
-import { distributorSeedShipments } from "@/features/distributor/mock-data";
-import { getLocalShipments, mergeShipments, upsertLocalShipment } from "@/features/distributor/storage";
-import type { DistributorShipment, ShipmentReceipt, TrackingEvent } from "@/features/distributor/types";
+import { subscribeToDistributorChanges } from "@/features/distributor/realtime";
+import type { DistributorShipment, ShipmentReceipt } from "@/features/distributor/types";
 import { getApiErrorMessage } from "@/lib/api";
 import { distributorService } from "@/services/distributor.service";
 import { useAuthStore } from "@/stores/auth-store";
@@ -22,7 +21,7 @@ function shipmentCodeFromQr(value: string) {
 export default function DistributorReceivePage() {
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
-  const [shipments, setShipments] = useState<DistributorShipment[]>(() => mergeShipments(distributorSeedShipments, getLocalShipments()));
+  const [shipments, setShipments] = useState<DistributorShipment[]>([]);
   const [qrValue, setQrValue] = useState("");
   const [selectedShipmentCode, setSelectedShipmentCode] = useState(searchParams.get("shipment") ?? "");
   const [receiverName, setReceiverName] = useState(user?.name ?? "");
@@ -37,10 +36,9 @@ export default function DistributorReceivePage() {
   }, [searchParams]);
 
   useEffect(() => {
-    distributorService
-      .getShipments()
-      .then((remote) => setShipments(mergeShipments(distributorSeedShipments, remote, getLocalShipments())))
-      .catch(() => undefined);
+    const refresh = () => distributorService.getShipments().then(setShipments).catch(() => undefined);
+    void refresh();
+    return subscribeToDistributorChanges(refresh);
   }, []);
 
   const selectedShipment = useMemo(
@@ -109,39 +107,20 @@ export default function DistributorReceivePage() {
     }
 
     setIsReceiving(true);
-    const now = new Date().toISOString();
     const receipt: ShipmentReceipt = {
       receiverName: receiverName.trim(),
       receiverPhone: receiverPhone.trim() || undefined,
       note: note.trim() || undefined,
       qrValue: qrValue || `AGRITRACE-${selectedShipment.shipmentCode}`,
-      receivedAt: now,
-    };
-    const eventItem: TrackingEvent = {
-      id: `${selectedShipment.shipmentCode}-receipt-${now}`,
-      location: selectedShipment.destination,
-      temperatureC: selectedShipment.temperatureC,
-      status: "RECEIVED",
-      note: `Tiếp nhận QR bởi ${receipt.receiverName}${receipt.note ? `: ${receipt.note}` : ""}`,
-      eventTime: now,
-    };
-    const optimistic: DistributorShipment = {
-      ...selectedShipment,
-      status: "RECEIVED",
-      actualArrival: selectedShipment.actualArrival ?? now,
-      receipt,
-      trackingEvents: [...selectedShipment.trackingEvents, eventItem],
+      receivedAt: new Date().toISOString(),
     };
 
     try {
       const updated = await distributorService.receiveShipment(selectedShipment.shipmentCode, receipt);
-      upsertLocalShipment(updated);
-      setShipments((current) => mergeShipments(current, [updated]));
+      setShipments((current) => [updated, ...current.filter((item) => item.shipmentCode !== updated.shipmentCode)]);
       toast.success(`Đã xác nhận tiếp nhận ${updated.shipmentCode}.`);
     } catch (error) {
-      upsertLocalShipment(optimistic);
-      setShipments((current) => mergeShipments(current, [optimistic]));
-      toast.info(`Đã lưu biên nhận tạm trên trình duyệt. API chưa đồng bộ: ${getApiErrorMessage(error)}`);
+      toast.error(`Không thể lưu biên nhận: ${getApiErrorMessage(error)}`);
     } finally {
       setIsReceiving(false);
     }
