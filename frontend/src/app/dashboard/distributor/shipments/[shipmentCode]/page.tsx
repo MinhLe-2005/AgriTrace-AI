@@ -42,6 +42,8 @@ const fieldClassName =
 
 const GPS_MIN_DISTANCE_METERS = 25;
 const GPS_MIN_INTERVAL_MS = 15_000;
+const GPS_TIMELINE_GROUP_WINDOW_MS = 2 * 60_000;
+const GPS_DEFAULT_NOTE = "Vị trí GPS trực tiếp từ thiết bị tài xế.";
 
 type GpsPosition = {
   latitude: number;
@@ -50,14 +52,19 @@ type GpsPosition = {
   observedAt: string;
 };
 
+type GpsTrackingEvent = TrackingEvent &
+  Required<Pick<TrackingEvent, "latitude" | "longitude">>;
+
 function isGpsPosition(
   event: TrackingEvent
-): event is TrackingEvent &
-  Required<Pick<TrackingEvent, "latitude" | "longitude">> {
+): event is GpsTrackingEvent {
   return Number.isFinite(event.latitude) && Number.isFinite(event.longitude);
 }
 
-function distanceInMeters(first: GpsPosition, second: GpsPosition) {
+function distanceInMeters(
+  first: Pick<GpsPosition, "latitude" | "longitude">,
+  second: Pick<GpsPosition, "latitude" | "longitude">
+) {
   const radius = 6_371_000;
   const toRadians = (value: number) => (value * Math.PI) / 180;
   const latitudeDelta = toRadians(second.latitude - first.latitude);
@@ -84,6 +91,42 @@ function googleMapsUrl(
   return embed
     ? `https://www.google.com/maps?q=${encodeURIComponent(coordinates)}&z=16&output=embed`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(coordinates)}`;
+}
+
+function isAutomaticGpsEvent(event: TrackingEvent): event is GpsTrackingEvent {
+  return isGpsPosition(event) && event.location.startsWith("GPS:");
+}
+
+type TimelineEntry = {
+  event: TrackingEvent;
+  mergedGpsPings: number;
+};
+
+function buildTimeline(events: TrackingEvent[]): TimelineEntry[] {
+  return events.reduce<TimelineEntry[]>((timeline, event) => {
+    const previousEntry = timeline.at(-1);
+    let canMergeWithPrevious = false;
+    if (
+      previousEntry &&
+      isAutomaticGpsEvent(previousEntry.event) &&
+      isAutomaticGpsEvent(event)
+    ) {
+      canMergeWithPrevious =
+        Math.abs(
+        new Date(previousEntry.event.eventTime).getTime() -
+          new Date(event.eventTime).getTime()
+        ) <= GPS_TIMELINE_GROUP_WINDOW_MS &&
+        distanceInMeters(previousEntry.event, event) < GPS_MIN_DISTANCE_METERS;
+    }
+
+    if (canMergeWithPrevious && previousEntry) {
+      previousEntry.mergedGpsPings += 1;
+      return timeline;
+    }
+
+    timeline.push({ event, mergedGpsPings: 1 });
+    return timeline;
+  }, []);
 }
 
 export default function ShipmentDetailPage() {
@@ -345,6 +388,7 @@ export default function ShipmentDetailPage() {
         }
       : null;
   }, [events]);
+  const timeline = useMemo(() => buildTimeline(events), [events]);
   const displayedGps = gpsPosition ?? latestRecordedGps;
   const nextStatuses = shipment ? nextShipmentStatuses(shipment.status) : [];
   const canUpdateLifecycle = Boolean(
@@ -629,7 +673,7 @@ export default function ShipmentDetailPage() {
                   Tracking hành trình
                 </h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  Các mốc vị trí, nhiệt độ và ghi chú đã ghi nhận.
+                  Chỉ hiện mốc trạng thái và vị trí GPS có thay đổi đáng kể.
                 </p>
               </div>
               <span className="flex items-center gap-1 text-xs font-bold text-blue-700">
@@ -638,13 +682,16 @@ export default function ShipmentDetailPage() {
               </span>
             </div>
             <div className="p-5">
-              {events.length === 0 ? (
+              {timeline.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   Chưa có điểm hành trình nào.
                 </p>
               ) : (
                 <ol className="relative ms-2 space-y-5 border-s border-amber-200">
-                  {events.map((item, index) => (
+                  {timeline.map(({ event: item, mergedGpsPings }, index) => {
+                    const isLiveGps = isAutomaticGpsEvent(item);
+                    const isDefaultGpsNote = item.note === GPS_DEFAULT_NOTE;
+                    return (
                     <li
                       key={`${item.id ?? index}-${item.eventTime}`}
                       className="ms-5"
@@ -652,14 +699,25 @@ export default function ShipmentDetailPage() {
                       <span className="absolute -start-[7px] mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-amber-500" />
                       <div className="flex flex-wrap justify-between gap-2">
                         <p className="text-xs font-bold text-gray-900">
-                          {item.location}
+                          {isLiveGps ? "Vị trí GPS trực tiếp" : item.location}
                         </p>
                         <time className="text-[11px] text-gray-400">
                           {shipmentDate(item.eventTime)}
                         </time>
                       </div>
+                      {isLiveGps && (
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          {item.latitude?.toFixed(6)}, {item.longitude?.toFixed(6)}
+                        </p>
+                      )}
                       <div className="mt-1 flex flex-wrap gap-2">
-                        <ShipmentStatusBadge status={item.status} />
+                        {isLiveGps ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                            <Radio size={11} /> GPS trực tiếp
+                          </span>
+                        ) : (
+                          <ShipmentStatusBadge status={item.status} />
+                        )}
                         {isGpsPosition(item) && (
                           <a
                             href={googleMapsUrl(item)}
@@ -669,6 +727,11 @@ export default function ShipmentDetailPage() {
                           >
                             <MapPinned size={11} /> Xem GPS
                           </a>
+                        )}
+                        {mergedGpsPings > 1 && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                            Đã gộp {mergedGpsPings} ping trùng
+                          </span>
                         )}
                         {item.temperatureC !== undefined && (
                           <span className="text-[11px] font-semibold text-blue-700">
@@ -681,13 +744,14 @@ export default function ShipmentDetailPage() {
                           </span>
                         )}
                       </div>
-                      {item.note && (
+                      {item.note && !(isLiveGps && isDefaultGpsNote) && (
                         <p className="mt-1.5 text-xs leading-relaxed text-gray-600">
                           {item.note}
                         </p>
                       )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ol>
               )}
             </div>
