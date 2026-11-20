@@ -46,7 +46,6 @@ public class DevDemoAccountBootstrap implements ApplicationRunner {
             Role role = roleRepository.findByName(account.role())
                     .orElseThrow(() -> new ResourceNotFoundException("Default " + account.role() + " role is missing"));
             User user = userRepository.findByEmailIgnoreCase(account.email())
-                    .or(() -> userRepository.findByUsernameIgnoreCase(account.username()))
                     .orElseGet(() -> User.builder()
                             .email(account.email())
                             .fullName(account.fullName())
