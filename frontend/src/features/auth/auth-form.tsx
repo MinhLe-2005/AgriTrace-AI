@@ -45,11 +45,11 @@ type FormValues = {
 };
 
 const DEMO_ACCOUNTS = [
-  { username: "customer", label: "Khách hàng", role: "Mua sắm & Truy xuất", icon: ShoppingBag },
-  { username: "farmer", label: "Nông dân", role: "Quản lý nông trại", icon: Sprout },
-  { username: "warehouse", label: "Thủ kho", role: "Kiểm định & Lưu kho", icon: Package },
-  { username: "distributor", label: "Nhà phân phối", role: "Vận chuyển & Giao hàng", icon: Truck },
-  { username: "admin", label: "Quản trị viên", role: "Toàn quyền hệ thống", icon: ShieldCheck },
+  { username: "customer", email: "customer@sportvenue.com", label: "Khách hàng", role: "Mua sắm & Truy xuất", icon: ShoppingBag },
+  { username: "farmer", email: "farmer@sportvenue.com", label: "Nông dân", role: "Quản lý nông trại", icon: Sprout },
+  { username: "warehouse", email: "warehouse@sportvenue.com", label: "Thủ kho", role: "Kiểm định & Lưu kho", icon: Package },
+  { username: "distributor", email: "distributor@sportvenue.com", label: "Nhà phân phối", role: "Vận chuyển & Giao hàng", icon: Truck },
+  { username: "admin", email: "admin@sportvenue.com", label: "Quản trị viên", role: "Toàn quyền hệ thống", icon: ShieldCheck },
 ];
 
 export function AuthForm({ mode }: { mode: Mode }) {
@@ -78,7 +78,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const {
     register,
     handleSubmit,
-    setValue,
+    reset,
+    clearErrors,
+    setFocus,
+    getValues,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -288,10 +291,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
-  function fillDemoAccount(username: string) {
-    setActiveDemo(username);
-    setValue("email", username, { shouldValidate: true });
-    setValue("password", "123456", { shouldValidate: true });
+  function fillDemoAccount(account: (typeof DEMO_ACCOUNTS)[number]) {
+    setActiveDemo(account.username);
+    reset({ ...getValues(), email: account.email, password: "123456" });
+    clearErrors(["email", "password"]);
+    requestAnimationFrame(() => setFocus("email"));
   }
 
   // ==========================================
@@ -620,7 +624,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 <button
                   key={acc.username}
                   type="button"
-                  onClick={() => fillDemoAccount(acc.username)}
+                  onClick={() => fillDemoAccount(acc)}
                   className={cn(
                     "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-all",
                     isSelected
