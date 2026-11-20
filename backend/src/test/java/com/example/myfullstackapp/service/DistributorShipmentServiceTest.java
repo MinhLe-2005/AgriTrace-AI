@@ -5,6 +5,7 @@ import com.example.myfullstackapp.dto.distributor.CreateTrackingEventRequest;
 import com.example.myfullstackapp.dto.distributor.UpdateShipmentStatusRequest;
 import com.example.myfullstackapp.entity.Order;
 import com.example.myfullstackapp.entity.Shipment;
+import com.example.myfullstackapp.entity.ShipmentTrackingEvent;
 import com.example.myfullstackapp.exception.ConflictException;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
 import com.example.myfullstackapp.repository.OrderRepository;
@@ -17,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -69,6 +71,28 @@ class DistributorShipmentServiceTest {
                 new UpdateShipmentStatusRequest("IN_TRANSIT", "Toll station", 4.1, null, "Position ping", null, null, null, null),
                 "distributor@example.com", false));
         verify(trackingEvents, never()).save(any());
+    }
+
+    @Test
+    void refreshesRecentDuplicateGpsPingInsteadOfAddingAnotherTimelineMarker() {
+        Shipment shipment = Shipment.builder().id(1L).shipmentCode("SHIP-1").distributorEmail("distributor@example.com")
+                .status("IN_TRANSIT").driverName("Driver").vehicleNumber("51A-123.45").origin("A").destination("B")
+                .productSummary("Produce").temperatureC(4.5).build();
+        ShipmentTrackingEvent previousGps = ShipmentTrackingEvent.builder().shipment(shipment)
+                .location("GPS: 10.762622, 106.660172").temperatureC(4.5).latitude(10.762622).longitude(106.660172)
+                .accuracyMeters(15.0).status("IN_TRANSIT").note("Vị trí GPS trực tiếp từ thiết bị tài xế.")
+                .eventTime(Instant.now().minusSeconds(10)).build();
+        when(shipments.findByShipmentCodeIgnoreCase("SHIP-1")).thenReturn(Optional.of(shipment));
+        when(trackingEvents.findFirstByShipmentIdAndLatitudeIsNotNullAndLongitudeIsNotNullOrderByEventTimeDesc(1L))
+                .thenReturn(Optional.of(previousGps));
+        when(trackingEvents.findByShipmentIdOrderByEventTimeAsc(1L)).thenReturn(List.of(previousGps));
+
+        service.addTrackingEvent("SHIP-1", new CreateTrackingEventRequest(
+                "GPS: 10.762622, 106.660172", 4.5, null, "IN_TRANSIT", "Vị trí GPS trực tiếp từ thiết bị tài xế.",
+                10.762622, 106.660172, 8.0), "distributor@example.com", false);
+
+        verify(trackingEvents).save(same(previousGps));
+        assertEquals(8.0, previousGps.getAccuracyMeters());
     }
 
     @Test

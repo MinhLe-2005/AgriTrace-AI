@@ -3,12 +3,11 @@
 import { Camera, CheckCircle2, PackageCheck, QrCode, ScanLine, Upload } from "lucide-react";
 import jsQR from "jsqr";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { DistributorPageHeader, ShipmentStatusBadge, shipmentTemperature } from "@/components/distributor/distributor-ui";
-import { distributorSeedShipments } from "@/features/distributor/mock-data";
-import { getLocalShipments, mergeShipments, upsertLocalShipment } from "@/features/distributor/storage";
-import type { DistributorShipment, ShipmentReceipt, TrackingEvent } from "@/features/distributor/types";
+import { subscribeToDistributorChanges } from "@/features/distributor/realtime";
+import type { DistributorShipment, ShipmentReceipt } from "@/features/distributor/types";
 import { getApiErrorMessage } from "@/lib/api";
 import { distributorService } from "@/services/distributor.service";
 import { useAuthStore } from "@/stores/auth-store";
@@ -19,14 +18,28 @@ function shipmentCodeFromQr(value: string) {
   return match?.[0] ?? value.trim().toUpperCase();
 }
 
+function recipientFromDestination(destination: string) {
+  const parts = destination
+    .split(/[·•|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const phone = parts.find((part) => /^\+?[0-9 ]{9,15}$/.test(part));
+  const phoneIndex = phone ? parts.indexOf(phone) : -1;
+  return {
+    name: phoneIndex > 0 ? parts[0] : undefined,
+    phone,
+  };
+}
+
 export default function DistributorReceivePage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
-  const [shipments, setShipments] = useState<DistributorShipment[]>(() => mergeShipments(distributorSeedShipments, getLocalShipments()));
+  const [shipments, setShipments] = useState<DistributorShipment[]>([]);
   const [qrValue, setQrValue] = useState("");
   const [selectedShipmentCode, setSelectedShipmentCode] = useState(searchParams.get("shipment") ?? "");
   const [receiverName, setReceiverName] = useState(user?.name ?? "");
-  const [receiverPhone, setReceiverPhone] = useState("");
+  const [receiverPhone, setReceiverPhone] = useState(user?.phone ?? "");
   const [note, setNote] = useState("");
   const [isReceiving, setIsReceiving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -37,16 +50,22 @@ export default function DistributorReceivePage() {
   }, [searchParams]);
 
   useEffect(() => {
-    distributorService
-      .getShipments()
-      .then((remote) => setShipments(mergeShipments(distributorSeedShipments, remote, getLocalShipments())))
-      .catch(() => undefined);
+    const refresh = () => distributorService.getShipments().then(setShipments).catch(() => undefined);
+    void refresh();
+    return subscribeToDistributorChanges(refresh);
   }, []);
 
   const selectedShipment = useMemo(
     () => shipments.find((shipment) => shipment.shipmentCode === selectedShipmentCode) ?? null,
     [selectedShipmentCode, shipments]
   );
+
+  useEffect(() => {
+    if (!selectedShipment) return;
+    const recipient = recipientFromDestination(selectedShipment.destination);
+    setReceiverName(recipient.name ?? user?.name ?? "");
+    setReceiverPhone(recipient.phone ?? user?.phone ?? "");
+  }, [selectedShipment?.shipmentCode, user?.name, user?.phone]);
 
   function applyQrValue(value: string) {
     const shipmentCode = shipmentCodeFromQr(value);
@@ -103,45 +122,36 @@ export default function DistributorReceivePage() {
       toast.error("Vui lòng nhập người tiếp nhận.");
       return;
     }
+    if (!receiverPhone.trim()) {
+      toast.error("Vui lòng nhập số điện thoại người tiếp nhận.");
+      return;
+    }
+    if (!/^\+?[0-9 ]{9,15}$/.test(receiverPhone.trim())) {
+      toast.error("Số điện thoại người tiếp nhận không hợp lệ.");
+      return;
+    }
     if (selectedShipment.status === "RECEIVED") {
-      toast.info("Chuyến này đã được tiếp nhận trước đó.");
+      toast.info("Chuyến này đã được tiếp nhận. Đang mở lịch sử biên nhận.");
+      router.push("/dashboard/distributor/history");
       return;
     }
 
     setIsReceiving(true);
-    const now = new Date().toISOString();
     const receipt: ShipmentReceipt = {
       receiverName: receiverName.trim(),
       receiverPhone: receiverPhone.trim() || undefined,
       note: note.trim() || undefined,
       qrValue: qrValue || `AGRITRACE-${selectedShipment.shipmentCode}`,
-      receivedAt: now,
-    };
-    const eventItem: TrackingEvent = {
-      id: `${selectedShipment.shipmentCode}-receipt-${now}`,
-      location: selectedShipment.destination,
-      temperatureC: selectedShipment.temperatureC,
-      status: "RECEIVED",
-      note: `Tiếp nhận QR bởi ${receipt.receiverName}${receipt.note ? `: ${receipt.note}` : ""}`,
-      eventTime: now,
-    };
-    const optimistic: DistributorShipment = {
-      ...selectedShipment,
-      status: "RECEIVED",
-      actualArrival: selectedShipment.actualArrival ?? now,
-      receipt,
-      trackingEvents: [...selectedShipment.trackingEvents, eventItem],
+      receivedAt: new Date().toISOString(),
     };
 
     try {
       const updated = await distributorService.receiveShipment(selectedShipment.shipmentCode, receipt);
-      upsertLocalShipment(updated);
-      setShipments((current) => mergeShipments(current, [updated]));
+      setShipments((current) => [updated, ...current.filter((item) => item.shipmentCode !== updated.shipmentCode)]);
       toast.success(`Đã xác nhận tiếp nhận ${updated.shipmentCode}.`);
+      router.push("/dashboard/distributor/history");
     } catch (error) {
-      upsertLocalShipment(optimistic);
-      setShipments((current) => mergeShipments(current, [optimistic]));
-      toast.info(`Đã lưu biên nhận tạm trên trình duyệt. API chưa đồng bộ: ${getApiErrorMessage(error)}`);
+      toast.error(`Không thể lưu biên nhận: ${getApiErrorMessage(error)}`);
     } finally {
       setIsReceiving(false);
     }
@@ -172,7 +182,7 @@ export default function DistributorReceivePage() {
           <form onSubmit={receiveShipment} className="p-5 space-y-4">
             <label className="block space-y-1"><span className="text-[11px] font-bold text-gray-600">Chuyến hàng *</span><select value={selectedShipmentCode} onChange={(event) => setSelectedShipmentCode(event.target.value)} className="field"><option value="">Chọn chuyến hàng</option>{shipments.filter((shipment) => shipment.status !== "CANCELLED").map((shipment) => <option key={shipment.shipmentCode} value={shipment.shipmentCode}>{shipment.shipmentCode} — {shipment.destination}</option>)}</select></label>
             {selectedShipment ? <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4 text-xs"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-mono font-bold text-amber-900">{selectedShipment.shipmentCode}</p><p className="font-semibold text-gray-900 mt-1">{selectedShipment.productSummary}</p></div><ShipmentStatusBadge status={selectedShipment.status} /></div><div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-600"><p>Điểm giao: <strong className="text-gray-800">{selectedShipment.destination}</strong></p><p>Tài xế: <strong className="text-gray-800">{selectedShipment.driverName}</strong></p><p>Lô: <strong className="font-mono text-gray-800">{selectedShipment.lotCode || "—"}</strong></p><p>Nhiệt độ hiện tại: <strong className="text-blue-700">{shipmentTemperature(selectedShipment)}</strong></p></div><Link href={`/dashboard/distributor/shipments/${encodeURIComponent(selectedShipment.shipmentCode)}`} className="inline-block mt-3 text-[11px] font-bold text-amber-700 hover:underline">Xem hành trình trước khi nhận →</Link></div> : <div className="rounded-xl border border-dashed border-gray-200 p-5 text-center text-xs text-gray-500">Chưa có chuyến nào được chọn.</div>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Input label="Người tiếp nhận *" value={receiverName} onChange={setReceiverName} placeholder="Họ và tên người nhận" /><Input label="Số điện thoại" value={receiverPhone} onChange={setReceiverPhone} placeholder="09xx xxx xxx" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Input label="Người tiếp nhận *" value={receiverName} onChange={setReceiverName} placeholder="Họ và tên người nhận" required /><Input label="Số điện thoại *" value={receiverPhone} onChange={setReceiverPhone} placeholder="09xx xxx xxx" required type="tel" /></div>
             <label className="block space-y-1"><span className="text-[11px] font-bold text-gray-600">Ghi chú biên nhận</span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Ví dụ: Nhận đủ hàng, bao bì nguyên vẹn, nhiệt độ đạt yêu cầu." className="field h-auto py-2 resize-y" /></label>
             <button disabled={isReceiving || !selectedShipment} className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-60"><CheckCircle2 size={15} />{isReceiving ? "Đang xác nhận..." : "Xác nhận tiếp nhận hàng"}</button>
           </form>
@@ -183,6 +193,6 @@ export default function DistributorReceivePage() {
   );
 }
 
-function Input({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return <label className="block space-y-1"><span className="text-[11px] font-bold text-gray-600">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="field" /></label>;
+function Input({ label, value, onChange, placeholder, required, type = "text" }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; required?: boolean; type?: "text" | "tel" }) {
+  return <label className="block space-y-1"><span className="text-[11px] font-bold text-gray-600">{label}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} className="field" /></label>;
 }
