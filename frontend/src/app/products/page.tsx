@@ -668,7 +668,7 @@ function ProductsContent() {
         <div className="relative z-10 max-w-2xl space-y-3">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300">
             <Sparkles size={13} />
-            Dữ liệu trực tiếp từ Supabase Database
+            100% Nông Sản Thu Hoạch Trực Tiếp Từ Nông Trại
           </span>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
             Nông Sản Sạch Có Mã QR Nguồn Gốc

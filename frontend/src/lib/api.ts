@@ -26,7 +26,12 @@ function messageFromError(error: AxiosError<ApiErrorResponse>) {
 
 function signOut() {
   useAuthStore.getState().clearSession();
-  if (typeof window !== "undefined" && window.location.pathname !== "/login") window.location.assign("/login");
+  if (typeof window !== "undefined") {
+    const isProtectedRoute = window.location.pathname.startsWith("/dashboard");
+    if (isProtectedRoute && window.location.pathname !== "/login") {
+      window.location.assign("/login");
+    }
+  }
 }
 
 api.interceptors.response.use(
@@ -62,7 +67,12 @@ api.interceptors.response.use(
 
     if (typeof window !== "undefined") {
       const reqUrl = request?.url ?? "";
-      const isBackgroundGet = request?.method?.toLowerCase() === "get" && (reqUrl.includes("/loyalty/me") || reqUrl.includes("/orders"));
+      const isBackgroundGet =
+        request?.method?.toLowerCase() === "get" &&
+        (reqUrl.includes("/loyalty/me") ||
+          reqUrl.includes("/orders") ||
+          reqUrl.includes("/users/me") ||
+          reqUrl.includes("/verifications"));
       if (!isBackgroundGet) {
         if (status === 403) toast.error("Bạn không có quyền thực hiện thao tác này.");
         else if (status && status >= 400 && status !== 401 && status !== 404) toast.error(messageFromError(error));

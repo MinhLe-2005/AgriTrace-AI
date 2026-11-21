@@ -25,9 +25,9 @@ export default function ChatPage() {
   const channels = [
     {
       id: "ch-ai",
-      name: "Trợ Lý AI AgriTrace (Google Gemini)",
+      name: "Trợ Lý AI AgriTrace 24/7",
       role: "AI_BOT",
-      roleBadge: "Gemini 1.5 Flash",
+      roleBadge: "Trợ Lý AI 24/7",
       roleColor: "#059669",
       lastMsg: "Giải đáp thắc mắc về nguồn gốc, quy trình VietGAP và mùa vụ...",
       time: "Trực tuyến",

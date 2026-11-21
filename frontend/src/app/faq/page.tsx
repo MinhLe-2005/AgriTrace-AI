@@ -340,7 +340,7 @@ const FAQ_DATABASE: FAQItem[] = [
     category: "ai",
     categoryLabel: "Trí Tuệ Nhân Tạo AI",
     categoryColor: "bg-blue-100 text-blue-800 border-blue-200",
-    question: "Trợ lý AI AgriTrace (Google Gemini) có thể hỗ trợ tôi những việc gì?",
+    question: "Trợ lý AI AgriTrace có thể hỗ trợ tôi những việc gì?",
     summary: "Tư vấn mùa vụ nông sản, hướng dẫn cách bảo quản rau củ và giải đáp thắc mắc 24/7.",
     answerContent: {
       lead: "Trợ lý AI được tích hợp trực tiếp trên website (nút 'Hỏi Trợ Lý AI' ở góc dưới màn hình) và hỗ trợ bạn mọi lúc:",
@@ -880,7 +880,7 @@ export default function FAQPage() {
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center justify-center font-bold">
                   <Sparkles size={20} />
                 </div>
-                <h4 className="font-extrabold text-sm text-white">Trợ Lý AI Gemini 24/7</h4>
+                <h4 className="font-extrabold text-sm text-white">Trợ Lý AI AgriTrace 24/7</h4>
                 <p className="text-xs text-emerald-200/90 leading-snug">
                   Tư vấn nông sản theo mùa vụ, giải đáp truy xuất mã lô và đặt hàng tức thì.
                 </p>

@@ -3,6 +3,7 @@
 import {
   Award,
   Bell,
+  Calendar,
   Camera,
   Check,
   CheckCheck,
@@ -10,11 +11,13 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  CreditCard,
   Edit3,
   ExternalLink,
   Eye,
   EyeOff,
   Gift,
+  Info,
   KeyRound,
   Lock,
   Mail,
@@ -22,6 +25,7 @@ import {
   Package,
   Phone,
   QrCode,
+  Receipt,
   RefreshCw,
   Save,
   Search,
@@ -35,11 +39,12 @@ import {
   Truck,
   Upload,
   User as UserIcon,
+  Warehouse,
   X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { getApiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
@@ -48,6 +53,7 @@ import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service"
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { reviewService } from "@/services/review.service";
 import { useAuthStore } from "@/stores/auth-store";
+import { useCartStore } from "@/stores/cart-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -83,6 +89,8 @@ type Order = {
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  deliverySlot?: string;
+  deliveryNote?: string;
   driverName?: string;
   driverPhone?: string;
   cancelReason?: string;
@@ -238,6 +246,8 @@ const mockOrders: Order[] = [
     receiverName: "Lê Quang Minh",
     receiverPhone: "0988 776 655",
     receiverAddress: "Số 123 Cầu Giấy, Hà Nội",
+    deliverySlot: "Giờ hành chính (08:00 - 17:00)",
+    deliveryNote: "Gọi điện trước khi giao 15 phút, giao tại quầy lễ tân nếu vắng mặt",
     driverName: "Nguyễn Văn Thắng",
     driverPhone: "0912.888.777",
     paymentMethod: "COD",
@@ -283,9 +293,13 @@ const mockOrders: Order[] = [
     receiverName: "Lê Quang Minh",
     receiverPhone: "0988 776 655",
     receiverAddress: "Số 123 Cầu Giấy, Hà Nội",
+    deliverySlot: "Giao sau 17:30 (Buổi tối)",
+    deliveryNote: "Để hàng cẩn thận trong thùng giữ nhiệt",
     driverName: "Trần Đình Trọng",
     driverPhone: "0934.555.222",
     paymentMethod: "COD",
+    paymentRef: "COD-CASH-REC-8790",
+    paidAt: "2026-10-10T11:20:00Z",
     timeline: [
       { title: "Đặt hàng thành công", time: "09:00 - 09/10/2026", completed: true },
       { title: "Đóng gói tại kho bảo quản lạnh", time: "14:30 - 09/10/2026", completed: true },
@@ -371,8 +385,10 @@ const mockSavedVouchers: SavedVoucher[] = [
 ];
 
 function CustomerDashboardContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user, updateUser } = useAuthStore();
+  const { addItem } = useCartStore();
   const { notifications, addNotification, markAsRead, markAllAsRead, deleteNotification } = useNotificationStore();
 
   const tabParam = searchParams.get("tab");
@@ -516,9 +532,11 @@ function CustomerDashboardContent() {
               paymentStatusColor: details.paymentStatusColor,
               holdMinutesLeft: details.holdMinutesLeft,
               lotCode: o.lotCode || "XL-2026-08",
-              receiverName: o.receiverName,
-              receiverPhone: o.receiverPhone,
-              receiverAddress: o.receiverAddress,
+              receiverName: o.receiverName || user?.name || "Khách Hàng",
+              receiverPhone: o.receiverPhone || user?.phone || "0988 776 655",
+              receiverAddress: o.receiverAddress || "Hà Nội, Việt Nam",
+              deliverySlot: o.deliverySlot || "Giờ hành chính (08:00 - 17:00)",
+              deliveryNote: o.deliveryNote || "",
               driverName: o.driverName || "Nguyễn Văn Thắng",
               driverPhone: o.driverPhone || "0912.888.777",
               shippingFee: o.shippingFee || 0,
@@ -606,8 +624,38 @@ function CustomerDashboardContent() {
     }
   }, [tabParam, orderParam, orders]);
 
-  // Order filter
+  // Order filter & search
   const [orderFilter, setOrderFilter] = useState<string>("ALL");
+  const [orderSearchText, setOrderSearchText] = useState<string>("");
+
+  function handleReorder(order: Order) {
+    if (!order.items || order.items.length === 0) {
+      router.push("/products");
+      return;
+    }
+    order.items.forEach((item, idx) => {
+      let parsedQty = 1;
+      if (item.qty) {
+        const num = parseInt(item.qty.replace(/[^0-9]/g, ""), 10);
+        if (!isNaN(num) && num > 0) parsedQty = num;
+      }
+      addItem(
+        {
+          id: `reorder-${order.id}-${idx}`,
+          name: item.name,
+          price: Math.round((item.price || 50000) / parsedQty),
+          unit: "Phần",
+          farm: item.origin || "Đà Lạt, Lâm Đồng",
+          cert: item.cert || "VietGAP",
+          image: item.image || "/images/products/rau-cu-combo.png",
+          batchCode: order.lotCode || "XL-2026-08",
+        },
+        parsedQty
+      );
+    });
+    toast.success(`Đã thêm ${order.items.length} món từ đơn #${order.id} vào giỏ hàng!`);
+    router.push("/cart");
+  }
 
   // Review modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -1110,6 +1158,13 @@ function CustomerDashboardContent() {
   }
 
   const filteredOrders = orders.filter((ord) => {
+    if (orderSearchText.trim()) {
+      const q = orderSearchText.trim().toLowerCase();
+      const matchCode = ord.id?.toLowerCase().includes(q);
+      const matchLot = ord.lotCode?.toLowerCase().includes(q);
+      const matchItem = ord.items?.some((it) => it.name.toLowerCase().includes(q));
+      if (!matchCode && !matchLot && !matchItem) return false;
+    }
     if (orderFilter === "ALL") return true;
     if (orderFilter === "SHIPPING") return ord.status === "SHIPPING";
     if (orderFilter === "DELIVERED") return ord.status === "DELIVERED" || ord.status === "COMPLETED";
@@ -1340,6 +1395,34 @@ function CustomerDashboardContent() {
       {/* ========================================================= */}
       {activeTab === "orders" && (
         <div className="space-y-4 animate-fade-in-up">
+          {/* Order Search Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={orderSearchText}
+                onChange={(e) => setOrderSearchText(e.target.value)}
+                placeholder="Tìm theo mã đơn (#AGRI...), lô hàng hoặc tên món..."
+                className="w-full pl-8 pr-8 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 shadow-2xs"
+              />
+              {orderSearchText && (
+                <button
+                  type="button"
+                  onClick={() => setOrderSearchText("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {orderSearchText && (
+              <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shrink-0">
+                Tìm thấy {filteredOrders.length} đơn
+              </span>
+            )}
+          </div>
+
           {/* Order Filter bar */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-gray-500 font-medium mr-1">Bộ lọc trạng thái:</span>
@@ -1393,6 +1476,9 @@ function CustomerDashboardContent() {
                 !!orderParam &&
                 order.id?.replace(/^#/, "").trim().toLowerCase() ===
                   orderParam.replace(/^#/, "").trim().toLowerCase();
+              const isQr =
+                (order.paymentMethod || "").toUpperCase() === "PAYOS" ||
+                (order.paymentMethod || "").toUpperCase() === "BANK";
               return (
                 <div
                   key={order.id}
@@ -1508,6 +1594,118 @@ function CustomerDashboardContent() {
                     ))}
                   </div>
 
+                  {/* Delivery & Cold Chain Logistics Snapshot */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 rounded-xl bg-gray-50/90 border border-gray-100 text-xs">
+                    {/* Receiver & Delivery Address */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-900">
+                        <MapPin size={13} className="text-emerald-700 shrink-0" />
+                        <span>Địa chỉ nhận hàng:</span>
+                      </div>
+                      <p className="font-semibold text-gray-800 pl-4">
+                        {order.receiverName} · {order.receiverPhone}
+                      </p>
+                      <p className="text-gray-600 pl-4 leading-relaxed line-clamp-2" title={order.receiverAddress}>
+                        {order.receiverAddress}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-4 text-[11px] text-gray-500 pt-0.5">
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} className="text-gray-400" />
+                          <span>Khung giờ: <strong className="text-gray-700">{order.deliverySlot || "Giờ hành chính (08:00 - 17:00)"}</strong></span>
+                        </span>
+                        {order.deliveryNote && (
+                          <span className="text-gray-500 italic">
+                            · Dặn shipper: "{order.deliveryNote}"
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Cold Chain Fleet & Payment Verification */}
+                    <div className="space-y-1 border-t md:border-t-0 md:border-l border-gray-200/80 pt-2.5 md:pt-0 md:pl-3.5">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-900">
+                        <Truck size={13} className="text-blue-600 shrink-0" />
+                        <span>Vận chuyển xe lạnh & Đối soát:</span>
+                      </div>
+                      <div className="pl-4 text-xs">
+                        {order.status === "DELIVERED" || order.status === "COMPLETED" ? (
+                          <span className="font-semibold text-emerald-800 flex items-center gap-1">
+                            <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                            <span>Đã giao thành công · Thùng xe 4.2°C đạt chuẩn VietGAP</span>
+                          </span>
+                        ) : order.status === "SHIPPING" ? (
+                          <span className="font-semibold text-blue-700 flex items-center gap-1 animate-pulse">
+                            <Truck size={12} className="text-blue-600 shrink-0" />
+                            <span>Đang giao xe lạnh 4.2°C · Tài xế {order.driverName} ({order.driverPhone})</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">
+                            ❄️ Bảo quản kho mát 2-5°C, chuẩn bị bàn giao đội xe AgriCold
+                          </span>
+                        )}
+                      </div>
+                      <div className="pl-4 text-[11px] space-y-0.5 pt-0.5 text-gray-600">
+                        <div className="flex items-center gap-1.5">
+                          <CreditCard size={11} className="text-gray-400 shrink-0" />
+                          <span>
+                            {isQr ? (
+                              order.status === "PENDING_PAYMENT" ? (
+                                <span className="text-amber-800 font-semibold">
+                                  ⏳ Chờ quét mã VietQR để kho lạnh xuất hàng
+                                </span>
+                              ) : (
+                                <span className="text-emerald-800 font-semibold">
+                                  ✅ Đã thanh toán VietQR 24/7{" "}
+                                  {order.paymentRef ? `· Mã GD: ${order.paymentRef}` : ""}
+                                  {order.paidAt ? ` (${new Date(order.paidAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })})` : ""}
+                                </span>
+                              )
+                            ) : order.status === "DELIVERED" || order.status === "COMPLETED" ? (
+                              <span className="text-emerald-800 font-semibold">
+                                ✅ Đã thanh toán (Tài xế đã thu đủ {(order.total || 0).toLocaleString("vi-VN")} đ tiền mặt COD)
+                              </span>
+                            ) : (
+                              <span className="text-orange-900 font-medium">
+                                💵 Thu hộ COD khi nhận hàng: <strong className="font-bold">{(order.total || 0).toLocaleString("vi-VN")} đ</strong>
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Real-time Status Alert Banner */}
+                  {order.status === "SHIPPING" && (
+                    <div className="p-3 rounded-xl bg-blue-50/90 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-950">
+                      <div className="flex items-start sm:items-center gap-2">
+                        <Truck size={15} className="text-blue-600 shrink-0 mt-0.5 sm:mt-0" />
+                        <span>
+                          <strong>Đơn hàng đang trên xe lạnh 4.2°C:</strong> Tài xế <strong>{order.driverName}</strong> ({order.driverPhone}) đang di chuyển tới bạn. Quý khách vui lòng để ý điện thoại và bấm <strong>[Đã nhận được hàng]</strong> khi nhận nông sản.
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleAdvanceOrderStep(order.id, "DELIVERED")}
+                        disabled={isUpdatingOrderStatus}
+                        className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shrink-0 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={13} />
+                        <span>Xác nhận đã nhận hàng</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {(order.status === "DELIVERED" || order.status === "COMPLETED") && (
+                    <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs text-emerald-900">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={14} className="text-emerald-700 shrink-0" />
+                        <span>
+                          <strong>Giao hàng thành công & đối soát chuỗi lạnh hoàn tất:</strong> Nông sản tươi ngon, giữ trọn dưỡng chất VietGAP từ nông trại.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Footer Actions */}
                   <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
                     <div className="text-xs text-gray-500 flex items-center gap-2">
@@ -1590,13 +1788,13 @@ function CustomerDashboardContent() {
                         <span>Xem chi tiết</span>
                       </button>
 
-                      <Link
-                        href="/products"
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                      <button
+                        onClick={() => handleReorder(order)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
                         <RefreshCw size={13} />
                         <span>Mua lại</span>
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2379,7 +2577,7 @@ function CustomerDashboardContent() {
               </div>
             )}
 
-            {/* COD & Delivery Verification Workflow Box */}
+            {/* COD & Delivery Verification Workflow Box with Strict Role Separation */}
             {selectedOrder.status !== "CANCELLED" && selectedOrder.status !== "REFUNDED" && (
               <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/90 to-teal-50/70 border border-emerald-200 space-y-3 text-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -2397,45 +2595,152 @@ function CustomerDashboardContent() {
                   </div>
                 </div>
 
-                {/* Interactive Status Progression Buttons for Customer / Demo Verification */}
-                {["CONFIRMED", "PAID", "PREPARING", "SHIPPING"].includes(selectedOrder.status) && (
-                  <div className="pt-2 border-t border-emerald-200/70 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-emerald-900">
-                      {selectedOrder.status === "SHIPPING"
-                        ? "Tài xế xe lạnh đã giao nông sản tới địa chỉ của bạn?"
-                        : "Đơn hàng đang chờ xuất kho lạnh (Bấm để cập nhật nhanh tiến độ giao nhận):"}
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {["CONFIRMED", "PAID", "PREPARING"].includes(selectedOrder.status) && (
-                        <button
-                          onClick={() => handleAdvanceOrderStep(selectedOrder.id, "SHIPPING")}
-                          disabled={isUpdatingOrderStatus}
-                          className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          <Truck size={13} />
-                          <span>Bắt đầu giao xe lạnh (Đang vận chuyển)</span>
-                        </button>
-                      )}
-                      {selectedOrder.status === "SHIPPING" && (
-                        <button
-                          onClick={() => handleAdvanceOrderStep(selectedOrder.id, "DELIVERED")}
-                          disabled={isUpdatingOrderStatus}
-                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          <CheckCircle2 size={14} />
-                          <span>
-                            ✅ Đã Nhận Được Hàng
-                            {(selectedOrder.paymentMethod || "").toUpperCase() === "COD"
-                              ? " & Xác Nhận Đã Thanh Toán COD"
-                              : ""}
-                          </span>
-                        </button>
-                      )}
-                    </div>
+                {/* Customer-Appropriate Action Zone: Role Boundaries Respected */}
+                <div className="pt-2 border-t border-emerald-200/70 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-emerald-900">
+                    {selectedOrder.status === "SHIPPING"
+                      ? "Tài xế xe lạnh đã giao nông sản tới địa chỉ của bạn? Quý khách vui lòng kiểm tra và xác nhận:"
+                      : selectedOrder.status === "PENDING_PAYMENT"
+                      ? "Đơn hàng đang chờ thanh toán VietQR (Hàng tạm giữ trong 30 phút):"
+                      : ["CONFIRMED", "PAID", "PREPARING"].includes(selectedOrder.status)
+                      ? "Kho lạnh trung tâm đang xử lý đóng gói và điều phối xe tải chuyên dụng:"
+                      : "Đơn hàng đã hoàn tất đối soát và lưu trữ dữ liệu chuỗi lạnh VietGAP:"}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedOrder.status === "SHIPPING" && (
+                      <button
+                        onClick={() => handleAdvanceOrderStep(selectedOrder.id, "DELIVERED")}
+                        disabled={isUpdatingOrderStatus}
+                        className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={14} />
+                        <span>
+                          ✅ Đã Nhận Được Hàng
+                          {(selectedOrder.paymentMethod || "").toUpperCase() === "COD"
+                            ? " & Xác Nhận Đã Thanh Toán COD"
+                            : ""}
+                        </span>
+                      </button>
+                    )}
+
+                    {selectedOrder.status === "PENDING_PAYMENT" && (
+                      <button
+                        onClick={() => {
+                          const code = selectedOrder.id;
+                          setSelectedOrder(null);
+                          handleOpenPayOS(code);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <QrCode size={13} />
+                        <span>Quét mã VietQR</span>
+                      </button>
+                    )}
+
+                    {["PENDING_PAYMENT", "CONFIRMED", "PREPARING", "PAID"].includes(selectedOrder.status) && (
+                      <button
+                        onClick={() => {
+                          const code = selectedOrder.id;
+                          setSelectedOrder(null);
+                          setCancelTargetCode(code);
+                          setShowCancelModal(true);
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Yêu cầu hủy đơn
+                      </button>
+                    )}
+
+                    {(selectedOrder.status === "DELIVERED" || selectedOrder.status === "COMPLETED") && (
+                      <button
+                        onClick={() => {
+                          const ord = selectedOrder;
+                          setSelectedOrder(null);
+                          setReviewOrderCode(ord.id);
+                          setReviewProductName(ord.items[0]?.name || "Nông sản tươi");
+                          setShowReviewModal(true);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Star size={13} className="fill-amber-300 text-amber-300" />
+                        <span>Đánh giá sản phẩm</span>
+                      </button>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             )}
+
+            {/* 4-Actor Responsibility Breakdown in AgriTrace Supply Chain */}
+            <div className="p-4 rounded-2xl bg-gray-50/90 border border-gray-200/80 space-y-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sprout size={15} className="text-emerald-700" />
+                  <span>Quy Trình & Phân Định Trách Nhiệm 4 Bên (Supply Chain Roles)</span>
+                </h4>
+                <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                  Minh bạch 100%
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                {/* 1. Nông dân / HTX */}
+                <div className="p-3 rounded-xl bg-white border border-gray-100 shadow-2xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                    <Sprout size={13} className="text-emerald-600 shrink-0" />
+                    <span>1. Nông dân / HTX</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 leading-tight">
+                    Thu hoạch nông sản sáng sớm, kiểm định dư lượng và cấp mã lô <strong>#{selectedOrder.lotCode}</strong>.
+                  </p>
+                  <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                    Chuẩn VietGAP/GlobalGAP
+                  </span>
+                </div>
+
+                {/* 2. Kho lạnh trung tâm */}
+                <div className="p-3 rounded-xl bg-white border border-gray-100 shadow-2xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-indigo-900">
+                    <Warehouse size={13} className="text-indigo-600 shrink-0" />
+                    <span>2. Kho lạnh trung tâm</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 leading-tight">
+                    Sơ chế, đóng gói túi màng khí thở ở 2°C - 5°C, niêm phong tem QR và xuất kho.
+                  </p>
+                  <span className="inline-block text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+                    Bảo quản lạnh 2-5°C
+                  </span>
+                </div>
+
+                {/* 3. Vận chuyển / Phân phối */}
+                <div className="p-3 rounded-xl bg-white border border-gray-100 shadow-2xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-900">
+                    <Truck size={13} className="text-blue-600 shrink-0" />
+                    <span>3. Xe lạnh vận chuyển</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 leading-tight">
+                    Tài xế <strong>{selectedOrder.driverName || "Nguyễn Văn Thắng"}</strong> ({selectedOrder.driverPhone || "0912.888.777"}) giao tận tay và đối soát thu tiền COD.
+                  </p>
+                  <span className="inline-block text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                    Thùng xe lạnh 4.2°C
+                  </span>
+                </div>
+
+                {/* 4. Khách hàng (Bạn) */}
+                <div className="p-3 rounded-xl bg-emerald-50/40 border border-emerald-300 shadow-2xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+                    <UserIcon size={13} className="text-emerald-700 shrink-0" />
+                    <span>4. Khách hàng (Bạn)</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 leading-tight">
+                    Kiểm tra tem nhãn, bấm <strong>Đã nhận được hàng</strong>, thanh toán và đánh giá chất lượng nông sản.
+                  </p>
+                  <span className="inline-block text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                    Vai trò của bạn
+                  </span>
+                </div>
+              </div>
+            </div>
 
             {/* Timeline Progress */}
             <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
@@ -2471,27 +2776,55 @@ function CustomerDashboardContent() {
               </div>
             </div>
 
-            {/* Shipping & Driver Info */}
+            {/* Shipping, Delivery Slot & Driver Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-2">
-                <span className="font-bold text-gray-800 block">Địa chỉ nhận hàng</span>
-                <p className="font-semibold text-gray-900">{selectedOrder.receiverName}</p>
-                <p className="text-gray-500">{selectedOrder.receiverPhone}</p>
-                <p className="text-gray-500">{selectedOrder.receiverAddress}</p>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                    <MapPin size={13} className="text-emerald-700" />
+                    <span>Địa chỉ nhận hàng tận nơi</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                    {selectedOrder.deliverySlot || "Giờ hành chính"}
+                  </span>
+                </div>
+                <div className="space-y-0.5 pt-1">
+                  <p className="font-bold text-gray-900">{selectedOrder.receiverName}</p>
+                  <p className="text-gray-600 font-medium">{selectedOrder.receiverPhone}</p>
+                  <p className="text-gray-600 leading-relaxed">{selectedOrder.receiverAddress}</p>
+                </div>
+                {selectedOrder.deliveryNote && (
+                  <div className="pt-2 border-t border-gray-200/80 text-[11px] text-gray-500 italic">
+                    💬 Dặn dò tài xế: "{selectedOrder.deliveryNote}"
+                  </div>
+                )}
               </div>
 
               <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-2">
-                <span className="font-bold text-gray-800 block">Tài xế xe lạnh phụ trách</span>
-                <p className="font-semibold text-gray-900">{selectedOrder.driverName}</p>
-                <p className="text-gray-500">Đội xe: AgriCold Hà Nội (Thùng lạnh 4.2°C)</p>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                    <Truck size={13} className="text-blue-600" />
+                    <span>Tài xế xe lạnh phụ trách</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-blue-800 bg-blue-100/70 px-2 py-0.5 rounded">
+                    AgriCold Fleet
+                  </span>
+                </div>
+                <div className="space-y-0.5 pt-1">
+                  <p className="font-bold text-gray-900">{selectedOrder.driverName || "Nguyễn Văn Thắng"}</p>
+                  <p className="text-gray-500">Đội xe: AgriCold Hà Nội (Thùng bảo quản 2°C - 5°C)</p>
+                  <p className="text-gray-500">Cảm biến IoT thùng xe: <strong>4.2°C (Đạt chuẩn VietGAP)</strong></p>
+                </div>
                 {selectedOrder.driverPhone && (
-                  <a
-                    href={`tel:${selectedOrder.driverPhone}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-semibold transition-colors mt-1"
-                  >
-                    <Phone size={12} />
-                    <span>Gọi {selectedOrder.driverPhone}</span>
-                  </a>
+                  <div className="pt-1">
+                    <a
+                      href={`tel:${selectedOrder.driverPhone}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-semibold transition-colors text-xs"
+                    >
+                      <Phone size={12} />
+                      <span>Gọi tài xế: {selectedOrder.driverPhone}</span>
+                    </a>
+                  </div>
                 )}
               </div>
             </div>
@@ -2570,7 +2903,25 @@ function CustomerDashboardContent() {
                 <span>Trạng thái thanh toán:</span>
                 <span className="font-bold text-emerald-800">{selectedOrder.paymentStatusText}</span>
               </div>
-              <div className="flex items-center justify-between text-gray-600">
+              <div className="flex items-center justify-between text-gray-600 pt-1 border-t border-gray-200/70">
+                <span>Mã đối soát giao dịch:</span>
+                <span className="font-mono font-semibold text-gray-800">
+                  {selectedOrder.paymentRef ||
+                    ((selectedOrder.paymentMethod || "").toUpperCase() === "PAYOS" ||
+                    (selectedOrder.paymentMethod || "").toUpperCase() === "BANK"
+                      ? "VIETQR-AUTO-VERIFIED"
+                      : "COD-CASH-ON-DELIVERY")}
+                </span>
+              </div>
+              {selectedOrder.paidAt && (
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>Thời gian ghi nhận thanh toán:</span>
+                  <span className="font-semibold text-emerald-800">
+                    {new Date(selectedOrder.paidAt).toLocaleString("vi-VN")}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-gray-600 pt-1 border-t border-gray-200/70">
                 <span>Tạm tính tiền hàng:</span>
                 <span className="font-medium text-gray-900">
                   {(
@@ -2606,20 +2957,66 @@ function CustomerDashboardContent() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setSelectedOrder(null)}
                 className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-colors cursor-pointer"
               >
                 Đóng
               </button>
-              <Link
-                href="/products"
-                className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs"
+
+              {selectedOrder.status === "SHIPPING" && (
+                <button
+                  onClick={() => handleAdvanceOrderStep(selectedOrder.id, "DELIVERED")}
+                  disabled={isUpdatingOrderStatus}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Xác nhận đã nhận hàng</span>
+                </button>
+              )}
+
+              {selectedOrder.status === "PENDING_PAYMENT" && (
+                <button
+                  onClick={() => {
+                    const code = selectedOrder.id;
+                    setSelectedOrder(null);
+                    handleOpenPayOS(code);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <QrCode size={13} />
+                  <span>Quét mã VietQR</span>
+                </button>
+              )}
+
+              {(selectedOrder.status === "DELIVERED" || selectedOrder.status === "COMPLETED") && (
+                <button
+                  onClick={() => {
+                    const ord = selectedOrder;
+                    setSelectedOrder(null);
+                    setReviewOrderCode(ord.id);
+                    setReviewProductName(ord.items[0]?.name || "Nông sản tươi");
+                    setShowReviewModal(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Star size={13} className="fill-emerald-700 text-emerald-700" />
+                  <span>Đánh giá nông sản</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  const ord = selectedOrder;
+                  setSelectedOrder(null);
+                  if (ord) handleReorder(ord);
+                }}
+                className="px-5 py-2 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <RefreshCw size={13} />
                 <span>Đặt mua lại</span>
-              </Link>
+              </button>
             </div>
           </div>
         </div>

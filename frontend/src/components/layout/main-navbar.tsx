@@ -114,16 +114,23 @@ export function MainNavbar() {
       setMyVerification(null);
       return;
     }
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      setMyVerification(null);
+      return;
+    }
     let mounted = true;
     (async () => {
       try {
-        const me = await authService.getMe().catch(() => null);
-        if (mounted && me && me.roles && me.roles.length > (user.roles?.length || 0)) {
-          updateUser({ roles: me.roles, companyName: me.companyName });
-        }
-        const reqs = await verificationsService.myRequests(user.email);
+        const reqs = await verificationsService.myRequests(user.email).catch(() => []);
         if (mounted && reqs && reqs.length > 0) {
           setMyVerification(reqs[0]);
+          if (reqs[0].status === "APPROVED") {
+            const me = await authService.getMe().catch(() => null);
+            if (mounted && me && me.roles && me.roles.length > (user.roles?.length || 0)) {
+              updateUser({ roles: me.roles, companyName: me.companyName });
+            }
+          }
         } else if (mounted) {
           setMyVerification(null);
         }
@@ -134,7 +141,7 @@ export function MainNavbar() {
     return () => {
       mounted = false;
     };
-  }, [user?.id, user?.email, isSpecialRole, pathname, updateUser]);
+  }, [user?.id, user?.email, isSpecialRole, updateUser]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/90 shadow-xs">
@@ -343,11 +350,8 @@ export function MainNavbar() {
                 : "text-gray-700 hover:text-rose-700 hover:bg-gray-100/80"
             )}
           >
-            <Flame size={14} className="text-rose-500 fill-rose-500 animate-pulse" />
+            <Flame size={14} className="text-rose-500 fill-rose-500" />
             <span>Sự Kiện & Giảm Giá</span>
-            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-500 text-white shadow-2xs">
-              HOT
-            </span>
           </Link>
 
           {/* 4. Truy Xuất QR Dropdown */}
@@ -474,9 +478,6 @@ export function MainNavbar() {
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-gray-900 group-hover:text-rose-800 block">
                           Sự Kiện & Mùa Vụ Khuyến Mãi
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-500 text-white">
-                          HOT
                         </span>
                       </div>
                       <span className="text-[10px] text-gray-500">Trợ giá vụ mùa tại vườn, đếm ngược thời gian sale</span>
