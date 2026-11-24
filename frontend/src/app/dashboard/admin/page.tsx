@@ -3,6 +3,7 @@
 import {
   Activity,
   AlertCircle,
+  AlertTriangle,
   Award,
   BookOpen,
   Calendar,
@@ -14,15 +15,18 @@ import {
   Edit,
   ExternalLink,
   Eye,
+  FileCheck,
   FileText,
   Filter,
   Gift,
   Package,
   Plus,
   Power,
+  QrCode,
   RefreshCw,
   Search,
   Shield,
+  ShieldCheck,
   ShoppingBag,
   Sparkles,
   Ticket,
@@ -41,6 +45,7 @@ import { useUsers } from "@/hooks/use-users";
 import { useVerificationMutations, useVerifications } from "@/hooks/use-verifications";
 import { getApiErrorMessage } from "@/lib/api";
 import { catalogService, type ApiOrder, type ApiVoucher } from "@/services/catalog.service";
+import { farmerService, type ApiHarvestLot } from "@/services/farmer.service";
 import { loyaltyService, type LoyaltyMemberAdmin } from "@/services/loyalty.service";
 import {
   useCampaignStore,
@@ -65,21 +70,21 @@ function submittedAt(value: string) {
   return new Date(value).toLocaleString("vi-VN");
 }
 
-type AdminTab = "verifications" | "orders" | "vouchers" | "loyalty" | "events" | "blog";
+type AdminTab = "verifications" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog";
 
 function AdminPortalContent() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab") as AdminTab | null;
 
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
-    if (tabParam && ["verifications", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
+    if (tabParam && ["verifications", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
       return tabParam;
     }
     return "verifications";
   });
 
   useEffect(() => {
-    if (tabParam && ["verifications", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
+    if (tabParam && ["verifications", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -122,6 +127,208 @@ function AdminPortalContent() {
       return matchStatus && matchType;
     });
   }, [verifications.data, verificationFilterStatus, verificationFilterType]);
+
+  // Admin: Xét Duyệt Lô Thu Hoạch & Cấp Lệnh Xuất Kho
+  const [adminBatches, setAdminBatches] = useState<ApiHarvestLot[]>([]);
+  const [adminBatchesLoading, setAdminBatchesLoading] = useState(false);
+  const [adminBatchSearch, setAdminBatchSearch] = useState("");
+  const [adminBatchFilter, setAdminBatchFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("PENDING");
+  const [batchDecisionTarget, setBatchDecisionTarget] = useState<{
+    batch: ApiHarvestLot;
+    action: "approve" | "reject";
+  } | null>(null);
+  const [batchDecisionReason, setBatchDecisionReason] = useState("");
+  const [isSubmittingBatchDecision, setIsSubmittingBatchDecision] = useState(false);
+
+  const fetchAdminBatches = async () => {
+    setAdminBatchesLoading(true);
+    try {
+      const data = await farmerService.getBatches();
+      setAdminBatches(data || []);
+    } catch (err: any) {
+      console.warn("Lỗi tải danh sách lô thu hoạch phía Admin:", err);
+    } finally {
+      setAdminBatchesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminBatches();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "batches") {
+      fetchAdminBatches();
+    }
+  }, [activeTab]);
+
+  const pendingBatchesCount = useMemo(() => {
+    return adminBatches.filter((b) => b.status === "Chờ duyệt xuất kho").length;
+  }, [adminBatches]);
+
+  const filteredAdminBatches = useMemo(() => {
+    return adminBatches.filter((b) => {
+      const matchesSearch =
+        adminBatchSearch.trim() === "" ||
+        b.code.toLowerCase().includes(adminBatchSearch.toLowerCase()) ||
+        b.product.toLowerCase().includes(adminBatchSearch.toLowerCase()) ||
+        (b.farmName && b.farmName.toLowerCase().includes(adminBatchSearch.toLowerCase()));
+
+      const matchesFilter =
+        adminBatchFilter === "ALL" ||
+        (adminBatchFilter === "PENDING" && b.status === "Chờ duyệt xuất kho") ||
+        (adminBatchFilter === "APPROVED" && b.status === "Đã duyệt xuất kho") ||
+        (adminBatchFilter === "REJECTED" && b.status === "Từ chối xuất kho");
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [adminBatches, adminBatchSearch, adminBatchFilter]);
+
+  const handleConfirmBatchDecision = async () => {
+    if (!batchDecisionTarget) return;
+    setIsSubmittingBatchDecision(true);
+    const { batch, action } = batchDecisionTarget;
+    const isApprove = action === "approve";
+    const newStatus = isApprove ? "Đã duyệt xuất kho" : "Từ chối xuất kho";
+    const newColor = isApprove ? "#10b981" : "#ef4444";
+    const note =
+      batchDecisionReason.trim() ||
+      (isApprove
+        ? "Admin đã thẩm định hồ sơ KCS và phê duyệt đủ điều kiện xuất kho nông sản."
+        : "Admin từ chối cấp lệnh xuất kho. Yêu cầu tái kiểm định tiêu chuẩn an toàn thực phẩm.");
+
+    try {
+      const updated = await farmerService.updateBatchStatus(batch.code, {
+        status: newStatus,
+        statusColor: newColor,
+        adminNote: note,
+        actorRole: "ADMIN",
+      });
+
+      setAdminBatches((prev) =>
+        prev.map((item) => (item.code === updated.code ? updated : item))
+      );
+
+      toast.success(
+        isApprove
+          ? `Đã phê duyệt xuất kho thành công cho lô ${batch.code}!`
+          : `Đã từ chối cấp lệnh xuất kho cho lô ${batch.code}!`
+      );
+      setBatchDecisionTarget(null);
+      setBatchDecisionReason("");
+    } catch (err: any) {
+      toast.error(err.message || "Không thể cập nhật phê duyệt lô");
+    } finally {
+      setIsSubmittingBatchDecision(false);
+    }
+  };
+
+  // Admin: Duyệt Chứng Nhận & Gia Hạn Nông Trại
+  const [adminCerts, setAdminCerts] = useState<any[]>([]);
+  const [adminCertsLoading, setAdminCertsLoading] = useState(false);
+  const [adminCertSearch, setAdminCertSearch] = useState("");
+  const [adminCertFilter, setAdminCertFilter] = useState<"ALL" | "PENDING" | "VALID" | "EXPIRED">("PENDING");
+  const [certDecisionTarget, setCertDecisionTarget] = useState<{
+    cert: any;
+    action: "approve" | "reject";
+  } | null>(null);
+  const [certDecisionNote, setCertDecisionNote] = useState("");
+  const [certApprovedExpiryDate, setCertApprovedExpiryDate] = useState("");
+  const [certApprovedNumber, setCertApprovedNumber] = useState("");
+  const [isSubmittingCertDecision, setIsSubmittingCertDecision] = useState(false);
+  const [viewingProofImage, setViewingProofImage] = useState<string | null>(null);
+
+  const fetchAdminCerts = async () => {
+    setAdminCertsLoading(true);
+    try {
+      const data = await farmerService.getCertificates();
+      setAdminCerts(data || []);
+    } catch (err: any) {
+      console.warn("Lỗi tải danh sách chứng nhận phía Admin:", err);
+    } finally {
+      setAdminCertsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminCerts();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "certs") {
+      fetchAdminCerts();
+    }
+  }, [activeTab]);
+
+  const pendingCertsCount = useMemo(() => {
+    return adminCerts.filter((c) => c.approvalStatus === "PENDING" || c.status === "PENDING").length;
+  }, [adminCerts]);
+
+  const filteredAdminCerts = useMemo(() => {
+    return adminCerts.filter((c) => {
+      const matchesSearch =
+        adminCertSearch.trim() === "" ||
+        (c.certNumber && c.certNumber.toLowerCase().includes(adminCertSearch.toLowerCase())) ||
+        (c.name && c.name.toLowerCase().includes(adminCertSearch.toLowerCase())) ||
+        (c.farmName && c.farmName.toLowerCase().includes(adminCertSearch.toLowerCase()));
+
+      const isPending = c.approvalStatus === "PENDING" || c.status === "PENDING";
+      const isValid = c.status === "VALID" && !isPending;
+      const isExpired = c.status === "EXPIRED" || c.status === "EXPIRING_SOON" || c.approvalStatus === "REJECTED";
+
+      const matchesFilter =
+        adminCertFilter === "ALL" ||
+        (adminCertFilter === "PENDING" && isPending) ||
+        (adminCertFilter === "VALID" && isValid) ||
+        (adminCertFilter === "EXPIRED" && isExpired);
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [adminCerts, adminCertSearch, adminCertFilter]);
+
+  const handleConfirmCertDecision = async () => {
+    if (!certDecisionTarget) return;
+    setIsSubmittingCertDecision(true);
+    const { cert, action } = certDecisionTarget;
+    const isApprove = action === "approve";
+
+    try {
+      const updated = await farmerService.decideCertificate(cert.certNumber, {
+        action,
+        adminNote: certDecisionNote.trim() || (isApprove ? "Admin đã phê duyệt gia hạn chứng chỉ thành công" : "Admin từ chối gia hạn"),
+        approvedExpiryDate: certApprovedExpiryDate.trim() || undefined,
+        newCertNumber: certApprovedNumber.trim() || undefined,
+      });
+
+      setAdminCerts((prev) =>
+        prev.map((item) => (item.certNumber === cert.certNumber ? updated : item))
+      );
+
+      toast.success(
+        isApprove
+          ? `Đã phê duyệt gia hạn chứng chỉ ${cert.certNumber} thành công!`
+          : `Đã từ chối hồ sơ chứng chỉ ${cert.certNumber}!`
+      );
+      setCertDecisionTarget(null);
+      setCertDecisionNote("");
+    } catch (err: any) {
+      toast.error(err.message || "Không thể cập nhật phê duyệt chứng nhận");
+    } finally {
+      setIsSubmittingCertDecision(false);
+    }
+  };
+
+  const handleDeleteAdminCert = async (certNumber: string, name: string) => {
+    if (confirm(`Admin xác nhận xóa chứng nhận "${name}" (${certNumber}) khỏi hệ thống?`)) {
+      try {
+        await farmerService.deleteCertificate(certNumber);
+        setAdminCerts((prev) => prev.filter((c) => c.certNumber !== certNumber));
+        toast.success(`Đã xóa vĩnh viễn chứng nhận "${name}" thành công!`);
+      } catch (err: any) {
+        toast.error(err.message || "Không thể xóa chứng nhận");
+      }
+    }
+  };
 
   // Member 4: Orders, Vouchers, and Loyalty States
   const [orders, setOrders] = useState<ApiOrder[]>([]);
@@ -793,6 +1000,30 @@ function AdminPortalContent() {
             <span>Duyệt Hồ Sơ ({pendingCount})</span>
           </button>
           <button
+            onClick={() => handleTabChange("batches")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
+              activeTab === "batches"
+                ? "bg-white text-red-950 shadow-xs"
+                : "text-red-200 hover:text-white hover:bg-red-800/60"
+            )}
+          >
+            <Package size={14} />
+            <span>Duyệt Lô Xuất Kho ({pendingBatchesCount})</span>
+          </button>
+          <button
+            onClick={() => handleTabChange("certs")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
+              activeTab === "certs"
+                ? "bg-white text-red-950 shadow-xs"
+                : "text-red-200 hover:text-white hover:bg-red-800/60"
+            )}
+          >
+            <Award size={14} />
+            <span>Duyệt Chứng Nhận ({pendingCertsCount})</span>
+          </button>
+          <button
             onClick={() => handleTabChange("orders")}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
@@ -1189,6 +1420,885 @@ function AdminPortalContent() {
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 1.5: XÉT DUYỆT LÔ THU HOẠCH & XUẤT KHO                   */}
+      {/* ========================================================= */}
+      {activeTab === "batches" && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Batch Approval KPIs */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Tổng lô khai báo</div>
+              <div className="text-2xl font-black text-gray-900">{adminBatches.length}</div>
+              <p className="mt-1 text-[11px] text-gray-400">Từ các nông trại trực thuộc</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Chờ duyệt xuất kho</div>
+              <div className="text-2xl font-black text-amber-600">{pendingBatchesCount}</div>
+              <p className="mt-1 text-[11px] text-amber-600/80 font-medium">Cần Admin thẩm định KCS</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Đã duyệt xuất kho</div>
+              <div className="text-2xl font-black text-emerald-700">
+                {adminBatches.filter((b) => b.status === "Đã duyệt xuất kho").length}
+              </div>
+              <p className="mt-1 text-[11px] text-emerald-600/80 font-medium">Đủ điều kiện lưu thông</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Đang vận chuyển / Giao</div>
+              <div className="text-2xl font-black text-blue-700">
+                {
+                  adminBatches.filter(
+                    (b) => b.transportStatus === "Đang vận chuyển" || b.transportStatus === "Đã nhập kho đích"
+                  ).length
+                }
+              </div>
+              <p className="mt-1 text-[11px] text-gray-400">Chuỗi logistics bảo quản lạnh</p>
+            </div>
+          </div>
+
+          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
+            {/* Header & Filter Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 p-4">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                  <Package size={18} className="text-[#1a7a3a]" />
+                  Xét Duyệt Lô Thu Hoạch & Cấp Lệnh Xuất Kho
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Admin thẩm định hồ sơ kiểm nghiệm KCS và tiêu chuẩn VietGAP/GlobalGAP trước khi phê duyệt cho phép nông dân xuất kho và điều phối vận chuyển.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { key: "PENDING", label: `Chờ duyệt (${pendingBatchesCount})` },
+                    {
+                      key: "APPROVED",
+                      label: `Đã duyệt (${adminBatches.filter((b) => b.status === "Đã duyệt xuất kho").length})`,
+                    },
+                    {
+                      key: "REJECTED",
+                      label: `Từ chối (${adminBatches.filter((b) => b.status === "Từ chối xuất kho").length})`,
+                    },
+                    { key: "ALL", label: `Tất cả (${adminBatches.length})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setAdminBatchFilter(tab.key)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
+                      adminBatchFilter === tab.key
+                        ? "bg-[#1a7a3a] text-white shadow-xs"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={fetchAdminBatches}
+                  className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                  title="Tải lại danh sách lô"
+                >
+                  <RefreshCw size={14} className={adminBatchesLoading ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={adminBatchSearch}
+                  onChange={(e) => setAdminBatchSearch(e.target.value)}
+                  placeholder="Tìm kiếm theo mã lô (XL-2026-08), tên nông sản, nông trại..."
+                  className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                />
+              </div>
+              {adminBatchSearch && (
+                <button
+                  onClick={() => setAdminBatchSearch("")}
+                  className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-800 bg-white border border-gray-200 rounded-lg"
+                >
+                  Xóa tìm kiếm
+                </button>
+              )}
+            </div>
+
+            {/* Harvest Lots Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Mã Lô & Nông Sản</th>
+                    <th className="py-3 px-4">Nông Trại / Nơi Trồng</th>
+                    <th className="py-3 px-4">Thu Hoạch & Sản Lượng</th>
+                    <th className="py-3 px-4">Tiêu Chuẩn & KCS</th>
+                    <th className="py-3 px-4">Trạng Thái Xét Duyệt</th>
+                    <th className="py-3 px-4">Lưu Kho / Vận Chuyển</th>
+                    <th className="py-3 px-4 text-right">Thao Tác Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {adminBatchesLoading ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-500">
+                        <RefreshCw size={20} className="animate-spin mx-auto text-emerald-600 mb-2" />
+                        Đang đồng bộ dữ liệu lô thu hoạch từ máy chủ...
+                      </td>
+                    </tr>
+                  ) : filteredAdminBatches.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-gray-500">
+                        <Package size={28} className="mx-auto text-gray-300 mb-2" />
+                        Không tìm thấy lô thu hoạch nào phù hợp với bộ lọc hiện tại.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAdminBatches.map((b) => (
+                      <tr key={b.code} className="hover:bg-gray-50/80 transition-colors">
+                        {/* Mã Lô & Nông Sản */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block text-[11px]">
+                            #{b.code}
+                          </div>
+                          <div className="font-bold text-gray-900 text-xs mt-1">{b.product}</div>
+                          <div className="text-[10px] text-gray-400">
+                            HSD: {b.expiryDate || "Chưa xác định"}
+                          </div>
+                        </td>
+
+                        {/* Nông Trại */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-gray-800 text-xs truncate max-w-[180px]" title={b.farmName}>
+                            {b.farmName || "Nông Trại Xanh Đà Lạt"}
+                          </div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">
+                            Quy trình: {b.cultivation || "Theo tiêu chuẩn an toàn"}
+                          </div>
+                        </td>
+
+                        {/* Thu Hoạch & Sản Lượng */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-gray-900">
+                            {b.qty} {b.unit || "kg"}
+                          </div>
+                          <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
+                            <Clock size={10} className="text-gray-400" />
+                            Ngày hái: {b.harvestDate}
+                          </div>
+                        </td>
+
+                        {/* Tiêu Chuẩn & KCS */}
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
+                            {b.cert || "VietGAP"}
+                          </span>
+                          <div className="text-[10px] text-teal-700 font-medium mt-1 flex items-center gap-1">
+                            <ShieldCheck size={11} className="text-teal-600" />
+                            KCS: Đạt ISO/IEC 17025
+                          </div>
+                        </td>
+
+                        {/* Trạng Thái Xét Duyệt */}
+                        <td className="py-3.5 px-4">
+                          {b.status === "Đã duyệt xuất kho" ? (
+                            <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
+                              <Check size={11} className="text-emerald-700" /> Đã duyệt xuất kho
+                            </span>
+                          ) : b.status === "Từ chối xuất kho" ? (
+                            <span className="bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
+                              <X size={11} className="text-rose-700" /> Từ chối xuất kho
+                            </span>
+                          ) : (
+                            <span className="bg-amber-50 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1 animate-pulse">
+                              <Clock size={11} className="text-amber-600" /> Chờ Admin duyệt
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Lưu Kho & Vận Chuyển */}
+                        <td className="py-3.5 px-4">
+                          {b.transportStatus === "Đang vận chuyển" ? (
+                            <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1">
+                              <Truck size={10} className="text-blue-600" /> Đang vận chuyển
+                            </span>
+                          ) : b.transportStatus === "Đã nhập kho đích" ? (
+                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1">
+                              <CheckCircle2 size={10} className="text-emerald-600" /> Đã nhập kho
+                            </span>
+                          ) : (
+                            <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1">
+                              🏡 Lưu kho vườn
+                            </span>
+                          )}
+                          <div className="text-[10px] text-gray-500 mt-1 truncate max-w-[140px]" title={b.transportDestination}>
+                            Đến: {b.transportDestination || "Kho phân phối"}
+                          </div>
+                        </td>
+
+                        {/* Thao Tác Admin */}
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {b.status === "Chờ duyệt xuất kho" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBatchDecisionTarget({ batch: b, action: "approve" });
+                                    setBatchDecisionReason("Hồ sơ kiểm nghiệm KCS đạt chuẩn an toàn thực phẩm ISO 17025. Đồng ý cấp lệnh xuất kho cho nông trại.");
+                                  }}
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                  title="Phê duyệt xuất kho"
+                                >
+                                  <Check size={12} /> Duyệt
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBatchDecisionTarget({ batch: b, action: "reject" });
+                                    setBatchDecisionReason("Dư lượng chưa đạt tiêu chuẩn an toàn hoặc chứng chỉ VietGAP hết hiệu lực. Yêu cầu tái kiểm định.");
+                                  }}
+                                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Từ chối xuất kho"
+                                >
+                                  <X size={12} /> Từ chối
+                                </button>
+                              </>
+                            ) : b.status === "Đã duyệt xuất kho" ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBatchDecisionTarget({ batch: b, action: "reject" });
+                                  setBatchDecisionReason("Tạm dừng lệnh xuất kho để kiểm tra bổ sung hồ sơ.");
+                                }}
+                                className="px-2.5 py-1 text-amber-700 hover:text-amber-800 text-[11px] font-semibold underline cursor-pointer"
+                              >
+                                Thu hồi duyệt
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBatchDecisionTarget({ batch: b, action: "approve" });
+                                  setBatchDecisionReason("Hồ sơ đã được bổ sung đầy đủ, đồng ý cấp lệnh xuất kho.");
+                                }}
+                                className="px-2.5 py-1 text-emerald-700 hover:text-emerald-800 text-[11px] font-semibold underline cursor-pointer"
+                              >
+                                Duyệt lại
+                              </button>
+                            )}
+
+                            <Link
+                              href={`/traceability?batch=${b.code}`}
+                              className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-[11px] inline-flex items-center gap-1"
+                              title="Xem trang tra cứu QR"
+                            >
+                              <QrCode size={12} /> QR
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Modal Xác Nhận Phê Duyệt / Từ Chối Của Admin */}
+          {batchDecisionTarget && (
+            <div
+              onClick={() => setBatchDecisionTarget(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer animate-in fade-in duration-200"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden cursor-default"
+              >
+                <div
+                  className={`px-5 py-4 flex items-center justify-between text-white ${
+                    batchDecisionTarget.action === "approve" ? "bg-emerald-950" : "bg-rose-950"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {batchDecisionTarget.action === "approve" ? (
+                      <CheckCircle2 size={18} className="text-emerald-400" />
+                    ) : (
+                      <AlertCircle size={18} className="text-rose-400" />
+                    )}
+                    <h3 className="text-sm font-bold">
+                      {batchDecisionTarget.action === "approve"
+                        ? "✅ Phê Duyệt & Cấp Lệnh Xuất Kho Nông Sản"
+                        : "❌ Từ Chối Cấp Lệnh Xuất Kho"}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setBatchDecisionTarget(null)}
+                    className="text-gray-300 hover:text-white p-1 rounded-lg"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4 text-xs">
+                  {/* Thông tin tóm tắt lô */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-emerald-800 text-xs">
+                        #{batchDecisionTarget.batch.code}
+                      </span>
+                      <span className="font-bold text-gray-700">
+                        {batchDecisionTarget.batch.qty} {batchDecisionTarget.batch.unit}
+                      </span>
+                    </div>
+                    <div className="font-bold text-gray-900 text-xs">
+                      {batchDecisionTarget.batch.product}
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      Nông trại: {batchDecisionTarget.batch.farmName} • Tiêu chuẩn: {batchDecisionTarget.batch.cert}
+                    </div>
+                  </div>
+
+                  {batchDecisionTarget.action === "approve" ? (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-[11px] leading-relaxed">
+                      Khi xác nhận phê duyệt, lô hàng sẽ chuyển sang trạng thái <strong>"Đã duyệt xuất kho"</strong>.
+                      Nông dân sẽ được mở khóa quyền điều phối xe lạnh và bắt đầu vận chuyển nông sản đến kho đích.
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-[11px] leading-relaxed">
+                      Lô hàng sẽ bị đánh dấu <strong>"Từ chối xuất kho"</strong>. Hệ thống sẽ khóa chức năng điều phối vận chuyển của nông dân cho đến khi có kết quả kiểm định mới.
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">
+                      Nhận xét thẩm định KCS & Ý kiến chỉ đạo của Admin: *
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={batchDecisionReason}
+                      onChange={(e) => setBatchDecisionReason(e.target.value)}
+                      placeholder="Nhập nhận xét phê duyệt hoặc lý do từ chối..."
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setBatchDecisionTarget(null)}
+                      className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                    >
+                      Hủy bỏ
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmittingBatchDecision}
+                      onClick={handleConfirmBatchDecision}
+                      className={`px-4 py-2 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 ${
+                        batchDecisionTarget.action === "approve"
+                          ? "bg-[#1a7a3a] hover:bg-[#14622e]"
+                          : "bg-rose-600 hover:bg-rose-700"
+                      }`}
+                    >
+                      {isSubmittingBatchDecision ? (
+                        <RefreshCw size={13} className="animate-spin" />
+                      ) : batchDecisionTarget.action === "approve" ? (
+                        <Check size={13} />
+                      ) : (
+                        <X size={13} />
+                      )}
+                      {batchDecisionTarget.action === "approve"
+                        ? "Xác Nhận Phê Duyệt Xuất Kho"
+                        : "Xác Nhận Từ Chối"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 1.75: XÉT DUYỆT CHỨNG NHẬN & HỒ SƠ GIA HẠN              */}
+      {/* ========================================================= */}
+      {activeTab === "certs" && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Certificate Approval KPIs */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Tổng chứng nhận nông trại</div>
+              <div className="text-2xl font-black text-gray-900">{adminCerts.length}</div>
+              <p className="mt-1 text-[11px] text-gray-400">VietGAP, GlobalGAP, Organic</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Chờ duyệt gia hạn & cấp mới</div>
+              <div className="text-2xl font-black text-amber-600">{pendingCertsCount}</div>
+              <p className="mt-1 text-[11px] text-amber-600/80 font-medium">Cần Admin thẩm định hồ sơ</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Đang có hiệu lực</div>
+              <div className="text-2xl font-black text-emerald-700">
+                {adminCerts.filter((c) => c.status === "VALID" && c.approvalStatus !== "PENDING").length}
+              </div>
+              <p className="mt-1 text-[11px] text-emerald-600/80 font-medium">Đạt chuẩn lưu hành nông sản</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-gray-500">Sắp hết hạn / Hết hạn</div>
+              <div className="text-2xl font-black text-rose-600">
+                {adminCerts.filter((c) => c.status === "EXPIRING_SOON" || c.status === "EXPIRED").length}
+              </div>
+              <p className="mt-1 text-[11px] text-rose-500/80 font-medium">Cảnh báo tự động gửi email</p>
+            </div>
+          </div>
+
+          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
+            {/* Header & Filter Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 p-4">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                  <Award size={18} className="text-[#1a7a3a]" />
+                  Xét Duyệt Chứng Nhận Tiêu Chuẩn Nông Nghiệp & Gia Hạn
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Admin thẩm định hồ sơ đăng ký cấp mới hoặc gia hạn chứng chỉ chất lượng (VietGAP / GlobalGAP) từ các nông trại, kiểm tra ảnh minh chứng kiểm nghiệm và cấp hiệu lực mới.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { key: "PENDING", label: `Chờ duyệt (${pendingCertsCount})` },
+                    {
+                      key: "VALID",
+                      label: `Có hiệu lực (${adminCerts.filter((c) => c.status === "VALID" && c.approvalStatus !== "PENDING").length})`,
+                    },
+                    {
+                      key: "EXPIRED",
+                      label: `Hết hạn / Cảnh báo (${adminCerts.filter((c) => c.status === "EXPIRED" || c.status === "EXPIRING_SOON" || c.approvalStatus === "REJECTED").length})`,
+                    },
+                    { key: "ALL", label: `Tất cả (${adminCerts.length})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setAdminCertFilter(tab.key)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
+                      adminCertFilter === tab.key
+                        ? "bg-[#1a7a3a] text-white shadow-xs"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={fetchAdminCerts}
+                  className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                  title="Tải lại danh sách chứng nhận"
+                >
+                  <RefreshCw size={14} className={adminCertsLoading ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={adminCertSearch}
+                  onChange={(e) => setAdminCertSearch(e.target.value)}
+                  placeholder="Tìm kiếm theo số hiệu chứng chỉ (GG-VN-9942), tên tiêu chuẩn, nông trại..."
+                  className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                />
+              </div>
+              {adminCertSearch && (
+                <button
+                  onClick={() => setAdminCertSearch("")}
+                  className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-800 bg-white border border-gray-200 rounded-lg"
+                >
+                  Xóa tìm kiếm
+                </button>
+              )}
+            </div>
+
+            {/* Certificates Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Tên Chứng Nhận & Tiêu Chuẩn</th>
+                    <th className="py-3 px-4">Nông Trại Trực Thuộc</th>
+                    <th className="py-3 px-4">Số Hiệu & Đơn Vị Cấp</th>
+                    <th className="py-3 px-4">Thời Hạn & Đề Xuất Mới</th>
+                    <th className="py-3 px-4">Trạng Thái Xét Duyệt</th>
+                    <th className="py-3 px-4">Tài Liệu Minh Chứng</th>
+                    <th className="py-3 px-4 text-right">Thao Tác Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {adminCertsLoading ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-500">
+                        <RefreshCw size={20} className="animate-spin mx-auto text-emerald-600 mb-2" />
+                        Đang tải danh sách chứng nhận nông trại...
+                      </td>
+                    </tr>
+                  ) : filteredAdminCerts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-gray-500">
+                        <Award size={28} className="mx-auto text-gray-300 mb-2" />
+                        Không tìm thấy chứng nhận nào phù hợp với bộ lọc hiện tại.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAdminCerts.map((c) => {
+                      const isPending = c.approvalStatus === "PENDING" || c.status === "PENDING";
+                      return (
+                        <tr key={c.certNumber} className="hover:bg-gray-50/80 transition-colors">
+                          {/* Tên Chứng Nhận */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-gray-900 text-xs">{c.name}</div>
+                            <span className="font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block text-[10px] mt-1 font-semibold">
+                              Số hiệu: {c.certNumber}
+                            </span>
+                          </td>
+
+                          {/* Nông Trại */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-gray-800 text-xs truncate max-w-[180px]" title={c.farmName}>
+                              {c.farmName || c.farmCode}
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">Mã trại: {c.farmCode}</div>
+                          </td>
+
+                          {/* Đơn Vị Cấp */}
+                          <td className="py-3.5 px-4">
+                            <div className="text-gray-700 text-xs font-medium truncate max-w-[170px]" title={c.issuedBy}>
+                              {c.issuedBy || "Tổ chức Kiểm định Quốc tế"}
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">Ngày cấp: {c.issueDate || "01/01/2026"}</div>
+                          </td>
+
+                          {/* Thời Hạn & Đề Xuất Mới */}
+                          <td className="py-3.5 px-4">
+                            <div className="text-xs font-semibold text-gray-700">
+                              Hạn cũ: <strong className="text-rose-600">{c.expiryDate}</strong>
+                            </div>
+                            {c.pendingRequestedExpiryDate && (
+                              <div className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block mt-1">
+                                Xin gia hạn đến: {c.pendingRequestedExpiryDate}
+                              </div>
+                            )}
+                            {c.pendingNewCertNumber && c.pendingNewCertNumber !== c.certNumber && (
+                              <div className="text-[10px] text-gray-500 mt-0.5">
+                                Mã mới: <span className="font-mono font-bold text-gray-800">{c.pendingNewCertNumber}</span>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Trạng Thái Xét Duyệt */}
+                          <td className="py-3.5 px-4">
+                            {isPending ? (
+                              <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1 animate-pulse">
+                                <Clock size={11} className="text-amber-600" />
+                                {c.pendingRequestedExpiryDate ? "Chờ duyệt gia hạn" : "Chờ duyệt cấp mới"}
+                              </span>
+                            ) : c.approvalStatus === "REJECTED" ? (
+                              <span className="bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
+                                <X size={11} className="text-rose-700" /> Bị từ chối
+                              </span>
+                            ) : c.status === "EXPIRED" ? (
+                              <span className="bg-rose-50 text-rose-800 border border-rose-300 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
+                                <AlertTriangle size={11} className="text-rose-600" /> Đã hết hạn
+                              </span>
+                            ) : c.status === "EXPIRING_SOON" ? (
+                              <span className="bg-amber-50 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
+                                <AlertTriangle size={11} className="text-amber-600" /> Sắp hết hạn
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
+                                <Check size={11} className="text-emerald-700" /> Đang có hiệu lực
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Minh Chứng */}
+                          <td className="py-3.5 px-4">
+                            {c.pendingProofImage ? (
+                              <button
+                                type="button"
+                                onClick={() => setViewingProofImage(c.pendingProofImage)}
+                                className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Eye size={11} /> Xem ảnh hồ sơ
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 italic">Không có ảnh</span>
+                            )}
+                          </td>
+
+                          {/* Thao Tác Admin */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {isPending ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCertDecisionTarget({ cert: c, action: "approve" });
+                                      setCertApprovedExpiryDate(c.pendingRequestedExpiryDate || "");
+                                      setCertApprovedNumber(c.pendingNewCertNumber || c.certNumber);
+                                      setCertDecisionNote("Hồ sơ đánh giá lại đạt chuẩn VietGAP/GlobalGAP. Phê duyệt gia hạn hiệu lực thêm 1 năm.");
+                                    }}
+                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    title="Phê duyệt gia hạn chứng chỉ"
+                                  >
+                                    <Check size={12} /> Duyệt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCertDecisionTarget({ cert: c, action: "reject" });
+                                      setCertDecisionNote("Hồ sơ kiểm định chưa đạt chuẩn an toàn hoặc thiếu chữ ký xác nhận của đơn vị đánh giá.");
+                                    }}
+                                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="Từ chối gia hạn"
+                                  >
+                                    <X size={12} /> Từ chối
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCertDecisionTarget({ cert: c, action: "approve" });
+                                    setCertApprovedExpiryDate("");
+                                    setCertApprovedNumber(c.certNumber);
+                                    setCertDecisionNote("Cập nhật gia hạn thủ công thời hạn hiệu lực mới.");
+                                  }}
+                                  className="px-2.5 py-1 text-emerald-700 hover:text-emerald-800 text-[11px] font-semibold underline cursor-pointer"
+                                >
+                                  Cấp hạn mới
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAdminCert(c.certNumber, c.name)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer transition-colors"
+                                title="Xóa chứng nhận này khỏi hệ thống"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Modal Phê Duyệt / Từ Chối Chứng Nhận Của Admin */}
+          {certDecisionTarget && (
+            <div
+              onClick={() => setCertDecisionTarget(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer animate-in fade-in duration-200"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden cursor-default"
+              >
+                <div
+                  className={`px-5 py-4 flex items-center justify-between text-white ${
+                    certDecisionTarget.action === "approve" ? "bg-emerald-950" : "bg-rose-950"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {certDecisionTarget.action === "approve" ? (
+                      <CheckCircle2 size={18} className="text-emerald-400" />
+                    ) : (
+                      <AlertCircle size={18} className="text-rose-400" />
+                    )}
+                    <h3 className="text-sm font-bold">
+                      {certDecisionTarget.action === "approve"
+                        ? "✅ Phê Duyệt Hiệu Lực Chứng Nhận Nông Trại"
+                        : "❌ Từ Chối Hồ Sơ Chứng Nhận"}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setCertDecisionTarget(null)}
+                    className="text-gray-300 hover:text-white p-1 rounded-lg"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4 text-xs">
+                  {/* Tóm tắt chứng chỉ */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-emerald-800 text-xs">
+                        #{certDecisionTarget.cert.certNumber}
+                      </span>
+                      <span className="text-[11px] text-gray-500">
+                        Nông trại: <strong>{certDecisionTarget.cert.farmName}</strong>
+                      </span>
+                    </div>
+                    <div className="font-bold text-gray-900 text-xs">
+                      {certDecisionTarget.cert.name}
+                    </div>
+                    <div className="text-[11px] text-gray-600">
+                      Hạn cũ: <span className="text-rose-600 font-bold">{certDecisionTarget.cert.expiryDate}</span>
+                      {certDecisionTarget.cert.pendingRequestedExpiryDate && (
+                        <span>
+                          {" "}
+                          $\rightarrow$ Đề xuất hạn mới:{" "}
+                          <strong className="text-emerald-700 font-bold">
+                            {certDecisionTarget.cert.pendingRequestedExpiryDate}
+                          </strong>
+                        </span>
+                      )}
+                    </div>
+                    {certDecisionTarget.cert.pendingNote && (
+                      <div className="text-[10px] text-gray-500 italic bg-white p-2 rounded border border-gray-100">
+                        Lời nhắn của nông trại: &ldquo;{certDecisionTarget.cert.pendingNote}&rdquo;
+                      </div>
+                    )}
+                  </div>
+
+                  {certDecisionTarget.action === "approve" && (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-gray-700 font-bold mb-1 text-[11px]">
+                          Số hiệu chứng chỉ mới:
+                        </label>
+                        <input
+                          type="text"
+                          value={certApprovedNumber}
+                          onChange={(e) => setCertApprovedNumber(e.target.value)}
+                          placeholder="Số hiệu chứng chỉ..."
+                          className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-700 font-bold mb-1 text-[11px]">
+                          Ngày hết hạn hiệu lực mới:
+                        </label>
+                        <input
+                          type="text"
+                          value={certApprovedExpiryDate}
+                          onChange={(e) => setCertApprovedExpiryDate(e.target.value)}
+                          placeholder="dd/MM/yyyy (VD: 25/11/2027)"
+                          className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">
+                      Nhận xét thẩm định của Ban Quản Trị / Admin: *
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={certDecisionNote}
+                      onChange={(e) => setCertDecisionNote(e.target.value)}
+                      placeholder="Nhập nhận xét phê duyệt gia hạn hoặc lý do từ chối..."
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setCertDecisionTarget(null)}
+                      className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                    >
+                      Hủy bỏ
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmittingCertDecision}
+                      onClick={handleConfirmCertDecision}
+                      className={`px-4 py-2 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 ${
+                        certDecisionTarget.action === "approve"
+                          ? "bg-[#1a7a3a] hover:bg-[#14622e]"
+                          : "bg-rose-600 hover:bg-rose-700"
+                      }`}
+                    >
+                      {isSubmittingCertDecision ? (
+                        <RefreshCw size={13} className="animate-spin" />
+                      ) : certDecisionTarget.action === "approve" ? (
+                        <Check size={13} />
+                      ) : (
+                        <X size={13} />
+                      )}
+                      {certDecisionTarget.action === "approve"
+                        ? "Xác Nhận Phê Duyệt Gia Hạn"
+                        : "Xác Nhận Từ Chối"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Xem Ảnh Minh Chứng Đính Kèm */}
+          {viewingProofImage && (
+            <div
+              onClick={() => setViewingProofImage(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs cursor-pointer animate-in fade-in"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white max-w-lg w-full rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3 cursor-default"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                    <FileCheck size={14} className="text-[#1a7a3a]" /> Hồ Sơ Giấy Kiểm Định Minh Chứng
+                  </span>
+                  <button onClick={() => setViewingProofImage(null)} className="text-gray-400 hover:text-gray-700">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-gray-200 max-h-[70vh]">
+                  <img
+                    src={viewingProofImage}
+                    alt="Hồ sơ chứng nhận"
+                    className="w-full h-auto object-contain max-h-[65vh]"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setViewingProofImage(null)}
+                    className="px-3.5 py-1.5 bg-gray-200 hover:bg-gray-300 font-bold text-xs rounded-xl text-gray-800"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

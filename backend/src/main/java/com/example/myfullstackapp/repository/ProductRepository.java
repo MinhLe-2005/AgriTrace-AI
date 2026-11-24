@@ -10,6 +10,8 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, String> {
     List<Product> findByActiveTrue();
+    List<Product> findByOwnerIdIgnoreCaseAndActiveTrue(String ownerId);
+    List<Product> findByFarmCodeIgnoreCaseAndActiveTrue(String farmCode);
     List<Product> findByCategoryCodeAndActiveTrue(String categoryCode);
     List<Product> findByFeaturedTrueAndActiveTrue();
     Optional<Product> findByBatchCode(String batchCode);
