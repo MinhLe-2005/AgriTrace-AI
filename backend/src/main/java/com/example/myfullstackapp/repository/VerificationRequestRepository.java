@@ -27,6 +27,5 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
 
     @EntityGraph(attributePaths = {"subject", "reviewedBy"})
     List<VerificationRequest> findBySubjectEmailIgnoreCaseOrderByCreatedAtDesc(String email);
-
     boolean existsBySubjectIdAndStatusIn(UUID subjectId, List<VerificationStatus> statuses);
 }

@@ -1,6 +1,6 @@
 import { api, unpack } from "@/lib/api";
 import type { ApiResponse } from "@/types/api";
-import type { VerificationRequest, VerificationSubmitInput } from "@/types/verification";
+import type { VerificationRequest, VerificationSubmission, VerificationSubmitInput } from "@/types/verification";
 
 export const verificationsService = {
   async list() {
@@ -13,7 +13,11 @@ export const verificationsService = {
     });
     return unpack(data);
   },
-  async submit(input: VerificationSubmitInput) {
+  async listMine() {
+    const { data } = await api.get<ApiResponse<VerificationRequest[]>>("/verifications/mine");
+    return unpack(data);
+  },
+  async submit(input: VerificationSubmission | VerificationSubmitInput) {
     const { data } = await api.post<ApiResponse<VerificationRequest>>("/verifications", input);
     return unpack(data);
   },

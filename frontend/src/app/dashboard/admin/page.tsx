@@ -6,19 +6,19 @@ import {
   AlertTriangle,
   Award,
   BookOpen,
-  Calendar,
   Check,
   CheckCircle2,
   Clock,
   Crown,
   DollarSign,
   Edit,
-  ExternalLink,
   Eye,
   FileCheck,
   FileText,
   Filter,
   Gift,
+  LayoutGrid,
+  List,
   Package,
   Plus,
   Power,
@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  CalendarDays,
   Ticket,
   Trash2,
   Truck,
@@ -41,6 +42,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { ErrorState, LoadingSkeleton } from "@/components/ui/states";
+import { AdminPageHeader, AdminStatCard } from "@/features/admin/admin-ui";
 import { useUsers } from "@/hooks/use-users";
 import { useVerificationMutations, useVerifications } from "@/hooks/use-verifications";
 import { getApiErrorMessage } from "@/lib/api";
@@ -71,28 +73,12 @@ function submittedAt(value: string) {
 }
 
 type AdminTab = "verifications" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog";
+const ADMIN_TABS: AdminTab[] = ["verifications", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"];
 
 function AdminPortalContent() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab") as AdminTab | null;
-
-  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
-    if (tabParam && ["verifications", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
-      return tabParam;
-    }
-    return "verifications";
-  });
-
-  useEffect(() => {
-    if (tabParam && ["verifications", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"].includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
-
-  const handleTabChange = (tab: AdminTab) => {
-    setActiveTab(tab);
-    window.history.replaceState(null, "", `/dashboard/admin?tab=${tab}`);
-  };
+  const activeTab: AdminTab = tabParam && ADMIN_TABS.includes(tabParam) ? tabParam : "verifications";
 
   // Member 1: Users & Verifications Hooks
   const users = useUsers();
@@ -333,6 +319,7 @@ function AdminPortalContent() {
   // Member 4: Orders, Vouchers, and Loyalty States
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState(false);
   const [orderSearch, setOrderSearch] = useState("");
   const [orderFilter, setOrderFilter] = useState("ALL");
   const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null);
@@ -382,6 +369,7 @@ function AdminPortalContent() {
 
   const [eventSearch, setEventSearch] = useState("");
   const [eventFilter, setEventFilter] = useState<"all" | "active" | "upcoming" | "expired">("all");
+  const [eventView, setEventView] = useState<"table" | "cards">("table");
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState({
@@ -445,6 +433,7 @@ function AdminPortalContent() {
 
   async function fetchOrders() {
     setOrdersLoading(true);
+    setOrdersError(false);
     try {
       const data = await catalogService.getOrders();
       const sorted = [...(data || [])].sort((a, b) => {
@@ -455,6 +444,7 @@ function AdminPortalContent() {
       });
       setOrders(sorted);
     } catch {
+      setOrdersError(true);
       toast.error("Không tải được danh sách đơn hàng.");
     } finally {
       setOrdersLoading(false);
@@ -963,128 +953,21 @@ function AdminPortalContent() {
   const totalUsers = users.isPending ? "…" : users.isError ? "—" : (users.data?.length ?? 0).toLocaleString("vi-VN");
   const lockedUsers = users.isPending ? "…" : users.isError ? "—" : (users.data?.filter((user) => !user.active).length ?? 0).toLocaleString("vi-VN");
   const pendingCount = verifications.isPending ? "…" : verifications.isError ? "—" : pendingRequests.length.toLocaleString("vi-VN");
+  const headerByTab = {
+    verifications: { title: "Tổng quan & duyệt hồ sơ", description: "Theo dõi tài khoản hệ thống và xử lý hồ sơ xác minh của nông dân, nhà phân phối.", icon: Shield, tone: "forest" as const, meta: `${pendingCount} hồ sơ chờ` },
+    batches: { title: "Duyệt lô thu hoạch & xuất kho", description: "Thẩm định hồ sơ kiểm nghiệm KCS và tiêu chuẩn VietGAP/GlobalGAP trước khi cấp lệnh xuất kho.", icon: Package, tone: "forest" as const, meta: `${pendingBatchesCount} lô chờ duyệt` },
+    certs: { title: "Duyệt chứng nhận & gia hạn", description: "Thẩm định hồ sơ đăng ký cấp mới hoặc gia hạn chứng chỉ chất lượng nông trại.", icon: Award, tone: "amber" as const, meta: `${pendingCertsCount} chứng nhận chờ` },
+    orders: { title: "Quản lý đơn hàng hệ thống", description: "Giám sát vòng đời đơn hàng và điều phối các bước chuyển trạng thái được phép.", icon: ShoppingBag, tone: "ocean" as const, meta: `${orders.length} đơn hàng` },
+    vouchers: { title: "Kho voucher & ưu đãi", description: "Quản lý mã khuyến mãi, điều kiện áp dụng và trạng thái sử dụng trên toàn hệ thống.", icon: Ticket, tone: "violet" as const, meta: `${vouchers.length} voucher` },
+    loyalty: { title: "Hội viên AgriClub", description: "Theo dõi hạng thành viên, điểm thưởng và lịch sử chi tiêu của khách hàng.", icon: Crown, tone: "amber" as const, meta: `${members.length} hội viên` },
+    events: { title: "Sự kiện & mùa vụ", description: "Quản lý thời gian, ưu đãi và phạm vi nông sản áp dụng cho từng chiến dịch.", icon: CalendarDays, tone: "teal" as const, meta: `${campaigns.length} chiến dịch` },
+    blog: { title: "Quản trị blog & cẩm nang", description: "Quản lý nội dung, chuyên mục, trạng thái xuất bản và thông tin tác giả.", icon: BookOpen, tone: "indigo" as const, meta: `${blogPosts.length} bài viết` },
+  } satisfies Record<AdminTab, { title: string; description: string; icon: typeof Shield; tone: "forest" | "ocean" | "violet" | "amber" | "teal" | "indigo"; meta: string }>;
+  const pageHeader = headerByTab[activeTab];
 
   return (
-    <div className="space-y-6">
-      {/* ── Top Header Banner ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-red-900 bg-red-950 p-5 text-white shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-800 shadow-md">
-            <Shield size={24} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold">Cổng Quản Trị Viên (Admin Portal)</h1>
-              <span className="rounded-full border border-red-400/30 bg-red-500/30 px-2 py-0.5 text-[11px] font-semibold text-red-300">
-                Toàn Hệ Thống
-              </span>
-            </div>
-            <p className="text-xs text-red-200/80">
-              Quản trị toàn diện: Người dùng, Đơn hàng chuỗi cung ứng, Kho Voucher & Hội viên AgriClub.
-            </p>
-          </div>
-        </div>
-
-        {/* Global Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-red-900/60 p-1 border border-red-800/80 text-xs font-semibold">
-          <button
-            onClick={() => handleTabChange("verifications")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "verifications"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <UserCheck size={14} />
-            <span>Duyệt Hồ Sơ ({pendingCount})</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("batches")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "batches"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <Package size={14} />
-            <span>Duyệt Lô Xuất Kho ({pendingBatchesCount})</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("certs")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "certs"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <Award size={14} />
-            <span>Duyệt Chứng Nhận ({pendingCertsCount})</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("orders")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "orders"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <ShoppingBag size={14} />
-            <span>Quản Lý Đơn Hàng</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("vouchers")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "vouchers"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <Ticket size={14} />
-            <span>Kho Voucher</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("loyalty")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "loyalty"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <Crown size={14} />
-            <span>Hội Viên AgriClub</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("events")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "events"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <Sparkles size={14} />
-            <span>Sự Kiện & Mùa Vụ ({campaigns.length})</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("blog")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer",
-              activeTab === "blog"
-                ? "bg-white text-red-950 shadow-xs"
-                : "text-red-200 hover:text-white hover:bg-red-800/60"
-            )}
-          >
-            <BookOpen size={14} />
-            <span>Quản Trị Blog ({blogPosts.length})</span>
-          </button>
-        </div>
-      </div>
+    <div className="space-y-6 [&_button]:touch-manipulation [&_button]:focus-visible:outline-none [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-primary [&_input]:focus-visible:ring-2 [&_input]:focus-visible:ring-primary/30 [&_select]:focus-visible:ring-2 [&_select]:focus-visible:ring-primary/30 [&_textarea]:focus-visible:ring-2 [&_textarea]:focus-visible:ring-primary/30">
+      <AdminPageHeader title={pageHeader.title} description={pageHeader.description} icon={pageHeader.icon} tone={pageHeader.tone} meta={pageHeader.meta} />
 
       {/* ========================================================= */}
       {/* TAB 1: PHÊ DUYỆT HỒ SƠ & TỔNG QUAN TÀI KHOẢN (MEMBER 1)     */}
@@ -1092,28 +975,10 @@ function AdminPortalContent() {
       {activeTab === "verifications" && (
         <div className="space-y-6 animate-fade-in">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Tổng tài khoản</div>
-              <div className="text-2xl font-black text-gray-900">{totalUsers}</div>
-              {users.isError && <p className="mt-1 text-[11px] text-red-600">Không tải được dữ liệu người dùng.</p>}
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Chờ duyệt xác minh</div>
-              <div className="text-2xl font-black text-amber-600">{pendingCount}</div>
-              {verifications.isError && <p className="mt-1 text-[11px] text-red-600">Không tải được hồ sơ xác minh.</p>}
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Tài khoản bị khóa</div>
-              <div className="text-2xl font-black text-red-600">{lockedUsers}</div>
-              {users.isError && <p className="mt-1 text-[11px] text-red-600">Không tải được dữ liệu người dùng.</p>}
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Doanh thu hệ thống</div>
-              <div className="text-2xl font-black text-emerald-700">
-                {totalRevenue.toLocaleString("vi-VN")} đ
-              </div>
-              <p className="mt-1 text-[11px] text-gray-400">Từ các đơn hàng đã xác nhận</p>
-            </div>
+            <AdminStatCard label="Tổng tài khoản" value={totalUsers} helper={users.isError ? "Không tải được dữ liệu người dùng" : "Tất cả tài khoản trong hệ thống"} icon={Users} />
+            <AdminStatCard label="Chờ duyệt xác minh" value={pendingCount} helper={verifications.isError ? "Không tải được hồ sơ xác minh" : "Hồ sơ cần quản trị viên xử lý"} icon={UserCheck} tone="warning" />
+            <AdminStatCard label="Tài khoản bị khóa" value={lockedUsers} helper="Tài khoản hiện không thể truy cập" icon={AlertCircle} tone="danger" />
+            <AdminStatCard label="Doanh thu hệ thống" value={`${totalRevenue.toLocaleString("vi-VN")} đ`} helper="Từ các đơn hàng đã xác nhận" icon={DollarSign} tone="success" />
           </div>
 
           <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
@@ -1293,7 +1158,6 @@ function AdminPortalContent() {
                           </div>
                         )}
                       </div>
-
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {request.status !== "APPROVED" && (
                           <button
@@ -2310,33 +2174,11 @@ function AdminPortalContent() {
       {activeTab === "orders" && (
         <div className="space-y-6 animate-fade-in">
           {/* Order KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-              <div className="text-xs text-gray-500">Tổng số đơn hàng</div>
-              <div className="text-2xl font-black text-gray-900">{orders.length}</div>
-              <div className="text-[11px] text-gray-400 mt-1">Toàn bộ khách hàng</div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-              <div className="text-xs text-gray-500">Đang giao xe lạnh</div>
-              <div className="text-2xl font-black text-blue-600">
-                {orders.filter((o) => o.status === "SHIPPING").length}
-              </div>
-              <div className="text-[11px] text-blue-500 mt-1">Xe lạnh chuyên dụng</div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-              <div className="text-xs text-gray-500">Đã giao thành công</div>
-              <div className="text-2xl font-black text-emerald-700">
-                {orders.filter((o) => o.status === "DELIVERED").length}
-              </div>
-              <div className="text-[11px] text-emerald-600 mt-1">Hoàn tất quy trình</div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-              <div className="text-xs text-gray-500">Tổng doanh thu</div>
-              <div className="text-2xl font-black text-amber-600">
-                {totalRevenue.toLocaleString("vi-VN")} đ
-              </div>
-              <div className="text-[11px] text-gray-400 mt-1">COD + VietQR 24/7</div>
-            </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <AdminStatCard label="Tổng đơn hàng" value={orders.length} helper="Tất cả đơn trên hệ thống" icon={Package} />
+            <AdminStatCard label="Đang xử lý / giao" value={orders.filter((o) => ["PAID", "CONFIRMED", "SHIPPING"].includes(String(o.status).toUpperCase())).length} helper="Đơn đang trong quy trình vận hành" icon={Truck} tone="primary" />
+            <AdminStatCard label="Đã đóng quy trình" value={orders.filter((o) => ["DELIVERED", "COMPLETED", "CANCELLED", "REFUNDED"].includes(String(o.status).toUpperCase())).length} helper="Hoàn tất, hủy hoặc hoàn tiền" icon={CheckCircle2} tone="success" />
+            <AdminStatCard label="Doanh thu ghi nhận" value={`${totalRevenue.toLocaleString("vi-VN")} đ`} helper="COD + VietQR 24/7" icon={DollarSign} tone="warning" />
           </div>
 
           {/* Filter & Search Bar */}
@@ -2345,10 +2187,10 @@ function AdminPortalContent() {
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm theo mã đơn (#ORD-...), tên người nhận, SĐT hoặc email..."
+                placeholder="Tìm theo mã đơn, tên người nhận, SĐT hoặc email…"
                 value={orderSearch}
                 onChange={(e) => setOrderSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-red-600"
+                className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-4 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
             </div>
 
@@ -2369,7 +2211,7 @@ function AdminPortalContent() {
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
                     orderFilter === f.key
-                      ? "bg-red-950 text-white"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   )}
                 >
@@ -2380,6 +2222,7 @@ function AdminPortalContent() {
                 onClick={fetchOrders}
                 className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs transition-colors shrink-0"
                 title="Làm mới"
+                aria-label="Làm mới danh sách đơn hàng"
               >
                 <RefreshCw size={14} className={ordersLoading ? "animate-spin" : ""} />
               </button>
@@ -2404,9 +2247,11 @@ function AdminPortalContent() {
                   {ordersLoading ? (
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-gray-400">
-                        Đang tải danh sách đơn hàng...
+                        Đang tải danh sách đơn hàng…
                       </td>
                     </tr>
+                  ) : ordersError ? (
+                    <tr><td colSpan={6} className="p-8 text-center text-red-600">Không thể tải đơn hàng. <button className="font-semibold underline" onClick={fetchOrders}>Thử lại</button></td></tr>
                   ) : filteredOrders.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-gray-400">
@@ -2496,43 +2341,19 @@ function AdminPortalContent() {
                                 : "bg-amber-50 text-amber-700 border-amber-200"
                             )}
                           >
-                            {order.status === "DELIVERED" || order.status === "COMPLETED"
-                              ? "✅ Đã giao thành công"
-                              : order.status === "SHIPPING"
-                              ? "🚚 Đang giao xe lạnh"
-                              : order.status === "CANCELLED"
-                              ? "❌ Đã hủy đơn"
-                              : order.status === "REFUNDED"
-                              ? "↩️ Đã hoàn tiền"
-                              : order.status === "PAID"
-                              ? "📦 Chờ đóng gói"
-                              : order.status === "PENDING_PAYMENT"
-                              ? "⏳ Chờ TT (Giữ hàng 30p)"
-                              : "📦 Chờ đóng gói"}
+                            <span aria-hidden className="mr-1.5 inline-block size-1.5 rounded-full bg-current" />
+                            {orderStatusLabel(order.status)}
                           </span>
                         </td>
                         <td className="p-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <select
-                              value={order.status}
-                              disabled={(order.allowedNextStatuses ?? []).length === 0}
-                              onChange={(e) => {
-                                const next = e.target.value;
-                                if (next === "CANCELLED" && !window.confirm(`Hủy đơn #${order.orderCode}? Tồn kho sẽ được hoàn và điểm thưởng của khách bị thu hồi.`)) return;
-                                handleUpdateOrderStatus(order.orderCode, next);
-                              }}
-                              className="text-[11px] font-semibold border border-gray-200 rounded-lg p-1 bg-white outline-none focus:border-red-600 disabled:opacity-50"
-                            >
-                              {ORDER_STATUS_OPTIONS.map((opt) => (
-                                <option
-                                  key={opt.value}
-                                  value={opt.value}
-                                  disabled={opt.value !== order.status && !(order.allowedNextStatuses ?? []).includes(opt.value)}
-                                >
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
+                            <button type="button" onClick={() => setSelectedOrder(order)} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Chi tiết</button>
+                            {(order.allowedNextStatuses ?? []).filter((status) => status !== "CANCELLED").slice(0, 1).map((status) => (
+                              <button key={status} type="button" onClick={() => void handleUpdateOrderStatus(order.orderCode, status)} className="rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                                Chuyển: {orderStatusLabel(status)}
+                              </button>
+                            ))}
+                            {(order.allowedNextStatuses ?? []).includes("CANCELLED") && <button type="button" onClick={() => { if (window.confirm(`Hủy đơn #${order.orderCode}? Tồn kho sẽ được hoàn và điểm thưởng của khách bị thu hồi.`)) void handleUpdateOrderStatus(order.orderCode, "CANCELLED"); }} className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-danger hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger">Hủy</button>}
                           </div>
                         </td>
                       </tr>
@@ -2542,6 +2363,7 @@ function AdminPortalContent() {
               </table>
             </div>
           </div>
+          {selectedOrder && <div className="fixed inset-0 z-50 flex justify-end bg-black/30" role="presentation" onClick={() => setSelectedOrder(null)}><aside role="dialog" aria-modal="true" aria-label="Chi tiết đơn hàng" onClick={(e) => e.stopPropagation()} className="h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4 border-b pb-4"><div><p className="text-xs font-semibold text-red-700">VẬN HÀNH HỆ THỐNG</p><h3 className="mt-1 text-lg font-bold">Đơn #{selectedOrder.orderCode}</h3></div><button aria-label="Đóng chi tiết đơn hàng" onClick={() => setSelectedOrder(null)} className="rounded-lg p-2 hover:bg-gray-100"><X size={18} /></button></div><dl className="mt-5 space-y-4 text-sm"><div><dt className="text-gray-500">Người nhận</dt><dd className="font-semibold">{selectedOrder.receiverName || "—"}</dd><dd className="text-gray-600">{selectedOrder.receiverPhone || "—"}</dd></div><div><dt className="text-gray-500">Địa chỉ</dt><dd>{selectedOrder.receiverAddress || "—"}</dd></div><div><dt className="text-gray-500">Tổng thanh toán</dt><dd className="font-bold">{(selectedOrder.total || 0).toLocaleString("vi-VN")} đ</dd></div><div><dt className="text-gray-500">Trạng thái hiện tại</dt><dd className="font-semibold">{selectedOrder.status}</dd></div><div><dt className="text-gray-500">Bước chuyển được phép</dt><dd>{selectedOrder.allowedNextStatuses?.length ? selectedOrder.allowedNextStatuses.join(", ") : "Không có bước chuyển tiếp"}</dd></div></dl></aside></div>}
         </div>
       )}
 
@@ -2550,23 +2372,13 @@ function AdminPortalContent() {
       {/* ========================================================= */}
       {activeTab === "vouchers" && (
         <div className="space-y-6 animate-fade-in">
-          {/* Voucher Header & Create Button */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
-            <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <Ticket className="text-red-700" size={20} />
-                Quản Trị Kho Voucher & Mã Khuyến Mãi
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Tạo mã giảm giá mới, quản lý thời hạn và kiểm soát trạng thái áp dụng trên giỏ hàng toàn quốc.
-              </p>
-            </div>
+          <div className="flex justify-end">
             <button
               onClick={() => setShowCreateVoucherModal(true)}
-              className="px-4 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-white text-xs font-bold transition-colors flex items-center gap-2 self-start sm:self-auto shadow-sm"
+              className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
             >
               <Plus size={16} />
-              <span>+ Tạo Voucher Mới</span>
+              <span>Tạo voucher</span>
             </button>
           </div>
 
@@ -2589,7 +2401,7 @@ function AdminPortalContent() {
                   {vouchersLoading ? (
                     <tr>
                       <td colSpan={7} className="p-8 text-center text-gray-400">
-                        Đang tải danh sách voucher...
+                        Đang tải danh sách voucher…
                       </td>
                     </tr>
                   ) : vouchers.length === 0 ? (
@@ -2621,7 +2433,7 @@ function AdminPortalContent() {
                           <button
                             onClick={() => handleToggleVoucher(v.id)}
                             className={cn(
-                              "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
+                              "px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors duration-200",
                               v.active
                                 ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                                 : "bg-gray-200 text-gray-500 hover:bg-gray-300"
@@ -2663,20 +2475,10 @@ function AdminPortalContent() {
       {/* ========================================================= */}
       {activeTab === "loyalty" && (
         <div className="space-y-6 animate-fade-in">
-          {/* Loyalty Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
-            <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <Crown className="text-amber-600" size={20} />
-                Quản Trị Hội Viên Thân Thiết AgriClub
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Theo dõi xếp hạng hội viên, tổng chi tiêu tích lũy, điểm thưởng khả dụng và tặng điểm VIP cho khách hàng.
-              </p>
-            </div>
+          <div className="flex justify-end">
             <button
               onClick={fetchMembers}
-              className="px-3.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-colors flex items-center gap-2 self-start sm:self-auto"
+              className="flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-3.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
             >
               <RefreshCw size={14} className={membersLoading ? "animate-spin" : ""} />
               <span>Cập nhật danh sách</span>
@@ -2701,7 +2503,7 @@ function AdminPortalContent() {
                   {membersLoading ? (
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-gray-400">
-                        Đang tải danh sách hội viên...
+                        Đang tải danh sách hội viên…
                       </td>
                     </tr>
                   ) : members.length === 0 ? (
@@ -2756,7 +2558,7 @@ function AdminPortalContent() {
                               }}
                               className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-colors inline-flex items-center gap-1.5"
                             >
-                              <Sparkles size={13} />
+                              <Award size={13} />
                               <span>Tặng Điểm VIP</span>
                             </button>
                           </td>
@@ -2776,58 +2578,34 @@ function AdminPortalContent() {
       {/* ========================================================= */}
       {activeTab === "events" && (
         <div className="space-y-6 animate-fade-in">
-          {/* Header & Quick Action */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
-            <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <Sparkles className="text-emerald-700" size={20} />
-                Quản Trị Sự Kiện & Mùa Vụ Khuyến Mãi (Events & Campaigns)
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Thiết lập các sự kiện trợ giá trực tiếp vụ mùa. Khi hết thời hạn diễn ra (sau ngày kết thúc), hệ thống tự động ngừng áp dụng giảm giá trên danh mục sản phẩm.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex rounded-lg border border-border bg-card p-1" aria-label="Kiểu hiển thị sự kiện">
+                <button type="button" aria-label="Hiển thị dạng bảng" aria-pressed={eventView === "table"} onClick={() => setEventView("table")} className={cn("rounded-md p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", eventView === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}><List aria-hidden="true" size={15} /></button>
+                <button type="button" aria-label="Hiển thị dạng thẻ" aria-pressed={eventView === "cards"} onClick={() => setEventView("cards")} className={cn("rounded-md p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", eventView === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}><LayoutGrid aria-hidden="true" size={15} /></button>
+              </div>
               <Link
                 href="/events"
                 target="_blank"
-                className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                className="flex h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
               >
                 <Eye size={14} />
                 <span>Xem Trang Khách Hàng</span>
               </Link>
               <button
                 onClick={handleOpenAddEvent}
-                className="px-4 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-white text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
+                className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
               >
                 <Plus size={16} />
-                <span>+ Thêm Sự Kiện Mới</span>
+                <span>Thêm sự kiện</span>
               </button>
-            </div>
           </div>
 
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <div className="text-xs text-gray-500 font-semibold">Tổng chiến dịch</div>
-              <div className="text-2xl font-black text-gray-900 mt-1">{campaignStats.total}</div>
-              <div className="text-[11px] text-gray-400 mt-1">Đã cấu hình</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs">
-              <div className="text-xs text-emerald-700 font-semibold">Đang diễn ra (Active)</div>
-              <div className="text-2xl font-black text-emerald-800 mt-1">{campaignStats.active}</div>
-              <div className="text-[11px] text-emerald-600 mt-1">Áp dụng giá giảm trực tiếp</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-blue-200 shadow-xs">
-              <div className="text-xs text-blue-700 font-semibold">Sắp diễn ra (Upcoming)</div>
-              <div className="text-2xl font-black text-blue-800 mt-1">{campaignStats.upcoming}</div>
-              <div className="text-[11px] text-blue-500 mt-1">Chờ đến ngày kích hoạt</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <div className="text-xs text-gray-500 font-semibold">Đã kết thúc (Expired)</div>
-              <div className="text-2xl font-black text-gray-500 mt-1">{campaignStats.expired}</div>
-              <div className="text-[11px] text-gray-400 mt-1">Tự động ngưng giảm giá</div>
-            </div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <AdminStatCard label="Tổng chiến dịch" value={campaignStats.total} helper="Tất cả chiến dịch đã cấu hình" icon={CalendarDays} />
+            <AdminStatCard label="Đang diễn ra" value={campaignStats.active} helper="Ưu đãi đang có hiệu lực" icon={Activity} tone="success" />
+            <AdminStatCard label="Sắp diễn ra" value={campaignStats.upcoming} helper="Đang chờ đến ngày bắt đầu" icon={Clock} tone="primary" />
+            <AdminStatCard label="Đã kết thúc" value={campaignStats.expired} helper="Đã ngừng áp dụng ưu đãi" icon={CheckCircle2} />
           </div>
 
           {/* Filter & Search */}
@@ -2836,10 +2614,10 @@ function AdminPortalContent() {
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm sự kiện theo tên, loại vụ mùa, mã voucher, nông sản..."
+                placeholder="Tìm theo tên, loại mùa vụ, voucher hoặc nông sản…"
                 value={eventSearch}
                 onChange={(e) => setEventSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-red-600"
+                className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-4 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
@@ -2858,7 +2636,7 @@ function AdminPortalContent() {
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
                     eventFilter === f.key
-                      ? "bg-red-950 text-white"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   )}
                 >
@@ -2868,22 +2646,42 @@ function AdminPortalContent() {
             </div>
           </div>
 
-          {/* Campaigns Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+          {/* Bảng sự kiện có độ rộng cột ổn định, tránh ép chữ và lệch hàng */}
+          <div className={cn("grid gap-4 lg:grid-cols-2", eventView === "table" && "md:hidden")}>
+            {filteredCampaigns.length === 0 && <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center lg:col-span-2"><CalendarDays aria-hidden="true" className="mx-auto text-muted-foreground" size={28} /><h3 className="mt-3 text-sm font-semibold">Không tìm thấy sự kiện</h3><p className="mt-1 text-xs text-muted-foreground">Thay đổi từ khóa, bộ lọc hoặc tạo sự kiện mới.</p></div>}
+            {filteredCampaigns.map((campaign) => {
+              const status = getCampaignStatus(campaign);
+              return <article key={campaign.id} className="group overflow-hidden rounded-2xl border border-border bg-card shadow-xs transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none">
+                <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-amber-400 to-orange-500" />
+                <div className="p-5"><div className="flex items-start gap-3"><span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-2xl">{campaign.bannerIcon || "🌾"}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="min-w-0 text-base font-bold leading-6 text-foreground">{campaign.title}</h3><span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-bold", campaign.typeColor)}>{campaign.typeLabel}</span></div><p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">/{campaign.slug}</p></div></div><p className="mt-3 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{campaign.description || "Chưa có mô tả sự kiện."}</p><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Thời gian</p><p className="mt-1 text-xs font-semibold tabular-nums">{new Intl.DateTimeFormat("vi-VN").format(new Date(`${campaign.startDate}T00:00:00`))} – {new Intl.DateTimeFormat("vi-VN").format(new Date(`${campaign.endDate}T00:00:00`))}</p></div><div className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Ưu đãi</p><p className="mt-1 text-lg font-black tabular-nums text-emerald-800">-{campaign.discountPercent}%</p></div></div><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><span className={cn("rounded-full border px-2.5 py-1 text-[10px] font-bold", !campaign.active ? "border-amber-200 bg-amber-50 text-amber-800" : status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : status === "upcoming" ? "border-blue-200 bg-blue-50 text-blue-800" : "border-border bg-muted text-muted-foreground")}>{!campaign.active ? "Tạm dừng" : status === "active" ? "Đang diễn ra" : status === "upcoming" ? "Sắp diễn ra" : "Đã kết thúc"}</span><div className="flex gap-1"><button type="button" onClick={() => handleToggleEvent(campaign.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`${campaign.active ? "Tạm dừng" : "Bật"} ${campaign.title}`}><Power aria-hidden="true" size={15} /></button><button type="button" onClick={() => handleOpenEditEvent(campaign)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Chỉnh sửa ${campaign.title}`}><Edit aria-hidden="true" size={15} /></button><button type="button" onClick={() => handleDeleteEvent(campaign.id, campaign.title)} className="rounded-lg p-2 text-danger hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger" aria-label={`Xóa ${campaign.title}`}><Trash2 aria-hidden="true" size={15} /></button></div></div></div>
+              </article>;
+            })}
+          </div>
+
+          <div className={cn("overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs", eventView !== "table" ? "hidden" : "hidden md:block")}>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold">
+              <table className="w-full min-w-[1280px] table-fixed text-left text-xs">
+                <colgroup>
+                  <col className="w-[30%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[6%]" />
+                </colgroup>
+                <thead className="border-b border-gray-200 bg-gray-50 text-[10px] font-bold uppercase leading-4 tracking-wider text-gray-500">
                   <tr>
-                    <th className="p-3.5">Biểu trưng & Tên sự kiện</th>
-                    <th className="p-3.5">Phân loại</th>
-                    <th className="p-3.5">Thời gian & Trạng thái</th>
-                    <th className="p-3.5">Mức trợ giá trực tiếp</th>
-                    <th className="p-3.5">Nông sản áp dụng</th>
-                    <th className="p-3.5 text-center">Bật/Tắt</th>
-                    <th className="p-3.5 text-right">Thao tác</th>
+                    <th className="px-5 py-3.5">Sự kiện</th>
+                    <th className="px-4 py-3.5">Phân loại</th>
+                    <th className="px-4 py-3.5">Thời gian</th>
+                    <th className="px-4 py-3.5">Ưu đãi</th>
+                    <th className="px-4 py-3.5">Phạm vi áp dụng</th>
+                    <th className="px-3 py-3.5 text-center">Hiển thị</th>
+                    <th className="px-3 py-3.5 text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 align-top">
                   {filteredCampaigns.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="p-8 text-center text-gray-400">
@@ -2894,35 +2692,40 @@ function AdminPortalContent() {
                     filteredCampaigns.map((c) => {
                       const status = getCampaignStatus(c);
                       return (
-                        <tr key={c.id} className="hover:bg-gray-50/70 transition-colors">
-                          <td className="p-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-2xl p-1.5 rounded-xl bg-gray-100 border border-gray-200 shrink-0">
+                        <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
+                          <td className="px-5 py-4">
+                            <div className="flex items-start gap-3">
+                              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-2xl">
                                 {c.bannerIcon || "🌾"}
                               </span>
-                              <div>
-                                <div className="font-bold text-gray-900 text-sm">{c.title}</div>
-                                <div className="text-[11px] text-gray-400 font-mono">/{c.slug}</div>
-                                <div className="text-[11px] text-gray-500 line-clamp-1 max-w-sm mt-0.5">
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold leading-5 text-gray-950">{c.title}</div>
+                                <div className="mt-0.5 truncate font-mono text-[10px] text-gray-400">/{c.slug}</div>
+                                <div className="mt-1 line-clamp-2 text-[11px] leading-4 text-gray-500">
                                   {c.description}
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="p-3.5">
-                            <span className={cn("px-2.5 py-1 rounded-full text-[11px] font-bold border", c.typeColor)}>
+                          <td className="px-4 py-4">
+                            <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold leading-4", c.typeColor)}>
                               {c.typeLabel}
                             </span>
                           </td>
-                          <td className="p-3.5">
-                            <div className="font-mono text-gray-700">
-                              {c.startDate} → {c.endDate}
+                          <td className="px-4 py-4">
+                            <div className="space-y-0.5 font-mono text-[11px] leading-4 text-gray-700">
+                              <div>Từ {new Date(`${c.startDate}T00:00:00`).toLocaleDateString("vi-VN")}</div>
+                              <div>đến {new Date(`${c.endDate}T00:00:00`).toLocaleDateString("vi-VN")}</div>
                             </div>
-                            <div className="mt-1">
-                              {status === "active" ? (
+                            <div className="mt-2">
+                              {!c.active ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                  Tạm dừng
+                                </span>
+                              ) : status === "active" ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                                  Đang diễn ra (Giảm giá có hiệu lực)
+                                  Đang diễn ra
                                 </span>
                               ) : status === "upcoming" ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
@@ -2930,13 +2733,13 @@ function AdminPortalContent() {
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-300">
-                                  Đã kết thúc (Về giá gốc)
+                                  Đã kết thúc
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="p-3.5">
-                            <div className="text-sm font-extrabold text-rose-600">
+                          <td className="px-4 py-4">
+                            <div className="text-base font-extrabold text-rose-600">
                               -{c.discountPercent}%
                               {c.discountAmount ? (
                                 <span className="text-[11px] font-normal text-gray-500 ml-1">
@@ -2945,13 +2748,13 @@ function AdminPortalContent() {
                               ) : null}
                             </div>
                             <div className="mt-1">
-                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
-                                ⚡ Trừ thẳng giá (Không cần mã)
+                              <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold leading-4 text-emerald-800">
+                                Trừ trực tiếp vào giá
                               </span>
                             </div>
                           </td>
-                          <td className="p-3.5">
-                            <div className="text-gray-700 font-medium">
+                          <td className="px-4 py-4">
+                            <div className="font-medium leading-5 text-gray-700">
                               {c.targetType === "all"
                                 ? "Toàn bộ danh mục nông sản"
                                 : c.targetProductNames && c.targetProductNames.length > 0
@@ -2959,31 +2762,35 @@ function AdminPortalContent() {
                                 : c.targetCategoryCodes?.join(", ") || "Chung"}
                             </div>
                           </td>
-                          <td className="p-3.5 text-center">
+                          <td className="px-3 py-4 text-center">
                             <button
                               onClick={() => handleToggleEvent(c.id)}
                               className={cn(
-                                "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
+                                "inline-flex min-w-[64px] justify-center rounded-full px-2.5 py-1.5 text-[10px] font-bold leading-4 transition-colors duration-200",
                                 c.active
                                   ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                                   : "bg-gray-200 text-gray-500 hover:bg-gray-300"
                               )}
                             >
-                              {c.active ? "Đang bật" : "Tắt"}
+                              {c.active ? "Đang bật" : "Tạm dừng"}
                             </button>
                           </td>
-                          <td className="p-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
+                          <td className="px-3 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
                               <button
+                                type="button"
                                 onClick={() => handleOpenEditEvent(c)}
-                                className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                                aria-label={`Chỉnh sửa sự kiện ${c.title}`}
+                                className="rounded-lg bg-gray-100 p-2 text-gray-700 transition-colors hover:bg-gray-200"
                                 title="Chỉnh sửa sự kiện"
                               >
                                 <Edit size={14} />
                               </button>
                               <button
+                                type="button"
                                 onClick={() => handleDeleteEvent(c.id, c.title)}
-                                className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 transition-colors"
+                                aria-label={`Xóa sự kiện ${c.title}`}
+                                className="rounded-lg bg-red-50 p-2 text-red-700 transition-colors hover:bg-red-100"
                                 title="Xóa sự kiện"
                               >
                                 <Trash2 size={14} />
@@ -3006,34 +2813,22 @@ function AdminPortalContent() {
       {/* ========================================================= */}
       {activeTab === "blog" && (
         <div className="space-y-6 animate-fade-in">
-          {/* Header & Quick Action */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
-            <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <BookOpen className="text-emerald-700" size={20} />
-                Quản Trị Bài Viết Blog & Cẩm Nang Tiêu Dùng
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Quản lý các bài viết cẩm nang, quyết định công bố giá vụ mùa, thông báo AI và kiến thức kiểm định an toàn nông nghiệp.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center justify-end gap-2">
               <Link
                 href="/blog"
                 target="_blank"
-                className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                className="flex h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
               >
                 <Eye size={14} />
                 <span>Xem Trang Blog</span>
               </Link>
               <button
                 onClick={handleOpenAddBlog}
-                className="px-4 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-white text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
+                className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
               >
                 <Plus size={16} />
-                <span>+ Viết Bài Mới</span>
+                <span>Viết bài mới</span>
               </button>
-            </div>
           </div>
 
           {/* Filter & Search */}
@@ -3042,10 +2837,10 @@ function AdminPortalContent() {
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm bài viết theo tiêu đề, tác giả hoặc nội dung..."
+                placeholder="Tìm theo tiêu đề, tác giả hoặc nội dung…"
                 value={blogSearch}
                 onChange={(e) => setBlogSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs outline-none focus:border-red-600"
+                className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-4 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
@@ -3065,7 +2860,7 @@ function AdminPortalContent() {
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
                     blogFilter === f.key
-                      ? "bg-red-950 text-white"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   )}
                 >
@@ -3138,7 +2933,7 @@ function AdminPortalContent() {
                           <button
                             onClick={() => handleToggleBlog(p.id)}
                             className={cn(
-                              "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all",
+                              "px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors duration-200",
                               p.active
                                 ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                                 : "bg-gray-200 text-gray-500 hover:bg-gray-300"
@@ -3201,7 +2996,7 @@ function AdminPortalContent() {
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: AGRITET2026, FREESHIP30..."
+                  placeholder="Ví dụ: AGRITET2026, FREESHIP30…"
                   value={newVoucher.code}
                   onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-gray-200 uppercase font-mono font-bold outline-none focus:border-red-600"
@@ -3213,7 +3008,7 @@ function AdminPortalContent() {
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Giảm 30.000đ cho đơn hàng rau củ..."
+                  placeholder="Ví dụ: Giảm 30.000 đ cho đơn hàng rau củ…"
                   value={newVoucher.title}
                   onChange={(e) => setNewVoucher({ ...newVoucher, title: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-gray-200 outline-none focus:border-red-600"
@@ -3290,7 +3085,7 @@ function AdminPortalContent() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-white text-xs font-bold shadow-md"
+                className="rounded-lg bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
               >
                 Lưu & Phát Hành Voucher
               </button>
@@ -3311,7 +3106,7 @@ function AdminPortalContent() {
           >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <Sparkles className="text-amber-600" size={20} />
+                <Award className="text-amber-600" size={20} />
                 <h3 className="font-bold text-gray-900 text-base">Tặng Điểm Thưởng VIP</h3>
               </div>
               <button
@@ -3391,7 +3186,7 @@ function AdminPortalContent() {
           >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <Sparkles className="text-emerald-700" size={20} />
+                <CalendarDays className="text-emerald-700" size={20} />
                 <h3 className="font-bold text-gray-900 text-base">
                   {editingEventId ? "Chỉnh Sửa Sự Kiện Khuyến Mãi" : "Thêm Sự Kiện / Mùa Vụ Khuyến Mãi Mới"}
                 </h3>
@@ -3406,6 +3201,10 @@ function AdminPortalContent() {
             </div>
 
             <div className="space-y-3.5 text-xs max-h-[70vh] overflow-y-auto pr-1">
+              <div className="border-b border-border pb-2">
+                <h4 className="text-sm font-bold text-foreground">Thông tin cơ bản</h4>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Tên, đường dẫn và loại hình chiến dịch.</p>
+              </div>
               {/* Event Title */}
               <div>
                 <label className="font-semibold text-gray-700 block mb-1">
@@ -3414,7 +3213,7 @@ function AdminPortalContent() {
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Mùa Thu Hoạch Dâu Tây Mộc Châu, Trợ Giá Rau Đà Lạt..."
+                  placeholder="Ví dụ: Mùa thu hoạch dâu tây Mộc Châu…"
                   value={eventForm.title}
                   onChange={(e) => {
                     const title = e.target.value;
@@ -3479,6 +3278,10 @@ function AdminPortalContent() {
               </div>
 
               {/* Dates & Discount */}
+              <div className="border-b border-border pb-2 pt-2">
+                <h4 className="text-sm font-bold text-foreground">Thời gian và ưu đãi</h4>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Khoảng hiệu lực và mức giảm áp dụng cho sản phẩm.</p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-semibold text-gray-700 block mb-1">Ngày bắt đầu (*):</label>
@@ -3550,6 +3353,10 @@ function AdminPortalContent() {
               </div>
 
               {/* Target Type & Product/Category Selector */}
+              <div className="border-b border-border pb-2 pt-2">
+                <h4 className="text-sm font-bold text-foreground">Phạm vi áp dụng</h4>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Chọn sản phẩm, danh mục hoặc toàn bộ cửa hàng.</p>
+              </div>
               <div>
                 <label className="font-semibold text-gray-700 block mb-1">Phạm vi áp dụng giảm giá:</label>
                 <div className="flex items-center gap-4 mb-2">
@@ -3611,12 +3418,16 @@ function AdminPortalContent() {
               </div>
 
               {/* Description */}
+              <div className="border-b border-border pb-2 pt-2">
+                <h4 className="text-sm font-bold text-foreground">Nội dung hiển thị</h4>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Thông tin khách hàng sẽ nhìn thấy trên trang sự kiện.</p>
+              </div>
               <div>
                 <label className="font-semibold text-gray-700 block mb-1">Mô tả tóm tắt sự kiện:</label>
                 <textarea
                   rows={2}
                   required
-                  placeholder="Tóm tắt ngắn gọn lý do giảm giá vụ mùa, sản lượng thu hoạch rộ..."
+                  placeholder="Tóm tắt lý do giảm giá và sản lượng thu hoạch…"
                   value={eventForm.description}
                   onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-gray-200 outline-none focus:border-red-600"
@@ -3630,7 +3441,7 @@ function AdminPortalContent() {
                 </label>
                 <textarea
                   rows={4}
-                  placeholder="Mô tả chi tiết vùng trồng, quy trình canh tác VietGAP/GlobalGAP, sản lượng thu hoạch, cam kết xe lạnh 24H..."
+                  placeholder="Mô tả vùng trồng, quy trình canh tác và sản lượng…"
                   value={eventForm.fullContent}
                   onChange={(e) => setEventForm({ ...eventForm, fullContent: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-gray-200 outline-none focus:border-red-600"
@@ -3662,7 +3473,7 @@ function AdminPortalContent() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-white text-xs font-bold shadow-md"
+                className="rounded-lg bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
               >
                 {editingEventId ? "Lưu Thay Đổi Sự Kiện" : "Tạo & Công Bố Sự Kiện"}
               </button>
@@ -3706,7 +3517,7 @@ function AdminPortalContent() {
                 <input
                   type="text"
                   required
-                  placeholder="Nhập tiêu đề bài viết blog..."
+                  placeholder="Nhập tiêu đề bài viết…"
                   value={blogForm.title}
                   onChange={(e) => {
                     const title = e.target.value;
@@ -3794,7 +3605,7 @@ function AdminPortalContent() {
                 <label className="font-semibold text-gray-700 block mb-1">Nông sản gắn kèm (CTA):</label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Dâu Tây New Zealand Mộc Châu, Cải Xoăn Kale..."
+                  placeholder="Ví dụ: Dâu tây Mộc Châu, cải xoăn kale…"
                   value={blogForm.relatedProductName}
                   onChange={(e) => setBlogForm({ ...blogForm, relatedProductName: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-gray-200 outline-none focus:border-red-600"
@@ -3807,7 +3618,7 @@ function AdminPortalContent() {
                 <textarea
                   rows={2}
                   required
-                  placeholder="Đoạn tóm tắt ngắn hiển thị trên thẻ bài viết..."
+                  placeholder="Đoạn tóm tắt hiển thị trên thẻ bài viết…"
                   value={blogForm.excerpt}
                   onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-gray-200 outline-none focus:border-red-600"
@@ -3820,7 +3631,7 @@ function AdminPortalContent() {
                 <textarea
                   rows={6}
                   required
-                  placeholder="Nội dung bài viết chi tiết, kiến thức chuyên môn, phân tích mùa vụ..."
+                  placeholder="Nội dung chi tiết và kiến thức chuyên môn…"
                   value={blogForm.content}
                   onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-gray-200 outline-none focus:border-red-600"
@@ -3860,7 +3671,7 @@ function AdminPortalContent() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-white text-xs font-bold shadow-md"
+                className="rounded-lg bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
               >
                 {editingBlogId ? "Cập Nhật Bài Viết" : "Xuất Bản Bài Viết"}
               </button>
@@ -3882,6 +3693,10 @@ const ORDER_STATUS_OPTIONS = [
   { value: "REFUNDED", label: "Đã hoàn tiền" },
 ];
 
+function orderStatusLabel(status?: string) {
+  return ORDER_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status ?? "Chưa xác định";
+}
+
 /** Chỉ tính doanh thu cho đơn đã thanh toán hoặc COD đã được xác nhận. */
 const REVENUE_STATUSES = new Set(["PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED"]);
 
@@ -3890,7 +3705,7 @@ export default function AdminPortalPage() {
     <Suspense
       fallback={
         <div className="p-12 text-center text-xs text-gray-400">
-          Đang tải bảng điều khiển quản trị...
+          Đang tải bảng điều khiển quản trị…
         </div>
       }
     >

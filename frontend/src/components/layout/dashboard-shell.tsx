@@ -3,6 +3,7 @@
 import {
   Award,
   BookOpen,
+  CalendarRange,
   ClipboardList,
   Crown,
   ChevronRight,
@@ -19,11 +20,9 @@ import {
   Shield,
   ShoppingBag,
   ShoppingCart,
-  Sparkles,
   Store,
   Ticket,
   Truck,
-  User,
   Users,
   Warehouse,
   X,
@@ -31,19 +30,20 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { Fragment, Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { LoadingSkeleton } from "@/components/ui/states";
 import { authService } from "@/services/auth.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
+import { cn } from "@/utils/cn";
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
-  badge?: string;
   matchPrefixes?: string[];
+  group?: string;
 };
 
 const customerNavigation: NavItem[] = [
@@ -79,16 +79,18 @@ const distributorNavigation: NavItem[] = [
 ];
 
 const adminNavigation: NavItem[] = [
-  { href: "/dashboard/admin", label: "Tổng Quan & Duyệt Hồ Sơ", icon: Shield },
-  { href: "/dashboard/admin?tab=vouchers", label: "Quản Lý Voucher (Kho Ưu Đãi)", icon: Ticket },
-  { href: "/dashboard/admin?tab=events", label: "Quản Lý Sự Kiện & Mùa Vụ", icon: Sparkles },
-  { href: "/dashboard/admin?tab=blog", label: "Quản Trị Blog & Cẩm Nang", icon: BookOpen },
-  { href: "/dashboard/admin?tab=orders", label: "Quản Lý Đơn Hàng Hệ Thống", icon: ClipboardList },
-  { href: "/dashboard/admin?tab=loyalty", label: "Quản Lý Hội Viên AgriClub", icon: Crown },
-  { href: "/dashboard/users", label: "Quản Lý Người Dùng", icon: Users },
-  { href: "/dashboard/farmer", label: "Giám Sát Nông Trại", icon: Leaf },
-  { href: "/dashboard/warehouse", label: "Giám Sát Kho Hàng", icon: Warehouse },
-  { href: "/dashboard/distributor", label: "Giám Sát Vận Chuyển", icon: Truck },
+  { href: "/dashboard/admin?tab=verifications", label: "Tổng Quan & Duyệt Hồ Sơ", icon: Shield, group: "Tổng quan" },
+  { href: "/dashboard/admin?tab=batches", label: "Duyệt Lô Xuất Kho", icon: PackageCheck, group: "Tổng quan" },
+  { href: "/dashboard/admin?tab=certs", label: "Duyệt Chứng Nhận Nông Trại", icon: Award, group: "Tổng quan" },
+  { href: "/dashboard/admin?tab=orders", label: "Quản Lý Đơn Hàng Hệ Thống", icon: ClipboardList, group: "Vận hành" },
+  { href: "/dashboard/farmer", label: "Giám Sát Nông Trại", icon: Leaf, group: "Vận hành" },
+  { href: "/dashboard/warehouse", label: "Giám Sát Kho Hàng", icon: Warehouse, group: "Vận hành" },
+  { href: "/dashboard/distributor", label: "Giám Sát Vận Chuyển", icon: Truck, group: "Vận hành" },
+  { href: "/dashboard/admin?tab=loyalty", label: "Quản Lý Hội Viên AgriClub", icon: Crown, group: "Khách hàng" },
+  { href: "/dashboard/admin?tab=events", label: "Quản Lý Sự Kiện & Mùa Vụ", icon: CalendarRange, group: "Marketing & nội dung" },
+  { href: "/dashboard/admin?tab=vouchers", label: "Quản Lý Voucher & Ưu Đãi", icon: Ticket, group: "Marketing & nội dung" },
+  { href: "/dashboard/admin?tab=blog", label: "Quản Trị Blog & Cẩm Nang", icon: BookOpen, group: "Marketing & nội dung" },
+  { href: "/dashboard/users", label: "Quản Lý Người Dùng", icon: Users, group: "Hệ thống" },
 ];
 
 const roleLabelMap: Record<string, string> = {
@@ -123,19 +125,21 @@ function SidebarNavItems({
 
   return (
     <>
-      {navItems.map((item) => {
+      {navItems.map((item, index) => {
         const [itemPath, itemQuery] = item.href.split("?");
         const itemTab = itemQuery ? new URLSearchParams(itemQuery).get("tab") : null;
         const active = itemTab
           ? pathname === itemPath && currentTab === itemTab
           : pathname === item.href && (!currentTab || pathname !== "/dashboard/admin");
         const Icon = item.icon;
+        const showGroup = item.group && item.group !== navItems[index - 1]?.group;
         return (
+          <Fragment key={item.href}>
+          {showGroup && <div className={cn("px-3 pb-1 pt-4 text-[9px] font-bold uppercase tracking-[0.16em] text-gray-400", index === 0 && "pt-1")}>{item.group}</div>}
           <Link
-            key={item.href}
             href={item.href}
             onClick={onSelect}
-            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-[background-color,color,border-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
               active
                 ? "bg-emerald-50 text-emerald-800 font-bold shadow-xs border border-emerald-100"
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
@@ -150,6 +154,7 @@ function SidebarNavItems({
             </div>
             {active && <ChevronRight size={14} className="text-emerald-700" />}
           </Link>
+          </Fragment>
         );
       })}
     </>
@@ -280,7 +285,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 text-gray-400 hover:text-gray-600 rounded"
+            aria-label="Đóng menu điều hướng"
+            className="lg:hidden rounded p-1 text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
           >
             <X size={20} />
           </button>
@@ -310,7 +316,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             {primaryRole === "CUSTOMER" ? "Khu Vực Cá Nhân" : "Bảng Chức Năng"}
           </div>
 
-          <Suspense fallback={<div className="p-4 text-xs text-gray-400">Đang tải menu...</div>}>
+          <Suspense fallback={<div className="p-4 text-xs text-gray-400">Đang tải menu…</div>}>
             <SidebarNavItems
               navItems={navItems}
               pathname={pathname}
@@ -357,7 +363,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              aria-label="Mở menu điều hướng"
+              className="lg:hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
             >
               <Menu size={20} />
             </button>
