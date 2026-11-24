@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
 
@@ -23,9 +24,10 @@ public class WarehouseDocumentService {
     private final FefoAllocationService fefo;
     private final StockReservationService reservationService;
     private final WarehouseDocumentRepository documents;
-    private final StockReservationRepository reservations;
     private final StockMovementRepository movements;
     private final WarehouseLotQuery lots;
+    private final StockBalanceRepository balances;
+    private final QualityInspectionRepository inspections;
 
     @Transactional
     public DocumentView create(UUID warehouseId, Type type, DocumentInput input, String actor) {
@@ -105,51 +107,30 @@ public class WarehouseDocumentService {
                         .findScopedForUpdate(id, warehouseId)
                         .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
         if (document.getStatus() == Status.CONFIRMED || document.getStatus() == Status.HANDED_OVER)
-            throw new ConflictException("Document is already in status: " + document.getStatus());
+            return view(document);
+        if (document.getStatus() == Status.RECEIVED) return view(document);
         if (document.getStatus() == Status.IN_TRANSIT) {
-            if (!warehouseId.equals(document.getTargetWarehouseId()))
-                throw new ConflictException("In-transit transfer must be received by target warehouse");
-            if (!inventory.requireWarehouse(warehouseId).isActive())
-                throw new ConflictException("Warehouse is inactive");
-            Map<UUID, BigDecimal> targetLocationDemands = new HashMap<>();
-            for (var line : document.getLines()) {
-                if (line.getTargetLocationId() == null) {
-                    throw new ConflictException("Target location is required for transfer");
-                }
-                targetLocationDemands.merge(line.getTargetLocationId(), line.getQuantityKg(), BigDecimal::add);
-            }
-            for (var entry : targetLocationDemands.entrySet()) {
-                inventory.checkCapacity(document.getTargetWarehouseId(), entry.getKey(), entry.getValue());
-            }
-            Map<String, LotSummary> lotData = new HashMap<>();
-            for (String lotId :
-                    document.getLines().stream()
-                            .map(WarehouseDocumentLine::getLotId)
-                            .distinct()
-                            .sorted()
-                            .toList()) {
-                lotData.put(lotId, lots.get(lotId));
-            }
-            for (var line : document.getLines()) {
-                var lot = lotData.get(line.getLotId());
-                requireEligible(lot);
-                inventory.change(
-                        document.getTargetWarehouseId(),
-                        line.getTargetLocationId(),
-                        lot,
-                        line.getQuantityKg(),
-                        id,
-                        "TRANSFER_IN",
-                        actor,
-                        null);
-            }
-            document.setStatus(Status.CONFIRMED);
-            document.setConfirmedAt(Instant.now());
-            document.setConfirmedBy(actor);
-            return view(documents.saveAndFlush(document));
+            if (warehouseId.equals(document.getWarehouseId())) return view(document);
+            return receiveTransfer(
+                    warehouseId,
+                    id,
+                    new TransferReceiveInput(
+                            document.getLines().stream()
+                                    .map(
+                                            line ->
+                                                    new TransferReceiveLine(
+                                                            line.getId(), line.getQuantityKg()))
+                                    .toList(),
+                            "Received remaining transfer"),
+                    actor);
         }
+        if (!warehouseId.equals(document.getWarehouseId()))
+            throw new ConflictException("Only the source warehouse can confirm this draft");
         if (document.getStatus() != Status.DRAFT)
-            throw new ConflictException("Document is in status " + document.getStatus() + "; only DRAFT documents can be confirmed");
+            throw new ConflictException(
+                    "Document is in status "
+                            + document.getStatus()
+                            + "; only DRAFT documents can be confirmed");
         Type type = document.getType();
         if (type != Type.COUNT
                 && type != Type.ADJUSTMENT
@@ -171,17 +152,22 @@ public class WarehouseDocumentService {
         if (type == Type.OUTBOUND) validateOutbound(document, lotData);
         if (type == Type.TRANSFER) {
             boolean interWarehouse = !warehouseId.equals(document.getTargetWarehouseId());
-            boolean requiresTransit = interWarehouse && (Boolean.TRUE.equals(document.getInTransit()) || document.getHandoverReference() != null);
+            boolean requiresTransit =
+                    interWarehouse
+                            && (Boolean.TRUE.equals(document.getInTransit())
+                                    || document.getHandoverReference() != null);
             if (!requiresTransit) {
                 Map<UUID, BigDecimal> targetLocationDemands = new HashMap<>();
                 for (var line : document.getLines()) {
                     if (line.getTargetLocationId() == null) {
                         throw new ConflictException("Target location is required for transfer");
                     }
-                    targetLocationDemands.merge(line.getTargetLocationId(), line.getQuantityKg(), BigDecimal::add);
+                    targetLocationDemands.merge(
+                            line.getTargetLocationId(), line.getQuantityKg(), BigDecimal::add);
                 }
                 for (var entry : targetLocationDemands.entrySet()) {
-                    inventory.checkCapacity(document.getTargetWarehouseId(), entry.getKey(), entry.getValue());
+                    inventory.checkCapacity(
+                            document.getTargetWarehouseId(), entry.getKey(), entry.getValue());
                 }
             }
         }
@@ -231,7 +217,10 @@ public class WarehouseDocumentService {
                             actor,
                             null);
                     boolean interWarehouse = !warehouseId.equals(document.getTargetWarehouseId());
-                    boolean requiresTransit = interWarehouse && (Boolean.TRUE.equals(document.getInTransit()) || document.getHandoverReference() != null);
+                    boolean requiresTransit =
+                            interWarehouse
+                                    && (Boolean.TRUE.equals(document.getInTransit())
+                                            || document.getHandoverReference() != null);
                     if (!requiresTransit) {
                         inventory.change(
                                 document.getTargetWarehouseId(),
@@ -242,6 +231,7 @@ public class WarehouseDocumentService {
                                 "TRANSFER_IN",
                                 actor,
                                 null);
+                        line.setReceivedQuantityKg(quantity);
                     }
                 }
                 case COUNT, ADJUSTMENT -> {
@@ -273,18 +263,32 @@ public class WarehouseDocumentService {
             }
         }
         if (document.getReservationId() != null) {
-            var reservation =
-                    reservationService.requireActive(warehouseId, document.getReservationId());
-            reservation.setStatus(StockReservation.Status.CONSUMED);
-            reservations.save(reservation);
+            Map<UUID, BigDecimal> dispatched = new HashMap<>();
+            for (var line : document.getLines()) {
+                var balance =
+                        inventory
+                                .find(warehouseId, line.getLocationId(), line.getLotId())
+                                .orElseThrow(
+                                        () ->
+                                                new ResourceNotFoundException(
+                                                        "Stock balance not found"));
+                dispatched.merge(balance.getId(), line.getQuantityKg(), BigDecimal::add);
+            }
+            reservationService.consume(warehouseId, document.getReservationId(), dispatched);
         }
-        boolean isInterTransit = document.getType() == Type.TRANSFER
-                && !warehouseId.equals(document.getTargetWarehouseId())
-                && (Boolean.TRUE.equals(document.getInTransit()) || document.getHandoverReference() != null);
+        boolean isInterTransit =
+                document.getType() == Type.TRANSFER
+                        && !warehouseId.equals(document.getTargetWarehouseId())
+                        && (Boolean.TRUE.equals(document.getInTransit())
+                                || document.getHandoverReference() != null);
         if (isInterTransit) {
             document.setStatus(Status.IN_TRANSIT);
         } else {
             document.setStatus(Status.CONFIRMED);
+            if (document.getType() == Type.TRANSFER) {
+                document.setReceivedAt(Instant.now());
+                document.setReceivedBy(actor);
+            }
         }
         document.setConfirmedAt(Instant.now());
         document.setConfirmedBy(actor);
@@ -303,41 +307,48 @@ public class WarehouseDocumentService {
             var reservation =
                     reservationService.requireActive(
                             document.getWarehouseId(), document.getReservationId());
-            boolean hasQuarantined = reservation.getLines().stream().anyMatch(l -> {
-                var b = inventory.balance(document.getWarehouseId(), l.getBalanceId());
-                return b.isHeld() || !b.getExpiryDate().isAfter(InventoryService.today());
-            });
-            if (hasQuarantined) {
-                reservationService.reconcile(document.getWarehouseId(), reservation.getId());
-                reservation = reservationService.get(document.getWarehouseId(), document.getReservationId());
-            }
+            Map<UUID, BalanceView> eligible = new HashMap<>();
+            for (var b : inventory.views(document.getWarehouseId(), reservation.getId(), true))
+                if (b.availableKg().signum() > 0
+                        && WarehouseExpiryPolicy.usableOn(b.expiryDate(), InventoryService.today()))
+                    eligible.put(b.id(), b);
             Map<String, BigDecimal> expected = new HashMap<>();
             for (var allocation : reservation.getLines()) {
                 var b = inventory.balance(document.getWarehouseId(), allocation.getBalanceId());
-                if (!b.isHeld() && b.getExpiryDate().isAfter(InventoryService.today())) {
+                if (allocation.remainingKg().signum() > 0 && eligible.containsKey(b.getId())) {
                     expected.merge(
                             key(b.getLocationId(), b.getLotId()),
-                            allocation.getQuantityKg(),
+                            allocation.remainingKg(),
                             BigDecimal::add);
                 }
             }
             if (expected.keySet().equals(actual.keySet())
-                    && actual.entrySet().stream().allMatch(e -> expected.get(e.getKey()).compareTo(e.getValue()) == 0)) {
+                    && actual.entrySet().stream()
+                            .allMatch(e -> expected.get(e.getKey()).compareTo(e.getValue()) == 0)) {
                 return;
             }
-            boolean matchesValidLines = !actual.isEmpty() && actual.entrySet().stream()
-                    .allMatch(e -> expected.containsKey(e.getKey()) && expected.get(e.getKey()).compareTo(e.getValue()) >= 0);
+            boolean matchesValidLines =
+                    !actual.isEmpty()
+                            && actual.entrySet().stream()
+                                    .allMatch(
+                                            e ->
+                                                    expected.containsKey(e.getKey())
+                                                            && expected.get(e.getKey())
+                                                                            .compareTo(e.getValue())
+                                                                    >= 0);
             if (matchesValidLines) {
                 return;
             }
             throw new ConflictException(
-                    "Outbound lines must match the active reservation or its reconciled eligible lines");
+                    "Outbound lines must match the active reservation or its reconciled eligible"
+                            + " lines");
         } else {
             if (matchesFefoAllocation(document, lotData, actual)) {
                 return;
             }
             throw new ConflictException(
-                    "Outbound lines must match the current FEFO allocation or the initial draft allocation");
+                    "Outbound lines must match the current FEFO allocation or the initial draft"
+                            + " allocation");
         }
     }
 
@@ -349,13 +360,23 @@ public class WarehouseDocumentService {
             return true;
         }
         if (document.getCreatedAt() != null
-                && matchesFefo(document.getWarehouseId(), document.getLines(), lotData, actual, document.getCreatedAt())) {
+                && matchesFefo(
+                        document.getWarehouseId(),
+                        document.getLines(),
+                        lotData,
+                        actual,
+                        document.getCreatedAt())) {
             var currentStockMap = new HashMap<String, BigDecimal>();
             for (var b : inventory.views(document.getWarehouseId(), null, true)) {
                 currentStockMap.put(key(b.locationId(), b.lotId()), b.availableKg());
             }
             return actual.entrySet().stream()
-                    .allMatch(e -> currentStockMap.getOrDefault(e.getKey(), BigDecimal.ZERO).compareTo(e.getValue()) >= 0);
+                    .allMatch(
+                            e ->
+                                    currentStockMap
+                                                    .getOrDefault(e.getKey(), BigDecimal.ZERO)
+                                                    .compareTo(e.getValue())
+                                            >= 0);
         }
         return false;
     }
@@ -374,9 +395,10 @@ public class WarehouseDocumentService {
         }
         var stock = inventory.views(warehouseId, null, true);
         if (asOf != null) {
-            stock = stock.stream()
-                    .filter(b -> b.receivedAt() != null && !b.receivedAt().isAfter(asOf))
-                    .toList();
+            stock =
+                    stock.stream()
+                            .filter(b -> b.receivedAt() != null && !b.receivedAt().isAfter(asOf))
+                            .toList();
         }
         Map<String, BigDecimal> expected = new HashMap<>();
         try {
@@ -397,7 +419,8 @@ public class WarehouseDocumentService {
             return false;
         }
         return expected.keySet().equals(actual.keySet())
-                && actual.entrySet().stream().allMatch(e -> expected.get(e.getKey()).compareTo(e.getValue()) == 0);
+                && actual.entrySet().stream()
+                        .allMatch(e -> expected.get(e.getKey()).compareTo(e.getValue()) == 0);
     }
 
     @Transactional
@@ -407,6 +430,8 @@ public class WarehouseDocumentService {
                 documents
                         .findScopedForUpdate(id, warehouseId)
                         .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        if (!warehouseId.equals(document.getWarehouseId()))
+            throw new ConflictException("Only the source warehouse can cancel this document");
         if (document.getStatus() != Status.DRAFT && document.getStatus() != Status.CANCELLED)
             throw new ConflictException(
                     "Confirmed documents cannot be cancelled; use an audited correction");
@@ -415,8 +440,112 @@ public class WarehouseDocumentService {
     }
 
     @Transactional
-    public DocumentView receiveTransfer(UUID targetWarehouseId, UUID id, String actor) {
-        return confirm(targetWarehouseId, id, actor);
+    public DocumentView receiveTransfer(
+            UUID targetWarehouseId, UUID id, TransferReceiveInput input, String actor) {
+        var scope =
+                documents
+                        .findLockScopeByIdAndWarehouseId(id, targetWarehouseId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
+        inventory.lock(scope.getWarehouseId(), scope.getTargetWarehouseId());
+        var document =
+                documents
+                        .findScopedForUpdate(id, targetWarehouseId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
+        if (document.getType() != Type.TRANSFER
+                || !targetWarehouseId.equals(document.getTargetWarehouseId())
+                || targetWarehouseId.equals(document.getWarehouseId()))
+            throw new ConflictException("Only the destination warehouse can receive this transfer");
+        if (document.getStatus() != Status.IN_TRANSIT && document.getStatus() != Status.RECEIVED)
+            throw new ConflictException("Transfer has not been dispatched");
+        Map<UUID, BigDecimal> received = new HashMap<>();
+        for (var line : input.lines()) {
+            if (received.put(line.lineId(), line.receivedKg()) != null)
+                throw new IllegalArgumentException("Duplicate receipt line");
+        }
+        var ids =
+                document.getLines().stream()
+                        .map(WarehouseDocumentLine::getId)
+                        .collect(java.util.stream.Collectors.toSet());
+        if (!ids.equals(received.keySet()))
+            throw new IllegalArgumentException("Receipt must describe every transfer line");
+        Map<UUID, BigDecimal> deltas = new HashMap<>();
+        Map<UUID, BigDecimal> capacity = new HashMap<>();
+        boolean complete = true;
+        for (var line : document.getLines()) {
+            BigDecimal value = received.get(line.getId());
+            if (value.compareTo(line.getReceivedQuantityKg()) < 0
+                    || value.compareTo(line.getQuantityKg()) > 0)
+                throw new ConflictException(
+                        "Cumulative receipt cannot decrease or exceed dispatched quantity");
+            BigDecimal delta = value.subtract(line.getReceivedQuantityKg());
+            deltas.put(line.getId(), delta);
+            capacity.merge(line.getTargetLocationId(), delta, BigDecimal::add);
+            complete &= value.compareTo(line.getQuantityKg()) == 0;
+        }
+        if (deltas.values().stream().allMatch(q -> q.signum() == 0)) {
+            if (document.getReceivedAt() == null)
+                throw new IllegalArgumentException("Receive at least one positive quantity");
+            return view(document);
+        }
+        if (!complete && (input.note() == null || input.note().isBlank()))
+            throw new IllegalArgumentException(
+                    "Partial receipts require a discrepancy or pending-delivery note");
+        for (var entry : capacity.entrySet())
+            inventory.checkCapacity(targetWarehouseId, entry.getKey(), entry.getValue());
+        for (var line : document.getLines()) {
+            BigDecimal delta = deltas.get(line.getId());
+            if (delta.signum() == 0) continue;
+            var source =
+                    inventory
+                            .find(document.getWarehouseId(), line.getLocationId(), line.getLotId())
+                            .orElseThrow(
+                                    () ->
+                                            new ConflictException(
+                                                    "Dispatched lot snapshot is missing"));
+            var snapshot = lotSnapshot(source);
+            boolean quarantine =
+                    source.isHeld()
+                            || WarehouseExpiryPolicy.expired(
+                                    source.getExpiryDate(), InventoryService.today());
+            try {
+                var current = lots.get(line.getLotId());
+                quarantine |=
+                        !"APPROVED".equals(current.status())
+                                || !current.expiryDate().equals(snapshot.expiryDate())
+                                || !current.productId().equals(snapshot.productId());
+            } catch (ResourceNotFoundException | WarehouseIntegrationException unavailable) {
+                quarantine = true;
+            }
+            var balance =
+                    inventory.change(
+                            targetWarehouseId,
+                            line.getTargetLocationId(),
+                            snapshot,
+                            delta,
+                            id,
+                            "TRANSFER_IN",
+                            actor,
+                            null);
+            if (quarantine) {
+                balance.setHeld(true);
+                balances.saveAndFlush(balance);
+                var inspection = new QualityInspection();
+                inspection.setWarehouseId(targetWarehouseId);
+                inspection.setBalanceId(balance.getId());
+                inspection.setHeld(true);
+                inspection.setNote(
+                        "Transfer receipt requires quality review; source lot is held, expired or"
+                                + " changed");
+                inspection.setActor(actor);
+                inspections.save(inspection);
+            }
+            line.setReceivedQuantityKg(received.get(line.getId()));
+        }
+        document.setReceivedAt(Instant.now());
+        document.setReceivedBy(actor);
+        document.setReceivingNote(input.note());
+        if (complete) document.setStatus(Status.RECEIVED);
+        return view(documents.saveAndFlush(document));
     }
 
     @Transactional
@@ -426,9 +555,11 @@ public class WarehouseDocumentService {
                 documents
                         .findScopedForUpdate(id, warehouseId)
                         .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        if (!warehouseId.equals(document.getWarehouseId()))
+            throw new ConflictException("Only the source warehouse can record handover");
         if (document.getType() != Type.OUTBOUND && document.getType() != Type.TRANSFER)
             throw new ConflictException("Only outbound and transfer documents can be handed over");
-        if (document.getStatus() == Status.HANDED_OVER) {
+        if (document.getHandoverReference() != null) {
             if (!input.reference().trim().equals(document.getHandoverReference()))
                 throw new ConflictException("Handover already recorded with another reference");
             return view(document);
@@ -448,7 +579,7 @@ public class WarehouseDocumentService {
     public List<DocumentView> list(UUID warehouseId, int page) {
         inventory.requireWarehouse(warehouseId);
         return documents
-                .findByWarehouseIdOrderByCreatedAtDesc(warehouseId, PageRequest.of(page, 100))
+                .findVisibleDocuments(warehouseId, Type.TRANSFER, PageRequest.of(page, 100))
                 .stream()
                 .map(this::view)
                 .toList();
@@ -458,7 +589,7 @@ public class WarehouseDocumentService {
     public DocumentView get(UUID warehouseId, UUID id) {
         return view(
                 documents
-                        .findByIdAndWarehouseId(id, warehouseId)
+                        .findVisible(id, warehouseId, Type.TRANSFER)
                         .orElseThrow(() -> new ResourceNotFoundException("Document not found")));
     }
 
@@ -467,7 +598,8 @@ public class WarehouseDocumentService {
     }
 
     private void requireEligible(LotSummary lot) {
-        if (!"APPROVED".equals(lot.status()) || lot.expiryDate().isBefore(InventoryService.today()))
+        if (!"APPROVED".equals(lot.status())
+                || WarehouseExpiryPolicy.expired(lot.expiryDate(), InventoryService.today()))
             throw new ConflictException("Lot must be approved and unexpired");
         initialKg(lot);
     }
@@ -495,7 +627,7 @@ public class WarehouseDocumentService {
         return switch (lot.unit().toUpperCase(Locale.ROOT)) {
             case "KG" -> lot.initialQuantity();
             case "T", "TON", "TONNE" -> lot.initialQuantity().multiply(new BigDecimal("1000"));
-            case "G" -> lot.initialQuantity().divide(new BigDecimal("1000"));
+            case "G" -> lot.initialQuantity().divide(new BigDecimal("1000"), 6, RoundingMode.HALF_UP);
             default ->
                     throw new WarehouseIntegrationException(
                             "Lot unit needs an agreed weight conversion to KG: " + lot.unit());
@@ -566,9 +698,14 @@ public class WarehouseDocumentService {
                                                 l.getLocationId(),
                                                 l.getTargetLocationId(),
                                                 l.getQuantityKg(),
-                                                l.getExpectedKg()))
+                                                l.getExpectedKg(),
+                                                l.getReceivedQuantityKg()))
                         .toList(),
                 d.getHandoverBy(),
-                d.getHandedOverAt());
+                d.getHandedOverAt(),
+                Boolean.TRUE.equals(d.getInTransit()),
+                d.getReceivedBy(),
+                d.getReceivedAt(),
+                d.getReceivingNote());
     }
 }

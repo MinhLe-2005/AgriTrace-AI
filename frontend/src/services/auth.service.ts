@@ -51,5 +51,9 @@ export const authService = {
   async updateProfile(payload: { fullName: string; phone?: string; companyName?: string; address?: string }) {
     const { data } = await api.patch<ApiResponse<BackendUser>>("/auth/profile", payload);
     return normalizeUser(unpack(data));
+  },
+  async getMe() {
+    const { data } = await api.get<ApiResponse<BackendUser>>("/users/me");
+    return normalizeUser(unpack(data));
   }
 };

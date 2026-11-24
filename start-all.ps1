@@ -3,6 +3,7 @@
 # Khoi dong toan bo he thong: PostgreSQL (Cloud/Local) + Spring Boot + Next.js
 # ===================================================================
 
+$ProgressPreference = 'SilentlyContinue'
 $RepoRoot = $PSScriptRoot
 if (-not $RepoRoot) { $RepoRoot = (Get-Location).Path }
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
@@ -52,45 +53,12 @@ if ($env:SPRING_DATASOURCE_URL -match "supabase\.com" -or $env:DB_HOST -match "s
 
 # 2. Khoi dong Backend Spring Boot (Port 8080)
 Write-Host "`n[2/3] Khoi dong Backend Spring Boot (port 8080)..." -ForegroundColor Yellow
-
-$mvnCmd = "mvn.cmd"
-$foundMvn = Get-Command "mvn.cmd", "mvn" -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($foundMvn) {
-    $mvnCmd = $foundMvn.Source
-} else {
-    $m2Wrapper = Get-ChildItem -Path "$env:USERPROFILE\.m2\wrapper\dists" -Filter "mvn.cmd" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($m2Wrapper) {
-        $mvnCmd = $m2Wrapper.FullName
-    } else {
-        $ideaMaven = Get-ChildItem -Path "C:\Program Files\JetBrains" -Filter "mvn.cmd" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($ideaMaven) {
-            $mvnCmd = $ideaMaven.FullName
-        }
-    }
-}
-
-Write-Host "  -> Su dung Maven: $mvnCmd" -ForegroundColor Gray
 $bPortListening = Test-NetConnection -ComputerName 127.0.0.1 -Port 8080 -InformationLevel Quiet -WarningAction SilentlyContinue
 if ($bPortListening) {
     Write-Host "  -> Port 8080 da dang chay san." -ForegroundColor Green
 } else {
-    $backendCmd = @"
-`$Host.UI.RawUI.WindowTitle = 'AgriTrace-Backend';
-if (Test-Path .env) {
-    Get-Content .env | ForEach-Object {
-        `$l = `$_.Trim();
-        if (`$l -and -not `$l.StartsWith('#')) {
-            `$p = `$l.Split('=', 2);
-            if (`$p.Length -eq 2) {
-                [System.Environment]::SetEnvironmentVariable(`$p[0].Trim(), `$p[1].Trim(), 'Process');
-            }
-        }
-    }
-}
-`$env:SPRING_PROFILES_ACTIVE = 'dev';
-& '$mvnCmd' spring-boot:run '-Dspring-boot.run.profiles=dev'
-"@
-    Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", $backendCmd -WorkingDirectory $BackendDir
+    $backendScript = Join-Path $BackendDir "run-backend.ps1"
+    Start-Process powershell.exe -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"$backendScript`"" -WorkingDirectory $BackendDir
 }
 
 # 3. Khoi dong Frontend Next.js (Port 3000)
@@ -99,7 +67,8 @@ $fPortListening = Test-NetConnection -ComputerName 127.0.0.1 -Port 3000 -Informa
 if ($fPortListening) {
     Write-Host "  -> Port 3000 da dang chay san." -ForegroundColor Green
 } else {
-    Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'AgriTrace-Frontend'; npm run dev" -WorkingDirectory $FrontendDir
+    $frontendScript = Join-Path $FrontendDir "run-frontend.ps1"
+    Start-Process powershell.exe -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"$frontendScript`"" -WorkingDirectory $FrontendDir
 }
 
 # Thong bao hoan tat

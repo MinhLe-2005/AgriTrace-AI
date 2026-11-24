@@ -43,13 +43,14 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint).accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/actuator/health", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/api/v1/loyalty/admin/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/vouchers/all").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/*/status").hasAnyRole("ADMIN", "DISTRIBUTOR")
-                        .requestMatchers("/api/v1/payment/payos/**", "/api/v1/loyalty/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/products/**", "/api/v1/vouchers/**", "/api/v1/traceability/**", "/api/v1/orders/**", "/api/v1/reviews/**", "/api/v1/loyalty/**", "/api/v1/campaigns", "/api/v1/blog-posts").permitAll()
+                        // A self-locked user cannot create a JWT; this endpoint
+                        // verifies the current password and clears self-locks only.
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/lock").permitAll()
+                        .requestMatchers("/api/v1/payment/payos/**", "/api/v1/loyalty/**", "/api/v1/campaigns/**", "/api/v1/blog-posts/**", "/api/v1/vouchers/**", "/api/v1/users/**", "/api/v1/verifications/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/products/**", "/api/v1/vouchers/**", "/api/v1/traceability/**", "/api/v1/orders/**", "/api/v1/reviews/**", "/api/v1/loyalty/**", "/api/v1/campaigns/**", "/api/v1/blog-posts/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders/**", "/api/v1/farmer/**", "/api/v1/products/**", "/api/v1/reviews/**", "/api/v1/loyalty/**").permitAll()
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/**").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/**", "/api/v1/farmer/**").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/farmer/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/farmer/**", "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/farmer/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

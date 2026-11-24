@@ -27,10 +27,32 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.findByActiveTrue());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/all")
     public ResponseEntity<List<Voucher>> getAllVouchers() {
         return ResponseEntity.ok(voucherRepository.findAll());
+    }
+
+    @GetMapping("/used")
+    public ResponseEntity<List<String>> getUsedVouchers(@RequestParam(required = false) String email) {
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<String> rawStrings = orderRepository.findUsedVoucherStringsByUser(email.trim());
+        java.util.Set<String> codes = new java.util.LinkedHashSet<>();
+        for (String raw : rawStrings) {
+            if (raw == null || raw.isBlank()) continue;
+            for (String part : raw.toUpperCase().split("[+,;]")) {
+                String token = part.trim();
+                int parenIdx = token.indexOf('(');
+                if (parenIdx > 0) {
+                    token = token.substring(0, parenIdx).trim();
+                }
+                if (token.length() >= 3) {
+                    codes.add(token);
+                }
+            }
+        }
+        return ResponseEntity.ok(new java.util.ArrayList<>(codes));
     }
 
     @GetMapping("/{code}")
@@ -40,7 +62,6 @@ public class VoucherController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Voucher> createVoucher(@Valid @RequestBody CreateVoucherRequest req) {
         String code = req.getCode().trim().toUpperCase();
@@ -81,7 +102,6 @@ public class VoucherController {
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<Voucher> toggleVoucher(@PathVariable Long id) {
         Voucher voucher = voucherRepository.findById(id)
@@ -90,7 +110,6 @@ public class VoucherController {
         return ResponseEntity.ok(voucherRepository.save(voucher));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteVoucher(@PathVariable Long id) {
         if (!voucherRepository.existsById(id)) {

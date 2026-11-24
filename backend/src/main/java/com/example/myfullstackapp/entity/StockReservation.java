@@ -60,5 +60,16 @@ public class StockReservation {
 
         @Column(nullable = false, precision = 14, scale = 3)
         private BigDecimal quantityKg;
+
+        @Column(nullable = false, precision = 14, scale = 3)
+        private BigDecimal dispatchedKg = BigDecimal.ZERO;
+
+        public Allocation(UUID balanceId, BigDecimal quantityKg) {
+            this(balanceId, quantityKg, BigDecimal.ZERO);
+        }
+
+        public BigDecimal remainingKg() {
+            return quantityKg.subtract(dispatchedKg);
+        }
     }
 }

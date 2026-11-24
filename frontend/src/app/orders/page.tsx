@@ -57,10 +57,6 @@ function OrdersLookupContent() {
     try {
       const cleanQ = q.replace(/^#/, "");
       const phone = phoneInput.trim() || undefined;
-      if (!user && !phone) {
-        setSearchError("Vui lòng nhập số điện thoại người nhận để xác minh đơn hàng.");
-        return;
-      }
       const code = cleanQ.startsWith("AGRI-") ? cleanQ : `AGRI-${cleanQ}`;
       const found = await catalogService.getOrderByCode(code, phone);
 

@@ -97,3 +97,12 @@ export function compressAvatarImage(
     reader.readAsDataURL(file);
   });
 }
+
+export async function compressImageFile(
+  file: File,
+  maxDimension = 900,
+  quality = 0.78
+): Promise<string> {
+  const result = await compressAvatarImage(file, maxDimension, maxDimension, quality);
+  return result.dataUrl;
+}

@@ -1,7 +1,9 @@
 package com.example.myfullstackapp.controller;
 
 import com.example.myfullstackapp.entity.TraceabilityRecord;
+import com.example.myfullstackapp.dto.traceability.TraceabilityChainResponse;
 import com.example.myfullstackapp.repository.TraceabilityRecordRepository;
+import com.example.myfullstackapp.service.TraceabilityChainService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +17,7 @@ import java.util.List;
 public class TraceabilityController {
 
     private final TraceabilityRecordRepository traceabilityRecordRepository;
+    private final TraceabilityChainService traceabilityChainService;
 
     @PostConstruct
     public void initSeedData() {
@@ -70,5 +73,14 @@ public class TraceabilityController {
         return traceabilityRecordRepository.findByBatchCodeIgnoreCase(batchCode)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Returns the persisted farm-to-delivery chain for a batch.  The existing
+     * legacy endpoint above is intentionally retained for current clients.
+     */
+    @GetMapping("/{batchCode}/chain")
+    public ResponseEntity<TraceabilityChainResponse> getChain(@PathVariable String batchCode) {
+        return ResponseEntity.ok(traceabilityChainService.traceByBatchCode(batchCode));
     }
 }

@@ -3,30 +3,42 @@
 import {
   AlertTriangle,
   Award,
+  BookOpen,
+  Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Edit3,
+  FileCheck,
   FileText,
   Home,
   Leaf,
+  Mail,
   MapPin,
   Package,
   Phone,
   Plus,
+  Printer,
   QrCode,
+  RefreshCw,
   Save,
+  Send,
+  ShieldCheck,
   Sparkles,
   Sprout,
   Trash2,
   Truck,
   Upload,
   User,
+  Warehouse,
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { farmerService } from "@/services/farmer.service";
+import { useEffect, useRef, useState } from "react";
+import { farmerService, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot } from "@/services/farmer.service";
+import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
 import { toast } from "@/stores/toast-store";
+import { useAuthStore } from "@/stores/auth-store";
 
 // =========================================================================
 // TYPES & DEFINITIONS
@@ -37,6 +49,7 @@ export type FarmItem = {
   code: string;
   name: string;
   owner: string;
+  ownerId?: string;
   phone: string;
   address: string;
   province: string;
@@ -50,13 +63,14 @@ export type FarmItem = {
 export type BatchItem = {
   code: string;
   farmCode: string;
+  ownerId?: string;
   product: string;
   plantingDate: string;
   harvestDate: string;
   expiryDate: string;
   qty: string;
   unit: string;
-  status: "Chờ duyệt xuất kho" | "Đã duyệt xuất kho" | "Đang lưu kho lạnh" | "Đang chăm sóc";
+  status: "Chờ duyệt xuất kho" | "Đã duyệt xuất kho" | "Đang lưu kho lạnh" | "Đang chăm sóc" | "Từ chối xuất kho";
   statusColor: string;
   cert: string;
   cultivation: string;
@@ -67,17 +81,20 @@ export type BatchItem = {
 export type FarmingLogItem = {
   id: string;
   farmCode?: string;
+  ownerId?: string;
   batchCode: string;
   date: string;
   stage: "Gieo hạt" | "Bón phân" | "Tưới tiêu" | "Phun sinh học" | "Thu hoạch";
   action: string;
   materialsUsed?: string;
   notes?: string;
+  proofImage?: string;
 };
 
 export type ProductItem = {
   id: string;
   farmCode?: string;
+  ownerId?: string;
   name: string;
   category: string;
   price: number;
@@ -90,6 +107,7 @@ export type ProductItem = {
 export type CertificationItem = {
   id: string;
   farmCode: string;
+  ownerId?: string;
   name: string;
   certNumber: string;
   issuedBy: string;
@@ -97,45 +115,648 @@ export type CertificationItem = {
   expiryDate: string;
   status: "VALID" | "EXPIRING_SOON" | "EXPIRED";
   daysLeft: number;
+  approvalStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED";
+  pendingRenewal?: {
+    newCertNumber: string;
+    proofImage: string;
+    requestedExpiryDate: string;
+    submittedAt: string;
+    note?: string;
+  };
 };
+
+const STORAGE_KEYS = {
+  farms: "agritrace_farmer_farms_v1",
+  selectedFarmId: "agritrace_farmer_selected_farm_v1",
+  logs: "agritrace_farmer_logs_v1",
+  certs: "agritrace_farmer_certs_v1",
+  certEmailSent: "agritrace_cert_expiry_email_sent_v1",
+  alertEmail: "agritrace_farmer_alert_email_v1",
+} as const;
+
+const PRODUCT_CATEGORIES = [
+  { value: "trai_cay", label: "Trái Cây Tươi & Đặc Sản" },
+  { value: "rau_la", label: "Rau Ăn Lá Hữu Cơ" },
+  { value: "cu_qua", label: "Củ Quả Sạch" },
+  { value: "nam_chebien", label: "Nấm & Đặc Sản Chế Biến" },
+] as const;
+
+type FarmerProfile = {
+  ownerId: string;
+  name: string;
+  email: string;
+  phone: string;
+  farmCodes: string[];
+  avatarText: string;
+  title: string;
+};
+
+const FARMER_PROFILES: FarmerProfile[] = [
+  {
+    ownerId: "farmer_hung",
+    name: "Bác Nguyễn Văn Hùng",
+    email: "farmer@agritrace.vn",
+    phone: "0912 345 678",
+    farmCodes: ["NT-DL-01", "NT-DT-02"],
+    avatarText: "VH",
+    title: "Chủ Nông Trại Đà Lạt & Cao Lãnh",
+  },
+  {
+    ownerId: "farmer_thieu",
+    name: "Nguyễn Thiệu",
+    email: "nguyenthieuu052@gmail.com",
+    phone: "0988 776 655",
+    farmCodes: ["NT-MC-03"],
+    avatarText: "NT",
+    title: "Chủ Vườn Sinh Thái Mộc Châu",
+  },
+];
+
+const DEFAULT_FARMS: FarmItem[] = [
+  {
+    id: "f1",
+    code: "NT-DL-01",
+    name: "Nông Trại Xanh Đà Lạt",
+    owner: "Bác Nguyễn Văn Hùng",
+    ownerId: "farmer_hung",
+    phone: "0912 345 678",
+    address: "Xã Xuân Thọ, TP. Đà Lạt",
+    province: "Lâm Đồng",
+    areaHectares: 4.5,
+    certStandard: "VietGAP & GlobalGAP",
+    rating: 4.9,
+    activeBatchCount: 3,
+    isDefault: true,
+  },
+  {
+    id: "f2",
+    code: "NT-DT-02",
+    name: "Vườn Cây Ăn Trái Cao Lãnh",
+    owner: "Bác Nguyễn Văn Hùng",
+    ownerId: "farmer_hung",
+    phone: "0912 345 678",
+    address: "Xã Mỹ Xương, Huyện Cao Lãnh",
+    province: "Đồng Tháp",
+    areaHectares: 3.2,
+    certStandard: "VietGAP Trồng trọt",
+    rating: 4.8,
+    activeBatchCount: 1,
+    isDefault: false,
+  },
+  {
+    id: "f3",
+    code: "NT-MC-03",
+    name: "Vườn Sinh Thái Mộc Châu",
+    owner: "Nguyễn Thiệu",
+    ownerId: "farmer_thieu",
+    phone: "0988 776 655",
+    address: "Tiểu khu Chè Đen, Thị trấn Nông trường Mộc Châu",
+    province: "Sơn La",
+    areaHectares: 5.0,
+    certStandard: "Hữu cơ TCVN & VietGAP",
+    rating: 5.0,
+    activeBatchCount: 2,
+    isDefault: false,
+  },
+];
+
+const DEFAULT_BATCHES: BatchItem[] = [
+  {
+    code: "XC-2026-01",
+    farmCode: "NT-DT-02",
+    ownerId: "farmer_hung",
+    product: "Xoài Cát Chu Cao Lãnh",
+    plantingDate: "10/05/2026",
+    harvestDate: "15/10/2026",
+    expiryDate: "30/11/2026",
+    qty: "1200",
+    unit: "kg",
+    status: "Đã duyệt xuất kho",
+    statusColor: "#10b981",
+    cert: "VietGAP",
+    cultivation: "Bao trái hữu cơ, thu hoạch đợt 1",
+    transportDestination: "Kho Tổng Logistics TP.HCM",
+    transportStatus: "Đã nhập kho đích",
+  },
+  {
+    code: "XC-2026-02",
+    farmCode: "NT-DT-02",
+    ownerId: "farmer_hung",
+    product: "Xoài Cát Chu Cao Lãnh",
+    plantingDate: "10/05/2026",
+    harvestDate: "27/10/2026",
+    expiryDate: "25/11/2026",
+    qty: "850",
+    unit: "kg",
+    status: "Chờ duyệt xuất kho",
+    statusColor: "#f97316",
+    cert: "VietGAP",
+    cultivation: "Đợt thu hoạch 2 - Trái chín độ 85%",
+    transportDestination: "Lưu tại kho bảo quản nông trại",
+    transportStatus: "Chưa vận chuyển",
+  },
+  {
+    code: "SR-2026-01",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    product: "Sầu Riêng Ri6 Chín Cây",
+    plantingDate: "01/01/2026",
+    harvestDate: "20/10/2026",
+    expiryDate: "20/11/2026",
+    qty: "500",
+    unit: "kg",
+    status: "Đang lưu kho lạnh",
+    statusColor: "#3b82f6",
+    cert: "GlobalGAP",
+    cultivation: "Hữu cơ sinh học, bảo quản kho mát",
+    transportDestination: "Kho Lạnh Phân Phối Hà Nội",
+    transportStatus: "Đang vận chuyển",
+  },
+  {
+    code: "DT-2026-03",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    product: "Dâu Tây Giống Nhật",
+    plantingDate: "15/08/2026",
+    harvestDate: "10/11/2026",
+    expiryDate: "18/11/2026",
+    qty: "100",
+    unit: "kg",
+    status: "Đang chăm sóc",
+    statusColor: "#f59e0b",
+    cert: "VietGAP",
+    cultivation: "Nhà màng công nghệ cao",
+    transportDestination: "Vườn đang chăm sóc (Chưa vận chuyển)",
+    transportStatus: "Chưa vận chuyển",
+  },
+  {
+    code: "MC-2026-01",
+    farmCode: "NT-MC-03",
+    ownerId: "farmer_thieu",
+    product: "Mận Hậu Mộc Châu Hữu Cơ",
+    plantingDate: "15/02/2026",
+    harvestDate: "20/05/2026",
+    expiryDate: "15/06/2026",
+    qty: "2500",
+    unit: "kg",
+    status: "Đã duyệt xuất kho",
+    statusColor: "#10b981",
+    cert: "Hữu cơ TCVN",
+    cultivation: "Mận chín cây, bao trái sinh học",
+    transportDestination: "Kho Lạnh Phân Phối Hà Nội",
+    transportStatus: "Đã nhập kho đích",
+  },
+  {
+    code: "TC-2026-02",
+    farmCode: "NT-MC-03",
+    ownerId: "farmer_thieu",
+    product: "Chè Shan Tuyết Cổ Thụ Mộc Châu",
+    plantingDate: "01/01/2026",
+    harvestDate: "05/11/2026",
+    expiryDate: "05/11/2027",
+    qty: "350",
+    unit: "kg",
+    status: "Chờ duyệt xuất kho",
+    statusColor: "#f97316",
+    cert: "VietGAP",
+    cultivation: "Búp chè 1 tôm 2 lá vùng núi cao",
+    transportDestination: "Kho Tổng Logistics Hà Nội",
+    transportStatus: "Chưa vận chuyển",
+  },
+];
+
+const DEFAULT_LOGS: FarmingLogItem[] = [
+  {
+    id: "l1",
+    farmCode: "NT-DT-02",
+    ownerId: "farmer_hung",
+    batchCode: "XC-2026-02",
+    date: "15/07/2026",
+    stage: "Bón phân",
+    action: "Bón phân hữu cơ vi sinh đợt 2",
+    materialsUsed: "Phân bón trùn quế hữu cơ O-Micro",
+    notes: "Tỷ lệ bón 2kg/gốc, tưới ẩm đất",
+  },
+  {
+    id: "l2",
+    farmCode: "NT-DT-02",
+    ownerId: "farmer_hung",
+    batchCode: "XC-2026-02",
+    date: "20/08/2026",
+    stage: "Phun sinh học",
+    action: "Bao trái và phun dung dịch xua đuổi ruồi vàng thảo mộc",
+    materialsUsed: "Chế phẩm sinh học tỏi - ớt - gừng lên men",
+    notes: "Cách ly an toàn 100% không dùng hóa chất độc hại",
+  },
+  {
+    id: "l3",
+    farmCode: "NT-DT-02",
+    ownerId: "farmer_hung",
+    batchCode: "XC-2026-02",
+    date: "27/10/2026",
+    stage: "Thu hoạch",
+    action: "Thu hoạch đợt 2 sáng sớm, phân loại trái",
+    materialsUsed: "Dụng cụ khử trùng, thùng lót giấy mềm",
+    notes: "Trái đạt chuẩn độ ngọt, chuyển gửi Admin duyệt",
+  },
+  {
+    id: "l4",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    batchCode: "SR-2026-01",
+    date: "10/09/2026",
+    stage: "Tưới tiêu",
+    action: "Tưới nước nhỏ giọt tự động kiểm soát EC và pH",
+    materialsUsed: "Nguồn nước sạch ngầm",
+    notes: "Độ pH ổn định 6.2",
+  },
+  {
+    id: "l5",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    batchCode: "DT-2026-03",
+    date: "12/10/2026",
+    stage: "Tưới tiêu",
+    action: "Tưới dinh dưỡng nhỏ giọt công nghệ Israel cho dâu tây",
+    materialsUsed: "Dung dịch dinh dưỡng hữu cơ vi lượng A-B",
+    notes: "Kiểm tra độ ẩm giá thể mùn dừa đạt 75%",
+  },
+  {
+    id: "l6",
+    farmCode: "NT-MC-03",
+    ownerId: "farmer_thieu",
+    batchCode: "TC-2026-02",
+    date: "15/08/2026",
+    stage: "Bón phân",
+    action: "Bón phân hữu cơ vi sinh ủ hoai cho cây chè cổ thụ",
+    materialsUsed: "Phân chuồng ủ hoai nấm Trichoderma",
+    notes: "Đảm bảo dinh dưỡng tự nhiên không hóa chất",
+  },
+  {
+    id: "l7",
+    farmCode: "NT-MC-03",
+    ownerId: "farmer_thieu",
+    batchCode: "TC-2026-02",
+    date: "05/11/2026",
+    stage: "Thu hoạch",
+    action: "Thu hái thủ công búp chè 1 tôm 2 lá trong sương sớm",
+    materialsUsed: "Gùi tre truyền thống, găng tay sạch",
+    notes: "Bảo quản trong bóng râm, đưa về xưởng chế biến trong ngày",
+  },
+];
+
+const DEFAULT_PRODUCTS: ProductItem[] = [
+  {
+    id: "p1",
+    farmCode: "NT-DT-02",
+    ownerId: "farmer_hung",
+    name: "Xoài Cát Chu Cao Lãnh",
+    category: "trai_cay",
+    price: 65000,
+    unit: "kg",
+    description: "Xoài Cát Chu thịt dày, thơm ngọt đậm đà canh tác chuẩn VietGAP",
+    origin: "Vườn Cây Ăn Trái Cao Lãnh",
+    image: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=400&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "p2",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    name: "Thanh Long Ruột Đỏ",
+    category: "trai_cay",
+    price: 45000,
+    unit: "kg",
+    description: "Thanh long mọng nước, vị ngọt thanh tự nhiên",
+    origin: "Nông Trại Xanh Đà Lạt",
+    image: "https://images.unsplash.com/photo-1527325678964-54921661f888?w=400&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "p3",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    name: "Sầu Riêng Ri6 Chín Cây",
+    category: "trai_cay",
+    price: 135000,
+    unit: "kg",
+    description: "Cơm vàng hạt lép, thu hoạch độ chín hoàn hảo tại vườn",
+    origin: "Nông Trại Xanh Đà Lạt",
+    image: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=400&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "p4",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    name: "Dâu Tây Giống Nhật",
+    category: "trai_cay",
+    price: 180000,
+    unit: "hộp 500g",
+    description: "Dâu tây canh tác giá thể xơ dừa nhà màng, vị ngọt thơm dịu",
+    origin: "Nông Trại Xanh Đà Lạt",
+    image: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=400&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "p5",
+    farmCode: "NT-MC-03",
+    ownerId: "farmer_thieu",
+    name: "Mận Hậu Mộc Châu Hữu Cơ",
+    category: "trai_cay",
+    price: 85000,
+    unit: "kg",
+    description: "Mận Hậu giòn ngọt rôn rốt, phủ phấn trắng tự nhiên canh tác hữu cơ tại thung lũng Mộc Châu",
+    origin: "Vườn Sinh Thái Mộc Châu",
+    image: "https://images.unsplash.com/photo-1596363505729-4190a9506133?w=400&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "p6",
+    farmCode: "NT-MC-03",
+    ownerId: "farmer_thieu",
+    name: "Chè Shan Tuyết Cổ Thụ Mộc Châu",
+    category: "nam_chebien",
+    price: 320000,
+    unit: "hộp 200g",
+    description: "Chè Shan tuyết búp phủ tuyết trắng, hương vị tiền chát hậu ngọt sâu lắng",
+    origin: "Vườn Sinh Thái Mộc Châu",
+    image: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=400&auto=format&fit=crop&q=80",
+  },
+];
+
+const DEFAULT_CERTS: CertificationItem[] = [
+  {
+    id: "c1",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    name: "Chứng nhận GlobalGAP",
+    certNumber: "GG-91024-VN",
+    issuedBy: "Tổ chức Chứng nhận Quốc tế Control Union",
+    issueDate: "15/01/2026",
+    expiryDate: "15/01/2027",
+    status: "VALID",
+    daysLeft: 64,
+  },
+  {
+    id: "c2",
+    farmCode: "NT-DL-01",
+    ownerId: "farmer_hung",
+    name: "Chứng nhận VietGAP Trồng trọt",
+    certNumber: "VG-49-2026-LD",
+    issuedBy: "Chi cục Quản lý Chất lượng Nông Lâm Sản Lâm Đồng",
+    issueDate: "20/11/2025",
+    expiryDate: "20/11/2026",
+    status: "EXPIRING_SOON",
+    daysLeft: 8,
+  },
+  {
+    id: "c3",
+    farmCode: "NT-DT-02",
+    ownerId: "farmer_hung",
+    name: "Chứng nhận VietGAP Cây Ăn Trái",
+    certNumber: "VG-66-2026-DT",
+    issuedBy: "Sở Nông nghiệp & PTNT Đồng Tháp",
+    issueDate: "10/03/2026",
+    expiryDate: "10/03/2027",
+    status: "VALID",
+    daysLeft: 118,
+  },
+  {
+    id: "c4",
+    farmCode: "NT-MC-03",
+    ownerId: "farmer_thieu",
+    name: "Chứng nhận Hữu cơ Việt Nam (TCVN 11041)",
+    certNumber: "MC-ORG-2026-001",
+    issuedBy: "Trung tâm Chứng nhận Phù hợp Quacert",
+    issueDate: "10/01/2026",
+    expiryDate: "10/01/2028",
+    status: "VALID",
+    daysLeft: 412,
+  },
+];
+
+function getLocalIsoDate(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDisplayDate(dStr: string): string {
+  if (!dStr) return "";
+  const parts = dStr.split("-");
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dStr;
+}
+
+function parseVnOrIsoDate(raw?: string): Date | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/\(.*?\)/g, "").trim();
+  const vnMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (vnMatch) {
+    return new Date(Number(vnMatch[3]), Number(vnMatch[2]) - 1, Number(vnMatch[1]));
+  }
+  const isoMatch = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+  }
+  return null;
+}
+
+function getCategoryLabel(categoryValue?: string): string {
+  if (!categoryValue) return "Trái Cây Tươi & Đặc Sản";
+  const found = PRODUCT_CATEGORIES.find((c) => c.value === categoryValue);
+  if (found) return found.label;
+  const lower = categoryValue.toLowerCase();
+  if (lower.includes("rau")) return "Rau Ăn Lá Hữu Cơ";
+  if (lower.includes("cu") || lower.includes("củ")) return "Củ Quả Sạch";
+  if (lower.includes("nam") || lower.includes("nấm")) return "Nấm & Đặc Sản Chế Biến";
+  return categoryValue;
+}
+
+function resolveBatchStatusColor(status?: string, fallbackColor?: string): string {
+  if (status === "Đã duyệt xuất kho") return "#10b981";
+  if (status === "Đang lưu kho lạnh") return "#3b82f6";
+  if (status === "Đang chăm sóc") return "#f59e0b";
+  if (status === "Chờ duyệt xuất kho") return "#f97316";
+  return fallbackColor || "#f97316";
+}
+
+function normalizeBatchCert(certStandard?: string): string {
+  if (!certStandard) return "VietGAP";
+  const lower = certStandard.toLowerCase();
+  if (lower.includes("globalgap")) return "GlobalGAP";
+  if (lower.includes("organic")) return "Organic USDA";
+  return "VietGAP";
+}
+
+function extractFarmCode(farmName?: string, origin?: string, farmList: FarmItem[] = DEFAULT_FARMS): string {
+  const combined = `${farmName || ""} ${origin || ""}`.trim();
+  const codeMatch = combined.match(/\(Mã:\s*([^)]+)\)/i);
+  if (codeMatch?.[1]) {
+    return codeMatch[1].trim().toUpperCase();
+  }
+  const combinedLower = combined.toLowerCase();
+  for (const f of farmList) {
+    if (combinedLower.includes(f.code.toLowerCase()) || combinedLower.includes(f.name.toLowerCase())) {
+      return f.code;
+    }
+  }
+  if (combinedLower.includes("cao lãnh") || combinedLower.includes("đồng tháp")) {
+    return "NT-DT-02";
+  }
+  if (combinedLower.includes("đà lạt") || combinedLower.includes("lâm đồng")) {
+    return "NT-DL-01";
+  }
+  if (combinedLower.includes("mộc châu") || combinedLower.includes("sơn la")) {
+    return "NT-MC-03";
+  }
+  return farmList[0]?.code || "NT-DL-01";
+}
+
+function generateLotCodeForProduct(productName: string, existingBatches: BatchItem[]): string {
+  const ascii = productName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/[^A-Za-z\s]/g, " ")
+    .trim();
+  const words = ascii.split(/\s+/).filter(Boolean);
+  let prefix = "AG";
+  if (words.length >= 2) {
+    prefix = (words[0][0] + words[1][0]).toUpperCase();
+  } else if (words.length === 1 && words[0].length >= 2) {
+    prefix = words[0].slice(0, 2).toUpperCase();
+  }
+  const year = new Date().getFullYear();
+  const existingCodes = new Set(existingBatches.map((b) => b.code.toUpperCase()));
+  for (let i = 0; i < 15; i += 1) {
+    const rand = Math.floor(Math.random() * 89) + 10;
+    const candidate = `${prefix}-${year}-${rand}`;
+    if (!existingCodes.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `${prefix}-${year}-${String(Date.now()).slice(-3)}`;
+}
+
+function getNextFarmCode(farmList: FarmItem[]): string {
+  const used = new Set(farmList.map((f) => f.code.toUpperCase()));
+  let idx = farmList.length + 1;
+  while (idx < 999) {
+    const candidate = `NT-VN-${String(idx).padStart(2, "0")}`;
+    if (!used.has(candidate)) {
+      return candidate;
+    }
+    idx += 1;
+  }
+  return `NT-VN-${String(Date.now()).slice(-4)}`;
+}
+
+function computeHarvestStats(batchList: BatchItem[]): { totalKgLabel: string; productSummary: string } {
+  let totalKg = 0;
+  const productsSet = new Set<string>();
+  for (const b of batchList) {
+    const num = Number(b.qty);
+    if (Number.isFinite(num) && num > 0) {
+      const unitLower = (b.unit || "kg").trim().toLowerCase();
+      if (unitLower === "tấn" || unitLower === "t" || unitLower === "ton") {
+        totalKg += num * 1000;
+      } else if (unitLower === "tạ") {
+        totalKg += num * 100;
+      } else if (unitLower === "g") {
+        totalKg += num / 1000;
+      } else if (unitLower.includes("500g")) {
+        totalKg += num * 0.5;
+      } else {
+        totalKg += num;
+      }
+    }
+    if (b.product?.trim()) {
+      productsSet.add(b.product.trim());
+    }
+  }
+  const rounded = Math.round(totalKg * 100) / 100;
+  const names = Array.from(productsSet).slice(0, 3);
+  const summary =
+    names.length === 0
+      ? "Chưa có nông sản thu hoạch"
+      : productsSet.size > 3
+      ? `${names.join(", ")}...`
+      : names.join(", ");
+  return {
+    totalKgLabel: `${rounded.toLocaleString("vi-VN")} kg`,
+    productSummary: summary,
+  };
+}
+
+function evaluateCertification(cert: CertificationItem, referenceNowMs: number | null): CertificationItem {
+  if (referenceNowMs === null) {
+    return cert;
+  }
+  const expiry = parseVnOrIsoDate(cert.expiryDate);
+  if (!expiry) {
+    return cert;
+  }
+  const refDate = new Date(referenceNowMs);
+  const todayMidnight = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate()).getTime();
+  const diffDays = Math.ceil((expiry.getTime() - todayMidnight) / (1000 * 60 * 60 * 24));
+  const status: CertificationItem["status"] =
+    diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "EXPIRING_SOON" : "VALID";
+  return {
+    ...cert,
+    daysLeft: diffDays,
+    status,
+  };
+}
+
+function readStoredJson<T>(key: string): T | null {
+  try {
+    const rawVal = localStorage.getItem(key);
+    if (!rawVal) return null;
+    return JSON.parse(rawVal) as T;
+  } catch {
+    return null;
+  }
+}
+
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  const maybeErr = err as { response?: { data?: { message?: string } | string }; message?: string };
+  if (typeof maybeErr?.response?.data === "string" && maybeErr.response.data.trim()) {
+    return maybeErr.response.data;
+  }
+  if (
+    maybeErr?.response?.data &&
+    typeof maybeErr.response.data === "object" &&
+    typeof maybeErr.response.data.message === "string" &&
+    maybeErr.response.data.message.trim()
+  ) {
+    return maybeErr.response.data.message;
+  }
+  if (typeof maybeErr?.message === "string" && maybeErr.message.trim()) {
+    return maybeErr.message;
+  }
+  return fallback;
+}
 
 export default function FarmerPortalPage() {
   // 5 Tab nghiệp vụ rõ ràng, tách riêng "Quản Lý Nông Trại" lên vị trí nổi bật
   const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs">("farms");
+  const [storageLoaded, setStorageLoaded] = useState(false);
+  const [clientNowMs, setClientNowMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab && ["farms", "batches", "logs", "products", "certs"].includes(tab)) {
+        setActiveTab(tab as any);
+      }
+    }
+  }, []);
 
   // =========================================================================
   // 1. DỮ LIỆU QUẢN LÝ NÔNG TRẠI (Quản lý nhiều nông trại canh tác)
   // =========================================================================
-  const [farms, setFarms] = useState<FarmItem[]>([
-    {
-      id: "f1",
-      code: "NT-DL-01",
-      name: "Nông Trại Xanh Đà Lạt",
-      owner: "Bác Nguyễn Văn Hùng",
-      phone: "0912 345 678",
-      address: "Xã Xuân Thọ, TP. Đà Lạt",
-      province: "Lâm Đồng",
-      areaHectares: 4.5,
-      certStandard: "VietGAP & GlobalGAP",
-      rating: 4.9,
-      activeBatchCount: 3,
-      isDefault: true,
-    },
-    {
-      id: "f2",
-      code: "NT-DT-02",
-      name: "Vườn Cây Ăn Trái Cao Lãnh",
-      owner: "Bác Nguyễn Văn Hùng",
-      phone: "0912 345 678",
-      address: "Xã Mỹ Xương, Huyện Cao Lãnh",
-      province: "Đồng Tháp",
-      areaHectares: 3.2,
-      certStandard: "VietGAP Trồng trọt",
-      rating: 4.8,
-      activeBatchCount: 1,
-      isDefault: false,
-    },
-  ]);
+  const [farms, setFarms] = useState<FarmItem[]>(DEFAULT_FARMS);
 
   // Nông trại đang được chọn làm việc
   const [selectedFarmId, setSelectedFarmId] = useState<string>("f1");
@@ -144,13 +765,13 @@ export default function FarmerPortalPage() {
   // Modal Thêm Nông Trại Mới
   const [isAddFarmModalOpen, setIsAddFarmModalOpen] = useState(false);
   const [newFarmName, setNewFarmName] = useState("");
-  const [newFarmCode, setNewFarmCode] = useState("NT-LH-03");
-  const [newFarmOwner, setNewFarmOwner] = useState(farms[0]?.owner || "Bác Nguyễn Văn Hùng");
-  const [newFarmPhone, setNewFarmPhone] = useState(farms[0]?.phone || "0912 345 678");
+  const [newFarmCode, setNewFarmCode] = useState("NT-VN-03");
+  const [newFarmOwner, setNewFarmOwner] = useState(DEFAULT_FARMS[0].owner);
+  const [newFarmPhone, setNewFarmPhone] = useState(DEFAULT_FARMS[0].phone);
   const [newFarmAddress, setNewFarmAddress] = useState("");
   const [newFarmProvince, setNewFarmProvince] = useState("Lâm Đồng");
   const [newFarmArea, setNewFarmArea] = useState("2.5");
-  const [newFarmCert, setNewFarmCert] = useState("VietGAP");
+  const [newFarmCert, setNewFarmCert] = useState("VietGAP Trồng trọt");
 
   // Modal Sửa Nông Trại
   const [editingFarm, setEditingFarm] = useState<FarmItem | null>(null);
@@ -158,86 +779,174 @@ export default function FarmerPortalPage() {
   // =========================================================================
   // 2. DỮ LIỆU LÔ THU HOẠCH
   // =========================================================================
-  const [batches, setBatches] = useState<BatchItem[]>([
-    {
-      code: "XC-2026-01",
-      farmCode: "NT-DT-02",
-      product: "Xoài Cát Chu Cao Lãnh",
-      plantingDate: "10/05/2026",
-      harvestDate: "15/10/2026",
-      expiryDate: "30/10/2026",
-      qty: "1200",
-      unit: "kg",
-      status: "Đã duyệt xuất kho",
-      statusColor: "#10b981",
-      cert: "VietGAP",
-      cultivation: "Bao trái hữu cơ, thu hoạch đợt 1",
-      transportDestination: "Kho Tổng Logistics TP.HCM",
-      transportStatus: "Đã nhập kho đích",
-    },
-    {
-      code: "XC-2026-02",
-      farmCode: "NT-DT-02",
-      product: "Xoài Cát Chu Cao Lãnh",
-      plantingDate: "10/05/2026",
-      harvestDate: "27/10/2026",
-      expiryDate: "11/11/2026",
-      qty: "850",
-      unit: "kg",
-      status: "Chờ duyệt xuất kho",
-      statusColor: "#f97316",
-      cert: "VietGAP",
-      cultivation: "Đợt thu hoạch 2 - Trái chín độ 85%",
-      transportDestination: "Lưu tại kho bảo quản nông trại",
-      transportStatus: "Chưa vận chuyển",
-    },
-    {
-      code: "SR-2026-01",
-      farmCode: "NT-DL-01",
-      product: "Sầu Riêng Ri6 Chín Cây",
-      plantingDate: "01/01/2026",
-      harvestDate: "20/10/2026",
-      expiryDate: "05/11/2026",
-      qty: "500",
-      unit: "kg",
-      status: "Đang lưu kho lạnh",
-      statusColor: "#3b82f6",
-      cert: "GlobalGAP",
-      cultivation: "Hữu cơ sinh học, bảo quản kho mát",
-      transportDestination: "Kho Lạnh Phân Phối Hà Nội",
-      transportStatus: "Đang vận chuyển",
-    },
-    {
-      code: "DT-2026-03",
-      farmCode: "NT-DL-01",
-      product: "Dâu Tây Giống Nhật",
-      plantingDate: "15/08/2026",
-      harvestDate: "28/10/2026 (Dự kiến)",
-      expiryDate: "05/11/2026",
-      qty: "200",
-      unit: "hộp 500g",
-      status: "Đang chăm sóc",
-      statusColor: "#f59e0b",
-      cert: "VietGAP",
-      cultivation: "Nhà màng công nghệ cao",
-      transportDestination: "Vườn đang chăm sóc (Chưa vận chuyển)",
-      transportStatus: "Chưa vận chuyển",
-    },
-  ]);
-
+  const [batches, setBatches] = useState<BatchItem[]>(DEFAULT_BATCHES);
   const [activeFilter, setActiveFilter] = useState<string>("Tất cả");
   const [selectedBatchFarm, setSelectedBatchFarm] = useState<string>("ALL");
   const [selectedTransportFilter, setSelectedTransportFilter] = useState<string>("Tất cả");
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
+
+  // Form State tạo Lô mới
+  const [formFarmCode, setFormFarmCode] = useState("NT-DT-02");
+  const [formProduct, setFormProduct] = useState("Xoài Cát Chu Cao Lãnh");
+  const [formLotCode, setFormLotCode] = useState("XC-2026-03");
+  const [formPlantingDate, setFormPlantingDate] = useState("2026-09-01");
+  const [formHarvestDate, setFormHarvestDate] = useState("2026-11-12");
+  const [formExpiryDate, setFormExpiryDate] = useState("2026-11-26");
+  const [formQty, setFormQty] = useState("500");
+  const [formUnit, setFormUnit] = useState("kg");
+  const [formCert, setFormCert] = useState("VietGAP");
+  const [formCultivation, setFormCultivation] = useState("Quy trình an toàn VietGAP");
+  const [formTransportDest, setFormTransportDest] = useState("Kho Tổng Logistics TP.HCM");
+
+  // =========================================================================
+  // 2.1. DỮ LIỆU NHẬT KÝ VÒNG ĐỜI LÔ THU HOẠCH (POST-HARVEST LIFECYCLE)
+  // =========================================================================
+  const [selectedLotForTimeline, setSelectedLotForTimeline] = useState<BatchItem | null>(null);
+  const [isLotTimelineModalOpen, setIsLotTimelineModalOpen] = useState(false);
+  const [lotTimelineEvents, setLotTimelineEvents] = useState<LotTimelineEvent[]>([]);
+  const [isLoadingLotTimeline, setIsLoadingLotTimeline] = useState(false);
+  const [isUpdatingLotStatus, setIsUpdatingLotStatus] = useState(false);
+  const [adminApprovalNote, setAdminApprovalNote] = useState("");
+  const [editTransportStatus, setEditTransportStatus] = useState<"Chưa vận chuyển" | "Đang vận chuyển" | "Đã nhập kho đích">("Chưa vận chuyển");
+  const [editTransportDest, setEditTransportDest] = useState("");
+  const [sseConnected, setSseConnected] = useState(false);
+  const selectedLotCodeRef = useRef<string | null>(null);
+
+  // In Tem Nhãn Mã QR Lô Hàng Chuẩn GS1
+  const [isPrintLabelModalOpen, setIsPrintLabelModalOpen] = useState(false);
+  const [selectedLotForPrint, setSelectedLotForPrint] = useState<QrLabelLot | null>(null);
+
+  const handleOpenPrintLabel = (lot: BatchItem | ApiHarvestLot) => {
+    const matchedFarm = farms.find((f) => f.code === (lot as any).farmCode);
+    setSelectedLotForPrint({
+      code: lot.code,
+      product: lot.product,
+      qty: lot.qty,
+      unit: lot.unit || "kg",
+      harvestDate: lot.harvestDate,
+      expiryDate: lot.expiryDate,
+      cert: lot.cert,
+      cultivation: lot.cultivation,
+      farmCode: (lot as any).farmCode,
+      farmName: matchedFarm ? matchedFarm.name : (lot as any).farmName,
+      farmAddress: matchedFarm ? matchedFarm.address : undefined,
+      transportDestination: lot.transportDestination,
+    });
+    setIsPrintLabelModalOpen(true);
+  };
 
   useEffect(() => {
+    selectedLotCodeRef.current = selectedLotForTimeline?.code || null;
+  }, [selectedLotForTimeline]);
+
+  // Thêm sự kiện vòng đời mới
+  const [isAddingCustomEvent, setIsAddingCustomEvent] = useState(false);
+  const [customEventStage, setCustomEventStage] = useState("Đóng gói & Dán tem QR");
+  const [customEventNote, setCustomEventNote] = useState("");
+  const [customEventOperator, setCustomEventOperator] = useState("");
+  const [isSubmittingCustomEvent, setIsSubmittingCustomEvent] = useState(false);
+
+  // =========================================================================
+  // 3. DỮ LIỆU NHẬT KÝ CANH TÁC
+  // =========================================================================
+  const [farmingLogs, setFarmingLogs] = useState<FarmingLogItem[]>(DEFAULT_LOGS);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
+  const [selectedFarmForLog, setSelectedFarmForLog] = useState("NT-DT-02");
+  const [selectedBatchForLog, setSelectedBatchForLog] = useState("XC-2026-02");
+  const [logDate, setLogDate] = useState("2026-11-12");
+  const [logStage, setLogStage] = useState<FarmingLogItem["stage"]>("Bón phân");
+  const [logAction, setLogAction] = useState("");
+  const [logMaterials, setLogMaterials] = useState("");
+  const [logNotes, setLogNotes] = useState("");
+  const [logProofImage, setLogProofImage] = useState("");
+  const [logProofFileName, setLogProofFileName] = useState("");
+  const [selectedLogFarm, setSelectedLogFarm] = useState<string>("ALL");
+
+  // =========================================================================
+  // 4. DỮ LIỆU SẢN PHẨM NÔNG NGHIỆP
+  // =========================================================================
+  const [products, setProducts] = useState<ProductItem[]>(DEFAULT_PRODUCTS);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [newProdFarmCode, setNewProdFarmCode] = useState("NT-DT-02");
+  const [newProdName, setNewProdName] = useState("");
+  const [newProdCategory, setNewProdCategory] = useState("trai_cay");
+  const [newProdPrice, setNewProdPrice] = useState("75000");
+  const [newProdUnit, setNewProdUnit] = useState("kg");
+  const [newProdDesc, setNewProdDesc] = useState("");
+  const [newProdImage, setNewProdImage] = useState<string>("");
+  const [selectedProductFarm, setSelectedProductFarm] = useState<string>("ALL");
+  const [selectedCertFarm, setSelectedCertFarm] = useState<string>("ALL");
+
+  // =========================================================================
+  // 5. DỮ LIỆU CHỨNG NHẬN
+  // =========================================================================
+  const [certifications, setCertifications] = useState<CertificationItem[]>(DEFAULT_CERTS);
+  const [isCertModalOpen, setIsCertModalOpen] = useState(false);
+  const [newCertFarmCode, setNewCertFarmCode] = useState("NT-DL-01");
+  const [newCertName, setNewCertName] = useState("Chứng nhận VietGAP Trồng trọt");
+  const [newCertNumber, setNewCertNumber] = useState("");
+  const [newCertIssuedBy, setNewCertIssuedBy] = useState("");
+  const [newCertIssueDate, setNewCertIssueDate] = useState("2026-11-12");
+  const [newCertExpiryDate, setNewCertExpiryDate] = useState("2027-11-12");
+
+  // State modal gia hạn chứng nhận (+1 năm) - Chờ Admin xét duyệt
+  const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+  const [renewingCert, setRenewingCert] = useState<CertificationItem | null>(null);
+  const [renewDuration, setRenewDuration] = useState("1");
+  const [renewStartDate, setRenewStartDate] = useState("");
+  const [renewRequestedExpiryDate, setRenewRequestedExpiryDate] = useState("");
+  const [renewNewCertNumber, setRenewNewCertNumber] = useState("");
+  const [renewIssuedBy, setRenewIssuedBy] = useState("");
+  const [renewNote, setRenewNote] = useState("");
+  const [renewProofImage, setRenewProofImage] = useState("");
+  const [renewProofFileName, setRenewProofFileName] = useState("");
+  const [isSubmittingRenewal, setIsSubmittingRenewal] = useState(false);
+
+  useEffect(() => {
+    const savedFarms = readStoredJson<FarmItem[]>(STORAGE_KEYS.farms);
+    const effectiveFarms = Array.isArray(savedFarms) && savedFarms.length > 0 ? savedFarms : DEFAULT_FARMS;
+    if (savedFarms && savedFarms.length > 0) {
+      setFarms(savedFarms);
+    }
+
+    try {
+      const savedSelectedId = localStorage.getItem(STORAGE_KEYS.selectedFarmId);
+      if (savedSelectedId && effectiveFarms.some((f) => f.id === savedSelectedId)) {
+        setSelectedFarmId(savedSelectedId);
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+
+    const savedLogs = readStoredJson<FarmingLogItem[]>(STORAGE_KEYS.logs);
+    if (Array.isArray(savedLogs) && savedLogs.length > 0) {
+      setFarmingLogs(savedLogs);
+    }
+
+    const savedCerts = readStoredJson<CertificationItem[]>(STORAGE_KEYS.certs);
+    if (Array.isArray(savedCerts) && savedCerts.length > 0) {
+      setCertifications(savedCerts);
+    }
+
+    setClientNowMs(Date.now());
+    setFormPlantingDate(getLocalIsoDate(-30));
+    setFormHarvestDate(getLocalIsoDate(0));
+    setFormExpiryDate(getLocalIsoDate(14));
+    setLogDate(getLocalIsoDate(0));
+    setNewCertIssueDate(getLocalIsoDate(0));
+    setNewCertExpiryDate(getLocalIsoDate(365));
+    setStorageLoaded(true);
+
     farmerService
       .getBatches()
       .then((data) => {
         if (data && data.length > 0) {
           const mapped: BatchItem[] = data.map((b) => ({
             code: b.code,
-            farmCode: "NT-DL-01",
+            farmCode: extractFarmCode(b.farmName, undefined, effectiveFarms),
             product: b.product,
             plantingDate: b.plantingDate || "",
             harvestDate: b.harvestDate,
@@ -245,9 +954,11 @@ export default function FarmerPortalPage() {
             qty: b.qty,
             unit: b.unit || "kg",
             status: (b.status as BatchItem["status"]) || "Chờ duyệt xuất kho",
-            statusColor: b.statusColor || "#10b981",
+            statusColor: resolveBatchStatusColor(b.status, b.statusColor),
             cert: b.cert || "VietGAP",
             cultivation: b.cultivation || "Theo tiêu chuẩn",
+            transportDestination: b.transportDestination || "Lưu tại kho bảo quản nông trại",
+            transportStatus: (b.transportStatus as BatchItem["transportStatus"]) || "Chưa vận chuyển",
           }));
           setBatches(mapped);
         }
@@ -261,19 +972,17 @@ export default function FarmerPortalPage() {
       .then((data) => {
         if (data && data.length > 0) {
           const mapped: ProductItem[] = data.map((p) => {
-            const isCaoLanh =
-              (p.farm && p.farm.includes("Cao Lãnh")) ||
-              (p.origin && p.origin.includes("Cao Lãnh")) ||
-              (p.origin && p.origin.includes("Đồng Tháp"));
+            const farmCode = extractFarmCode(p.farm, p.origin, effectiveFarms);
+            const matchedFarm = effectiveFarms.find((f) => f.code === farmCode);
             return {
               id: p.id,
-              farmCode: isCaoLanh ? "NT-DT-02" : "NT-DL-01",
+              farmCode,
               name: p.name,
-              category: p.categoryCode || "Trái Cây Đặc Sản",
+              category: p.categoryCode || "trai_cay",
               price: Number(p.price) || 50000,
               unit: p.unit || "kg",
               description: p.description || p.name,
-              origin: p.origin || p.farm || (isCaoLanh ? "Vườn Cây Ăn Trái Cao Lãnh" : "Nông Trại Xanh Đà Lạt"),
+              origin: p.origin || p.farm || matchedFarm?.name || "Nông Trại Liên Kết",
               image: p.image || "🌱",
             };
           });
@@ -283,209 +992,261 @@ export default function FarmerPortalPage() {
       .catch((err) => {
         console.warn("Không thể tải sản phẩm từ API:", err);
       });
+
+    farmerService
+      .getCertificates()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: CertificationItem[] = data.map((c) => {
+            const rawItem: CertificationItem = {
+              id: c.id ? String(c.id) : c.certNumber,
+              farmCode: c.farmCode || "NT-DL-01",
+              name: c.name,
+              certNumber: c.certNumber,
+              issuedBy: c.issuedBy || "Tổ chức Chứng nhận Nông nghiệp",
+              issueDate: c.issueDate || "01/01/2026",
+              expiryDate: c.expiryDate || "01/01/2027",
+              status: (c.status || "VALID") as any,
+              daysLeft: typeof c.daysLeft === "number" ? c.daysLeft : 365,
+              approvalStatus: (c.approvalStatus || "NONE") as any,
+              pendingRenewal: c.pendingNewCertNumber
+                ? {
+                    newCertNumber: c.pendingNewCertNumber,
+                    proofImage: c.pendingProofImage || "",
+                    requestedExpiryDate: c.pendingRequestedExpiryDate || "",
+                    note: c.pendingNote || "",
+                    submittedAt: c.submittedAt || "",
+                  }
+                : undefined,
+            };
+            return evaluateCertification(rawItem, clientNowMs ?? Date.now());
+          });
+          setCertifications(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn("Không thể tải chứng nhận từ API:", err);
+      });
+
+    farmerService
+      .getLogs()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: FarmingLogItem[] = data.map((l) => ({
+            id: String(l.id),
+            farmCode: l.farmCode || "NT-DL-01",
+            batchCode: l.batchCode,
+            date: l.date,
+            stage: l.stage,
+            action: l.action,
+            materialsUsed: l.materialsUsed || "",
+            notes: l.notes || "",
+            proofImage: l.proofImage || undefined,
+          }));
+          setFarmingLogs(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn("Không thể tải nhật ký canh tác từ API:", err);
+      });
   }, []);
 
-  // Form State tạo Lô mới
-  const todayStr = new Date().toISOString().split("T")[0];
-  const [formFarmCode, setFormFarmCode] = useState("NT-DT-02");
-  const [formProduct, setFormProduct] = useState("Xoài Cát Chu Cao Lãnh");
-  const [formLotCode, setFormLotCode] = useState("XC-2026-03");
-  const [formPlantingDate, setFormPlantingDate] = useState("2026-05-10");
-  const [formHarvestDate, setFormHarvestDate] = useState(todayStr);
-  const [formExpiryDate, setFormExpiryDate] = useState("2026-11-15");
-  const [formQty, setFormQty] = useState("500");
-  const [formUnit, setFormUnit] = useState("kg");
-  const [formCert, setFormCert] = useState("VietGAP");
-  const [formCultivation, setFormCultivation] = useState("Quy trình an toàn VietGAP");
-  const [formTransportDest, setFormTransportDest] = useState("Kho Tổng Logistics TP.HCM");
+  // 2.3. ĐỒNG BỘ TRẠNG THÁI THỜI GIAN THỰC (SERVER-SENT EVENTS - SSE)
+  useEffect(() => {
+    const streamBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8080/api/v1";
+    const streamUrl = `${streamBase}/farmer/batches/stream`;
 
-  // =========================================================================
-  // 3. DỮ LIỆU NHẬT KÝ CANH TÁC
-  // =========================================================================
-  const [farmingLogs, setFarmingLogs] = useState<FarmingLogItem[]>([
-    {
-      id: "l1",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "15/07/2026",
-      stage: "Bón phân",
-      action: "Bón phân hữu cơ vi sinh đợt 2",
-      materialsUsed: "Phân bón trùn quế hữu cơ O-Micro",
-      notes: "Tỷ lệ bón 2kg/gốc, tưới ẩm đất",
-    },
-    {
-      id: "l2",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "20/08/2026",
-      stage: "Phun sinh học",
-      action: "Bao trái và phun dung dịch xua đuổi ruồi vàng thảo mộc",
-      materialsUsed: "Chế phẩm sinh học tỏi - ớt - gừng lên men",
-      notes: "Cách ly an toàn 100% không dùng hóa chất độc hại",
-    },
-    {
-      id: "l3",
-      farmCode: "NT-DT-02",
-      batchCode: "XC-2026-02",
-      date: "27/10/2026",
-      stage: "Thu hoạch",
-      action: "Thu hoạch đợt 2 sáng sớm, phân loại trái",
-      materialsUsed: "Dụng cụ khử trùng, thùng lót giấy mềm",
-      notes: "Trái đạt chuẩn độ ngọt, chuyển gửi Admin duyệt",
-    },
-    {
-      id: "l4",
-      farmCode: "NT-DL-01",
-      batchCode: "SR-2026-01",
-      date: "10/09/2026",
-      stage: "Tưới tiêu",
-      action: "Tưới nước nhỏ giọt tự động kiểm soát EC và pH",
-      materialsUsed: "Nguồn nước sạch ngầm",
-      notes: "Độ pH ổn định 6.2",
-    },
-    {
-      id: "l5",
-      farmCode: "NT-DL-01",
-      batchCode: "DT-2026-03",
-      date: "12/10/2026",
-      stage: "Tưới tiêu",
-      action: "Tưới dinh dưỡng nhỏ giọt công nghệ Israel cho dâu tây",
-      materialsUsed: "Dung dịch dinh dưỡng hữu cơ vi lượng A-B",
-      notes: "Kiểm tra độ ẩm giá thể mùn dừa đạt 75%",
-    },
-  ]);
+    let eventSource: EventSource | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
-  const [selectedFarmForLog, setSelectedFarmForLog] = useState("NT-DT-02");
-  const [selectedBatchForLog, setSelectedBatchForLog] = useState("XC-2026-02");
-  const [logDate, setLogDate] = useState(todayStr);
-  const [logStage, setLogStage] = useState<FarmingLogItem["stage"]>("Bón phân");
-  const [logAction, setLogAction] = useState("");
-  const [logMaterials, setLogMaterials] = useState("");
-  const [logNotes, setLogNotes] = useState("");
-  const [selectedLogFarm, setSelectedLogFarm] = useState<string>("ALL");
+    const connectSse = () => {
+      try {
+        eventSource = new EventSource(streamUrl);
 
-  // =========================================================================
-  // 4. DỮ LIỆU SẢN PHẨM NÔNG NGHIỆP
-  // =========================================================================
-  const [products, setProducts] = useState<ProductItem[]>([
-    {
-      id: "p1",
-      farmCode: "NT-DT-02",
-      name: "Xoài Cát Chu Cao Lãnh",
-      category: "Trái Cây Đặc Sản",
-      price: 65000,
-      unit: "kg",
-      description: "Xoài Cát Chu thịt dày, thơm ngọt đậm đà canh tác chuẩn VietGAP",
-      origin: "Vườn Cây Ăn Trái Cao Lãnh",
-      image: "🥭",
-    },
-    {
-      id: "p2",
-      farmCode: "NT-DL-01",
-      name: "Thanh Long Ruột Đỏ",
-      category: "Trái Cây Đặc Sản",
-      price: 45000,
-      unit: "kg",
-      description: "Thanh long mọng nước, vị ngọt thanh tự nhiên",
-      origin: "Nông Trại Xanh Đà Lạt",
-      image: "🐉",
-    },
-    {
-      id: "p3",
-      farmCode: "NT-DL-01",
-      name: "Sầu Riêng Ri6 Chín Cây",
-      category: "Trái Cây Cao Cấp",
-      price: 135000,
-      unit: "kg",
-      description: "Cơm vàng hạt lép, thu hoạch độ chín hoàn hảo tại vườn",
-      origin: "Nông Trại Xanh Đà Lạt",
-      image: "👑",
-    },
-    {
-      id: "p4",
-      farmCode: "NT-DL-01",
-      name: "Dâu Tây Giống Nhật",
-      category: "Trái Cây Đặc Sản",
-      price: 180000,
-      unit: "hộp 500g",
-      description: "Dâu tây canh tác giá thể xơ dừa nhà màng, vị ngọt thơm dịu",
-      origin: "Nông Trại Xanh Đà Lạt",
-      image: "🍓",
-    },
-  ]);
+        eventSource.addEventListener("connected", () => {
+          setSseConnected(true);
+        });
 
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  const [newProdFarmCode, setNewProdFarmCode] = useState("NT-DT-02");
-  const [newProdName, setNewProdName] = useState("");
-  const [newProdCategory, setNewProdCategory] = useState("Trái Cây Đặc Sản");
-  const [newProdPrice, setNewProdPrice] = useState("75000");
-  const [newProdUnit, setNewProdUnit] = useState("kg");
-  const [newProdDesc, setNewProdDesc] = useState("");
-  const [newProdImage, setNewProdImage] = useState<string>("🥭");
-  const [selectedProductFarm, setSelectedProductFarm] = useState<string>("ALL");
-  const [selectedCertFarm, setSelectedCertFarm] = useState<string>("ALL");
+        eventSource.addEventListener("batch-changed", (e: MessageEvent) => {
+          try {
+            const data: BatchChangeEvent = JSON.parse(e.data);
+            if (!data || !data.code) return;
 
-  // =========================================================================
-  // 5. DỮ LIỆU CHỨNG NHẬN
-  // =========================================================================
-  const [certifications, setCertifications] = useState<CertificationItem[]>([
-    {
-      id: "c1",
-      farmCode: "NT-DL-01",
-      name: "Chứng nhận GlobalGAP",
-      certNumber: "GG-91024-VN",
-      issuedBy: "Tổ chức Chứng nhận Quốc tế Control Union",
-      issueDate: "15/01/2026",
-      expiryDate: "15/01/2027",
-      status: "VALID",
-      daysLeft: 79,
-    },
-    {
-      id: "c2",
-      farmCode: "NT-DL-01",
-      name: "Chứng nhận VietGAP Trồng trọt",
-      certNumber: "VG-49-2026-LD",
-      issuedBy: "Chi cục Quản lý Chất lượng Nông Lâm Sản Lâm Đồng",
-      issueDate: "20/11/2025",
-      expiryDate: "20/11/2026",
-      status: "EXPIRING_SOON",
-      daysLeft: 23,
-    },
-    {
-      id: "c3",
-      farmCode: "NT-DT-02",
-      name: "Chứng nhận VietGAP Cây Ăn Trái",
-      certNumber: "VG-66-2026-DT",
-      issuedBy: "Sở Nông nghiệp & PTNT Đồng Tháp",
-      issueDate: "10/03/2026",
-      expiryDate: "10/03/2027",
-      status: "VALID",
-      daysLeft: 133,
-    },
-  ]);
+            setBatches((prev) =>
+              prev.map((item) => {
+                if (item.code.toUpperCase() === data.code.toUpperCase()) {
+                  return {
+                    ...item,
+                    status: (data.status as BatchItem["status"]) || item.status,
+                    statusColor: resolveBatchStatusColor(data.status, data.statusColor),
+                    transportStatus: (data.transportStatus as BatchItem["transportStatus"]) || item.transportStatus,
+                    transportDestination: data.transportDestination || item.transportDestination,
+                  };
+                }
+                return item;
+              })
+            );
+
+            // Cập nhật modal đang mở nếu đúng lô
+            if (selectedLotCodeRef.current && selectedLotCodeRef.current.toUpperCase() === data.code.toUpperCase()) {
+              setSelectedLotForTimeline((prev) => {
+                if (!prev || prev.code.toUpperCase() !== data.code.toUpperCase()) return prev;
+                return {
+                  ...prev,
+                  status: (data.status as BatchItem["status"]) || prev.status,
+                  statusColor: resolveBatchStatusColor(data.status, data.statusColor),
+                  transportStatus: (data.transportStatus as BatchItem["transportStatus"]) || prev.transportStatus,
+                  transportDestination: data.transportDestination || prev.transportDestination,
+                };
+              });
+
+              // Tự động tải lại timeline trong modal
+              farmerService.getBatchTimeline(data.code).then((fresh) => {
+                if (fresh) setLotTimelineEvents(fresh);
+              }).catch(() => {});
+            }
+
+            // Hiển thị toast thông báo theo từng loại hành động
+            if (data.actionType === "ADMIN_APPROVED") {
+              toast.success(`🔔 [Admin Thẩm Định] Đã duyệt xuất kho cho lô ${data.code}!`);
+            } else if (data.actionType === "ADMIN_REJECTED") {
+              toast.error(`⚠️ [Admin Thẩm Định] Từ chối xuất kho lô ${data.code}: ${data.note || "Yêu cầu tái kiểm định"}`);
+            } else if (data.actionType === "DRIVER_PICKUP") {
+              toast.success(`🚚 [Tài Xế Nhận Hàng] Đã quét QR tiếp nhận lô ${data.code} lên xe lạnh!`);
+            } else if (data.actionType === "WAREHOUSE_INBOUND") {
+              toast.success(`🏢 [Thủ Kho Nhập Kho] Đã quét QR hoàn tất nhập kho đích cho lô ${data.code}!`);
+            } else {
+              toast.info(`🔔 Trạng thái lô ${data.code} vừa được cập nhật (${data.status})`);
+            }
+          } catch (err) {
+            console.warn("Lỗi phân tích SSE batch-changed:", err);
+          }
+        });
+
+        eventSource.onerror = () => {
+          setSseConnected(false);
+          eventSource?.close();
+          setTimeout(connectSse, 4000);
+        };
+      } catch {
+        setSseConnected(false);
+      }
+    };
+
+    connectSse();
+
+    // Fallback polling an toàn mỗi 5s
+    pollTimer = setInterval(() => {
+      farmerService.getBatches().then((data) => {
+        if (data && data.length > 0) {
+          setBatches((prev) => {
+            const map = new Map(data.map((d) => [d.code.toUpperCase(), d]));
+            return prev.map((oldItem) => {
+              const fresh = map.get(oldItem.code.toUpperCase());
+              if (!fresh) return oldItem;
+              return {
+                ...oldItem,
+                status: (fresh.status as BatchItem["status"]) || oldItem.status,
+                statusColor: resolveBatchStatusColor(fresh.status, fresh.statusColor),
+                transportStatus: (fresh.transportStatus as BatchItem["transportStatus"]) || oldItem.transportStatus,
+                transportDestination: fresh.transportDestination || oldItem.transportDestination,
+              };
+            });
+          });
+        }
+      }).catch(() => {});
+    }, 5000);
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.farms, JSON.stringify(farms));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [farms, storageLoaded]);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.selectedFarmId, selectedFarmId);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [selectedFarmId, storageLoaded]);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.logs, JSON.stringify(farmingLogs));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [farmingLogs, storageLoaded]);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.certs, JSON.stringify(certifications));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [certifications, storageLoaded]);
 
   // =========================================================================
   // HANDLERS
   // =========================================================================
 
+  const openAddFarmModal = () => {
+    setNewFarmCode(getNextFarmCode(farms));
+    setNewFarmName("");
+    setNewFarmOwner(currentProfile.name);
+    setNewFarmPhone(currentProfile.phone);
+    setNewFarmAddress("");
+    setNewFarmProvince(activeOwnerId === "farmer_thieu" ? "Sơn La" : "Lâm Đồng");
+    setNewFarmArea("2.5");
+    setNewFarmCert(activeOwnerId === "farmer_thieu" ? "Hữu cơ TCVN" : "VietGAP Trồng trọt");
+    setIsAddFarmModalOpen(true);
+  };
+
   // Thêm Nông Trại mới
   const handleCreateFarm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFarmName.trim()) {
-      toast.error("Vui lòng nhập tên nông trại!");
+    const codeUpper = newFarmCode.trim().toUpperCase();
+    const areaNum = Number(newFarmArea);
+    if (!codeUpper) {
+      toast.error("Vui lòng nhập mã nông trại!");
+      return;
+    }
+    if (farms.some((f) => f.code.toUpperCase() === codeUpper)) {
+      toast.error(`Mã nông trại ${codeUpper} đã tồn tại!`);
+      return;
+    }
+    if (!newFarmName.trim() || !newFarmAddress.trim()) {
+      toast.error("Vui lòng nhập đầy đủ tên và địa chỉ nông trại!");
+      return;
+    }
+    if (!Number.isFinite(areaNum) || areaNum <= 0) {
+      toast.error("Quy mô diện tích phải lớn hơn 0 ha!");
       return;
     }
 
     const newFarm: FarmItem = {
       id: "f_" + Date.now(),
-      code: newFarmCode.trim().toUpperCase(),
+      code: codeUpper,
       name: newFarmName.trim(),
-      owner: newFarmOwner.trim(),
-      phone: newFarmPhone.trim(),
+      owner: newFarmOwner.trim() || currentProfile.name,
+      ownerId: activeOwnerId,
+      phone: newFarmPhone.trim() || currentProfile.phone,
       address: newFarmAddress.trim(),
-      province: newFarmProvince.trim(),
-      areaHectares: Number(newFarmArea) || 1.0,
+      province: newFarmProvince.trim() || "Việt Nam",
+      areaHectares: areaNum,
       certStandard: newFarmCert,
       rating: 5.0,
       activeBatchCount: 0,
@@ -502,10 +1263,26 @@ export default function FarmerPortalPage() {
   const handleUpdateFarm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingFarm) return;
+    if (!editingFarm.name.trim()) {
+      toast.error("Tên nông trại không được để trống!");
+      return;
+    }
+    if (!Number.isFinite(editingFarm.areaHectares) || editingFarm.areaHectares <= 0) {
+      toast.error("Diện tích phải lớn hơn 0 ha!");
+      return;
+    }
 
-    setFarms(farms.map((f) => (f.id === editingFarm.id ? editingFarm : f)));
+    const updated: FarmItem = {
+      ...editingFarm,
+      name: editingFarm.name.trim(),
+      owner: editingFarm.owner.trim(),
+      phone: editingFarm.phone.trim(),
+      address: editingFarm.address.trim(),
+      province: (editingFarm.province || "").trim(),
+    };
+    setFarms(farms.map((f) => (f.id === updated.id ? updated : f)));
     setEditingFarm(null);
-    toast.success(`Đã cập nhật thông tin trang trại "${editingFarm.name}"!`);
+    toast.success(`Đã cập nhật thông tin trang trại "${updated.name}"!`);
   };
 
   // Xóa Nông Trại
@@ -514,10 +1291,18 @@ export default function FarmerPortalPage() {
       toast.error("Hệ thống yêu cầu duy trì ít nhất 1 nông trại!");
       return;
     }
+    const targetFarm = farms.find((f) => f.id === id);
     if (confirm(`Bạn có chắc muốn xóa nông trại "${name}"?`)) {
-      setFarms(farms.filter((f) => f.id !== id));
-      if (selectedFarmId === id) {
-        setSelectedFarmId(farms[0].id);
+      const remaining = farms.filter((f) => f.id !== id);
+      setFarms(remaining);
+      if (selectedFarmId === id && remaining[0]) {
+        setSelectedFarmId(remaining[0].id);
+      }
+      if (targetFarm) {
+        if (selectedBatchFarm === targetFarm.code) setSelectedBatchFarm("ALL");
+        if (selectedLogFarm === targetFarm.code) setSelectedLogFarm("ALL");
+        if (selectedProductFarm === targetFarm.code) setSelectedProductFarm("ALL");
+        if (selectedCertFarm === targetFarm.code) setSelectedCertFarm("ALL");
       }
       toast.info(`Đã xóa nông trại ${name}`);
     }
@@ -526,55 +1311,103 @@ export default function FarmerPortalPage() {
   // Sinh mã lô tự động
   const handleProductSelect = (productName: string) => {
     setFormProduct(productName);
-    const words = productName.split(" ");
-    let prefix = "AG";
-    if (words.length >= 2) {
-      prefix = (words[0][0] + words[1][0]).toUpperCase();
-    }
-    const rand = Math.floor(Math.random() * 80) + 10;
-    setFormLotCode(`${prefix}-2026-${rand}`);
+    setFormLotCode(generateLotCodeForProduct(productName, batches));
   };
 
-  const handleOpenCreateBatch = () => {
-    handleProductSelect(products[0]?.name || "Xoài Cát Chu");
+  const openCreateBatchModal = (preferredFarmCode?: string, preferredProductName?: string) => {
+    const defaultFarmForOwner = visibleFarms[0]?.code || "NT-DL-01";
+    const targetFarmCode =
+      preferredFarmCode ||
+      (selectedBatchFarm !== "ALL" && visibleFarms.some((f) => f.code === selectedBatchFarm)
+        ? selectedBatchFarm
+        : defaultFarmForOwner);
+    const targetFarm = visibleFarms.find((f) => f.code === targetFarmCode) || visibleFarms[0];
+    const matchingProducts = visibleProducts.filter((p) => !p.farmCode || p.farmCode === targetFarmCode);
+    const nextProduct = preferredProductName || matchingProducts[0]?.name || visibleProducts[0]?.name || "Nông sản sạch";
+
+    setFormFarmCode(targetFarmCode);
+    setFormProduct(nextProduct);
+    setFormLotCode(generateLotCodeForProduct(nextProduct, visibleBatches));
+    setFormCert(normalizeBatchCert(targetFarm?.certStandard));
+    setFormPlantingDate(getLocalIsoDate(-30));
+    setFormHarvestDate(getLocalIsoDate(0));
+    setFormExpiryDate(getLocalIsoDate(14));
+    setFormQty("500");
+    setFormUnit("kg");
+    setFormCultivation(
+      targetFarm?.certStandard?.toLowerCase().includes("globalgap")
+        ? "Quy trình an toàn GlobalGAP"
+        : "Quy trình an toàn VietGAP"
+    );
+    setFormTransportDest("Kho Tổng Logistics TP.HCM");
     setIsBatchModalOpen(true);
+  };
+
+  const handleBatchFarmChange = (nextFarmCode: string) => {
+    setFormFarmCode(nextFarmCode);
+    const targetFarm = visibleFarms.find((f) => f.code === nextFarmCode) || visibleFarms[0];
+    const matchingProducts = visibleProducts.filter((p) => !p.farmCode || p.farmCode === nextFarmCode);
+    const nextProduct = matchingProducts[0]?.name || visibleProducts[0]?.name || "Nông sản sạch";
+    setFormProduct(nextProduct);
+    setFormLotCode(generateLotCodeForProduct(nextProduct, visibleBatches));
+    setFormCert(normalizeBatchCert(targetFarm?.certStandard));
   };
 
   // Nộp form tạo Lô thu hoạch
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formLotCode.trim()) {
+    const codeUpper = formLotCode.trim().toUpperCase();
+    if (!codeUpper) {
       toast.error("Vui lòng nhập mã lô thu hoạch!");
       return;
     }
+    if (batches.some((b) => b.code.toUpperCase() === codeUpper)) {
+      toast.error(`Mã lô ${codeUpper} đã tồn tại trong danh sách!`);
+      return;
+    }
+    const qtyNum = Number(formQty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      toast.error("Sản lượng thu hoạch phải lớn hơn 0!");
+      return;
+    }
+    if (!formHarvestDate || !formExpiryDate) {
+      toast.error("Vui lòng nhập đầy đủ ngày thu hoạch và hạn sử dụng!");
+      return;
+    }
+    if (formExpiryDate < formHarvestDate) {
+      toast.error("Hạn sử dụng phải sau hoặc cùng ngày thu hoạch!");
+      return;
+    }
+    if (formPlantingDate && formHarvestDate < formPlantingDate) {
+      toast.error("Ngày thu hoạch không thể trước ngày gieo trồng!");
+      return;
+    }
 
-    const formatDisplayDate = (dStr: string) => {
-      if (!dStr) return "";
-      const p = dStr.split("-");
-      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dStr;
-    };
-
+    const targetFarm = visibleFarms.find((f) => f.code === formFarmCode) || currentFarm;
     const newBatch: BatchItem = {
-      code: formLotCode.trim().toUpperCase(),
-      farmCode: formFarmCode,
-      product: formProduct,
+      code: codeUpper,
+      farmCode: targetFarm.code,
+      ownerId: activeOwnerId,
+      product: formProduct.trim() || "Nông sản sạch",
       plantingDate: formatDisplayDate(formPlantingDate),
       harvestDate: formatDisplayDate(formHarvestDate),
       expiryDate: formatDisplayDate(formExpiryDate),
-      qty: formQty,
+      qty: String(qtyNum),
       unit: formUnit,
       status: "Chờ duyệt xuất kho",
       statusColor: "#f97316",
       cert: formCert,
-      cultivation: formCultivation,
+      cultivation: formCultivation.trim() || "Theo quy trình an toàn",
       transportDestination: formTransportDest,
       transportStatus: "Chưa vận chuyển",
     };
 
-    // Lưu vào database backend (bảng agri_harvest_lots & tự động sinh mã QR agri_traceability)
+    setIsSubmittingBatch(true);
     try {
-      await farmerService.createBatch({
+      const saved = await farmerService.createBatch({
         code: newBatch.code,
+        ownerId: activeOwnerId,
+        farmCode: targetFarm.code,
         product: newBatch.product,
         plantingDate: newBatch.plantingDate,
         harvestDate: newBatch.harvestDate,
@@ -585,32 +1418,364 @@ export default function FarmerPortalPage() {
         statusColor: newBatch.statusColor,
         cert: newBatch.cert,
         cultivation: newBatch.cultivation,
-        farmName: `${currentFarm.name} (Mã: ${currentFarm.code})`,
+        farmName: `${targetFarm.name} (Mã: ${targetFarm.code})`,
+        transportDestination: newBatch.transportDestination,
+        transportStatus: newBatch.transportStatus,
       });
-    } catch (err) {
-      console.warn("Không thể lưu lô qua API, lưu tại phiên:", err);
-    }
 
-    setBatches([newBatch, ...batches]);
-    setIsBatchModalOpen(false);
-    toast.success(`Đã tạo thành công lô ${newBatch.code} cho ${currentFarm.name}!`);
+      const persistedBatch: BatchItem = {
+        ...newBatch,
+        code: saved.code || newBatch.code,
+        transportDestination: saved.transportDestination || newBatch.transportDestination,
+        transportStatus: (saved.transportStatus as BatchItem["transportStatus"]) || newBatch.transportStatus,
+      };
+      setBatches([persistedBatch, ...batches]);
+      setIsBatchModalOpen(false);
+      toast.success(`Đã tạo & lưu lô ${persistedBatch.code} cho ${targetFarm.name}!`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể tạo lô thu hoạch trên máy chủ!"));
+    } finally {
+      setIsSubmittingBatch(false);
+    }
   };
 
   const handleDeleteBatch = async (code: string) => {
     try {
       await farmerService.deleteBatch(code);
+      setBatches((prev) => prev.filter((item) => item.code !== code));
+      toast.info(`Đã xóa lô ${code} khỏi hệ thống!`);
     } catch (err) {
-      console.warn("Xóa lô qua API thất bại:", err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setBatches((prev) => prev.filter((item) => item.code !== code));
+        toast.info(`Đã xóa lô ${code}!`);
+      } else {
+        toast.error(getApiErrorMessage(err, `Không thể xóa lô ${code} trên hệ thống!`));
+      }
     }
-    setBatches(batches.filter((item) => item.code !== code));
-    toast.info(`Đã xóa lô ${code}!`);
+  };
+
+  // =========================================================================
+  // XỬ LÝ NHẬT KÝ VÒNG ĐỜI LÔ THU HOẠCH & TIẾN TRÌNH DUYỆT XUẤT KHO
+  // =========================================================================
+  const handleOpenLotTimeline = async (lot: BatchItem) => {
+    setSelectedLotForTimeline(lot);
+    setEditTransportStatus(lot.transportStatus || "Chưa vận chuyển");
+    setEditTransportDest(lot.transportDestination || "Kho phân phối");
+    setAdminApprovalNote("");
+    setIsAddingCustomEvent(false);
+    setIsLotTimelineModalOpen(true);
+    setIsLoadingLotTimeline(true);
+
+    try {
+      const events = await farmerService.getBatchTimeline(lot.code);
+      if (events && events.length > 0) {
+        setLotTimelineEvents(events);
+      } else {
+        setLotTimelineEvents([
+          {
+            stage: "Thu hoạch & Khai báo lô",
+            time: lot.harvestDate,
+            badge: "Đã thu hoạch",
+            note: `Sản lượng: ${lot.qty} ${lot.unit} - Nông trại: ${lot.farmCode} - Tiêu chuẩn: ${lot.cert} (${lot.cultivation})`,
+          },
+          {
+            stage: "Kiểm định chất lượng KCS",
+            time: lot.harvestDate,
+            badge: "Đạt chuẩn KCS",
+            note: "Kiểm nghiệm an toàn thực phẩm, dư lượng nitrat & BVTV đạt chuẩn ISO/IEC 17025",
+          },
+          {
+            stage: "Thẩm định & Phê duyệt xuất kho",
+            time: lot.harvestDate,
+            badge: lot.status,
+            note:
+              lot.status === "Đã duyệt xuất kho"
+                ? "Admin hệ thống đã thẩm định hồ sơ lô và phê duyệt đủ điều kiện xuất kho"
+                : "Hồ sơ lô đang trong trạng thái chờ Ban Quản trị / Admin kiểm duyệt xuất kho",
+          },
+          {
+            stage: "Lưu kho & Vận chuyển chuỗi lạnh",
+            time: lot.harvestDate,
+            badge: lot.transportStatus || "Chưa vận chuyển",
+            note: `Trạng thái: ${lot.transportStatus || "Chưa vận chuyển"} - Điểm đến: ${lot.transportDestination || "Kho bảo quản"}`,
+          },
+        ]);
+      }
+    } catch (err: any) {
+      console.warn("Lỗi tải timeline lô:", err);
+      setLotTimelineEvents([
+        {
+          stage: "Thu hoạch & Khai báo lô",
+          time: lot.harvestDate,
+          badge: "Đã thu hoạch",
+          note: `Sản lượng: ${lot.qty} ${lot.unit} - Nông trại: ${lot.farmCode} - Tiêu chuẩn: ${lot.cert} (${lot.cultivation})`,
+        },
+        {
+          stage: "Kiểm định chất lượng KCS",
+          time: lot.harvestDate,
+          badge: "Đạt chuẩn KCS",
+          note: "Kiểm nghiệm an toàn thực phẩm, dư lượng nitrat & BVTV đạt chuẩn ISO/IEC 17025",
+        },
+        {
+          stage: "Thẩm định & Phê duyệt xuất kho",
+          time: lot.harvestDate,
+          badge: lot.status,
+          note:
+            lot.status === "Đã duyệt xuất kho"
+              ? "Admin hệ thống đã thẩm định hồ sơ lô và phê duyệt đủ điều kiện xuất kho"
+              : "Hồ sơ lô đang trong trạng thái chờ Ban Quản trị / Admin kiểm duyệt xuất kho",
+        },
+        {
+          stage: "Lưu kho & Vận chuyển chuỗi lạnh",
+          time: lot.harvestDate,
+          badge: lot.transportStatus || "Chưa vận chuyển",
+          note: `Trạng thái: ${lot.transportStatus || "Chưa vận chuyển"} - Điểm đến: ${lot.transportDestination || "Kho bảo quản"}`,
+        },
+      ]);
+    } finally {
+      setIsLoadingLotTimeline(false);
+    }
+  };
+
+  const handleUpdateLotApproval = async (newStatus: "Đã duyệt xuất kho" | "Chờ duyệt xuất kho") => {
+    if (!selectedLotForTimeline) return;
+    setIsUpdatingLotStatus(true);
+    try {
+      const updated = await farmerService.updateBatchStatus(selectedLotForTimeline.code, {
+        status: newStatus,
+        statusColor: newStatus === "Đã duyệt xuất kho" ? "#10b981" : "#f59e0b",
+        adminNote:
+          adminApprovalNote.trim() ||
+          (newStatus === "Đã duyệt xuất kho"
+            ? "Admin đã phê duyệt xuất kho lô hàng thành công"
+            : "Chuyển về trạng thái chờ duyệt"),
+      });
+
+      setBatches((prev) =>
+        prev.map((b) =>
+          b.code === updated.code
+            ? {
+                ...b,
+                status: updated.status as BatchItem["status"],
+                statusColor: updated.statusColor || (updated.status === "Đã duyệt xuất kho" ? "#10b981" : "#f59e0b"),
+              }
+            : b
+        )
+      );
+
+      setSelectedLotForTimeline((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: updated.status as BatchItem["status"],
+              statusColor: updated.statusColor || (updated.status === "Đã duyệt xuất kho" ? "#10b981" : "#f59e0b"),
+            }
+          : null
+      );
+
+      toast.success(
+        newStatus === "Đã duyệt xuất kho"
+          ? "Đã phê duyệt xuất kho lô hàng thành công!"
+          : "Đã chuyển về trạng thái chờ duyệt!"
+      );
+
+      const freshEvents = await farmerService.getBatchTimeline(selectedLotForTimeline.code);
+      setLotTimelineEvents(freshEvents);
+      setAdminApprovalNote("");
+    } catch (err: any) {
+      toast.error(err.message || "Không thể cập nhật trạng thái duyệt");
+    } finally {
+      setIsUpdatingLotStatus(false);
+    }
+  };
+
+  const handleUpdateLotTransport = async () => {
+    if (!selectedLotForTimeline) return;
+    setIsUpdatingLotStatus(true);
+    try {
+      const updated = await farmerService.updateBatchStatus(selectedLotForTimeline.code, {
+        transportStatus: editTransportStatus,
+        transportDestination: editTransportDest.trim() || "Kho phân phối",
+        adminNote: `Cập nhật xuất kho & vận chuyển: ${editTransportStatus}`,
+      });
+
+      setBatches((prev) =>
+        prev.map((b) =>
+          b.code === updated.code
+            ? {
+                ...b,
+                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportDestination: updated.transportDestination,
+              }
+            : b
+        )
+      );
+
+      setSelectedLotForTimeline((prev) =>
+        prev
+          ? {
+              ...prev,
+              transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+              transportDestination: updated.transportDestination,
+            }
+          : null
+      );
+
+      toast.success("Đã cập nhật trạng thái xuất kho & vận chuyển chuỗi lạnh!");
+
+      const freshEvents = await farmerService.getBatchTimeline(selectedLotForTimeline.code);
+      setLotTimelineEvents(freshEvents);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể cập nhật vận chuyển");
+    } finally {
+      setIsUpdatingLotStatus(false);
+    }
+  };
+
+  const handleDriverPickup = async (lotCode: string) => {
+    setIsUpdatingLotStatus(true);
+    try {
+      const updated = await farmerService.driverPickup(lotCode);
+      setBatches((prev) =>
+        prev.map((b) =>
+          b.code === updated.code
+            ? {
+                ...b,
+                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportDestination: updated.transportDestination,
+              }
+            : b
+        )
+      );
+      if (selectedLotForTimeline && selectedLotForTimeline.code === lotCode) {
+        setSelectedLotForTimeline((prev) =>
+          prev
+            ? {
+                ...prev,
+                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportDestination: updated.transportDestination,
+              }
+            : null
+        );
+        const freshEvents = await farmerService.getBatchTimeline(lotCode);
+        setLotTimelineEvents(freshEvents);
+      }
+      toast.success(`🚚 Tài xế đã quét mã QR tiếp nhận lô ${lotCode} lên xe lạnh thành công!`);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể tiếp nhận hàng");
+    } finally {
+      setIsUpdatingLotStatus(false);
+    }
+  };
+
+  const handleWarehouseInbound = async (lotCode: string) => {
+    setIsUpdatingLotStatus(true);
+    try {
+      const updated = await farmerService.warehouseInbound(lotCode);
+      setBatches((prev) =>
+        prev.map((b) =>
+          b.code === updated.code
+            ? {
+                ...b,
+                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportDestination: updated.transportDestination,
+              }
+            : b
+        )
+      );
+      if (selectedLotForTimeline && selectedLotForTimeline.code === lotCode) {
+        setSelectedLotForTimeline((prev) =>
+          prev
+            ? {
+                ...prev,
+                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportDestination: updated.transportDestination,
+              }
+            : null
+        );
+        const freshEvents = await farmerService.getBatchTimeline(lotCode);
+        setLotTimelineEvents(freshEvents);
+      }
+      toast.success(`🏢 Thủ kho đã quét mã QR hoàn tất nhập kho đích cho lô ${lotCode}!`);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể nhập kho đích");
+    } finally {
+      setIsUpdatingLotStatus(false);
+    }
+  };
+
+  const handleAddCustomTimelineEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLotForTimeline) return;
+    if (!customEventStage.trim()) {
+      toast.error("Vui lòng chọn hoặc nhập giai đoạn sự kiện");
+      return;
+    }
+    setIsSubmittingCustomEvent(true);
+    try {
+      const newEv = await farmerService.addBatchTimelineEvent(selectedLotForTimeline.code, {
+        stage: customEventStage.trim(),
+        note: customEventNote.trim(),
+        operator: customEventOperator.trim() || undefined,
+        badge: "Ghi nhận",
+      });
+
+      setLotTimelineEvents((prev) => [...prev, newEv]);
+      toast.success("Đã thêm sự kiện vào nhật ký vòng đời lô!");
+      setCustomEventNote("");
+      setCustomEventOperator("");
+      setIsAddingCustomEvent(false);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể thêm sự kiện");
+    } finally {
+      setIsSubmittingCustomEvent(false);
+    }
+  };
+
+  const openCreateLogModal = (farmCode?: string, batchCode?: string) => {
+    const defaultFarm = visibleFarms[0]?.code || "NT-DL-01";
+    const initialFarm =
+      farmCode || (selectedLogFarm !== "ALL" && visibleFarms.some((f) => f.code === selectedLogFarm) ? selectedLogFarm : defaultFarm);
+    setSelectedFarmForLog(initialFarm);
+    if (batchCode) {
+      setSelectedBatchForLog(batchCode);
+    } else {
+      const matchingBatches = visibleBatches.filter((b) => b.farmCode === initialFarm);
+      setSelectedBatchForLog(matchingBatches[0]?.code || "");
+    }
+    setLogDate(getLocalIsoDate(0));
+    setLogStage("Bón phân");
+    setLogAction("");
+    setLogMaterials("");
+    setLogNotes("");
+    setLogProofImage("");
+    setLogProofFileName("");
+    setIsLogModalOpen(true);
+  };
+
+  const handleLogImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ảnh tải lên tối đa 5MB!");
+      return;
+    }
+    setLogProofFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === "string") {
+        setLogProofImage(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Ghi nhật ký canh tác
-  const handleCreateLog = (e: React.FormEvent) => {
+  const handleCreateLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBatchForLog) {
-      toast.error("Vui lòng chọn lô thu hoạch của nông trại!");
+      toast.error("Nông trại này chưa có lô thu hoạch. Vui lòng tạo lô trước!");
       return;
     }
     if (!logAction.trim()) {
@@ -618,28 +1783,77 @@ export default function FarmerPortalPage() {
       return;
     }
 
-    const formatDisplayDate = (dStr: string) => {
-      const p = dStr.split("-");
-      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dStr;
-    };
-
+    const formattedDate = formatDisplayDate(logDate);
     const newLog: FarmingLogItem = {
       id: "l_" + Date.now(),
       farmCode: selectedFarmForLog,
+      ownerId: activeOwnerId,
       batchCode: selectedBatchForLog,
-      date: formatDisplayDate(logDate),
+      date: formattedDate,
       stage: logStage,
       action: logAction.trim(),
       materialsUsed: logMaterials.trim(),
       notes: logNotes.trim(),
+      proofImage: logProofImage || undefined,
     };
+
+    setIsSubmittingLog(true);
+    let syncedToQr = false;
+    try {
+      const savedToDb = await farmerService.createLog({
+        farmCode: selectedFarmForLog,
+        batchCode: selectedBatchForLog,
+        ownerId: activeOwnerId,
+        date: formattedDate,
+        stage: logStage,
+        action: logAction.trim(),
+        materialsUsed: logMaterials.trim(),
+        notes: logNotes.trim(),
+        proofImage: logProofImage || undefined,
+      });
+      if (savedToDb?.id) {
+        newLog.id = String(savedToDb.id);
+      }
+
+      await farmerService.addBatchLog(selectedBatchForLog, {
+        stage: logStage,
+        time: formattedDate,
+        materials: logMaterials.trim(),
+        note: logNotes.trim() ? `${logAction.trim()} - ${logNotes.trim()}` : logAction.trim(),
+        proofImage: logProofImage || undefined,
+      });
+      syncedToQr = true;
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status !== 404) {
+        console.warn("Đồng bộ nhật ký lên QR không thành công:", err);
+      }
+    } finally {
+      setIsSubmittingLog(false);
+    }
 
     setFarmingLogs([newLog, ...farmingLogs]);
     setIsLogModalOpen(false);
     setLogAction("");
     setLogMaterials("");
     setLogNotes("");
-    toast.success(`Đã ghi nhật ký canh tác cho lô ${selectedBatchForLog}!`);
+    setLogProofImage("");
+    setLogProofFileName("");
+    if (syncedToQr) {
+      toast.success(`Đã ghi nhật ký & lưu ảnh vào Database cho lô ${selectedBatchForLog}!`);
+    } else {
+      toast.info(`Đã lưu nhật ký tại máy cho lô ${selectedBatchForLog}!`);
+    }
+  };
+
+  const handleDeleteLog = (id: string, actionName: string) => {
+    if (confirm(`Bạn có chắc muốn xóa ghi chép "${actionName}"?`)) {
+      setFarmingLogs((prev) => prev.filter((item) => item.id !== id));
+      if (!id.startsWith("l_")) {
+        farmerService.deleteLog(id).catch((err) => console.warn("Lỗi xóa log trên server:", err));
+      }
+      toast.info("Đã xóa ghi chép nhật ký!");
+    }
   };
 
   // Upload ảnh nông sản
@@ -659,6 +1873,22 @@ export default function FarmerPortalPage() {
     }
   };
 
+  const openCreateProductModal = () => {
+    const defaultFarm = visibleFarms[0]?.code || "NT-DL-01";
+    const initialFarm =
+      selectedProductFarm !== "ALL" && visibleFarms.some((f) => f.code === selectedProductFarm)
+        ? selectedProductFarm
+        : defaultFarm;
+    setNewProdFarmCode(initialFarm);
+    setNewProdName("");
+    setNewProdCategory("trai_cay");
+    setNewProdPrice("75000");
+    setNewProdUnit("kg");
+    setNewProdDesc("");
+    setNewProdImage("");
+    setIsProductModalOpen(true);
+  };
+
   // Thêm Sản phẩm mới
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -666,76 +1896,377 @@ export default function FarmerPortalPage() {
       toast.error("Vui lòng nhập tên sản phẩm!");
       return;
     }
+    const priceNum = Number(newProdPrice);
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      toast.error("Giá bán dự kiến phải lớn hơn 0 VNĐ!");
+      return;
+    }
+    if (!newProdImage) {
+      toast.error("Vui lòng tải lên ảnh sản phẩm!");
+      return;
+    }
 
-    const targetFarm = farms.find((f) => f.code === newProdFarmCode);
+    const targetFarm = visibleFarms.find((f) => f.code === newProdFarmCode) || visibleFarms[0] || currentFarm;
+    const clientProdId = "p_" + Date.now();
     const newProd: ProductItem = {
-      id: "p_" + Date.now(),
-      farmCode: newProdFarmCode,
+      id: clientProdId,
+      farmCode: targetFarm.code,
+      ownerId: activeOwnerId,
       name: newProdName.trim(),
       category: newProdCategory,
-      price: Number(newProdPrice) || 50000,
+      price: priceNum,
       unit: newProdUnit,
       description: newProdDesc.trim() || "Nông sản sạch canh tác theo quy chuẩn tự nhiên",
-      origin: targetFarm ? targetFarm.name : "Nông trại",
-      image: newProdImage || "🌱",
+      origin: targetFarm.name,
+      image: newProdImage,
     };
 
+    setIsSubmittingProduct(true);
     try {
-      await farmerService.createProduct({
+      const saved = await farmerService.createProduct({
         id: newProd.id,
+        ownerId: activeOwnerId,
+        farmCode: targetFarm.code,
         name: newProd.name,
         price: newProd.price,
         oldPrice: newProd.price,
         unit: newProd.unit,
         description: newProd.description,
         origin: newProd.origin,
-        farm: currentFarm.name,
+        farm: `${targetFarm.name} (Mã: ${targetFarm.code})`,
+        cert: normalizeBatchCert(targetFarm.certStandard),
         image: newProd.image,
         categoryCode: newProd.category,
       });
-    } catch (err) {
-      console.warn("Không thể lưu sản phẩm qua API:", err);
-    }
 
-    setProducts([...products, newProd]);
-    setIsProductModalOpen(false);
-    setNewProdName("");
-    setNewProdDesc("");
-    setNewProdImage("🥭");
-    toast.success(`Đã thêm sản phẩm "${newProd.name}" vào danh mục trang trại!`);
+      const persistedProd: ProductItem = {
+        ...newProd,
+        id: saved.id || newProd.id,
+        category: saved.categoryCode || newProd.category,
+        image: saved.image || newProd.image,
+      };
+      setProducts([...products, persistedProd]);
+      setIsProductModalOpen(false);
+      setNewProdName("");
+      setNewProdDesc("");
+      setNewProdImage("");
+      toast.success(`Đã thêm & lưu sản phẩm "${persistedProd.name}" cho ${targetFarm.name}!`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể lưu sản phẩm lên máy chủ!"));
+    } finally {
+      setIsSubmittingProduct(false);
+    }
   };
 
   const handleDeleteProduct = async (id: string, name: string) => {
     try {
       await farmerService.deleteProduct(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      toast.info(`Đã xóa sản phẩm "${name}" khỏi hệ thống!`);
     } catch (err) {
-      console.warn("Không thể xóa sản phẩm qua API:", err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        toast.info(`Đã xóa sản phẩm "${name}"!`);
+      } else {
+        toast.error(getApiErrorMessage(err, `Không thể xóa sản phẩm "${name}"!`));
+      }
     }
-    setProducts(products.filter((p) => p.id !== id));
-    toast.info(`Đã xóa sản phẩm "${name}"!`);
   };
 
-  const filteredBatches = batches.filter((b) => {
-    const matchStatus =
-      activeFilter === "Tất cả" || b.status.toLowerCase().includes(activeFilter.toLowerCase());
+  const openCreateCertModal = () => {
+    const defaultFarm = visibleFarms[0]?.code || "NT-DL-01";
+    const initialFarm =
+      selectedCertFarm !== "ALL" && visibleFarms.some((f) => f.code === selectedCertFarm)
+        ? selectedCertFarm
+        : defaultFarm;
+    setNewCertFarmCode(initialFarm);
+    setNewCertName(activeOwnerId === "farmer_thieu" ? "Chứng nhận Hữu cơ Việt Nam (TCVN 11041)" : "Chứng nhận VietGAP Trồng trọt");
+    setNewCertNumber("");
+    setNewCertIssuedBy(activeOwnerId === "farmer_thieu" ? "Trung tâm Chứng nhận Phù hợp Quacert" : "Chi cục Quản lý Chất lượng Nông Lâm Sản");
+    setNewCertIssueDate(getLocalIsoDate(0));
+    setNewCertExpiryDate(getLocalIsoDate(365));
+    setIsCertModalOpen(true);
+  };
+
+  const handleCreateCert = (e: React.FormEvent) => {
+    e.preventDefault();
+    const certNumUpper = newCertNumber.trim().toUpperCase();
+    if (!newCertName.trim() || !certNumUpper || !newCertIssuedBy.trim()) {
+      toast.error("Vui lòng nhập đầy đủ tên, số hiệu và đơn vị cấp chứng nhận!");
+      return;
+    }
+    if (certifications.some((c) => c.certNumber.toUpperCase() === certNumUpper)) {
+      toast.error(`Số hiệu chứng nhận ${certNumUpper} đã tồn tại!`);
+      return;
+    }
+    if (!newCertIssueDate || !newCertExpiryDate || newCertExpiryDate <= newCertIssueDate) {
+      toast.error("Ngày hết hạn phải sau ngày cấp!");
+      return;
+    }
+
+    const baseCert: CertificationItem = {
+      id: "c_" + Date.now(),
+      farmCode: newCertFarmCode,
+      ownerId: activeOwnerId,
+      name: newCertName.trim(),
+      certNumber: certNumUpper,
+      issuedBy: newCertIssuedBy.trim(),
+      issueDate: formatDisplayDate(newCertIssueDate),
+      expiryDate: formatDisplayDate(newCertExpiryDate),
+      status: "VALID",
+      daysLeft: 365,
+    };
+    const evaluated = evaluateCertification(baseCert, clientNowMs ?? Date.now());
+    setCertifications([evaluated, ...certifications]);
+    farmerService
+      .saveCertificate({
+        certNumber: certNumUpper,
+        name: newCertName.trim(),
+        farmCode: newCertFarmCode,
+        ownerId: activeOwnerId,
+        farmName: visibleFarms.find((f) => f.code === newCertFarmCode)?.name || newCertFarmCode,
+        issuedBy: newCertIssuedBy.trim(),
+        issueDate: formatDisplayDate(newCertIssueDate),
+        expiryDate: formatDisplayDate(newCertExpiryDate),
+        status: evaluated.status,
+        alertEmail: activeAlertEmail,
+      })
+      .catch((err) => console.warn("Không thể đồng bộ chứng nhận lên Server:", err));
+    setIsCertModalOpen(false);
+    toast.success(`Đã thêm chứng nhận "${evaluated.name}"!`);
+  };
+
+  const authUser = useAuthStore((state) => state.user);
+  const activeAlertEmail = authUser?.email || "";
+
+
+
+  const calculateRenewExpiry = (startDateStr: string, durationYears: string) => {
+    const sDate = parseVnOrIsoDate(startDateStr);
+    if (!sDate) return renewRequestedExpiryDate;
+    const dur = parseFloat(durationYears) || 1;
+    const end = new Date(sDate);
+    if (dur === 0.5) {
+      end.setMonth(end.getMonth() + 6);
+    } else {
+      end.setFullYear(end.getFullYear() + Math.round(dur));
+    }
+    end.setDate(end.getDate() - 1);
+    return `${String(end.getDate()).padStart(2, "0")}/${String(end.getMonth() + 1).padStart(2, "0")}/${end.getFullYear()}`;
+  };
+
+  const handleOpenRenewModal = (cert: CertificationItem) => {
+    setRenewingCert(cert);
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const currentExpiry = parseVnOrIsoDate(cert.expiryDate) || todayMidnight;
+
+    // Ngày bắt đầu hiệu lực mới (dự kiến): ngày tiếp theo của ngày hết hạn hiện tại
+    const nextStart = new Date(currentExpiry);
+    nextStart.setDate(nextStart.getDate() + 1);
+    const startIso = `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, "0")}-${String(nextStart.getDate()).padStart(2, "0")}`;
+    setRenewStartDate(startIso);
+
+    // Ngày hết hạn mới (dự kiến): +1 năm so với hạn cũ
+    const newEnd = new Date(currentExpiry);
+    newEnd.setFullYear(newEnd.getFullYear() + 1);
+    const newEndVn = `${String(newEnd.getDate()).padStart(2, "0")}/${String(newEnd.getMonth() + 1).padStart(2, "0")}/${newEnd.getFullYear()}`;
+
+    setRenewDuration("1");
+    setRenewRequestedExpiryDate(cert.pendingRenewal?.requestedExpiryDate || newEndVn);
+    setRenewNewCertNumber(cert.pendingRenewal?.newCertNumber || "");
+    setRenewIssuedBy(cert.issuedBy || "Tổ chức Chứng nhận Quốc tế Control Union");
+    setRenewNote(cert.pendingRenewal?.note || "");
+    setRenewProofImage(cert.pendingRenewal?.proofImage || "");
+    setRenewProofFileName(cert.pendingRenewal?.proofImage ? "Tài liệu xác minh đã tải" : "");
+    setIsRenewModalOpen(true);
+  };
+
+  const handleRenewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ảnh tải lên tối đa 5MB!");
+      return;
+    }
+    setRenewProofFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === "string") {
+        setRenewProofImage(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmitRenewal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renewingCert) return;
+
+    // Nếu để trống mã mới thì giữ nguyên mã cũ theo thiết kế modal
+    const finalCertNumber = renewNewCertNumber.trim()
+      ? renewNewCertNumber.trim().toUpperCase()
+      : renewingCert.certNumber;
+
+    setIsSubmittingRenewal(true);
+    try {
+      const updated = certifications.map((c) => {
+        if (c.id === renewingCert.id) {
+          return {
+            ...c,
+            approvalStatus: "PENDING" as const,
+            pendingRenewal: {
+              newCertNumber: finalCertNumber,
+              proofImage: renewProofImage,
+              requestedExpiryDate: renewRequestedExpiryDate,
+              submittedAt: new Date().toLocaleDateString("vi-VN"),
+              note: renewNote.trim(),
+            },
+          };
+        }
+        return c;
+      });
+
+      setCertifications(updated);
+      try {
+        localStorage.setItem(STORAGE_KEYS.certs, JSON.stringify(updated));
+      } catch {
+        // Ignore quota errors
+      }
+
+      toast.success(
+        `Đã nộp yêu cầu gia hạn cho "${renewingCert.name}" thành công! Hồ sơ đang chờ Quản trị viên (Admin) xét duyệt.`
+      );
+      setIsRenewModalOpen(false);
+    } finally {
+      setIsSubmittingRenewal(false);
+    }
+  };
+
+  const handleDeleteCert = async (certIdentifier: string, name: string) => {
+    if (confirm(`Bạn có chắc muốn xóa chứng nhận "${name}" khỏi hệ thống?`)) {
+      try {
+        await farmerService.deleteCertificate(certIdentifier);
+        setCertifications((prev) =>
+          prev.filter((c) => c.certNumber !== certIdentifier && c.id !== certIdentifier)
+        );
+        toast.success(`Đã xóa vĩnh viễn chứng nhận "${name}" thành công!`);
+      } catch (err: any) {
+        console.warn("Lỗi xóa chứng nhận phía server:", err);
+        setCertifications((prev) =>
+          prev.filter((c) => c.certNumber !== certIdentifier && c.id !== certIdentifier)
+        );
+        toast.info(`Đã gỡ chứng nhận "${name}"!`);
+      }
+    }
+  };
+
+  // 🛡️ PHÂN QUYỀN DỮ LIỆU THEO TÀI KHOẢN ĐĂNG NHẬP (DATA OWNERSHIP / ISOLATION)
+  const activeOwnerId =
+    authUser?.email === "nguyenthieuu052@gmail.com" || (authUser?.name || "").toLowerCase().includes("thiệu")
+      ? "farmer_thieu"
+      : "farmer_hung";
+
+  const currentProfile = FARMER_PROFILES.find((p) => p.ownerId === activeOwnerId) || FARMER_PROFILES[0];
+
+  useEffect(() => {
+    const ownerFarms = farms.filter((f) => (f.ownerId || "farmer_hung") === activeOwnerId);
+    if (ownerFarms.length > 0 && !ownerFarms.some((f) => f.id === selectedFarmId)) {
+      setSelectedFarmId(ownerFarms[0].id);
+      setFormFarmCode(ownerFarms[0].code);
+    }
+  }, [activeOwnerId, farms, selectedFarmId]);
+
+  // DỮ LIỆU ĐƯỢC CÔ LẬP THEO CHỦ VƯỜN HIỆN TẠI (STRICT DATA OWNERSHIP ISOLATION)
+  const visibleFarms = farms.filter((f) => (f.ownerId || "farmer_hung") === activeOwnerId);
+
+  const visibleBatches = batches.filter((b) => {
+    const oId = b.ownerId || (b.farmCode === "NT-MC-03" ? "farmer_thieu" : "farmer_hung");
+    return oId === activeOwnerId;
+  });
+
+  const visibleLogs = farmingLogs.filter((l) => {
+    const oId = l.ownerId || (l.farmCode === "NT-MC-03" ? "farmer_thieu" : "farmer_hung");
+    return oId === activeOwnerId;
+  });
+
+  const visibleProducts = products.filter((p) => {
+    const oId = p.ownerId || (p.farmCode === "NT-MC-03" ? "farmer_thieu" : "farmer_hung");
+    return oId === activeOwnerId;
+  });
+
+  const computedCerts = certifications.map((c) => evaluateCertification(c, clientNowMs));
+  const visibleCerts = computedCerts.filter((c) => {
+    const oId = c.ownerId || (c.farmCode === "NT-MC-03" ? "farmer_thieu" : "farmer_hung");
+    return oId === activeOwnerId;
+  });
+
+  const filteredBatches = visibleBatches.filter((b) => {
+    const matchStatus = activeFilter === "Tất cả" || b.status === activeFilter;
     const matchFarm = selectedBatchFarm === "ALL" || b.farmCode === selectedBatchFarm;
+    const effectiveTransport = b.transportStatus || "Chưa vận chuyển";
     const matchTransport =
-      selectedTransportFilter === "Tất cả" || (b.transportStatus || "").includes(selectedTransportFilter);
+      selectedTransportFilter === "Tất cả" || effectiveTransport === selectedTransportFilter;
     return matchStatus && matchFarm && matchTransport;
   });
 
-  const displayedProducts = products.filter((p) => {
+  const harvestStats = computeHarvestStats(visibleBatches);
+
+  // Tự động kiểm tra và gửi email cảnh báo khi có chứng nhận còn <= 5 ngày
+  useEffect(() => {
+    if (!storageLoaded || visibleCerts.length === 0) return;
+
+    const criticalCerts = visibleCerts.filter(
+      (c) => c.daysLeft <= 5 && c.daysLeft >= 0
+    );
+    if (criticalCerts.length === 0) return;
+
+    const sentRecords = readStoredJson<Record<string, string>>(STORAGE_KEYS.certEmailSent) || {};
+    const todayStr = getLocalIsoDate(0);
+    let hasNotified = false;
+
+    criticalCerts.forEach(async (cert) => {
+      const sentKey = `${cert.certNumber}_${cert.daysLeft}_${todayStr}`;
+      if (sentRecords[sentKey]) return;
+
+      const farm = visibleFarms.find((f) => f.code === cert.farmCode);
+      try {
+        await farmerService.notifyCertExpiry({
+          certName: cert.name,
+          certNumber: cert.certNumber,
+          farmName: farm ? `${farm.name} (${farm.code})` : cert.farmCode,
+          daysLeft: cert.daysLeft,
+          expiryDate: cert.expiryDate,
+          toEmail: activeAlertEmail,
+        });
+        sentRecords[sentKey] = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEYS.certEmailSent, JSON.stringify(sentRecords));
+        if (!hasNotified) {
+          hasNotified = true;
+          toast.info(
+            `Hệ thống đã gửi email cảnh báo: Chứng nhận "${cert.name}" còn ${cert.daysLeft} ngày hết hạn!`
+          );
+        }
+      } catch (err) {
+        console.warn("Lỗi tự động gửi email cảnh báo:", err);
+      }
+    });
+  }, [visibleCerts, storageLoaded, activeAlertEmail, visibleFarms]);
+
+
+  const displayedProducts = visibleProducts.filter((p) => {
     if (selectedProductFarm === "ALL") return true;
     return p.farmCode === selectedProductFarm;
   });
 
-  const displayedLogs = farmingLogs.filter((l) => {
+  const displayedLogs = visibleLogs.filter((l) => {
     if (selectedLogFarm === "ALL") return true;
     const fCode = l.farmCode || batches.find((b) => b.code === l.batchCode)?.farmCode;
     return fCode === selectedLogFarm;
   });
 
-  const displayedCerts = certifications.filter((c) => {
+  const displayedCerts = visibleCerts.filter((c) => {
     if (selectedCertFarm === "ALL") return true;
     return c.farmCode === selectedCertFarm;
   });
@@ -763,17 +2294,13 @@ export default function FarmerPortalPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              const rand = Math.floor(Math.random() * 80) + 20;
-              setNewFarmCode(`NT-VN-0${farms.length + 1}`);
-              setIsAddFarmModalOpen(true);
-            }}
+            onClick={openAddFarmModal}
             className="px-3.5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-emerald-700/60 transition-all cursor-pointer"
           >
             <Plus size={15} /> Thêm Nông Trại
           </button>
           <button
-            onClick={handleOpenCreateBatch}
+            onClick={() => openCreateBatchModal()}
             className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition-all transform active:scale-95 cursor-pointer"
           >
             <Plus size={16} /> Tạo Lô Thu Hoạch
@@ -793,7 +2320,7 @@ export default function FarmerPortalPage() {
         >
           <Home size={16} /> Quản Lý Nông Trại
           <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full">
-            {farms.length} Trang trại
+            {visibleFarms.length} Trang trại
           </span>
         </button>
 
@@ -807,7 +2334,7 @@ export default function FarmerPortalPage() {
         >
           <Package size={16} /> Quản Lý Lô Thu Hoạch
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {batches.length} Lô
+            {visibleBatches.length} Lô
           </span>
         </button>
 
@@ -821,7 +2348,7 @@ export default function FarmerPortalPage() {
         >
           <FileText size={16} /> Sổ Nhật Ký Canh Tác
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {farmingLogs.length} Ghi chép
+            {visibleLogs.length} Ghi chép
           </span>
         </button>
 
@@ -835,7 +2362,7 @@ export default function FarmerPortalPage() {
         >
           <Sprout size={16} /> Quản Lý Sản Phẩm (Xoài, Sầu riêng...)
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {products.length} Loại
+            {visibleProducts.length} Loại
           </span>
         </button>
 
@@ -848,11 +2375,18 @@ export default function FarmerPortalPage() {
           }`}
         >
           <Award size={16} /> Chứng Nhận & Cảnh Báo
-          {certifications.some((c) => c.status === "EXPIRING_SOON") && (
+          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full mr-1">
+            {visibleCerts.length}
+          </span>
+          {visibleCerts.some((c) => c.status === "EXPIRED") ? (
+            <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+              ⛔ Có chứng chỉ hết hạn
+            </span>
+          ) : visibleCerts.some((c) => c.status === "EXPIRING_SOON") ? (
             <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
               ⚠️ Sắp hết hạn
             </span>
-          )}
+          ) : null}
         </button>
       </div>
 
@@ -872,10 +2406,7 @@ export default function FarmerPortalPage() {
               </p>
             </div>
             <button
-              onClick={() => {
-                setNewFarmCode(`NT-VN-0${farms.length + 1}`);
-                setIsAddFarmModalOpen(true);
-              }}
+              onClick={openAddFarmModal}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Nông Trại Mới
@@ -884,80 +2415,94 @@ export default function FarmerPortalPage() {
 
           {/* Grid Cards Nông Trại */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {farms.map((farm) => {
-              const isSelected = farm.id === selectedFarmId;
-              return (
-                <div
-                  key={farm.id}
-                  className={`bg-white rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all ${
-                    isSelected ? "border-emerald-600 ring-2 ring-emerald-500/20" : "border-gray-200 hover:border-gray-300"
-                  }`}
+            {visibleFarms.length === 0 ? (
+              <div className="col-span-2 bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center text-gray-400">
+                <Home size={36} className="mx-auto mb-2 opacity-40 text-emerald-600" />
+                <p className="text-sm font-semibold">Chủ vườn hiện tại chưa có nông trại nào trong danh sách.</p>
+                <button
+                  type="button"
+                  onClick={openAddFarmModal}
+                  className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        Mã: {farm.code}
-                      </span>
-                      <span className="text-emerald-700 bg-emerald-100 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                        <CheckCircle2 size={11} /> Đang quản lý
-                      </span>
-                    </div>
-
-                    <div>
-                      <h4 className="text-base font-extrabold text-gray-900">{farm.name}</h4>
-                      <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
-                        <MapPin size={13} className="text-emerald-600 shrink-0" />
-                        <span>{farm.address}, {farm.province}</span>
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 text-xs">
-                      <div className="bg-gray-50 p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-gray-400 block font-semibold uppercase">Diện tích</span>
-                        <span className="font-extrabold text-emerald-800 text-sm">{farm.areaHectares} ha</span>
-                      </div>
-                      <div className="bg-gray-50 p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-gray-400 block font-semibold uppercase">Tiêu chuẩn</span>
-                        <span className="font-bold text-gray-800 text-[11px] truncate block">{farm.certStandard}</span>
-                      </div>
-                      <div className="bg-gray-50 p-2.5 rounded-xl text-center">
-                        <span className="text-[10px] text-gray-400 block font-semibold uppercase">Đợt thu hoạch</span>
-                        <span className="font-extrabold text-blue-700 text-sm">
-                          {batches.filter((b) => b.farmCode === farm.code).length} Lô
+                  <Plus size={14} /> Thêm Trang Trại Đầu Tiên
+                </button>
+              </div>
+            ) : (
+              visibleFarms.map((farm) => {
+                const isSelected = farm.id === selectedFarmId;
+                return (
+                  <div
+                    key={farm.id}
+                    className={`bg-white rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all ${
+                      isSelected ? "border-emerald-600 ring-2 ring-emerald-500/20" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          Mã: {farm.code}
+                        </span>
+                        <span className="text-emerald-700 bg-emerald-100 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 size={11} /> Đang quản lý
                         </span>
                       </div>
+
+                      <div>
+                        <h4 className="text-base font-extrabold text-gray-900">{farm.name}</h4>
+                        <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
+                          <MapPin size={13} className="text-emerald-600 shrink-0" />
+                          <span>{farm.address}, {farm.province}</span>
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 text-xs">
+                        <div className="bg-gray-50 p-2.5 rounded-xl text-center">
+                          <span className="text-[10px] text-gray-400 block font-semibold uppercase">Diện tích</span>
+                          <span className="font-extrabold text-emerald-800 text-sm">{farm.areaHectares} ha</span>
+                        </div>
+                        <div className="bg-gray-50 p-2.5 rounded-xl text-center">
+                          <span className="text-[10px] text-gray-400 block font-semibold uppercase">Tiêu chuẩn</span>
+                          <span className="font-bold text-gray-800 text-[11px] truncate block">{farm.certStandard}</span>
+                        </div>
+                        <div className="bg-gray-50 p-2.5 rounded-xl text-center">
+                          <span className="text-[10px] text-gray-400 block font-semibold uppercase">Đợt thu hoạch</span>
+                          <span className="font-extrabold text-blue-700 text-sm">
+                            {visibleBatches.filter((b) => b.farmCode === farm.code).length} Lô
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-gray-600 space-y-1 pt-1">
+                        <div className="flex items-center gap-2">
+                          <User size={13} className="text-gray-400" />
+                          <span>Chủ trang trại: <strong>{farm.owner}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone size={13} className="text-gray-400" />
+                          <span>Số điện thoại: <strong>{farm.phone}</strong></span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="text-xs text-gray-600 space-y-1 pt-1">
-                      <div className="flex items-center gap-2">
-                        <User size={13} className="text-gray-400" />
-                        <span>Chủ trang trại: <strong>{farm.owner}</strong></span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Phone size={13} className="text-gray-400" />
-                        <span>Số điện thoại: <strong>{farm.phone}</strong></span>
-                      </div>
+                    <div className="pt-4 border-t border-gray-100 mt-4 flex items-center justify-between">
+                      <button
+                        onClick={() => setEditingFarm({ ...farm })}
+                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Edit3 size={13} /> Sửa thông tin
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFarm(farm.id, farm.name)}
+                        className="p-2 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
+                        title="Xóa nông trại"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="pt-4 border-t border-gray-100 mt-4 flex items-center justify-between">
-                    <button
-                      onClick={() => setEditingFarm({ ...farm })}
-                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Edit3 size={13} /> Sửa thông tin
-                    </button>
-                    <button
-                      onClick={() => handleDeleteFarm(farm.id, farm.name)}
-                      className="p-2 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
-                      title="Xóa nông trại"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -971,8 +2516,10 @@ export default function FarmerPortalPage() {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-gray-500 font-semibold uppercase">Tổng sản lượng quản lý</div>
-              <div className="text-xl font-extrabold text-gray-900 mt-1">2,750 kg</div>
-              <div className="text-[11px] text-emerald-600 mt-0.5">Xoài, Sầu riêng, Dâu tây</div>
+              <div className="text-xl font-extrabold text-gray-900 mt-1">{harvestStats.totalKgLabel}</div>
+              <div className="text-[11px] text-emerald-600 mt-0.5 truncate" title={harvestStats.productSummary}>
+                {harvestStats.productSummary}
+              </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-gray-500 font-semibold uppercase">Đã duyệt xuất kho</div>
@@ -991,7 +2538,7 @@ export default function FarmerPortalPage() {
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-amber-700 font-semibold uppercase">Lưu tại kho vườn</div>
               <div className="text-xl font-extrabold text-amber-600 mt-1">
-                {batches.filter((b) => b.transportStatus === "Chưa vận chuyển").length} Lô
+                {batches.filter((b) => !b.transportStatus || b.transportStatus === "Chưa vận chuyển").length} Lô
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">Chưa vận chuyển đi</div>
             </div>
@@ -1017,13 +2564,13 @@ export default function FarmerPortalPage() {
                   selectedBatchFarm === "ALL" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
                 }`}
               >
-                {batches.length} Lô
+                {visibleBatches.length} Lô
               </span>
             </button>
 
-            {farms.map((farm) => {
+            {visibleFarms.map((farm) => {
               const active = selectedBatchFarm === farm.code;
-              const count = batches.filter((b) => b.farmCode === farm.code).length;
+              const count = visibleBatches.filter((b) => b.farmCode === farm.code).length;
 
               return (
                 <button
@@ -1053,21 +2600,52 @@ export default function FarmerPortalPage() {
           {/* Batches Table Card */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
             <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-gray-50/50">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <Package size={18} className="text-[#1a7a3a]" />
-                <h3 className="font-bold text-sm text-gray-900">Danh Sách Lô Thu Hoạch & Tình Trạng Vận Chuyển</h3>
+                <h3 className="font-bold text-sm text-gray-900">Danh Sách Lô Thu Hoạch & Vận Chuyển</h3>
+                {sseConnected ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Đồng Bộ Trực Tiếp (Live Sync)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    <RefreshCw size={10} className="animate-spin text-amber-600" />
+                    Đang kết nối...
+                  </span>
+                )}
               </div>
 
               {/* Status Filters */}
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Lọc trạng thái kiểm duyệt */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 text-xs flex-wrap">
+                  {["Tất cả", "Chờ duyệt xuất kho", "Đã duyệt xuất kho", "Đang lưu kho lạnh", "Đang chăm sóc"].map((st) => {
+                    const sel = activeFilter === st;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setActiveFilter(st)}
+                        className={`px-2 py-0.5 rounded-lg font-semibold text-[11px] cursor-pointer transition-all ${
+                          sel ? "bg-emerald-700 text-white" : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        {st === "Tất cả" ? "Tất cả trạng thái" : st}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Lọc tình trạng vận chuyển */}
-                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 text-xs">
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 text-xs flex-wrap">
                   <Truck size={13} className="text-gray-400 ml-1 mr-0.5" />
                   {["Tất cả", "Chưa vận chuyển", "Đang vận chuyển", "Đã nhập kho đích"].map((v) => {
                     const sel = selectedTransportFilter === v;
                     return (
                       <button
                         key={v}
+                        type="button"
                         onClick={() => setSelectedTransportFilter(v)}
                         className={`px-2 py-0.5 rounded-lg font-semibold text-[11px] cursor-pointer transition-all ${
                           sel ? "bg-emerald-700 text-white" : "text-gray-600 hover:bg-gray-100"
@@ -1081,11 +2659,7 @@ export default function FarmerPortalPage() {
 
                 {/* Nút Khai báo lô mới */}
                 <button
-                  onClick={() => {
-                    const initialFarm = selectedBatchFarm !== "ALL" ? selectedBatchFarm : farms[0]?.code || "NT-DT-02";
-                    setFormFarmCode(initialFarm);
-                    setIsBatchModalOpen(true);
-                  }}
+                  onClick={() => openCreateBatchModal()}
                   className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer ml-auto"
                 >
                   <Plus size={14} /> Khai Báo Lô Mới
@@ -1181,28 +2755,37 @@ export default function FarmerPortalPage() {
 
                           {/* Trạng Thái Kiểm Duyệt */}
                           <td className="py-3 px-3">
-                            <span style={{ color: b.statusColor }} className="font-bold flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenLotTimeline(b)}
+                              className="text-left font-bold flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+                              title="Bấm để xem chi tiết trạng thái kiểm duyệt của Admin"
+                            >
                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.statusColor }} />
-                              {b.status}
-                            </span>
+                              <span style={{ color: b.statusColor }}>{b.status}</span>
+                            </button>
                           </td>
 
                           {/* Mã QR & Thao Tác */}
                           <td className="py-3 px-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => {
-                                  setSelectedFarmForLog(b.farmCode);
-                                  setSelectedBatchForLog(b.code);
-                                  setIsLogModalOpen(true);
-                                }}
-                                className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer"
+                                onClick={() => handleOpenPrintLabel(b)}
+                                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                title="In tem nhãn mã QR chuẩn GS1 dán thùng hàng / bao bì"
                               >
-                                <FileText size={12} /> Nhật ký
+                                <Printer size={12} /> In tem
+                              </button>
+                              <button
+                                onClick={() => handleOpenLotTimeline(b)}
+                                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-[#1a7a3a] border border-emerald-200 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                title="Xem nhật ký vòng đời từ thu hoạch, duyệt xuất kho và vận chuyển"
+                              >
+                                <Clock size={12} /> Nhật ký
                               </button>
                               <Link
                                 href={`/traceability?batch=${b.code}`}
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1a7a3a] bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 hover:bg-emerald-100"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1a7a3a] bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 hover:bg-emerald-100"
+                                title="Tra cứu trang QR công khai"
                               >
                                 <QrCode size={13} /> QR
                               </Link>
@@ -1245,13 +2828,7 @@ export default function FarmerPortalPage() {
               </p>
             </div>
             <button
-              onClick={() => {
-                const initialFarm = selectedLogFarm !== "ALL" ? selectedLogFarm : farms[0]?.code || "NT-DT-02";
-                setSelectedFarmForLog(initialFarm);
-                const matchingBatches = batches.filter((b) => b.farmCode === initialFarm);
-                setSelectedBatchForLog(matchingBatches[0]?.code || batches[0]?.code || "");
-                setIsLogModalOpen(true);
-              }}
+              onClick={() => openCreateLogModal()}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Ghi Chép Mới
@@ -1278,14 +2855,14 @@ export default function FarmerPortalPage() {
                   selectedLogFarm === "ALL" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
                 }`}
               >
-                {farmingLogs.length}
+                {visibleLogs.length}
               </span>
             </button>
 
-            {farms.map((farm) => {
+            {visibleFarms.map((farm) => {
               const active = selectedLogFarm === farm.code;
-              const count = farmingLogs.filter((l) => {
-                const fCode = l.farmCode || batches.find((b) => b.code === l.batchCode)?.farmCode;
+              const count = visibleLogs.filter((l) => {
+                const fCode = l.farmCode || visibleBatches.find((b) => b.code === l.batchCode)?.farmCode;
                 return fCode === farm.code;
               }).length;
 
@@ -1361,9 +2938,19 @@ export default function FarmerPortalPage() {
                           </span>
                         </div>
 
-                        <span className="text-gray-400 flex items-center gap-1 text-[11px] font-medium">
-                          <Clock size={12} /> {log.date}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 flex items-center gap-1 text-[11px] font-medium">
+                            <Clock size={12} /> {log.date}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteLog(log.id, log.action)}
+                            className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
+                            title="Xóa ghi chép"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Tên hành động canh tác */}
@@ -1390,6 +2977,30 @@ export default function FarmerPortalPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Ảnh minh chứng thực tế */}
+                      {log.proofImage && (
+                        <div className="mt-2.5 flex items-center gap-3 bg-emerald-50/60 border border-emerald-200/80 p-2 rounded-xl">
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-emerald-200 shrink-0 bg-white">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={log.proofImage}
+                              alt="Ảnh minh chứng canh tác"
+                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                              onClick={() => window.open(log.proofImage, "_blank")}
+                              title="Bấm để xem ảnh kích thước lớn"
+                            />
+                          </div>
+                          <div className="text-xs">
+                            <span className="font-bold text-emerald-900 flex items-center gap-1 text-[11px]">
+                              📸 Ảnh minh chứng thực tế tại vườn
+                            </span>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              Đã lưu ảnh bằng chứng canh tác chuẩn VietGAP. Bấm vào ảnh để mở ảnh gốc.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1414,11 +3025,7 @@ export default function FarmerPortalPage() {
               </p>
             </div>
             <button
-              onClick={() => {
-                const initialFarm = selectedProductFarm !== "ALL" ? selectedProductFarm : farms[0]?.code || "NT-DT-02";
-                setNewProdFarmCode(initialFarm);
-                setIsProductModalOpen(true);
-              }}
+              onClick={openCreateProductModal}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Sản Phẩm Mới
@@ -1445,13 +3052,13 @@ export default function FarmerPortalPage() {
                   selectedProductFarm === "ALL" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
                 }`}
               >
-                {products.length} Loại
+                {visibleProducts.length} Loại
               </span>
             </button>
 
-            {farms.map((farm) => {
+            {visibleFarms.map((farm) => {
               const active = selectedProductFarm === farm.code;
-              const count = products.filter((p) => p.farmCode === farm.code).length;
+              const count = visibleProducts.filter((p) => p.farmCode === farm.code).length;
 
               return (
                 <button
@@ -1499,11 +3106,11 @@ export default function FarmerPortalPage() {
                           {p.image && (p.image.startsWith("data:") || p.image.startsWith("http") || p.image.startsWith("/")) ? (
                             <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                           ) : (
-                            <span>{p.image || "🌱"}</span>
+                            <Sprout size={24} className="text-emerald-700" />
                           )}
                         </div>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                          {p.category}
+                          {getCategoryLabel(p.category)}
                         </span>
                       </div>
 
@@ -1524,11 +3131,7 @@ export default function FarmerPortalPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => {
-                            handleProductSelect(p.name);
-                            if (p.farmCode) setFormFarmCode(p.farmCode);
-                            setIsBatchModalOpen(true);
-                          }}
+                          onClick={() => openCreateBatchModal(p.farmCode || currentFarm?.code, p.name)}
                           className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold text-[11px] rounded-lg border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
                         >
                           + Tạo Lô
@@ -1568,7 +3171,47 @@ export default function FarmerPortalPage() {
                 Theo dõi hiệu lực chứng chỉ VietGAP & GlobalGAP, tự động cảnh báo khi chứng chỉ sắp hết hạn theo từng trang trại
               </p>
             </div>
+            <button
+              onClick={openCreateCertModal}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Plus size={15} /> Thêm Chứng Nhận Mới
+            </button>
           </div>
+
+          {/* CẢNH BÁO KHẨN CẤP: CHỨNG NHẬN CÒN <= 5 NGÀY */}
+          {computedCerts.some((c) => c.daysLeft <= 5 && c.daysLeft >= 0) && (
+            <div className="bg-gradient-to-r from-rose-50 via-amber-50 to-orange-50 border-2 border-rose-300 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+                  <Mail size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-rose-600 text-white text-[11px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Cảnh Báo Khẩn Cấp (Còn ≤ 5 Ngày)
+                    </span>
+                    <span className="text-xs text-rose-700 font-bold">Hệ Thống Tự Động Gửi Email Thông Báo</span>
+                  </div>
+                  <p className="text-xs text-rose-950 font-medium mt-1">
+                    Có chứng nhận tiêu chuẩn nông trại sắp hết hiệu lực trong vòng 5 ngày tới. Email cảnh báo đã được hệ thống tự động gửi đến <strong>{activeAlertEmail || "email đăng ký của bạn"}</strong> để kịp thời hoàn tất thủ tục gia hạn kiểm định.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstCritical = computedCerts.find((c) => c.daysLeft <= 5 && c.daysLeft >= 0);
+                    if (firstCritical) handleOpenRenewModal(firstCritical);
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw size={13} /> Gia Hạn Ngay
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Bộ lọc Chọn Nông Trại để xem Chứng Nhận */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
@@ -1590,13 +3233,13 @@ export default function FarmerPortalPage() {
                   selectedCertFarm === "ALL" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
                 }`}
               >
-                {certifications.length} Chứng chỉ
+                {visibleCerts.length} Chứng chỉ
               </span>
             </button>
 
-            {farms.map((farm) => {
+            {visibleFarms.map((farm) => {
               const active = selectedCertFarm === farm.code;
-              const count = certifications.filter((c) => c.farmCode === farm.code).length;
+              const count = visibleCerts.filter((c) => c.farmCode === farm.code).length;
 
               return (
                 <button
@@ -1637,18 +3280,32 @@ export default function FarmerPortalPage() {
                   <div
                     key={cert.id}
                     className={`p-5 rounded-2xl border text-xs flex flex-col justify-between transition-all ${
-                      cert.status === "EXPIRING_SOON"
+                      cert.status === "EXPIRED"
+                        ? "bg-rose-50/70 border-rose-300 text-rose-950 shadow-sm"
+                        : cert.status === "EXPIRING_SOON"
                         ? "bg-amber-50/60 border-amber-300 text-amber-950 shadow-sm"
                         : "bg-white border-gray-200 text-gray-900 shadow-xs hover:border-emerald-300"
                     }`}
                   >
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-emerald-900 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px]">
                           <Home size={11} className="text-emerald-700" />
                           {certFarm ? certFarm.name : cert.farmCode}
                         </span>
-                        {cert.status === "EXPIRING_SOON" ? (
+                        {cert.approvalStatus === "PENDING" ? (
+                          <span className="bg-amber-500 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                            <Clock size={11} /> Chờ Admin xét duyệt
+                          </span>
+                        ) : cert.daysLeft <= 5 && cert.daysLeft >= 0 ? (
+                          <span className="bg-rose-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-pulse shadow-xs">
+                            <AlertTriangle size={11} /> Sắp hết hạn: Còn {cert.daysLeft} ngày
+                          </span>
+                        ) : cert.status === "EXPIRED" ? (
+                          <span className="bg-rose-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <AlertTriangle size={11} /> Đã hết hạn ({Math.abs(cert.daysLeft)} ngày)
+                          </span>
+                        ) : cert.status === "EXPIRING_SOON" ? (
                           <span className="bg-amber-500 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             <AlertTriangle size={11} /> Còn {cert.daysLeft} ngày
                           </span>
@@ -1664,11 +3321,67 @@ export default function FarmerPortalPage() {
                         Số hiệu: <strong className="font-mono text-gray-800">{cert.certNumber}</strong>
                       </div>
                       <div className="text-gray-500">Đơn vị cấp: {cert.issuedBy}</div>
+
+                      {cert.approvalStatus === "PENDING" && cert.pendingRenewal && (
+                        <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-2.5 space-y-1.5 text-[11px] text-amber-950 mt-1.5">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="flex items-center gap-1 text-amber-800">
+                              <Clock size={12} /> Yêu cầu gia hạn:
+                            </span>
+                            <span className="font-mono text-emerald-900 bg-white border border-amber-200 px-1.5 py-0.5 rounded font-bold text-[10px]">
+                              {cert.pendingRenewal.newCertNumber}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-gray-600 pt-0.5">
+                            <span>Hạn mới đề xuất: <strong className="text-emerald-800">{cert.pendingRenewal.requestedExpiryDate}</strong></span>
+                            <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                              <CheckCircle2 size={11} /> Đã gửi ảnh xác minh
+                            </span>
+                          </div>
+                          {cert.pendingRenewal.note && (
+                            <p className="text-[10px] text-gray-500 italic truncate">
+                              Ghi chú: &ldquo;{cert.pendingRenewal.note}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between font-semibold text-[11px]">
-                      <span className="text-gray-500">Ngày cấp: {cert.issueDate}</span>
-                      <span className="text-rose-600 font-bold">Hết hạn: {cert.expiryDate}</span>
+                    <div className="pt-3 border-t border-gray-100 mt-3 space-y-2">
+                      <div className="flex items-center justify-between font-semibold text-[11px]">
+                        <span className="text-gray-500">Ngày cấp: {cert.issueDate}</span>
+                        <span className="text-rose-600 font-bold">Hết hạn: {cert.expiryDate}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-1.5">
+                          {cert.approvalStatus === "PENDING" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRenewModal(cert)}
+                              className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-[11px] rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                              title="Xem hoặc cập nhật hồ sơ gia hạn đang chờ duyệt"
+                            >
+                              <Clock size={11} /> Đang chờ duyệt (Cập nhật)
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRenewModal(cert)}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <RefreshCw size={11} /> Gia hạn
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCert(cert.certNumber || cert.id, cert.name)}
+                          className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
+                          title="Xóa chứng nhận"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1829,13 +3542,38 @@ export default function FarmerPortalPage() {
             </div>
 
             <form onSubmit={handleUpdateFarm} className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Mã Nông Trại *</label>
+                  <input
+                    type="text"
+                    value={editingFarm.code}
+                    disabled
+                    title="Mã nông trại cố định để đảm bảo tính toàn vẹn liên kết với lô hàng và chứng nhận"
+                    className="w-full px-3 py-2 border border-gray-200 bg-gray-100 text-gray-500 rounded-xl font-mono font-bold uppercase cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Quy mô (Hecta) *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editingFarm.areaHectares}
+                    onChange={(e) => setEditingFarm({ ...editingFarm, areaHectares: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-gray-700 font-bold mb-1">Tên Nông Trại</label>
+                <label className="block text-gray-700 font-bold mb-1">Tên Nông Trại *</label>
                 <input
                   type="text"
                   value={editingFarm.name}
                   onChange={(e) => setEditingFarm({ ...editingFarm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold"
+                  placeholder="VD: Vườn Xoài Cát Chu Đồng Tháp..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold text-sm"
                   required
                 />
               </div>
@@ -1861,42 +3599,54 @@ export default function FarmerPortalPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1">Quy mô (Hecta)</label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-gray-700 font-bold mb-1">Địa chỉ canh tác cụ thể</label>
                   <input
-                    type="number"
-                    step="0.1"
-                    value={editingFarm.areaHectares}
-                    onChange={(e) => setEditingFarm({ ...editingFarm, areaHectares: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold"
+                    type="text"
+                    value={editingFarm.address}
+                    onChange={(e) => setEditingFarm({ ...editingFarm, address: e.target.value })}
+                    placeholder="Xã/Thôn, Huyện..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-bold mb-1">Tiêu chuẩn canh tác</label>
-                  <select
-                    value={editingFarm.certStandard}
-                    onChange={(e) => setEditingFarm({ ...editingFarm, certStandard: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-medium"
-                  >
-                    <option value="VietGAP Trồng trọt">VietGAP Trồng trọt</option>
-                    <option value="GlobalGAP Xuất khẩu">GlobalGAP Xuất khẩu</option>
-                    <option value="VietGAP & GlobalGAP">VietGAP & GlobalGAP (Đạt cả 2 chuẩn)</option>
-                    <option value="Hữu cơ Organic USDA">Hữu cơ Organic USDA</option>
-                    <option value="OCOP 4 Sao Đặc sản">OCOP 4 Sao Đặc sản địa phương</option>
-                    <option value="Chưa chứng nhận">Chưa có chứng nhận</option>
-                  </select>
+                  <label className="block text-gray-700 font-bold mb-1">Tỉnh / Thành</label>
+                  <input
+                    type="text"
+                    value={editingFarm.province || ""}
+                    onChange={(e) => setEditingFarm({ ...editingFarm, province: e.target.value })}
+                    placeholder="Tỉnh/Thành phố"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-gray-700 font-bold mb-1">Địa chỉ cụ thể</label>
-                <input
-                  type="text"
-                  value={editingFarm.address}
-                  onChange={(e) => setEditingFarm({ ...editingFarm, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl"
-                />
+                <label className="block text-gray-700 font-bold mb-1">Tiêu chuẩn canh tác chính</label>
+                <select
+                  value={editingFarm.certStandard}
+                  onChange={(e) => setEditingFarm({ ...editingFarm, certStandard: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-medium"
+                >
+                  <option value="VietGAP Trồng trọt">VietGAP Trồng trọt</option>
+                  <option value="GlobalGAP Xuất khẩu">GlobalGAP Xuất khẩu</option>
+                  <option value="VietGAP & GlobalGAP">VietGAP & GlobalGAP (Đạt cả 2 chuẩn)</option>
+                  <option value="Hữu cơ Organic USDA">Hữu cơ Organic USDA</option>
+                  <option value="OCOP 4 Sao Đặc sản">OCOP 4 Sao Đặc sản địa phương</option>
+                  <option value="Chưa chứng nhận">Chưa có chứng nhận</option>
+                  {![
+                    "VietGAP Trồng trọt",
+                    "GlobalGAP Xuất khẩu",
+                    "VietGAP & GlobalGAP",
+                    "Hữu cơ Organic USDA",
+                    "OCOP 4 Sao Đặc sản",
+                    "Chưa chứng nhận",
+                  ].includes(editingFarm.certStandard) && (
+                    <option value={editingFarm.certStandard}>{editingFarm.certStandard}</option>
+                  )}
+                </select>
               </div>
 
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
@@ -1915,6 +3665,698 @@ export default function FarmerPortalPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: NHẬT KÝ VÒNG ĐỜI LÔ THU HOẠCH & TIẾN TRÌNH DUYỆT XUẤT KHO */}
+      {/* ========================================================================= */}
+      {isLotTimelineModalOpen && selectedLotForTimeline && (
+        <div
+          onClick={() => setIsLotTimelineModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs cursor-pointer animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[92vh] cursor-default"
+          >
+            {/* Modal Header */}
+            <div className="bg-emerald-950 text-white px-5 py-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-800/80 border border-emerald-600/50 flex items-center justify-center text-emerald-300">
+                  <Clock size={19} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-xs bg-emerald-900 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700">
+                      #{selectedLotForTimeline.code}
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      Nhật Ký Vòng Đời Lô Thu Hoạch
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-emerald-300/80 mt-0.5">
+                    {selectedLotForTimeline.product} • Thu hoạch: {selectedLotForTimeline.harvestDate} • {selectedLotForTimeline.cert}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsLotTimelineModalOpen(false)}
+                className="text-emerald-400 hover:text-white p-1 rounded-lg hover:bg-emerald-900/50 cursor-pointer transition-colors"
+                title="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-5 text-xs">
+              {/* Tóm tắt thông số lô */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
+                <div>
+                  <div className="text-[10px] text-gray-500 font-medium">Ngày thu hoạch</div>
+                  <div className="font-bold text-gray-900 text-xs mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 size={12} className="text-emerald-600" />
+                    {selectedLotForTimeline.harvestDate}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-500 font-medium">Sản lượng thu hái</div>
+                  <div className="font-bold text-gray-900 text-xs mt-0.5 flex items-center gap-1">
+                    <Package size={12} className="text-emerald-600" />
+                    {selectedLotForTimeline.qty} {selectedLotForTimeline.unit}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-500 font-medium">Trạng thái duyệt</div>
+                  <div className="mt-0.5">
+                    {selectedLotForTimeline.status === "Đã duyệt xuất kho" ? (
+                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                        <Check size={10} /> Đã duyệt xuất kho
+                      </span>
+                    ) : (
+                      <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                        <Clock size={10} /> Chờ Admin duyệt
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-500 font-medium">Vận chuyển & Lưu kho</div>
+                  <div className="mt-0.5">
+                    {selectedLotForTimeline.transportStatus === "Đang vận chuyển" ? (
+                      <span className="bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                        <Truck size={10} className="animate-pulse" /> Đang vận chuyển
+                      </span>
+                    ) : selectedLotForTimeline.transportStatus === "Đã nhập kho đích" ? (
+                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Đã nhập kho đích
+                      </span>
+                    ) : (
+                      <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                        🏡 Lưu kho nông trại
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* LƯU Ý PHÂN ĐỊNH RÕ RÀNG GIỮA CANH TÁC & SAU THU HOẠCH */}
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3 text-[11px] text-emerald-900 flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2">
+                  <BookOpen size={15} className="text-emerald-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-emerald-950">Phạm vi nhật ký vòng đời lô thu hoạch:</span>
+                    <p className="text-[10px] text-emerald-800/90 mt-0.5 leading-relaxed">
+                      Tiến trình dưới đây theo dõi chuỗi sự kiện <strong>hậu cần từ thời điểm thu hoạch trở đi</strong> (Thu hoạch → Kiểm định KCS → Admin duyệt xuất kho → Lưu kho lạnh & Vận chuyển). Các hoạt động chăm sóc ruộng đồng (Làm đất, Gieo trồng, Bón phân, Tưới tiêu) trước thu hoạch được lưu trữ riêng tại mục <strong>"Sổ Nhật Ký Canh Tác"</strong>.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLotTimelineModalOpen(false);
+                    setActiveTab("logs");
+                  }}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
+                >
+                  Xem Sổ Canh Tác
+                </button>
+              </div>
+
+              {/* DÒNG THỜI GIAN VÒNG ĐỜI SAU THU HOẠCH */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-1.5">
+                    <Clock size={14} className="text-[#1a7a3a]" />
+                    Hành Trình Vòng Đời Lô (Từ Thu Hoạch Đến Xuất Kho)
+                  </h4>
+                  {isLoadingLotTimeline && (
+                    <span className="text-[11px] text-gray-500 flex items-center gap-1">
+                      <RefreshCw size={11} className="animate-spin text-emerald-600" /> Đang đồng bộ...
+                    </span>
+                  )}
+                </div>
+
+                {/* TIẾN TRÌNH LIÊN THÔNG 3 BÊN THỜI GIAN THỰC */}
+                <div className="bg-gradient-to-r from-emerald-50/70 via-blue-50/70 to-purple-50/70 p-3.5 rounded-xl border border-gray-200 mb-4">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-gray-700 mb-2">
+                    <span className="flex items-center gap-1.5 text-gray-900">
+                      <Sparkles size={13} className="text-amber-500" />
+                      Tiến Trình Liên Thông Chuỗi Cung Ứng (Tự Động Cập Nhật Realtime):
+                    </span>
+                    {sseConnected ? (
+                      <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        SSE Live Connected
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-gray-400">Đồng bộ định kỳ</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                    <div
+                      className={`p-2 rounded-lg border transition-all ${
+                        selectedLotForTimeline.status === "Đã duyệt xuất kho"
+                          ? "bg-emerald-100 border-emerald-300 text-emerald-900 font-bold shadow-2xs"
+                          : "bg-amber-50 border-amber-200 text-amber-900 font-semibold"
+                      }`}
+                    >
+                      <div className="text-sm mb-0.5">
+                        {selectedLotForTimeline.status === "Đã duyệt xuất kho" ? "✅" : "⏳"}
+                      </div>
+                      <div className="font-bold">1. Admin Thẩm Định</div>
+                      <div className="text-[9px] mt-0.5">{selectedLotForTimeline.status}</div>
+                    </div>
+
+                    <div
+                      className={`p-2 rounded-lg border transition-all ${
+                        selectedLotForTimeline.transportStatus === "Đang vận chuyển"
+                          ? "bg-blue-100 border-blue-400 text-blue-900 font-bold shadow-2xs animate-pulse ring-2 ring-blue-300/40"
+                          : selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                          ? "bg-blue-50 border-blue-200 text-blue-800 font-semibold"
+                          : "bg-white/90 border-gray-200 text-gray-500"
+                      }`}
+                    >
+                      <div className="text-sm mb-0.5">
+                        {selectedLotForTimeline.transportStatus === "Đang vận chuyển"
+                          ? "🚚"
+                          : selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                          ? "📦"
+                          : "🏡"}
+                      </div>
+                      <div className="font-bold">2. Tài Xế Nhận Hàng</div>
+                      <div className="text-[9px] mt-0.5">
+                        {selectedLotForTimeline.transportStatus || "Chưa vận chuyển"}
+                      </div>
+                    </div>
+
+                    <div
+                      className={`p-2 rounded-lg border transition-all ${
+                        selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                          ? "bg-purple-100 border-purple-300 text-purple-900 font-bold shadow-2xs"
+                          : "bg-white/90 border-gray-200 text-gray-500"
+                      }`}
+                    >
+                      <div className="text-sm mb-0.5">
+                        {selectedLotForTimeline.transportStatus === "Đã nhập kho đích" ? "🏢" : "⏳"}
+                      </div>
+                      <div className="font-bold">3. Thủ Kho Nhập Kho</div>
+                      <div className="text-[9px] mt-0.5">
+                        {selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                          ? "Đã nhập kho đích"
+                          : "Chờ nhập kho"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-emerald-200">
+                  {/* MỐC 1: KHAI BÁO THU HOẠCH */}
+                  <div className="relative group">
+                    <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white shadow-xs flex items-center justify-center text-white">
+                      <CheckCircle2 size={12} />
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs hover:border-emerald-300 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                          <span>Khai Báo Thu Hoạch & Khởi Tạo Mã Lô</span>
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] px-1.5 py-0.2 rounded border border-emerald-200 font-semibold">
+                            Mốc khởi đầu
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-mono font-medium">
+                          {selectedLotForTimeline.harvestDate}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 text-gray-600 text-[11px] space-y-0.5">
+                        <div>
+                          • <strong>Sản lượng:</strong> {selectedLotForTimeline.qty} {selectedLotForTimeline.unit} |{" "}
+                          <strong>Nông sản:</strong> {selectedLotForTimeline.product}
+                        </div>
+                        <div>
+                          • <strong>Nơi trồng:</strong> {selectedLotForTimeline.farmCode} |{" "}
+                          <strong>Tiêu chuẩn:</strong> {selectedLotForTimeline.cert} ({selectedLotForTimeline.cultivation})
+                        </div>
+                        <div className="text-gray-400 text-[10px] italic">
+                          Hoàn tất công đoạn thu hoạch từ nông trại và khai báo hồ sơ điện tử lên hệ thống truy xuất.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MỐC 2: KIỂM ĐỊNH CHẤT LƯỢNG KCS */}
+                  <div className="relative group">
+                    <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-teal-500 border-2 border-white shadow-xs flex items-center justify-center text-white">
+                      <ShieldCheck size={12} />
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs hover:border-teal-300 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                          <span>Kiểm Định Chất Lượng KCS & An Toàn Vệ Sinh</span>
+                          <span className="bg-teal-50 text-teal-700 text-[10px] px-1.5 py-0.2 rounded border border-teal-200 font-semibold">
+                            ISO/IEC 17025
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-mono font-medium">
+                          {selectedLotForTimeline.harvestDate}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-gray-600 text-[11px]">
+                        Kiểm tra các chỉ tiêu dư lượng thuốc BVTV, hàm lượng Nitrat và vi sinh vật gây hại. Toàn bộ đạt ngưỡng an toàn cho phép lưu thông thực phẩm.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MỐC 3: ADMIN THẨM ĐỊNH & PHÊ DUYỆT XUẤT KHO */}
+                  <div className="relative group">
+                    <div className={`absolute -left-6 top-1 w-5 h-5 rounded-full border-2 border-white shadow-xs flex items-center justify-center text-white ${
+                      selectedLotForTimeline.status === "Đã duyệt xuất kho" ? "bg-emerald-600" : "bg-amber-500"
+                    }`}>
+                      <FileCheck size={12} />
+                    </div>
+                    <div className={`border rounded-xl p-3.5 shadow-2xs transition-all ${
+                      selectedLotForTimeline.status === "Đã duyệt xuất kho"
+                        ? "bg-emerald-50/50 border-emerald-200"
+                        : "bg-amber-50/50 border-amber-200"
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                          <span>Admin Thẩm Định & Phê Duyệt Xuất Kho</span>
+                          {selectedLotForTimeline.status === "Đã duyệt xuất kho" ? (
+                            <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-300 flex items-center gap-1">
+                              <Check size={10} /> ĐÃ DUYỆT XUẤT KHO
+                            </span>
+                          ) : (
+                            <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded font-bold border border-amber-300 flex items-center gap-1">
+                              <Clock size={10} /> CHỜ ADMIN DUYỆT
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-gray-500 font-mono">
+                          {selectedLotForTimeline.harvestDate}
+                        </span>
+                      </div>
+
+                      <div className="mt-1.5 text-gray-700 text-[11px] leading-relaxed">
+                        {selectedLotForTimeline.status === "Đã duyệt xuất kho" ? (
+                          <span>
+                            ✅ Hồ sơ kiểm định và tiêu chuẩn sản phẩm đã được Ban Quản Lý / Admin thẩm định hợp lệ.{" "}
+                            <strong>Cho phép xuất kho và phân phối ra thị trường.</strong>
+                          </span>
+                        ) : (
+                          <span>
+                            ⏳ Hồ sơ lô đang trong danh sách chờ Admin xét duyệt kiểm tra hồ sơ trước khi cấp phép xuất kho nông sản.
+                          </span>
+                        )}
+                      </div>
+
+                      {/* THÔNG TIN THẨM ĐỊNH PHÍA ADMIN (NÔNG DÂN KHÔNG TỰ DUYỆT) */}
+                      <div className="mt-3 pt-2.5 border-t border-gray-200/80">
+                        {selectedLotForTimeline.status === "Chờ duyệt xuất kho" ? (
+                          <div className="bg-amber-100/70 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-900 space-y-2">
+                            <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                              <Clock size={13} className="text-amber-600" />
+                              Hồ sơ đang chờ Ban Quản Trị / Admin xét duyệt
+                            </div>
+                            <p className="text-[10px] text-amber-800/90 leading-relaxed">
+                              Theo quy trình phân quyền hệ thống, chỉ <strong>Ban Quản Trị / Admin</strong> mới có quyền thẩm định hồ sơ KCS và phê duyệt cấp lệnh xuất kho. Nông dân không thể tự phê duyệt lệnh xuất kho cho chính mình.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  toast.info(`Đã gửi thông báo nhắc Admin ưu tiên thẩm định lô ${selectedLotForTimeline.code}!`);
+                                }}
+                                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                              >
+                                <Mail size={11} /> Gửi Lời Nhắc Đến Admin
+                              </button>
+                              <span className="text-[10px] text-amber-700 italic">
+                                (Yêu cầu sẽ hiển thị tại mục "Duyệt Lô Xuất Kho" của Admin)
+                              </span>
+                            </div>
+                          </div>
+                        ) : selectedLotForTimeline.status === "Từ chối xuất kho" ? (
+                          <div className="bg-rose-100/70 border border-rose-200 rounded-lg p-3 text-[11px] text-rose-900">
+                            <div className="font-bold flex items-center gap-1.5 text-rose-800">
+                              <X size={13} className="text-rose-600" />
+                              Lô hàng đã bị Admin từ chối xuất kho
+                            </div>
+                            <p className="text-[10px] text-rose-800/90 mt-1 leading-relaxed">
+                              Lô hàng chưa đáp ứng đầy đủ điều kiện an toàn thực phẩm hoặc chứng chỉ VietGAP/GlobalGAP hết hạn. Vui lòng liên hệ Admin để bổ sung kiểm định.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-100/70 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-900">
+                            <div className="font-bold flex items-center gap-1.5 text-emerald-800">
+                              <CheckCircle2 size={13} className="text-emerald-600" />
+                              Đã có lệnh phê duyệt xuất kho từ Admin
+                            </div>
+                            <p className="text-[10px] text-emerald-800/90 mt-1 leading-relaxed">
+                              Hồ sơ lô đã được xác nhận đủ điều kiện an toàn thực phẩm. Nông dân được phép xuất hàng và điều phối xe lạnh vận chuyển đến kho đích.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MỐC 4: QUẢN LÝ LƯU KHO & VẬN CHUYỂN CHUỖI LẠNH */}
+                  <div className="relative group">
+                    <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-xs flex items-center justify-center text-white">
+                      <Truck size={12} />
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs hover:border-blue-300 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                          <span>Quản Lý Lưu Kho & Vận Chuyển Chuỗi Lạnh</span>
+                          <span className="bg-blue-50 text-blue-700 text-[10px] px-1.5 py-0.2 rounded border border-blue-200 font-semibold">
+                            Logistics
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-gray-500 font-mono">
+                          {selectedLotForTimeline.harvestDate}
+                        </span>
+                      </div>
+
+                      <div className="mt-1.5 text-gray-600 text-[11px] space-y-0.5">
+                        <div>
+                          • <strong>Hiện trạng:</strong> {selectedLotForTimeline.transportStatus || "Lưu tại vườn (Chưa chuyển)"}
+                        </div>
+                        <div>
+                          • <strong>Kho đích / Điểm giao:</strong> {selectedLotForTimeline.transportDestination || "Kho phân phối"}
+                        </div>
+                      </div>
+
+                      {/* Cảnh Báo Khi Chưa Được Phê Duyệt Xuất Kho */}
+                      {selectedLotForTimeline.status !== "Đã duyệt xuất kho" ? (
+                        <div className="mt-3 pt-2.5 border-t border-gray-100">
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start gap-2">
+                            <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">Lô hàng đang khóa xuất kho (Chờ Admin phê duyệt):</span>
+                              <p className="text-[10px] text-amber-800 mt-0.5">
+                                Theo quy chuẩn kiểm soát nguồn gốc, lô hàng bắt buộc phải được <strong>Ban Quản Trị / Admin</strong> duyệt đạt chuẩn an toàn trước khi kích hoạt lệnh điều phối xe lạnh xuất kho.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-3 pt-2.5 border-t border-gray-100 space-y-3">
+                          {/* Trạng thái liên thông vận chuyển */}
+                          {selectedLotForTimeline.transportStatus === "Chưa vận chuyển" || !selectedLotForTimeline.transportStatus ? (
+                            <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between text-blue-900 font-bold text-[11px]">
+                                <span className="flex items-center gap-1.5"><Truck size={13} className="text-blue-700" /> Bước tiếp theo: Tài xế nhận hàng</span>
+                                <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full border border-amber-300">Chờ quét QR tại vườn</span>
+                              </div>
+                              <p className="text-[10px] text-blue-800 leading-relaxed">
+                                Lô hàng đã đủ điều kiện xuất kho. Khi tài xế xe lạnh đến vườn và quét mã QR của lô nông sản, trạng thái sẽ tự động chuyển sang <strong>Đang vận chuyển</strong>.
+                              </p>
+                              <button
+                                type="button"
+                                disabled={isUpdatingLotStatus}
+                                onClick={() => handleDriverPickup(selectedLotForTimeline.code)}
+                                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                {isUpdatingLotStatus ? <RefreshCw size={12} className="animate-spin" /> : <Truck size={12} />}
+                                🚚 Mô phỏng Tài xế quét QR nhận hàng (Bắt đầu vận chuyển)
+                              </button>
+                            </div>
+                          ) : selectedLotForTimeline.transportStatus === "Đang vận chuyển" ? (
+                            <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between text-purple-900 font-bold text-[11px]">
+                                <span className="flex items-center gap-1.5"><Truck size={13} className="text-purple-700 animate-pulse" /> Đang vận chuyển chuỗi lạnh</span>
+                                <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full border border-blue-300">Xe lạnh trên đường</span>
+                              </div>
+                              <p className="text-[10px] text-purple-800 leading-relaxed">
+                                Hàng đang được bảo quản lạnh trên lộ trình đến <strong>{selectedLotForTimeline.transportDestination || "Kho phân phối"}</strong>. Khi xe đến kho, thủ kho sẽ quét QR kiểm định để hoàn tất nhập kho đích.
+                              </p>
+                              <button
+                                type="button"
+                                disabled={isUpdatingLotStatus}
+                                onClick={() => handleWarehouseInbound(selectedLotForTimeline.code)}
+                                className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-[11px] flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                {isUpdatingLotStatus ? <RefreshCw size={12} className="animate-spin" /> : <Warehouse size={12} />}
+                                🏢 Mô phỏng Thủ kho quét QR nhập kho đích
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-1">
+                              <div className="font-bold text-[11px] flex items-center gap-1.5 text-emerald-800">
+                                <CheckCircle2 size={13} className="text-emerald-600" />
+                                Đã nhập kho đích thành công
+                              </div>
+                              <p className="text-[10px] text-emerald-800/90 leading-relaxed">
+                                Thủ kho đã xác nhận tiếp nhận và lưu kho lạnh an toàn tại <strong>{selectedLotForTimeline.transportDestination || "Kho phân phối"}</strong>. Vòng đời lô thu hoạch đã hoàn tất thành công.
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="text-[11px] font-bold text-gray-700 pt-1">Hoặc tùy chỉnh trạng thái thủ công:</div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditTransportStatus("Chưa vận chuyển")}
+                              className={`px-2 py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-colors text-center ${
+                                editTransportStatus === "Chưa vận chuyển"
+                                  ? "bg-amber-100 border-amber-300 text-amber-900"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                              }`}
+                            >
+                              🏡 Lưu kho vườn
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditTransportStatus("Đang vận chuyển")}
+                              className={`px-2 py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-colors text-center ${
+                                editTransportStatus === "Đang vận chuyển"
+                                  ? "bg-blue-100 border-blue-300 text-blue-900"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                              }`}
+                            >
+                              🚚 Đang vận chuyển
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditTransportStatus("Đã nhập kho đích")}
+                              className={`px-2 py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-colors text-center ${
+                                editTransportStatus === "Đã nhập kho đích"
+                                  ? "bg-emerald-100 border-emerald-300 text-emerald-900"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                              }`}
+                            >
+                              🏢 Đã nhập kho đích
+                            </button>
+                          </div>
+                          <div className="flex gap-2 items-center pt-1">
+                            <input
+                              type="text"
+                              value={editTransportDest}
+                              onChange={(e) => setEditTransportDest(e.target.value)}
+                              placeholder="Nhập địa điểm giao hàng / kho đến (VD: Kho Tổng Logistics TP.HCM)"
+                              className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:border-emerald-600 text-gray-800"
+                            />
+                            <button
+                              type="button"
+                              disabled={isUpdatingLotStatus}
+                              onClick={handleUpdateLotTransport}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                            >
+                              {isUpdatingLotStatus ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}
+                              Lưu
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CÁC SỰ KIỆN HẬU CẦN SAU THU HOẠCH TÙY BIẾN (Đóng gói, dán tem, bàn giao, giao hàng...) */}
+                  {lotTimelineEvents
+                    .filter((ev) => {
+                      const s = (ev.stage || "").toLowerCase();
+                      // Loại bỏ các mốc mặc định đã hiển thị ở trên
+                      if (
+                        ev.stage.includes("Thu hoạch") ||
+                        ev.stage.includes("Kiểm định") ||
+                        ev.stage.includes("phê duyệt") ||
+                        ev.stage.includes("Lưu kho & Vận chuyển") ||
+                        ev.stage.includes("Gieo trồng")
+                      ) {
+                        return false;
+                      }
+                      // Lọc bỏ hoàn toàn các hoạt động canh tác đồng ruộng trước thu hoạch (như bón phân, tưới nước)
+                      if (
+                        s.includes("bón phân") ||
+                        s.includes("tưới") ||
+                        s.includes("làm đất") ||
+                        s.includes("phun thuốc") ||
+                        s.includes("chăm sóc") ||
+                        s.includes("cắt tỉa") ||
+                        s.includes("tỉa cành") ||
+                        s.includes("làm cỏ") ||
+                        s.includes("gieo hạt") ||
+                        s.includes("xử lý đất") ||
+                        s.includes("ủ phân")
+                      ) {
+                        return false;
+                      }
+                      return true;
+                    })
+                    .map((ev, idx) => (
+                      <div key={idx} className="relative group">
+                        <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-indigo-500 border-2 border-white shadow-xs flex items-center justify-center text-white">
+                          <CheckCircle2 size={11} />
+                        </div>
+                        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs hover:border-indigo-300 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                              {ev.stage}
+                              {ev.badge && (
+                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded border border-indigo-200 font-semibold">
+                                  {ev.badge}
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-mono">
+                              {ev.time}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-gray-600 text-[11px]">{ev.note}</p>
+                          {ev.operator && (
+                            <div className="mt-1 text-[10px] text-gray-400">
+                              Người thực hiện: <span className="font-semibold text-gray-600">{ev.operator}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* KHU VỰC THÊM SỰ KIỆN SAU THU HOẠCH TÙY CHỌN */}
+              <div className="pt-2 border-t border-gray-100">
+                {!isAddingCustomEvent ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCustomEvent(true)}
+                    className="w-full py-2 border border-dashed border-gray-300 hover:border-emerald-500 text-gray-600 hover:text-emerald-700 font-bold rounded-xl text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Plus size={13} /> Ghi Thêm Sự Kiện Vòng Đời Lô Mới
+                  </button>
+                ) : (
+                  <form onSubmit={handleAddCustomTimelineEvent} className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-800 text-xs flex items-center gap-1">
+                        <Plus size={13} className="text-emerald-600" />
+                        Ghi Nhận Sự Kiện Sau Thu Hoạch
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingCustomEvent(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-gray-600 font-bold text-[10px] mb-1">
+                          Tên sự kiện / Giai đoạn:
+                        </label>
+                        <select
+                          value={customEventStage}
+                          onChange={(e) => setCustomEventStage(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                        >
+                          <option value="Đóng gói & Dán tem QR">Đóng gói & Dán tem QR</option>
+                          <option value="Tái kiểm định KCS đột xuất">Tái kiểm định KCS đột xuất</option>
+                          <option value="Kiểm tra nhiệt độ container">Kiểm tra nhiệt độ container</option>
+                          <option value="Bàn giao đơn vị vận tải">Bàn giao đơn vị vận tải</option>
+                          <option value="Giao hàng đến siêu thị / Đối tác">Giao hàng đến siêu thị / Đối tác</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 font-bold text-[10px] mb-1">
+                          Người / Đơn vị thực hiện:
+                        </label>
+                        <input
+                          type="text"
+                          value={customEventOperator}
+                          onChange={(e) => setCustomEventOperator(e.target.value)}
+                          placeholder="VD: Nguyễn Văn A (Tổ trưởng đóng gói)"
+                          className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-600 font-bold text-[10px] mb-1">
+                        Chi tiết ghi chú:
+                      </label>
+                      <input
+                        type="text"
+                        value={customEventNote}
+                        onChange={(e) => setCustomEventNote(e.target.value)}
+                        placeholder="VD: Đóng thùng carton 10kg có màng vi lỗ, kiểm soát nhiệt độ 4.5°C"
+                        className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingCustomEvent(false)}
+                        className="px-3 py-1 bg-gray-200 text-gray-700 font-semibold rounded-lg text-[11px] cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingCustomEvent}
+                        className="px-3 py-1 bg-[#1a7a3a] text-white font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSubmittingCustomEvent ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}
+                        Lưu Sự Kiện
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/traceability?batch=${selectedLotForTimeline.code}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1a7a3a] hover:underline"
+                >
+                  <QrCode size={14} /> Tra cứu trang QR công khai của lô
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenPrintLabel(selectedLotForTimeline);
+                  }}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                >
+                  <Printer size={13} /> In Tem QR Chuẩn GS1
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLotTimelineModalOpen(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1943,10 +4385,10 @@ export default function FarmerPortalPage() {
                 </label>
                 <select
                   value={formFarmCode}
-                  onChange={(e) => setFormFarmCode(e.target.value)}
+                  onChange={(e) => handleBatchFarmChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-bold text-gray-800"
                 >
-                  {farms.map((f) => (
+                  {visibleFarms.map((f) => (
                     <option key={f.id} value={f.code}>
                       🏡 {f.name} ({f.code}) - {f.province}
                     </option>
@@ -1963,14 +4405,14 @@ export default function FarmerPortalPage() {
                     onChange={(e) => handleProductSelect(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-medium"
                   >
-                    {products
+                    {visibleProducts
                       .filter((p) => !p.farmCode || p.farmCode === formFarmCode)
                       .map((p) => (
                         <option key={p.id} value={p.name}>
                           {p.name}
                         </option>
                       ))}
-                    {products.filter((p) => !p.farmCode || p.farmCode === formFarmCode).length === 0 && (
+                    {visibleProducts.filter((p) => !p.farmCode || p.farmCode === formFarmCode).length === 0 && (
                       <option value="Nông sản sạch">Nông sản sạch của nông trại</option>
                     )}
                   </select>
@@ -2039,9 +4481,8 @@ export default function FarmerPortalPage() {
                       className="w-24 px-2 py-2 border border-gray-300 rounded-xl bg-white"
                     >
                       <option value="kg">kg</option>
-                      <option value="tạ">tạ</option>
+                      <option value="g">g</option>
                       <option value="tấn">tấn</option>
-                      <option value="hộp">hộp</option>
                     </select>
                   </div>
                 </div>
@@ -2120,9 +4561,10 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-sm"
+                  disabled={isSubmittingBatch}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-sm"
                 >
-                  <CheckCircle2 size={16} /> Lưu & Cấp Mã QR
+                  <CheckCircle2 size={16} /> {isSubmittingBatch ? "Đang lưu..." : "Lưu & Cấp Mã QR"}
                 </button>
               </div>
             </form>
@@ -2157,7 +4599,7 @@ export default function FarmerPortalPage() {
                   onChange={(e) => {
                     const nextFarm = e.target.value;
                     setSelectedFarmForLog(nextFarm);
-                    const matching = batches.filter((b) => b.farmCode === nextFarm);
+                    const matching = visibleBatches.filter((b) => b.farmCode === nextFarm);
                     if (matching.length > 0) {
                       setSelectedBatchForLog(matching[0].code);
                     } else {
@@ -2166,7 +4608,7 @@ export default function FarmerPortalPage() {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-bold text-gray-800"
                 >
-                  {farms.map((f) => (
+                  {visibleFarms.map((f) => (
                     <option key={f.id} value={f.code}>
                       🏡 {f.name} ({f.code}) - {f.province}
                     </option>
@@ -2186,14 +4628,14 @@ export default function FarmerPortalPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-mono font-bold text-emerald-800"
                     required
                   >
-                    {batches
+                    {visibleBatches
                       .filter((b) => b.farmCode === selectedFarmForLog)
                       .map((b) => (
                         <option key={b.code} value={b.code}>
                           Lô {b.code} ({b.product})
                         </option>
                       ))}
-                    {batches.filter((b) => b.farmCode === selectedFarmForLog).length === 0 && (
+                    {visibleBatches.filter((b) => b.farmCode === selectedFarmForLog).length === 0 && (
                       <option value="">Chưa có lô cho nông trại này</option>
                     )}
                   </select>
@@ -2259,6 +4701,67 @@ export default function FarmerPortalPage() {
                 />
               </div>
 
+              {/* 8. Ảnh minh chứng thực tế */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">
+                  8. Ảnh minh chứng canh tác thực tế (Tùy chọn)
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-3.5 text-center hover:border-emerald-500 transition-colors bg-gray-50/50">
+                  {logProofImage ? (
+                    <div className="space-y-2">
+                      <div className="relative inline-block max-h-36 overflow-hidden rounded-lg border border-gray-200 shadow-xs">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={logProofImage}
+                          alt="Ảnh minh chứng"
+                          className="max-h-32 object-contain mx-auto"
+                        />
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-xs text-gray-600 font-medium truncate max-w-xs">
+                          📎 {logProofFileName || "Ảnh minh chứng canh tác"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLogProofImage("");
+                            setLogProofFileName("");
+                          }}
+                          className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-semibold text-[11px] cursor-pointer"
+                        >
+                          Xóa &amp; Chọn lại
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="mx-auto text-gray-400 mb-1" size={22} />
+                      <p className="text-gray-700 font-semibold text-xs mb-0.5">
+                        Tải ảnh chụp thực tế tại vườn / công việc canh tác
+                      </p>
+                      <p className="text-[11px] text-gray-400 mb-2">
+                        Hỗ trợ ảnh JPG, PNG, WEBP (tối đa 5MB)
+                      </p>
+                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold rounded-xl cursor-pointer text-xs">
+                        <Upload size={13} /> Chọn ảnh từ thiết bị
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {!selectedBatchForLog && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium">
+                  ⚠️ Nông trại đang chọn chưa có lô thu hoạch. Hãy tạo lô ở Tab Quản Lý Lô Thu Hoạch trước khi ghi nhật ký.
+                </div>
+              )}
+
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -2269,9 +4772,10 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  disabled={!selectedBatchForLog || isSubmittingLog}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <Save size={15} /> Lưu Nhật Ký
+                  <Save size={15} /> {isSubmittingLog ? "Đang lưu..." : "Lưu Nhật Ký"}
                 </button>
               </div>
             </form>
@@ -2306,7 +4810,7 @@ export default function FarmerPortalPage() {
                   onChange={(e) => setNewProdFarmCode(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-bold text-gray-800"
                 >
-                  {farms.map((f) => (
+                  {visibleFarms.map((f) => (
                     <option key={f.id} value={f.code}>
                       🏡 {f.name} ({f.code}) - {f.province}
                     </option>
@@ -2330,31 +4834,34 @@ export default function FarmerPortalPage() {
               <div>
                 <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Upload size={13} className="text-emerald-700" /> 3. Hình ảnh nông sản (Tải ảnh hoặc Chọn biểu tượng)
+                    <Upload size={13} className="text-emerald-700" /> 3. Hình ảnh nông sản <span className="text-rose-500">*</span>
                   </span>
-                  {newProdImage && newProdImage.startsWith("data:") && (
+                  {newProdImage && (
                     <button
                       type="button"
-                      onClick={() => setNewProdImage("🌱")}
+                      onClick={() => setNewProdImage("")}
                       className="text-[11px] text-rose-600 hover:underline cursor-pointer"
                     >
-                      Gỡ ảnh chụp
+                      Xóa ảnh
                     </button>
                   )}
                 </label>
 
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                  <div className="w-16 h-16 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-3xl overflow-hidden shrink-0 shadow-xs">
-                    {newProdImage && (newProdImage.startsWith("data:") || newProdImage.startsWith("http") || newProdImage.startsWith("/")) ? (
+                <div className="flex items-center gap-4 p-3.5 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
+                  <div className="w-20 h-20 rounded-xl bg-white border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                    {newProdImage ? (
                       <img src={newProdImage} alt="Xem trước" className="w-full h-full object-cover" />
                     ) : (
-                      <span>{newProdImage || "🌱"}</span>
+                      <div className="text-center p-2">
+                        <Upload className="mx-auto text-gray-300 mb-1" size={22} />
+                        <span className="text-[10px] text-gray-400 block leading-tight">Chưa có ảnh</span>
+                      </div>
                     )}
                   </div>
 
                   <div className="flex-1 space-y-1.5">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg cursor-pointer shadow-xs transition-colors">
-                      <Upload size={13} /> Chọn ảnh từ máy tính / điện thoại
+                    <label className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors">
+                      <Upload size={14} /> Tải ảnh từ máy tính / điện thoại
                       <input
                         type="file"
                         accept="image/*"
@@ -2362,23 +4869,9 @@ export default function FarmerPortalPage() {
                         className="hidden"
                       />
                     </label>
-                    <p className="text-[10px] text-gray-400">
-                      Hỗ trợ JPG, PNG, WebP (Tối đa 5MB) hoặc chọn nhanh biểu tượng:
+                    <p className="text-[11px] text-gray-500">
+                      Tải ảnh chụp sản phẩm thực tế (Hỗ trợ định dạng JPG, PNG, WebP tối đa 5MB)
                     </p>
-                    <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                      {["🥭", "🍓", "👑", "🐉", "🥑", "🍇", "🥬", "🍊", "🍎", "🌽", "🥕", "🌱"].map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => setNewProdImage(emoji)}
-                          className={`w-6 h-6 rounded-md text-xs flex items-center justify-center cursor-pointer transition-transform hover:scale-110 ${
-                            newProdImage === emoji ? "bg-emerald-200 border-2 border-emerald-600 scale-105" : "bg-white border border-gray-200"
-                          }`}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2391,9 +4884,11 @@ export default function FarmerPortalPage() {
                     onChange={(e) => setNewProdCategory(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white"
                   >
-                    <option value="Trái Cây Đặc Sản">Trái Cây Đặc Sản</option>
-                    <option value="Trái Cây Cao Cấp">Trái Cây Cao Cấp</option>
-                    <option value="Rau Củ Hữu Cơ">Rau Củ Hữu Cơ</option>
+                    {PRODUCT_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -2443,15 +4938,345 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  disabled={isSubmittingProduct}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <Save size={15} /> Lưu Sản Phẩm
+                  <Save size={15} /> {isSubmittingProduct ? "Đang lưu..." : "Lưu Sản Phẩm"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: THÊM CHỨNG NHẬN CHẤT LƯỢNG MỚI */}
+      {/* ========================================================================= */}
+      {isCertModalOpen && (
+        <div onClick={() => setIsCertModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Award size={18} className="text-emerald-400" />
+                <h3 className="text-sm font-bold">Thêm Chứng Nhận Chất Lượng Mới</h3>
+              </div>
+              <button onClick={() => setIsCertModalOpen(false)} className="text-emerald-300 hover:text-white cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCert} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">1. Nông Trại Được Cấp Chứng Nhận *</label>
+                <select
+                  value={newCertFarmCode}
+                  onChange={(e) => setNewCertFarmCode(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-bold text-gray-800"
+                >
+                  {visibleFarms.map((f) => (
+                    <option key={f.id} value={f.code}>
+                      🏡 {f.name} ({f.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">2. Tên Chứng Nhận *</label>
+                <input
+                  type="text"
+                  value={newCertName}
+                  onChange={(e) => setNewCertName(e.target.value)}
+                  placeholder="VD: Chứng nhận GlobalGAP, VietGAP Trồng trọt..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">3. Số Hiệu Chứng Chỉ *</label>
+                <input
+                  type="text"
+                  value={newCertNumber}
+                  onChange={(e) => setNewCertNumber(e.target.value)}
+                  placeholder="VD: VG-88-2026-VN"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono font-bold uppercase text-emerald-800"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">4. Đơn Vị Cấp *</label>
+                <input
+                  type="text"
+                  value={newCertIssuedBy}
+                  onChange={(e) => setNewCertIssuedBy(e.target.value)}
+                  placeholder="VD: Chi cục Quản lý Chất lượng Nông Lâm Sản..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Ngày cấp *</label>
+                  <input
+                    type="date"
+                    value={newCertIssueDate}
+                    onChange={(e) => setNewCertIssueDate(e.target.value)}
+                    className="w-full px-2.5 py-2 border border-gray-300 rounded-xl"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Ngày hết hạn *</label>
+                  <input
+                    type="date"
+                    value={newCertExpiryDate}
+                    onChange={(e) => setNewCertExpiryDate(e.target.value)}
+                    className="w-full px-2.5 py-2 border border-gray-300 rounded-xl text-rose-600 font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCertModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-xl cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Save size={15} /> Lưu Chứng Nhận
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL GIA HẠN CHỨNG NHẬN - CHUẨN THEO MẪU BẠN GỬI */}
+      {isRenewModalOpen && renewingCert && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100 max-h-[92vh] flex flex-col p-6 animate-fade-in">
+            {/* Header: Gia hạn chứng nhận +1 năm */}
+            <div className="flex items-start justify-between pb-3.5 border-b border-gray-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-gray-900">Gia hạn chứng nhận</h3>
+                  <span className="bg-emerald-50 text-emerald-600 font-bold text-xs px-2 py-0.5 rounded-md">
+                    +{renewDuration === "0.5" ? "6 tháng" : `${renewDuration} năm`}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Vui lòng kiểm tra thông tin chứng nhận trước khi thực hiện gia hạn.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRenewModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form body with scroll */}
+            <form onSubmit={handleSubmitRenewal} className="py-2 space-y-4 text-xs overflow-y-auto flex-1 pr-1">
+              {/* Section 1: Thông tin chứng nhận hiện tại */}
+              <div className="space-y-2 pb-3 border-b border-gray-100">
+                <h4 className="text-xs font-bold text-gray-900 mb-2">Thông tin chứng nhận hiện tại</h4>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Tên chứng nhận</span>
+                  <span className="font-bold text-gray-900">{renewingCert.name}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Số hiệu hiện tại</span>
+                  <span className="font-bold text-gray-900">{renewingCert.certNumber}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Ngày cấp</span>
+                  <span className="font-bold text-gray-900">{renewingCert.issueDate}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Ngày hết hạn</span>
+                  <span className="font-bold text-rose-500">{renewingCert.expiryDate}</span>
+                </div>
+              </div>
+
+              {/* Section 2: Thông tin gia hạn */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-gray-900">Thông tin gia hạn</h4>
+
+                {/* Thời gian gia hạn */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">Thời gian gia hạn</label>
+                  <select
+                    value={renewDuration}
+                    onChange={(e) => {
+                      const newDur = e.target.value;
+                      setRenewDuration(newDur);
+                      setRenewRequestedExpiryDate(calculateRenewExpiry(renewStartDate, newDur));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white font-medium text-gray-800 focus:outline-emerald-600 cursor-pointer"
+                  >
+                    <option value="1">1 năm</option>
+                    <option value="2">2 năm</option>
+                    <option value="3">3 năm</option>
+                    <option value="0.5">6 tháng</option>
+                  </select>
+                </div>
+
+                {/* Ngày bắt đầu hiệu lực mới (dự kiến) */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">
+                    Ngày bắt đầu hiệu lực mới (dự kiến)
+                  </label>
+                  <input
+                    type="date"
+                    value={renewStartDate}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setRenewStartDate(newStart);
+                      setRenewRequestedExpiryDate(calculateRenewExpiry(newStart, renewDuration));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600"
+                    required
+                  />
+                </div>
+
+                {/* Ngày hết hạn mới (dự kiến) */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-0.5">
+                    Ngày hết hạn mới (dự kiến)
+                  </label>
+                  <div className="text-emerald-700 font-bold text-sm tracking-wide">
+                    {renewRequestedExpiryDate}
+                  </div>
+                </div>
+
+                {/* Mã chứng nhận mới (nếu có) */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">
+                    Mã chứng nhận mới (nếu có)
+                  </label>
+                  <input
+                    type="text"
+                    value={renewNewCertNumber}
+                    onChange={(e) => setRenewNewCertNumber(e.target.value)}
+                    placeholder="Để trống nếu giữ mã cũ"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600 placeholder:text-gray-400 font-mono"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Không tự tạo mã mới. Chỉ nhập khi tổ chức chứng nhận cấp mã khác.
+                  </p>
+                </div>
+
+                {/* Đơn vị thực hiện gia hạn */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">
+                    Đơn vị thực hiện gia hạn
+                  </label>
+                  <input
+                    type="text"
+                    value={renewIssuedBy}
+                    onChange={(e) => setRenewIssuedBy(e.target.value)}
+                    placeholder="VD: Tổ chức Chứng nhận Quốc tế Control Union"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600 placeholder:text-gray-400"
+                  />
+                </div>
+
+                {/* Ghi chú */}
+                <div>
+                  <label className="block text-gray-600 font-medium mb-1">Ghi chú</label>
+                  <textarea
+                    value={renewNote}
+                    onChange={(e) => setRenewNote(e.target.value)}
+                    placeholder="Nhập ghi chú về quá trình gia hạn..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-emerald-600 placeholder:text-gray-400 resize-none"
+                  />
+                </div>
+
+                {/* Section 3: Tài liệu chứng minh gia hạn */}
+                <div className="border border-gray-200 rounded-2xl p-3.5 bg-white space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-gray-900 text-xs">
+                    <span className="text-gray-600">📎</span> Tài liệu chứng minh gia hạn
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Tải lên giấy chứng nhận mới hoặc biên bản đánh giá (PDF, JPG, PNG).
+                  </p>
+
+                  {renewProofImage ? (
+                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={renewProofImage} alt="Chứng từ" className="w-10 h-10 object-cover rounded-lg border border-emerald-300" />
+                        <span className="text-xs text-emerald-950 font-medium truncate max-w-xs">
+                          {renewProofFileName || "Tài liệu gia hạn đính kèm"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenewProofImage("");
+                          setRenewProofFileName("");
+                        }}
+                        className="text-xs text-rose-600 font-bold hover:underline shrink-0 ml-2 cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-full py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:text-emerald-700 hover:border-emerald-300 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer bg-white transition-all shadow-2xs hover:bg-gray-50">
+                      <span>⭡</span> Tải tài liệu lên
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleRenewImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsRenewModalOpen(false)}
+                    className="flex-1 py-2.5 rounded-full border border-gray-200 text-gray-700 font-bold text-xs hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingRenewal}
+                    className="flex-1 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>✓</span> Xác nhận gia hạn
+                  </button>
+                </div>
+                <p className="text-center text-[10px] text-gray-400 mt-2.5">
+                  Minh họa bố cục Modal, chưa phải biểu mẫu gia hạn pháp lý.
+                </p>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL IN TEM NHÃN MÃ QR LÔ HÀNG CHUẨN GS1 */}
+      <QrLabelModal
+        isOpen={isPrintLabelModalOpen}
+        onClose={() => setIsPrintLabelModalOpen(false)}
+        lot={selectedLotForPrint}
+      />
     </div>
   );
 }

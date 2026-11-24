@@ -7,6 +7,12 @@ public final class ShipmentValidation {
     public static final String MAX_TEMPERATURE_C = "40.0";
     public static final String MIN_HUMIDITY_PERCENT = "0.0";
     public static final String MAX_HUMIDITY_PERCENT = "100.0";
+    public static final String MIN_LATITUDE = "-90.0";
+    public static final String MAX_LATITUDE = "90.0";
+    public static final String MIN_LONGITUDE = "-180.0";
+    public static final String MAX_LONGITUDE = "180.0";
+    public static final String MIN_GPS_ACCURACY_METERS = "0.0";
+    public static final String MAX_GPS_ACCURACY_METERS = "100000.0";
 
     private ShipmentValidation() { }
 }

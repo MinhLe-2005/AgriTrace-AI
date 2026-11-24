@@ -138,6 +138,78 @@ export const catalogService = {
     return res.data;
   },
 
+  async getUsedVouchers(email?: string): Promise<string[]> {
+    const cleanEmail = (email || "").trim().toLowerCase();
+    const localSet = new Set<string>();
+    if (typeof window !== "undefined" && cleanEmail) {
+      try {
+        const raw = localStorage.getItem(`agritrace_used_vouchers_${cleanEmail}`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as string[];
+          if (Array.isArray(parsed)) {
+            parsed.forEach((c) => localSet.add(c.trim().toUpperCase()));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (!cleanEmail) return Array.from(localSet);
+    try {
+      const res = await api.get<string[]>("/vouchers/used", { params: { email: cleanEmail } });
+      if (Array.isArray(res.data)) {
+        res.data.forEach((c) => localSet.add(c.trim().toUpperCase()));
+      }
+    } catch {
+      // fallback to localSet if endpoint not reachable
+    }
+    return Array.from(localSet);
+  },
+
+  markVoucherUsedLocal(email?: string, voucherString?: string) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+    if (typeof window === "undefined" || !cleanEmail || !voucherString) return;
+    try {
+      const key = `agritrace_used_vouchers_${cleanEmail}`;
+      const existing = JSON.parse(localStorage.getItem(key) || "[]") as string[];
+      const set = new Set<string>(Array.isArray(existing) ? existing : []);
+      voucherString
+        .toUpperCase()
+        .split(/[+,;]/)
+        .forEach((part) => {
+          let token = part.trim();
+          const pIdx = token.indexOf("(");
+          if (pIdx > 0) token = token.substring(0, pIdx).trim();
+          if (token.length >= 3) set.add(token);
+        });
+      localStorage.setItem(key, JSON.stringify(Array.from(set)));
+    } catch {
+      // ignore
+    }
+  },
+
+  unmarkVoucherUsedLocal(email?: string, voucherString?: string) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+    if (typeof window === "undefined" || !cleanEmail || !voucherString) return;
+    try {
+      const key = `agritrace_used_vouchers_${cleanEmail}`;
+      const existing = JSON.parse(localStorage.getItem(key) || "[]") as string[];
+      const set = new Set<string>(Array.isArray(existing) ? existing : []);
+      voucherString
+        .toUpperCase()
+        .split(/[+,;]/)
+        .forEach((part) => {
+          let token = part.trim();
+          const pIdx = token.indexOf("(");
+          if (pIdx > 0) token = token.substring(0, pIdx).trim();
+          if (token.length >= 3) set.delete(token);
+        });
+      localStorage.setItem(key, JSON.stringify(Array.from(set)));
+    } catch {
+      // ignore
+    }
+  },
+
   async validateVoucher(params: { code: string; subtotal?: number; email?: string }): Promise<{
     valid: boolean;
     code: string;

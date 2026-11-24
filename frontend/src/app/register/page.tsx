@@ -31,7 +31,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Main Form Container */}
-        <div className="max-w-md mx-auto w-full my-auto animate-fade-in-up">
+        <div className="max-w-lg mx-auto w-full my-auto animate-fade-in-up">
           {/* Tabs: Đăng nhập / Đăng ký */}
           <div className="flex p-1 bg-gray-100/80 rounded-xl mb-6">
             <Link
@@ -45,12 +45,12 @@ export default function RegisterPage() {
             </span>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-5">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-              Tạo tài khoản mới
+              Tạo tài khoản & Chọn vai trò
             </h1>
             <p className="text-sm text-gray-500 mt-1.5">
-              Đăng ký để khám phá nông sản sạch và theo dõi nguồn gốc xuất xứ.
+              Chọn vai trò phù hợp trong chuỗi cung ứng nông sản sạch AgriTrace AI.
             </p>
           </div>
 
@@ -60,7 +60,7 @@ export default function RegisterPage() {
               i
             </span>
             <p className="leading-relaxed">
-              Tài khoản mới mặc định là <strong className="font-semibold text-emerald-950">Khách hàng</strong>. Ban quản trị sẽ nâng quyền nếu bạn là Nông dân, Nhân viên kho hoặc Nhà phân phối.
+              Tài khoản <strong className="font-semibold text-emerald-950">Khách hàng</strong> được kích hoạt mua sắm ngay. Với vị trí <strong className="font-semibold text-emerald-950">Nông dân, Thủ kho, Nhà phân phối</strong>, vui lòng điền kèm <strong>Hồ sơ năng lực</strong> bên dưới — tài khoản chỉ được vào vị trí công việc sau khi <strong>Ban Quản Trị phê duyệt</strong>.
             </p>
           </div>
 

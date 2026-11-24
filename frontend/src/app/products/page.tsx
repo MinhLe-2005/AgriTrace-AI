@@ -67,6 +67,53 @@ function normalizeCategoryCode(code?: string | null): string {
   return code.toLowerCase().trim();
 }
 
+function normalizeVi(text?: string | null): string {
+  if (!text) return "";
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+function matchesProductQuery(p: ApiProduct, rawQuery: string): boolean {
+  const q = normalizeVi(rawQuery);
+  if (!q) return false;
+  const pName = normalizeVi(p.name);
+  const pBatch = normalizeVi(p.batchCode).replace(/^lot-/, "");
+  const qBatch = q.replace(/^lot-/, "");
+  const pId = normalizeVi(p.id);
+
+  if (pId === q || pBatch === qBatch || pBatch.includes(qBatch) || pName.includes(q)) {
+    return true;
+  }
+  // Map common AI / traceability lot codes & keywords to products
+  if ((q.includes("dt-mc") || q.includes("lot-dt") || q.includes("dau tay") || q === "dau") && pName.includes("dau tay")) {
+    return true;
+  }
+  if ((q.includes("cs-bg") || q.includes("sp-cs") || q.includes("cam sanh") || q === "cam") && pName.includes("cam")) {
+    return true;
+  }
+  if ((q.includes("xl-2026") || q.includes("xa lach")) && pName.includes("xa lach")) {
+    return true;
+  }
+  if ((q.includes("kl-dl") || q.includes("sp-kl") || q.includes("kale") || q.includes("cai xoan")) && (pName.includes("kale") || pName.includes("cai xoan"))) {
+    return true;
+  }
+  if ((q.includes("cc-dl") || q.includes("sp-cc") || q.includes("ca chua")) && pName.includes("ca chua")) {
+    return true;
+  }
+  if ((q.includes("bo-bl") || q.includes("sp-bo") || q.includes("bo sap") || q.includes("bo 034")) && pName.includes("bo")) {
+    return true;
+  }
+  if ((q.includes("cr-dl") || q.includes("sp-cr") || q.includes("ca rot")) && pName.includes("ca rot")) {
+    return true;
+  }
+  return false;
+}
+
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,6 +122,7 @@ function ProductsContent() {
   const searchParam = searchParams.get("search") || "";
   const buyParam = searchParams.get("buy") || "";
   const detailParam = searchParams.get("detail") || searchParams.get("product") || searchParams.get("batch") || "";
+  const triggerParam = searchParams.get("t") || "";
 
   const { addItem } = useCartStore();
   const { user } = useAuthStore();
@@ -153,38 +201,6 @@ function ProductsContent() {
     loadData();
   }, [user?.email]);
 
-  // Handle direct buyParam or detailParam from AI / URL
-  useEffect(() => {
-    if (!products.length) return;
-
-    if (buyParam) {
-      const q = buyParam.toLowerCase().trim();
-      const matched = products.find(
-        (p) =>
-          p.batchCode?.toLowerCase() === q ||
-          p.id?.toLowerCase() === q ||
-          p.name.toLowerCase().includes(q)
-      );
-      if (matched) {
-        setQuickBuyProduct(matched);
-        setQuickBuyQty(1);
-        setSelectedProduct(null);
-      }
-    } else if (detailParam) {
-      const q = detailParam.toLowerCase().trim();
-      const matched = products.find(
-        (p) =>
-          p.batchCode?.toLowerCase() === q ||
-          p.id?.toLowerCase() === q ||
-          p.name.toLowerCase().includes(q)
-      );
-      if (matched) {
-        setSelectedProduct(matched);
-        setModalQty(1);
-      }
-    }
-  }, [products, buyParam, detailParam]);
-
   // Dynamically compute product prices based on active seasonal events
   const dynamicProducts = useMemo(() => {
     return products.map((p) => {
@@ -215,6 +231,30 @@ function ProductsContent() {
       };
     });
   }, [products, getProductDiscount, campaigns]);
+
+  // Handle direct buyParam or detailParam from AI / URL
+  useEffect(() => {
+    if (!dynamicProducts.length) return;
+
+    if (buyParam) {
+      const matched =
+        dynamicProducts.find((p) => matchesProductQuery(p, buyParam)) ||
+        (searchParam ? dynamicProducts.find((p) => matchesProductQuery(p, searchParam)) : undefined);
+      if (matched) {
+        setQuickBuyProduct(matched);
+        setQuickBuyQty(1);
+        setSelectedProduct(null);
+      }
+    } else if (detailParam) {
+      const matched =
+        dynamicProducts.find((p) => matchesProductQuery(p, detailParam)) ||
+        (searchParam ? dynamicProducts.find((p) => matchesProductQuery(p, searchParam)) : undefined);
+      if (matched) {
+        setSelectedProduct(matched);
+        setModalQty(1);
+      }
+    }
+  }, [dynamicProducts, buyParam, detailParam, searchParam, triggerParam]);
 
   // Compute product count per category
   const categoryCounts = useMemo(() => {
@@ -257,14 +297,14 @@ function ProductsContent() {
         (filterCategory === "daily" && (pCat.includes("rau") || pCat.includes("cu")));
       if (!matchCat) return false;
 
-      // 2. Search query
+      // 2. Search query (diacritic-insensitive)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
+        const qNorm = normalizeVi(q);
         const matchSearch =
-          p.name.toLowerCase().includes(q) ||
-          (p.farm && p.farm.toLowerCase().includes(q)) ||
-          (p.origin && p.origin.toLowerCase().includes(q)) ||
-          (p.batchCode && p.batchCode.toLowerCase().includes(q));
+          matchesProductQuery(p, q) ||
+          (p.farm && (p.farm.toLowerCase().includes(q) || normalizeVi(p.farm).includes(qNorm))) ||
+          (p.origin && (p.origin.toLowerCase().includes(q) || normalizeVi(p.origin).includes(qNorm)));
         if (!matchSearch) return false;
       }
 
@@ -628,7 +668,7 @@ function ProductsContent() {
         <div className="relative z-10 max-w-2xl space-y-3">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300">
             <Sparkles size={13} />
-            Dữ liệu trực tiếp từ Supabase Database
+            100% Nông Sản Thu Hoạch Trực Tiếp Từ Nông Trại
           </span>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
             Nông Sản Sạch Có Mã QR Nguồn Gốc
@@ -1086,7 +1126,7 @@ function ProductsContent() {
                               className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline mt-0.5 text-left cursor-pointer group/promo"
                               title="Bấm để xem căn cứ & lịch biểu trợ giá mùa vụ"
                             >
-                              <span>🌾 {(p as any).campaignTitle || "Vụ mùa chính vụ"} · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ</span>
+                              <span>🌾 {(p as { campaignTitle?: string }).campaignTitle || "Vụ mùa chính vụ"} · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ</span>
                               <Info size={11} className="text-amber-600 group-hover/promo:scale-110 transition-transform shrink-0" />
                             </button>
                           )}

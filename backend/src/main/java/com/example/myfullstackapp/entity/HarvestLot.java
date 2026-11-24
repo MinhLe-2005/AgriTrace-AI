@@ -59,6 +59,19 @@ public class HarvestLot {
     @Builder.Default
     private String farmName = "Nông Trại Xanh Đà Lạt (Mã: NT-DL-01)";
 
+    @Column(name = "farm_code", length = 64)
+    private String farmCode;
+
+    @Column(name = "owner_id", length = 64)
+    private String ownerId;
+
+    @Column(length = 255)
+    private String transportDestination;
+
+    @Column(length = 64)
+    @Builder.Default
+    private String transportStatus = "Chưa vận chuyển";
+
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

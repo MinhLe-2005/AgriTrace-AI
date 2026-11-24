@@ -3,6 +3,8 @@ package com.example.myfullstackapp.controller;
 import com.example.myfullstackapp.dto.ApiResponse;
 import com.example.myfullstackapp.dto.auth.ChangeOwnPasswordRequest;
 import com.example.myfullstackapp.dto.auth.ChangePasswordRequest;
+import com.example.myfullstackapp.dto.auth.LockOwnAccountRequest;
+import com.example.myfullstackapp.dto.auth.UnlockOwnAccountRequest;
 import com.example.myfullstackapp.dto.auth.UpdateProfileRequest;
 import com.example.myfullstackapp.dto.user.UserResponse;
 import com.example.myfullstackapp.service.AuthService;
@@ -49,9 +51,36 @@ public class AccountController {
         return ApiResponse.ok("Đổi mật khẩu thành công!", null);
     }
 
+    /**
+     * Self-lock requires the current password so that a stolen access token
+     * cannot be used to lock the account as a denial-of-service attack.
+     */
+    @PostMapping("/lock")
+    public ApiResponse<Void> lockOwnAccount(
+            @Valid @RequestBody LockOwnAccountRequest request,
+            Authentication authentication
+    ) {
+        authService.lockOwnAccount(actor(authentication), request);
+        return ApiResponse.ok("Tài khoản đã được khoá", null);
+    }
+
+    /**
+     * This is deliberately public: after a self-lock, the owner cannot sign
+     * in to obtain a JWT. It verifies email and current password and clears
+     * only a self-lock; administrator locks remain in force.
+     */
+    @DeleteMapping("/lock")
+    @PreAuthorize("permitAll()")
+    public ApiResponse<Void> unlockOwnAccount(@Valid @RequestBody UnlockOwnAccountRequest request) {
+        authService.unlockOwnAccount(request);
+        return ApiResponse.ok("Tài khoản đã được mở khoá", null);
+    }
+
     private String actor(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null) {
-            throw new AccessDeniedException("Vui lòng đăng nhập để tiếp tục");
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null
+                || "anonymousUser".equals(authentication.getPrincipal())
+                || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
+            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Vui lòng đăng nhập để tiếp tục");
         }
         return authentication.getName();
     }

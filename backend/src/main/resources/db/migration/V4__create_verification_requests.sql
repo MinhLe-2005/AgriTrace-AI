@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS verification_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type VARCHAR(20) NOT NULL CHECK (type IN ('FARMER', 'DISTRIBUTOR')),
+    type VARCHAR(20) NOT NULL CHECK (type IN ('FARMER', 'WAREHOUSE', 'DISTRIBUTOR')),
     status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
     organization_name VARCHAR(150) NOT NULL,
     document_type VARCHAR(50) NOT NULL,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CheckCircle2, PackageCheck, QrCode, ScanLine, Upload } from "lucide-react";
+import { Camera, CheckCircle2, Clock, MapPin, Package, PackageCheck, QrCode, ScanLine, Truck, Upload } from "lucide-react";
 import jsQR from "jsqr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -11,6 +11,7 @@ import { getLocalShipments, mergeShipments, upsertLocalShipment } from "@/featur
 import type { DistributorShipment, ShipmentReceipt, TrackingEvent } from "@/features/distributor/types";
 import { getApiErrorMessage } from "@/lib/api";
 import { distributorService } from "@/services/distributor.service";
+import { farmerService, ApiHarvestLot } from "@/services/farmer.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 
@@ -31,6 +32,10 @@ export default function DistributorReceivePage() {
   const [isReceiving, setIsReceiving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [farmerBatches, setFarmerBatches] = useState<ApiHarvestLot[]>([]);
+  const [selectedBatchCode, setSelectedBatchCode] = useState<string>("");
+  const [isPickingUpBatch, setIsPickingUpBatch] = useState(false);
+
   useEffect(() => {
     const requestedShipment = searchParams.get("shipment");
     if (requestedShipment) setSelectedShipmentCode(requestedShipment);
@@ -41,7 +46,29 @@ export default function DistributorReceivePage() {
       .getShipments()
       .then((remote) => setShipments(mergeShipments(distributorSeedShipments, remote, getLocalShipments())))
       .catch(() => undefined);
+
+    farmerService
+      .getBatches()
+      .then((lots) => {
+        if (lots) setFarmerBatches(lots);
+      })
+      .catch(() => undefined);
   }, []);
+
+  const handleFarmerBatchPickup = async (code: string) => {
+    setIsPickingUpBatch(true);
+    try {
+      const updated = await farmerService.driverPickup(code, {
+        driverName: user?.name || "Tài xế Chuỗi Lạnh AgriTrace",
+      });
+      setFarmerBatches((prev) => prev.map((b) => (b.code === updated.code ? updated : b)));
+      toast.success(`🚚 Tài xế đã quét mã QR tiếp nhận lô ${code} thành công! Trạng thái đã chuyển sang "Đang vận chuyển".`);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể tiếp nhận lô hàng");
+    } finally {
+      setIsPickingUpBatch(false);
+    }
+  };
 
   const selectedShipment = useMemo(
     () => shipments.find((shipment) => shipment.shipmentCode === selectedShipmentCode) ?? null,
@@ -49,15 +76,22 @@ export default function DistributorReceivePage() {
   );
 
   function applyQrValue(value: string) {
-    const shipmentCode = shipmentCodeFromQr(value);
-    setQrValue(value);
+    const rawVal = value.trim();
+    const shipmentCode = shipmentCodeFromQr(rawVal);
+    setQrValue(rawVal);
     const found = shipments.find((shipment) => shipment.shipmentCode === shipmentCode);
     if (found) {
       setSelectedShipmentCode(found.shipmentCode);
       toast.success(`Đã nhận diện chuyến ${found.shipmentCode}.`);
-    } else {
-      toast.error(`Không tìm thấy chuyến ${shipmentCode}. Vui lòng kiểm tra mã QR.`);
+      return;
     }
+    const foundBatch = farmerBatches.find((b) => b.code.toUpperCase() === rawVal.toUpperCase());
+    if (foundBatch) {
+      setSelectedBatchCode(foundBatch.code);
+      toast.success(`Đã nhận diện mã QR lô nông sản ${foundBatch.code} (${foundBatch.product}).`);
+      return;
+    }
+    toast.error(`Không tìm thấy chuyến hoặc lô ${rawVal}. Vui lòng kiểm tra mã QR.`);
   }
 
   function decodeQrImage(event: ChangeEvent<HTMLInputElement>) {
@@ -178,6 +212,87 @@ export default function DistributorReceivePage() {
           </form>
         </section>
       </div>
+
+      {/* KHỐI TIẾP NHẬN LÔ NÔNG SẢN TẠI VƯỜN DÀNH CHO TÀI XẾ (DRIVER PICKUP) */}
+      <section className="bg-white rounded-2xl border border-amber-200 p-5 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Truck size={18} className="text-amber-700" />
+            <h2 className="font-bold text-sm text-gray-900">
+              Tiếp Nhận Lô Thu Hoạch Tại Vườn Bằng Quét Mã QR (Lô Đã Duyệt Xuất Kho)
+            </h2>
+          </div>
+          <span className="text-xs text-gray-500">
+            Tài xế đến vườn quét mã QR ➔ Hệ thống tự động kích hoạt trạng thái &quot;Đang vận chuyển&quot;
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {farmerBatches
+            .filter((b) => b.status === "Đã duyệt xuất kho")
+            .map((lot) => {
+              const isMoving = lot.transportStatus === "Đang vận chuyển";
+              const isAtDest = lot.transportStatus === "Đã nhập kho đích";
+
+              return (
+                <div
+                  key={lot.code}
+                  className={`p-4 rounded-xl border transition-all ${
+                    isMoving
+                      ? "bg-blue-50/70 border-blue-200"
+                      : isAtDest
+                      ? "bg-emerald-50/50 border-emerald-200"
+                      : "bg-white border-gray-200 hover:border-amber-400"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-xs text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
+                      #{lot.code}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isMoving
+                          ? "bg-blue-100 text-blue-800"
+                          : isAtDest
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {lot.transportStatus || "Chưa vận chuyển"}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-gray-900 text-xs mt-2">{lot.product}</h4>
+                  <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
+                    <div>Sản lượng: <strong>{lot.qty} {lot.unit || "kg"}</strong></div>
+                    <div>Điểm đến: <strong>{lot.transportDestination || "Kho phân phối"}</strong></div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
+                    {isMoving ? (
+                      <span className="text-[11px] font-bold text-blue-700 flex items-center gap-1">
+                        <Truck size={12} className="animate-pulse" /> Đang vận chuyển chuỗi lạnh
+                      </span>
+                    ) : isAtDest ? (
+                      <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Đã giao kho đích
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPickingUpBatch}
+                        onClick={() => handleFarmerBatchPickup(lot.code)}
+                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <QrCode size={13} />
+                        Quét QR Nhận Hàng Lên Xe
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      </section>
       <style jsx>{`.field { width: 100%; height: 2.5rem; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 0 .75rem; font-size: .75rem; outline: none; background: #fff; } .field:focus { border-color: #d97706; box-shadow: 0 0 0 4px rgba(217, 119, 6, .1); }`}</style>
     </div>
   );

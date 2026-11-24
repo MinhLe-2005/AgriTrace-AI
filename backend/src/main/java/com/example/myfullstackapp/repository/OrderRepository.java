@@ -16,9 +16,14 @@ import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByUserEmailOrderByCreatedAtDesc(String userEmail);
+    @Query("select o from Order o where lower(o.userEmail) = lower(:userEmail) order by o.createdAt desc nulls last, o.id desc")
+    List<Order> findByUserEmailOrderByCreatedAtDesc(@Param("userEmail") String userEmail);
+
+    @Query("select o from Order o order by o.createdAt desc nulls last, o.id desc")
     List<Order> findAllByOrderByCreatedAtDesc();
     Optional<Order> findByOrderCode(String orderCode);
+    List<Order> findByOrderCodeIn(List<String> orderCodes);
+    List<Order> findByLotCodeIgnoreCaseOrderByCreatedAtAsc(String lotCode);
     Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
     Page<Order> findByStatusInOrderByCreatedAtDesc(List<String> statuses, Pageable pageable);
 

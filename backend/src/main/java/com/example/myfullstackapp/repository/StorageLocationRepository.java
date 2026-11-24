@@ -7,11 +7,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface StorageLocationRepository extends JpaRepository<StorageLocation, UUID> {
+    @Query("select l from StorageLocation l where l.warehouse.id=:warehouseId and l.id in :ids")
+    List<StorageLocation> findForBalances(
+            @Param("warehouseId") UUID warehouseId, @Param("ids") Collection<UUID> ids);
+
     List<StorageLocation> findByWarehouseIdOrderByCodeAsc(UUID warehouseId);
 
     Optional<StorageLocation> findByIdAndWarehouseId(UUID id, UUID warehouseId);

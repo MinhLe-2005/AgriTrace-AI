@@ -10,8 +10,16 @@ import { catalogService, type ApiOrder } from "@/services/catalog.service";
 type Filter = "ALL" | "PENDING" | "SHIPPING" | "COMPLETED";
 
 function statusInfo(status: ApiOrder["status"]) {
-  if (status === "COMPLETED") return { label: "Đã giao", className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-  if (status === "PENDING") return { label: "Chờ xử lý", className: "bg-sky-50 text-sky-700 border-sky-200" };
+  const normalized = (status || "").toUpperCase();
+  if (normalized === "COMPLETED" || normalized === "DELIVERED") {
+    return { label: "Đã giao", className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  }
+  if (normalized === "PENDING" || normalized === "CONFIRMED" || normalized === "PAID" || normalized === "PROCESSING") {
+    return { label: normalized === "PAID" ? "Đã thanh toán" : "Chờ giao", className: "bg-sky-50 text-sky-700 border-sky-200" };
+  }
+  if (normalized === "CANCELLED") {
+    return { label: "Đã hủy", className: "bg-rose-50 text-rose-700 border-rose-200" };
+  }
   return { label: "Đang giao", className: "bg-amber-50 text-amber-800 border-amber-200" };
 }
 
@@ -38,7 +46,14 @@ export default function DistributorOrdersPage() {
   const visibleOrders = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return orders.filter((order) => {
-      const matchedStatus = filter === "ALL" || order.status === filter;
+      const orderStatus = (order.status || "").toUpperCase();
+      const isPendingGroup = orderStatus === "PENDING" || orderStatus === "CONFIRMED" || orderStatus === "PAID" || orderStatus === "PROCESSING";
+      const isCompletedGroup = orderStatus === "COMPLETED" || orderStatus === "DELIVERED";
+      const matchedStatus =
+        filter === "ALL" ||
+        (filter === "PENDING" && isPendingGroup) ||
+        (filter === "SHIPPING" && orderStatus === "SHIPPING") ||
+        (filter === "COMPLETED" && isCompletedGroup);
       const matchedQuery =
         !normalized ||
         order.orderCode.toLowerCase().includes(normalized) ||

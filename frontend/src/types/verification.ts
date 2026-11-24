@@ -7,7 +7,7 @@ export type VerificationStatus =
   | "SUSPENDED"
   | "EXPIRED";
 
-export type VerificationType = "FARMER" | "DISTRIBUTOR";
+export type VerificationType = "FARMER" | "WAREHOUSE" | "DISTRIBUTOR";
 
 export interface VerificationRequest {
   id: string;
@@ -23,4 +23,13 @@ export interface VerificationRequest {
   decisionReason?: string | null;
   createdAt: string;
   reviewedAt?: string | null;
+}
+
+export interface VerificationSubmitInput {
+  type: VerificationType;
+  organizationName: string;
+  documentType: string;
+  documentUrl: string;
+  note?: string;
+  subjectEmail?: string;
 }

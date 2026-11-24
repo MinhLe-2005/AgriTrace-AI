@@ -37,19 +37,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 
 import { authService } from "@/services/auth.service";
+import { verificationsService } from "@/services/verifications.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCartStore } from "@/stores/cart-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { toast } from "@/stores/toast-store";
+import type { VerificationRequest } from "@/types/verification";
 import { cn } from "@/utils/cn";
 
 export function MainNavbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, clearSession, refreshToken } = useAuthStore();
+  const { user, clearSession, refreshToken, updateUser } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [myVerification, setMyVerification] = useState<VerificationRequest | null>(null);
 
   // Desktop Hover Mega Dropdowns state
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
@@ -98,6 +101,47 @@ export function MainNavbar() {
 
   const hasRole = (role: string) =>
     Boolean(user?.roles?.some((r) => r === role || r === `ROLE_${role}`));
+
+  const isSpecialRole =
+    hasRole("ADMIN") ||
+    hasRole("FARMER") ||
+    hasRole("WAREHOUSE") ||
+    hasRole("WAREHOUSE_STAFF") ||
+    hasRole("DISTRIBUTOR");
+
+  useEffect(() => {
+    if (!user || isSpecialRole) {
+      setMyVerification(null);
+      return;
+    }
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      setMyVerification(null);
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      try {
+        const reqs = await verificationsService.myRequests(user.email).catch(() => []);
+        if (mounted && reqs && reqs.length > 0) {
+          setMyVerification(reqs[0]);
+          if (reqs[0].status === "APPROVED") {
+            const me = await authService.getMe().catch(() => null);
+            if (mounted && me && me.roles && me.roles.length > (user.roles?.length || 0)) {
+              updateUser({ roles: me.roles, companyName: me.companyName });
+            }
+          }
+        } else if (mounted) {
+          setMyVerification(null);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id, user?.email, isSpecialRole, updateUser]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/90 shadow-xs">
@@ -306,11 +350,8 @@ export function MainNavbar() {
                 : "text-gray-700 hover:text-rose-700 hover:bg-gray-100/80"
             )}
           >
-            <Flame size={14} className="text-rose-500 fill-rose-500 animate-pulse" />
+            <Flame size={14} className="text-rose-500 fill-rose-500" />
             <span>Sự Kiện & Giảm Giá</span>
-            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-500 text-white shadow-2xs">
-              HOT
-            </span>
           </Link>
 
           {/* 4. Truy Xuất QR Dropdown */}
@@ -437,9 +478,6 @@ export function MainNavbar() {
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-gray-900 group-hover:text-rose-800 block">
                           Sự Kiện & Mùa Vụ Khuyến Mãi
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-500 text-white">
-                          HOT
                         </span>
                       </div>
                       <span className="text-[10px] text-gray-500">Trợ giá vụ mùa tại vườn, đếm ngược thời gian sale</span>
@@ -806,7 +844,7 @@ export function MainNavbar() {
           {user ? (
             <>
               {/* Role-based Quick Link button */}
-              {user.roles.includes("ADMIN") ? (
+              {hasRole("ADMIN") ? (
                 <Link
                   href="/dashboard/admin"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-xs transition-colors"
@@ -815,7 +853,7 @@ export function MainNavbar() {
                   <Shield size={14} strokeWidth={1.75} />
                   <span>Quản Trị</span>
                 </Link>
-              ) : user.roles.includes("FARMER") ? (
+              ) : hasRole("FARMER") ? (
                 <Link
                   href="/dashboard/farmer"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-xs transition-colors"
@@ -824,7 +862,7 @@ export function MainNavbar() {
                   <Sprout size={14} strokeWidth={1.75} />
                   <span>Nông Trại</span>
                 </Link>
-              ) : user.roles.includes("WAREHOUSE") || user.roles.includes("WAREHOUSE_STAFF") ? (
+              ) : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF") ? (
                 <Link
                   href="/dashboard/warehouse"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors"
@@ -833,7 +871,7 @@ export function MainNavbar() {
                   <Warehouse size={14} strokeWidth={1.75} />
                   <span>Kho Hàng</span>
                 </Link>
-              ) : user.roles.includes("DISTRIBUTOR") ? (
+              ) : hasRole("DISTRIBUTOR") ? (
                 <Link
                   href="/dashboard/distributor"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-xs transition-colors"
@@ -843,14 +881,43 @@ export function MainNavbar() {
                   <span>Vận Chuyển</span>
                 </Link>
               ) : (
-                <Link
-                  href="/dashboard/customer?tab=orders"
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                  title="Xem đơn mua của bạn"
-                >
-                  <ShoppingBag size={14} strokeWidth={1.75} />
-                  <span>Đơn Mua</span>
-                </Link>
+                <div className="flex items-center gap-1.5">
+                  {myVerification && (myVerification.status === "PENDING" || myVerification.status === "UNDER_REVIEW") && (
+                    <Link
+                      href="/dashboard"
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors"
+                      title="Xem tiến trình phê duyệt hồ sơ vị trí"
+                    >
+                      <ShieldCheck size={14} className="text-amber-600" />
+                      <span>
+                        Chờ duyệt:{" "}
+                        {myVerification.type === "FARMER"
+                          ? "Nông dân"
+                          : myVerification.type === "WAREHOUSE"
+                          ? "Thủ kho"
+                          : "Vận chuyển"}
+                      </span>
+                    </Link>
+                  )}
+                  {myVerification && (myVerification.status === "REJECTED" || myVerification.status === "CHANGES_REQUESTED") && (
+                    <Link
+                      href="/dashboard"
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-300 transition-colors"
+                      title="Bổ sung lại hồ sơ vị trí"
+                    >
+                      <ShieldCheck size={14} className="text-rose-600" />
+                      <span>Hồ sơ vị trí: Cần bổ sung</span>
+                    </Link>
+                  )}
+                  <Link
+                    href="/dashboard/customer?tab=orders"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                    title="Xem đơn mua của bạn"
+                  >
+                    <ShoppingBag size={14} strokeWidth={1.75} />
+                    <span>Đơn Mua</span>
+                  </Link>
+                </div>
               )}
 
               {/* User Dropdown */}
@@ -875,8 +942,8 @@ export function MainNavbar() {
                 </button>
 
                 {userOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2.5">
+                  <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-gray-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-2.5 border-b border-gray-100 flex items-center gap-2.5">
                       {user.avatarUrl ? (
                         <img
                           src={user.avatarUrl}
@@ -891,58 +958,183 @@ export function MainNavbar() {
                       <div className="min-w-0 flex-1">
                         <p className="font-bold text-gray-900 truncate">{user.name || "Tài khoản"}</p>
                         <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          {hasRole("ADMIN")
+                            ? "Quản trị viên (ADMIN)"
+                            : hasRole("FARMER")
+                            ? "Nông dân (FARMER)"
+                            : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF")
+                            ? "Thủ kho (WAREHOUSE)"
+                            : hasRole("DISTRIBUTOR")
+                            ? "Vận chuyển (DISTRIBUTOR)"
+                            : "Khách hàng (CUSTOMER)"}
+                        </span>
                       </div>
                     </div>
 
                     <div className="py-1">
-                      <Link
-                        href="/dashboard/customer?tab=profile"
-                        onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
-                      >
-                        <User size={14} className="text-gray-500" />
-                        <span>Hồ sơ của tôi</span>
-                      </Link>
-                      <Link
-                        href="/dashboard/customer?tab=orders"
-                        onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
-                      >
-                        <ShoppingBag size={14} className="text-gray-500" />
-                        <span>Đơn mua của tôi</span>
-                      </Link>
-                      <Link
-                        href="/dashboard/customer?tab=vouchers"
-                        onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
-                      >
-                        <Gift size={14} className="text-gray-500" />
-                        <span>Kho Voucher & Ưu đãi</span>
-                      </Link>
-                      <Link
-                        href="/dashboard/customer?tab=points"
-                        onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
-                      >
-                        <Award size={14} className="text-gray-500" />
-                        <span>Điểm & Hạng hội viên</span>
-                      </Link>
-                      <Link
-                        href="/terms"
-                        onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
-                      >
-                        <FileText size={14} className="text-gray-500" />
-                        <span>Điều khoản dịch vụ</span>
-                      </Link>
-                      <Link
-                        href="/dashboard/customer?tab=password"
-                        onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
-                      >
-                        <KeyRound size={14} className="text-gray-500" />
-                        <span>Đổi mật khẩu</span>
-                      </Link>
+                      {hasRole("ADMIN") ? (
+                        <>
+                          <Link
+                            href="/dashboard/admin"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-red-700 hover:bg-red-50 font-bold transition-colors"
+                          >
+                            <Shield size={14} className="text-red-600" />
+                            <span>Cổng Quản Trị Hệ Thống</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/admin?tab=orders"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <ShoppingBag size={14} className="text-gray-500" />
+                            <span>Quản lý đơn hàng</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/admin?tab=vouchers"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <Gift size={14} className="text-gray-500" />
+                            <span>Quản lý Voucher & Ưu đãi</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/users"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <User size={14} className="text-gray-500" />
+                            <span>Quản lý người dùng</span>
+                          </Link>
+                        </>
+                      ) : hasRole("FARMER") ? (
+                        <>
+                          <Link
+                            href="/dashboard/farmer"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-emerald-800 hover:bg-emerald-50 font-bold transition-colors"
+                          >
+                            <Sprout size={14} className="text-emerald-700" />
+                            <span>Quản Lý Nông Trại & Lô Hàng</span>
+                          </Link>
+                          <Link
+                            href="/traceability"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <QrCode size={14} className="text-gray-500" />
+                            <span>Cấp & Tra cứu mã QR</span>
+                          </Link>
+                        </>
+                      ) : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF") ? (
+                        <>
+                          <Link
+                            href="/dashboard/warehouse"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-blue-800 hover:bg-blue-50 font-bold transition-colors"
+                          >
+                            <Warehouse size={14} className="text-blue-700" />
+                            <span>Quản Lý Kho Lạnh & FEFO</span>
+                          </Link>
+                          <Link
+                            href="/traceability"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <QrCode size={14} className="text-gray-500" />
+                            <span>Quét mã QR nghiệm thu</span>
+                          </Link>
+                        </>
+                      ) : hasRole("DISTRIBUTOR") ? (
+                        <>
+                          <Link
+                            href="/dashboard/distributor"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-amber-800 hover:bg-amber-50 font-bold transition-colors"
+                          >
+                            <Truck size={14} className="text-amber-700" />
+                            <span>Cổng Điều Phối Vận Chuyển</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/distributor/receive"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <QrCode size={14} className="text-gray-500" />
+                            <span>Tiếp nhận hàng & Quét QR</span>
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link
+                            href="/dashboard"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-emerald-800 hover:bg-emerald-50 font-bold transition-colors"
+                          >
+                            <ShieldCheck size={14} className="text-emerald-700" />
+                            <span>
+                              {myVerification
+                                ? `Hồ sơ vị trí (${
+                                    myVerification.status === "PENDING" || myVerification.status === "UNDER_REVIEW"
+                                      ? "Chờ duyệt"
+                                      : myVerification.status === "APPROVED"
+                                      ? "Đã duyệt"
+                                      : "Cần bổ sung"
+                                  })`
+                                : "Ứng tuyển Vị trí & Đối tác"}
+                            </span>
+                          </Link>
+                          <Link
+                            href="/dashboard/customer?tab=profile"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <User size={14} className="text-gray-500" />
+                            <span>Hồ sơ của tôi</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/customer?tab=orders"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <ShoppingBag size={14} className="text-gray-500" />
+                            <span>Đơn mua của tôi</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/customer?tab=vouchers"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <Gift size={14} className="text-gray-500" />
+                            <span>Kho Voucher & Ưu đãi</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/customer?tab=points"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <Award size={14} className="text-gray-500" />
+                            <span>Điểm & Hạng hội viên</span>
+                          </Link>
+                          <Link
+                            href="/terms"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <FileText size={14} className="text-gray-500" />
+                            <span>Điều khoản dịch vụ</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/customer?tab=password"
+                            onClick={() => setUserOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+                          >
+                            <KeyRound size={14} className="text-gray-500" />
+                            <span>Đổi mật khẩu</span>
+                          </Link>
+                        </>
+                      )}
                     </div>
 
                     <div className="border-t border-gray-100 pt-1">
@@ -1132,8 +1324,30 @@ export function MainNavbar() {
           {/* User Section on Mobile */}
           {user && (
             <div className="pt-2 border-t border-gray-100 space-y-1">
-              <Link href="/dashboard/customer?tab=orders" onClick={() => setMobileOpen(false)} className="block px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 rounded-lg">
-                Đơn Mua Của Bạn
+              <Link
+                href={
+                  hasRole("ADMIN")
+                    ? "/dashboard/admin"
+                    : hasRole("FARMER")
+                    ? "/dashboard/farmer"
+                    : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF")
+                    ? "/dashboard/warehouse"
+                    : hasRole("DISTRIBUTOR")
+                    ? "/dashboard/distributor"
+                    : "/dashboard/customer?tab=orders"
+                }
+                onClick={() => setMobileOpen(false)}
+                className="block px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 rounded-lg"
+              >
+                {hasRole("ADMIN")
+                  ? "Cổng Quản Trị Hệ Thống"
+                  : hasRole("FARMER")
+                  ? "Cổng Quản Lý Nông Trại"
+                  : hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF")
+                  ? "Cổng Quản Lý Kho Lạnh"
+                  : hasRole("DISTRIBUTOR")
+                  ? "Cổng Điều Phối Vận Chuyển"
+                  : "Đơn Mua Của Bạn"}
               </Link>
               <button
                 onClick={handleLogout}

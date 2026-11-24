@@ -27,13 +27,27 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.CONFLICT, msg, "CONFLICT", List.of());
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    ResponseEntity<ApiError> locked(AccountLockedException ex) {
+        return error(HttpStatus.valueOf(423), ex.getMessage(), "ACCOUNT_LOCKED", List.of());
+    }
+
     @ExceptionHandler({InvalidTokenException.class, AuthenticationException.class})
     ResponseEntity<ApiError> unauthorized(RuntimeException ex) {
         return error(HttpStatus.UNAUTHORIZED, "Tài khoản hoặc mật khẩu không chính xác", "UNAUTHORIZED", List.of());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    ResponseEntity<ApiError> forbidden(AccessDeniedException ex) { return error(HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này", "FORBIDDEN", List.of()); }
+    ResponseEntity<ApiError> forbidden(AccessDeniedException ex) {
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()
+                || "anonymousUser".equals(auth.getPrincipal())
+                || auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
+            return error(HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập để tiếp tục", "UNAUTHORIZED", List.of());
+        }
+        return error(HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này", "FORBIDDEN", List.of());
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex) {

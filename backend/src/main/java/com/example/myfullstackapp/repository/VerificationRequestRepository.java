@@ -14,7 +14,19 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
     List<VerificationRequest> findByStatusAndTypeOrderByCreatedAtAsc(VerificationStatus status, VerificationType type);
 
     @EntityGraph(attributePaths = {"subject", "reviewedBy"})
+    List<VerificationRequest> findByStatusOrderByCreatedAtAsc(VerificationStatus status);
+
+    @EntityGraph(attributePaths = {"subject", "reviewedBy"})
+    List<VerificationRequest> findByTypeOrderByCreatedAtDesc(VerificationType type);
+
+    @EntityGraph(attributePaths = {"subject", "reviewedBy"})
     List<VerificationRequest> findAllByOrderByCreatedAtDesc();
+
+    @EntityGraph(attributePaths = {"subject", "reviewedBy"})
+    List<VerificationRequest> findBySubjectIdOrderByCreatedAtDesc(UUID subjectId);
+
+    @EntityGraph(attributePaths = {"subject", "reviewedBy"})
+    List<VerificationRequest> findBySubjectEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 
     boolean existsBySubjectIdAndStatusIn(UUID subjectId, List<VerificationStatus> statuses);
 }

@@ -14,7 +14,32 @@ export type ApiHarvestLot = {
   cert?: string;
   cultivation?: string;
   farmName?: string;
+  farmCode?: string;
+  ownerId?: string;
+  transportDestination?: string;
+  transportStatus?: string;
   createdAt?: string;
+};
+
+export type LotTimelineEvent = {
+  stage: string;
+  time: string;
+  note: string;
+  badge?: string;
+  operator?: string;
+};
+
+export type BatchChangeEvent = {
+  code: string;
+  product: string;
+  status: string;
+  statusColor?: string;
+  transportStatus?: string;
+  transportDestination?: string;
+  actionType: "ADMIN_APPROVED" | "ADMIN_REJECTED" | "DRIVER_PICKUP" | "WAREHOUSE_INBOUND" | "STATUS_UPDATED";
+  actorRole: "ADMIN" | "DISTRIBUTOR" | "WAREHOUSE" | "FARMER";
+  note?: string;
+  timestamp: string;
 };
 
 export type ApiProductItem = {
@@ -25,6 +50,8 @@ export type ApiProductItem = {
   unit: string;
   origin?: string;
   farm?: string;
+  farmCode?: string;
+  ownerId?: string;
   cert?: string;
   rating?: number;
   reviews?: number;
@@ -37,22 +64,129 @@ export type ApiProductItem = {
 };
 
 export const farmerService = {
-  async getBatches(): Promise<ApiHarvestLot[]> {
-    const res = await api.get<ApiHarvestLot[]>("/farmer/batches");
+  async getBatches(params?: { ownerId?: string; farmCode?: string }): Promise<ApiHarvestLot[]> {
+    const res = await api.get<ApiHarvestLot[]>("/farmer/batches", { params });
     return res.data;
   },
 
   async createBatch(lot: ApiHarvestLot): Promise<ApiHarvestLot> {
-    const res = await api.post<{ success: boolean; data: ApiHarvestLot }>("/farmer/batches", lot);
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiHarvestLot }>("/farmer/batches", lot);
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể tạo lô thu hoạch");
+    }
     return res.data.data;
+  },
+
+  async addBatchLog(
+    code: string,
+    entry: { stage: string; time: string; note?: string; materials?: string; proofImage?: string; image?: string }
+  ): Promise<{ stage: string; time: string; note: string; proofImage?: string }> {
+    const res = await api.post<{ success: boolean; message?: string; data?: { stage: string; time: string; note: string; proofImage?: string } }>(
+      `/farmer/batches/${encodeURIComponent(code)}/logs`,
+      entry
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể đồng bộ nhật ký canh tác lên QR");
+    }
+    return res.data.data;
+  },
+
+  async getLogs(params?: { ownerId?: string; farmCode?: string; batchCode?: string }): Promise<any[]> {
+    const res = await api.get<any[]>("/farmer/logs", { params });
+    return res.data;
+  },
+
+  async createLog(log: any): Promise<any> {
+    const res = await api.post<{ success: boolean; data?: any }>("/farmer/logs", log);
+    return res.data?.data;
+  },
+
+  async deleteLog(id: string | number): Promise<void> {
+    await api.delete(`/farmer/logs/${id}`);
   },
 
   async deleteBatch(code: string): Promise<void> {
     await api.delete(`/farmer/batches/${code}`);
   },
 
-  async getProducts(): Promise<ApiProductItem[]> {
-    const res = await api.get<ApiProductItem[]>("/products");
+  async getBatchTimeline(code: string): Promise<LotTimelineEvent[]> {
+    const res = await api.get<{ success: boolean; data?: LotTimelineEvent[] }>(
+      `/farmer/batches/${encodeURIComponent(code)}/timeline`
+    );
+    return res.data?.data || [];
+  },
+
+  async updateBatchStatus(
+    code: string,
+    payload: {
+      status?: string;
+      statusColor?: string;
+      transportStatus?: string;
+      transportDestination?: string;
+      adminNote?: string;
+      actorRole?: string;
+    }
+  ): Promise<ApiHarvestLot> {
+    const res = await api.patch<{ success: boolean; message?: string; data?: ApiHarvestLot }>(
+      `/farmer/batches/${encodeURIComponent(code)}/status`,
+      payload
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể cập nhật trạng thái lô");
+    }
+    return res.data.data;
+  },
+
+  async driverPickup(
+    code: string,
+    payload?: { driverName?: string; vehiclePlate?: string; destination?: string }
+  ): Promise<ApiHarvestLot> {
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiHarvestLot }>(
+      `/farmer/batches/${encodeURIComponent(code)}/driver-pickup`,
+      payload || {}
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể thực hiện tiếp nhận lô hàng");
+    }
+    return res.data.data;
+  },
+
+  async warehouseInbound(
+    code: string,
+    payload?: { warehouseStaff?: string; warehouseName?: string; temperature?: string }
+  ): Promise<ApiHarvestLot> {
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiHarvestLot }>(
+      `/farmer/batches/${encodeURIComponent(code)}/warehouse-inbound`,
+      payload || {}
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể thực hiện nhập kho đích");
+    }
+    return res.data.data;
+  },
+
+  async addBatchTimelineEvent(
+    code: string,
+    event: {
+      stage: string;
+      time?: string;
+      note?: string;
+      badge?: string;
+      operator?: string;
+    }
+  ): Promise<LotTimelineEvent> {
+    const res = await api.post<{ success: boolean; message?: string; data?: LotTimelineEvent }>(
+      `/farmer/batches/${encodeURIComponent(code)}/timeline-events`,
+      event
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể thêm sự kiện vòng đời");
+    }
+    return res.data.data;
+  },
+
+  async getProducts(params?: { ownerId?: string; farmCode?: string; category?: string }): Promise<ApiProductItem[]> {
+    const res = await api.get<ApiProductItem[]>("/products", { params });
     return res.data;
   },
 
@@ -63,5 +197,69 @@ export const farmerService = {
 
   async deleteProduct(id: string): Promise<void> {
     await api.delete(`/products/${id}`);
+  },
+  async notifyCertExpiry(payload: {
+    certName: string;
+    certNumber: string;
+    farmName: string;
+    daysLeft: number;
+    expiryDate: string;
+    toEmail?: string;
+  }): Promise<{ success: boolean; message: string; data?: Record<string, unknown> }> {
+    const res = await api.post<{ success: boolean; message: string; data?: Record<string, unknown> }>(
+      "/farmer/certificates/notify-expiry",
+      payload
+    );
+    return res.data;
+  },
+
+  async getCertificates(): Promise<any[]> {
+    const res = await api.get<any[]>("/farmer/certificates");
+    return res.data;
+  },
+
+  async saveCertificate(cert: any): Promise<any> {
+    const res = await api.post<{ success: boolean; data?: any }>("/farmer/certificates", cert);
+    return res.data?.data;
+  },
+
+  async renewCertificate(payload: {
+    certNumber: string;
+    newCertNumber?: string;
+    requestedExpiryDate: string;
+    proofImage?: string;
+    note?: string;
+  }): Promise<any> {
+    const res = await api.post<{ success: boolean; message?: string; data?: any }>(
+      "/farmer/certificates/renew",
+      payload
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể nộp hồ sơ gia hạn chứng chỉ");
+    }
+    return res.data.data;
+  },
+
+  async decideCertificate(
+    certNumber: string,
+    payload: { action: "approve" | "reject"; adminNote?: string; newCertNumber?: string; approvedExpiryDate?: string }
+  ): Promise<any> {
+    const res = await api.patch<{ success: boolean; message?: string; data?: any }>(
+      `/farmer/certificates/${encodeURIComponent(certNumber)}/decision`,
+      payload
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể cập nhật phê duyệt chứng chỉ");
+    }
+    return res.data.data;
+  },
+
+  async triggerCertAutoScan(): Promise<{ success: boolean; message?: string; data?: any }> {
+    const res = await api.post<{ success: boolean; message?: string; data?: any }>("/farmer/certificates/trigger-auto-scan");
+    return res.data;
+  },
+
+  async deleteCertificate(certNumber: string): Promise<void> {
+    await api.delete(`/farmer/certificates/${encodeURIComponent(certNumber)}`);
   },
 };

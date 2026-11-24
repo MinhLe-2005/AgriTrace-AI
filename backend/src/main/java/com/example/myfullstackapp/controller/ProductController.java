@@ -18,15 +18,33 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<List<Product>> getProducts(
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) Boolean featured
+            @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) String ownerId,
+            @RequestParam(required = false) String farmCode
     ) {
+        List<Product> list;
         if (category != null && !category.equalsIgnoreCase("all")) {
-            return ResponseEntity.ok(productRepository.findByCategoryCodeAndActiveTrue(category.toLowerCase()));
+            list = productRepository.findByCategoryCodeAndActiveTrue(category.toLowerCase());
+        } else if (Boolean.TRUE.equals(featured)) {
+            list = productRepository.findByFeaturedTrueAndActiveTrue();
+        } else {
+            list = productRepository.findByActiveTrue();
         }
-        if (Boolean.TRUE.equals(featured)) {
-            return ResponseEntity.ok(productRepository.findByFeaturedTrueAndActiveTrue());
+
+        if (ownerId != null && !ownerId.isBlank()) {
+            String cleanOwner = ownerId.trim().toLowerCase();
+            list = list.stream()
+                    .filter(p -> p.getOwnerId() != null && p.getOwnerId().toLowerCase().contains(cleanOwner))
+                    .toList();
+        } else if (farmCode != null && !farmCode.isBlank()) {
+            String cleanFarm = farmCode.trim().toLowerCase();
+            list = list.stream()
+                    .filter(p -> (p.getFarmCode() != null && p.getFarmCode().equalsIgnoreCase(cleanFarm))
+                            || (p.getFarm() != null && p.getFarm().toLowerCase().contains(cleanFarm)))
+                    .toList();
         }
-        return ResponseEntity.ok(productRepository.findByActiveTrue());
+
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
@@ -44,12 +62,28 @@ public class ProductController {
     }
 
     @PostMapping
-    public ResponseEntity<Product> createProduct(@RequestBody Product req) {
+    public ResponseEntity<?> createProduct(@RequestBody Product req) {
+        if (req.getName() == null || req.getName().isBlank()) {
+            return ResponseEntity.badRequest().body("Tên sản phẩm không được để trống");
+        }
+        if (req.getPrice() == null || req.getPrice() <= 0) {
+            return ResponseEntity.badRequest().body("Giá sản phẩm phải lớn hơn 0");
+        }
         if (req.getId() == null || req.getId().isBlank()) {
             req.setId("p_" + System.currentTimeMillis());
         }
+        req.setName(req.getName().trim());
         if (req.getOldPrice() == null) {
             req.setOldPrice(req.getPrice());
+        }
+        if (req.getUnit() == null || req.getUnit().isBlank()) {
+            req.setUnit("1 kg");
+        }
+        if (req.getActive() == null) {
+            req.setActive(true);
+        }
+        if (req.getOwnerId() == null || req.getOwnerId().isBlank()) {
+            req.setOwnerId("farmer_hung");
         }
         Product saved = productRepository.save(req);
         return ResponseEntity.ok(saved);
@@ -57,7 +91,9 @@ public class ProductController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable String id) {
-        productRepository.deleteById(id);
+        if (productRepository.existsById(id)) {
+            productRepository.deleteById(id);
+        }
         return ResponseEntity.noContent().build();
     }
 }

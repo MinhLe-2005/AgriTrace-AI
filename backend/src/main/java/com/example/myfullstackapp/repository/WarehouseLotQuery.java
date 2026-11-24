@@ -67,6 +67,52 @@ public class WarehouseLotQuery {
         return read(id, false);
     }
 
+    public Map<String, LotSummary> getMany(Collection<String> ids) {
+        Map<String, LotSummary> result = new HashMap<>();
+        if (ids.isEmpty()) return result;
+        List<Long> numeric =
+                ids.stream()
+                        .map(
+                                id -> {
+                                    try {
+                                        return Long.parseLong(id);
+                                    } catch (NumberFormatException invalid) {
+                                        throw new IllegalArgumentException(
+                                                "Farmer lot ID must be numeric");
+                                    }
+                                })
+                        .distinct()
+                        .sorted()
+                        .toList();
+        try {
+            for (int offset = 0; offset < numeric.size(); offset += 500) {
+                var batch = numeric.subList(offset, Math.min(numeric.size(), offset + 500));
+                jdbc.query(
+                        SELECT
+                                + " where id in ("
+                                + String.join(",", Collections.nCopies(batch.size(), "?"))
+                                + ")",
+                        rs -> {
+                            var lot =
+                                    map(
+                                            Long.toString(rs.getLong("id")),
+                                            rs.getString("product"),
+                                            rs.getString("code"),
+                                            rs.getString("expiry_date"),
+                                            rs.getString("qty"),
+                                            rs.getString("unit"),
+                                            rs.getString("status"));
+                            result.put(lot.id(), lot);
+                        },
+                        batch.toArray());
+            }
+            return result;
+        } catch (DataAccessException failure) {
+            throw new WarehouseIntegrationException(
+                    "Farmer lot schema is not available for inventory queries");
+        }
+    }
+
     public LotSummary lockForReceipt(String id) {
         return read(id, true);
     }

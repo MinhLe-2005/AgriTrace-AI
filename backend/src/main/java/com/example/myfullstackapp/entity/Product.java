@@ -34,6 +34,12 @@ public class Product {
     @Column(length = 128)
     private String farm;
 
+    @Column(name = "farm_code", length = 64)
+    private String farmCode;
+
+    @Column(name = "owner_id", length = 64)
+    private String ownerId;
+
     @Column(length = 64)
     private String cert;
 
@@ -46,7 +52,7 @@ public class Product {
     @Column(length = 128)
     private String harvest;
 
-    @Column(length = 255)
+    @Column(columnDefinition = "TEXT")
     private String image;
 
     @Column(length = 64)

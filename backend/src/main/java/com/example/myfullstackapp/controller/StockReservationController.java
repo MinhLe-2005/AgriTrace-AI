@@ -55,6 +55,12 @@ public class StockReservationController {
         return ApiResponse.ok("Reservation released", reservations.release(warehouseId, id));
     }
 
+    @PutMapping("/reservations/{id}/reconcile")
+    public ApiResponse<ReservationView> reconcile(
+            @PathVariable UUID warehouseId, @PathVariable UUID id) {
+        return ApiResponse.ok("Reservation reallocated", reservations.reconcile(warehouseId, id));
+    }
+
     @GetMapping("/unit-conversions")
     public ApiResponse<List<UnitConversionView>> conversions(@PathVariable UUID warehouseId) {
         return ApiResponse.ok("Measured unit conversions retrieved", weights.list(warehouseId));
