@@ -32,7 +32,6 @@ public class FarmerAccountBootstrap implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        final String email = "nguyenthieuu052@gmail.com".toLowerCase(Locale.ROOT);
         final String rawPassword = "Farmer123@";
 
         try {
@@ -41,30 +40,41 @@ public class FarmerAccountBootstrap implements ApplicationRunner {
             Role userRole = roleRepository.findByName(RoleName.USER)
                     .orElseGet(() -> roleRepository.save(Role.builder().name(RoleName.USER).build()));
 
-            User user = userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
-                log.info("Bootstrapping new farmer account: {}", email);
-                return User.builder()
-                        .email(email)
-                        .username("nguyenthieuu052")
-                        .fullName("Nguyễn Thiệu")
-                        .phone("0912345678")
-                        .active(true)
-                        .roles(new HashSet<>())
-                        .build();
-            });
+            // Farmer 1: Bác Nguyễn Văn Hùng (Chủ Nông Trại Xanh Đà Lạt & Cao Lãnh)
+            bootstrapSingleFarmer("farmer@agritrace.vn", "farmer_hung", "Bác Nguyễn Văn Hùng", "0912345678", rawPassword, farmerRole, userRole);
+            bootstrapSingleFarmer("hung.farmer@agritrace.vn", "farmer_hung", "Bác Nguyễn Văn Hùng", "0912345678", rawPassword, farmerRole, userRole);
 
-            user.setActive(true);
-            user.setPasswordHash(passwordEncoder.encode(rawPassword));
-            if (user.getRoles() == null) {
-                user.setRoles(new HashSet<>());
-            }
-            user.getRoles().add(farmerRole);
-            user.getRoles().add(userRole);
+            // Farmer 2: Nguyễn Thiệu (Chủ Vườn Sinh Thái Mộc Châu)
+            bootstrapSingleFarmer("nguyenthieuu052@gmail.com", "farmer_thieu", "Nguyễn Thiệu", "0987654321", rawPassword, farmerRole, userRole);
 
-            userRepository.save(user);
-            log.info("Farmer account [{}] initialized successfully with FARMER role!", email);
+            log.info("Bootstrapped farmer accounts successfully (farmer@agritrace.vn & nguyenthieuu052@gmail.com) with password Farmer123@");
         } catch (Exception ex) {
-            log.warn("Failed to bootstrap farmer account [{}]: {}", email, ex.getMessage(), ex);
+            log.warn("Failed to bootstrap farmer accounts: {}", ex.getMessage(), ex);
         }
+    }
+
+    private void bootstrapSingleFarmer(String email, String username, String fullName, String phone, String rawPassword, Role farmerRole, Role userRole) {
+        String cleanEmail = email.toLowerCase(Locale.ROOT).trim();
+        User user = userRepository.findByEmailIgnoreCase(cleanEmail).orElseGet(() -> {
+            log.info("Bootstrapping new farmer account: {}", cleanEmail);
+            return User.builder()
+                    .email(cleanEmail)
+                    .username(username)
+                    .fullName(fullName)
+                    .phone(phone)
+                    .active(true)
+                    .roles(new HashSet<>())
+                    .build();
+        });
+
+        user.setActive(true);
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setFullName(fullName);
+        if (user.getRoles() == null) {
+            user.setRoles(new HashSet<>());
+        }
+        user.getRoles().add(farmerRole);
+        user.getRoles().add(userRole);
+        userRepository.save(user);
     }
 }
