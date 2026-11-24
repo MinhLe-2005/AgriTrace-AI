@@ -12,6 +12,10 @@ public interface HarvestLotRepository extends JpaRepository<HarvestLot, Long> {
 
     List<HarvestLot> findAllByOrderByCreatedAtDesc();
 
+    List<HarvestLot> findByOwnerIdIgnoreCaseOrderByCreatedAtDesc(String ownerId);
+
+    List<HarvestLot> findByFarmCodeIgnoreCaseOrderByCreatedAtDesc(String farmCode);
+
     Optional<HarvestLot> findByCodeIgnoreCase(String code);
 
     boolean existsByCodeIgnoreCase(String code);
