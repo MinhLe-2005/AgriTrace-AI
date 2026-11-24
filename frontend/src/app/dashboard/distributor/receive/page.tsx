@@ -63,8 +63,8 @@ export default function DistributorReceivePage() {
       });
       setFarmerBatches((prev) => prev.map((b) => (b.code === updated.code ? updated : b)));
       toast.success(`🚚 Tài xế đã quét mã QR tiếp nhận lô ${code} thành công! Trạng thái đã chuyển sang "Đang vận chuyển".`);
-    } catch (err: any) {
-      toast.error(err.message || "Không thể tiếp nhận lô hàng");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không thể tiếp nhận lô hàng");
     } finally {
       setIsPickingUpBatch(false);
     }

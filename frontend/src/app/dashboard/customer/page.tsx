@@ -1615,7 +1615,7 @@ function CustomerDashboardContent() {
                         </span>
                         {order.deliveryNote && (
                           <span className="text-gray-500 italic">
-                            · Dặn shipper: "{order.deliveryNote}"
+                            · Dặn shipper: &ldquo;{order.deliveryNote}&rdquo;
                           </span>
                         )}
                       </div>
@@ -2795,7 +2795,7 @@ function CustomerDashboardContent() {
                 </div>
                 {selectedOrder.deliveryNote && (
                   <div className="pt-2 border-t border-gray-200/80 text-[11px] text-gray-500 italic">
-                    💬 Dặn dò tài xế: "{selectedOrder.deliveryNote}"
+                    💬 Dặn dò tài xế: &ldquo;{selectedOrder.deliveryNote}&rdquo;
                   </div>
                 )}
               </div>
