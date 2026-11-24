@@ -2,6 +2,7 @@
 
 import {
   ArrowRight,
+  ArrowUpRight,
   Award,
   Check,
   CheckCircle2,
@@ -9,24 +10,18 @@ import {
   ChevronRight,
   Clock,
   Copy,
-  Eye,
-  Heart,
-  HelpCircle,
-  Info,
   Leaf,
   MapPin,
   Package,
   QrCode,
-  ShieldAlert,
   ShieldCheck,
   ShoppingBag,
-  Sparkles,
+  Sprout,
   Star,
   Tag,
   Thermometer,
   Truck,
   X,
-  Zap,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -46,11 +41,11 @@ import { cn } from "@/utils/cn";
 /* ── Static Ticker & Hero Words ── */
 
 const ticker = [
-  "Lô xà lách thủy canh 500kg thu hoạch sáng nay lúc 05:30 tại Nông Trại Xanh Đà Lạt",
-  "Chính vụ: Dâu tây Mộc Châu đạt chuẩn GlobalGAP đã cập bến kho lạnh trung tâm",
-  "Vận chuyển: Tuyến xe lạnh 49C-188 đang giao hàng về kho phân phối (4.1°C)",
-  "Ưu đãi: Nhập mã AGRI30 giảm ngay 30% cho đơn hàng đầu tiên hôm nay",
-  "Minh bạch: 100% nông sản đều có mã QR số hóa truy xuất nguồn gốc",
+  "LÔ #XL-2026-08 · Xà lách thủy canh 500kg thu hoạch lúc 05:30 tại Nông Trại Xanh Đà Lạt (KCS: Đạt)",
+  "CHÍNH VỤ · Dâu tây Mộc Châu chuẩn GlobalGAP đã cập bến kho lạnh trung tâm (Nhiệt độ kho: 3.8°C)",
+  "LOGISTICS · Tuyến xe lạnh 49C-188.92 đang điều phối về trạm phân phối TP.HCM (4.1°C · Độ ẩm 82%)",
+  "ƯU ĐÃI MÙA VỤ · Nhập mã AGRI30 giảm ngay 30% cho đơn hàng nông sản tươi đầu tiên hôm nay",
+  "MINH BẠCH GS1 · 100% nông sản xuất vườn đều định danh mã QR độc bản chống giả mạo",
 ];
 
 const heroWords = ["Bàn Ăn Gia Đình", "Bữa Cơm An Lành", "Người Tiêu Dùng", "Sức Khỏe Mọi Nhà"];
@@ -64,6 +59,7 @@ export default function HomePage() {
   const [quickBuyProduct, setQuickBuyProduct] = useState<ApiProduct | null>(null);
   const [quickBuyQty, setQuickBuyQty] = useState(1);
   const [modalQty, setModalQty] = useState(1);
+  const [quickQrInput, setQuickQrInput] = useState("AGRI-QR-XL-2026-08-DEMO");
 
   // Live data states loaded from Supabase
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -76,7 +72,7 @@ export default function HomePage() {
 
   function scrollProducts(direction: "left" | "right") {
     if (!productCarouselRef.current) return;
-    const scrollAmount = 320;
+    const scrollAmount = 330;
     productCarouselRef.current.scrollBy({
       left: direction === "left" ? -scrollAmount : scrollAmount,
       behavior: "smooth",
@@ -149,19 +145,27 @@ export default function HomePage() {
     }
   }
 
+  function handleQuickTrace(e: React.FormEvent) {
+    e.preventDefault();
+    const code = quickQrInput.trim() || "AGRI-QR-XL-2026-08-DEMO";
+    router.push(`/traceability?batch=${encodeURIComponent(code)}`);
+  }
+
   return (
-    <div className="bg-[#fbfdfb]">
-      {/* ── Ticker chữ chạy ── */}
-      <div className="bg-[#0f2e1a] text-emerald-100 py-2 overflow-hidden text-xs border-b border-emerald-900/50">
-        <div className="flex items-center gap-3 max-w-7xl mx-auto px-4 sm:px-6">
-          <span className="shrink-0 flex items-center gap-1.5 bg-emerald-700 text-white font-bold px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider shadow-xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Trực tiếp nông trại
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen">
+      {/* ── Live Supply Chain Telemetry Strip (Deep Botanical Ink) ── */}
+      <div className="bg-[#16261E] text-stone-200 py-2 overflow-hidden text-xs border-b border-stone-800">
+        <div className="flex items-center gap-4 max-w-7xl mx-auto px-4 sm:px-6">
+          <span className="shrink-0 flex items-center gap-1.5 bg-amber-400/15 text-amber-300 font-mono font-bold px-2.5 py-0.5 rounded text-[10px] uppercase tracking-wider border border-amber-400/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>NHẬT KÝ VỤ MÙA LIVE</span>
           </span>
           <div className="overflow-hidden whitespace-nowrap flex-1">
-            <div className="animate-marquee gap-12">
+            <div className="animate-marquee gap-14">
               {ticker.concat(ticker).map((t, i) => (
-                <span key={i} className="inline-block mr-12 font-medium">
-                  {t}
+                <span key={i} className="inline-flex items-center gap-2.5 mr-14 font-mono text-[11px] text-stone-300">
+                  <span className="text-amber-400">◆</span>
+                  <span>{t}</span>
                 </span>
               ))}
             </div>
@@ -169,174 +173,330 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Hero Section ── */}
-      <section className="bg-gradient-to-b from-emerald-50/70 via-emerald-50/30 to-white py-10 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-          <div className="space-y-5 animate-fade-in-up">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-semibold border border-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-              Tiêu chuẩn VietGAP & GlobalGAP
-            </span>
+      {/* ── Editorial Hero Section: Warm Alabaster Paper + Botanical Field Dossier ── */}
+      <section className="relative overflow-hidden border-b border-[#E4DFD5] pt-8 pb-12 sm:pt-12 sm:pb-16">
+        {/* Subtle Architectural Dot Grid in corner */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-1/2 editorial-grid-bg opacity-60 [mask-image:radial-gradient(ellipse_at_top_right,black,transparent_75%)]"
+        />
 
-            <h1 className="text-3xl sm:text-[46px] font-extrabold text-gray-900 leading-tight tracking-tight">
-              Nông Sản Tươi Sạch <br />
-              Từ Trang Trại Đến <br />
-              <span className="relative inline-block text-emerald-700">
-                <span key={wordIdx} className="animate-fade-in-up inline-block">
-                  {heroWords[wordIdx]}
-                </span>
-                <span className="absolute bottom-0.5 left-0 w-full h-2 bg-emerald-200/50 -z-10 rounded" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* Editorial Issue Masthead Strip */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-5 mb-7 border-b border-[#E4DFD5] text-[11px] font-mono text-stone-500">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-[#16261E] text-amber-300 font-bold">
+                CHỨNG THỰC GS1 · VIETGAP
               </span>
-            </h1>
-
-            <p className="text-gray-600 text-sm leading-relaxed max-w-lg">
-              Rau củ quả thu hoạch mỗi sáng tại Đà Lạt & Mộc Châu. Mỗi sản phẩm đều có mã QR truy xuất nguồn gốc
-              minh bạch từ nông trại đến tận bàn ăn của bạn.
-            </p>
-
-            <div className="flex flex-wrap gap-3 pt-1">
-              <Link
-                href="/products"
-                className="group px-6 py-3 rounded-xl text-sm font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm hover:shadow-md transition-all flex items-center gap-2"
-              >
-                <ShoppingBag size={15} strokeWidth={1.75} />
-                <span>Xem Cửa Hàng</span>
-                <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                href="/traceability"
-                className="px-6 py-3 rounded-xl text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:border-emerald-400 shadow-xs hover:shadow transition-all flex items-center gap-2"
-              >
-                <QrCode size={15} strokeWidth={1.75} className="text-emerald-700" />
-                <span>Tra Cứu Mã QR</span>
-              </Link>
+              <span>ẤN PHẨM NÔNG NGHIỆP MINH BẠCH · ĐÀ LẠT & MỘC CHÂU</span>
             </div>
-
-            {/* Mini stats */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200/80 max-w-sm">
-              <div>
-                <div className="text-lg font-extrabold text-emerald-700">100%</div>
-                <div className="text-[11px] text-gray-500">Chuẩn VietGAP</div>
-              </div>
-              <div>
-                <div className="text-lg font-extrabold text-amber-600">24 Giờ</div>
-                <div className="text-[11px] text-gray-500">Thu Hái & Giao</div>
-              </div>
-              <div>
-                <div className="text-lg font-extrabold text-blue-600">QR Code</div>
-                <div className="text-[11px] text-gray-500">Truy Xuất Gốc</div>
-              </div>
+            <div className="hidden sm:flex items-center gap-4">
+              <span>NHIỆT ĐỘ CHUỖI LẠNH: <strong className="text-[#166534]">2.0°C – 4.8°C</strong></span>
+              <span>·</span>
+              <span>KIỂM ĐỊNH KCS: <strong className="text-[#166534]">ISO/IEC 17025</strong></span>
             </div>
           </div>
 
-          <div className="animate-fade-in-up delay-200 rounded-2xl overflow-hidden shadow-xl border-4 border-white group relative">
-            <Image
-              src="/images/hero-farm.png"
-              alt="Nông trại sạch"
-              width={640}
-              height={420}
-              priority
-              className="w-full h-[320px] sm:h-[400px] object-cover group-hover:scale-105 transition-transform duration-700"
-            />
-            <div className="absolute bottom-4 left-4 right-4 p-3 rounded-xl bg-white/95 backdrop-blur-md shadow-lg border border-gray-100 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                  <Leaf size={16} />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
+            {/* Left Column (7 cols): Editorial Story & Passport Verification Console */}
+            <div className="lg:col-span-7 flex flex-col justify-between space-y-6 animate-fade-in-up">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F3EFE6] border border-[#E2DDD1] text-[11px] font-bold text-[#166534]">
+                  <Sprout size={13} />
+                  <span>Thu hoạch lúc 05:30 sáng · Định danh QR từng lô nông sản</span>
                 </div>
-                <div>
-                  <div className="font-bold text-gray-900">Nông Trại Xanh Mộc Châu</div>
-                  <div className="text-[11px] text-gray-500">Nhiệt độ thu hái: 18.5°C · Đạt chuẩn GlobalGAP</div>
+
+                <h1 className="font-serif text-3xl sm:text-5xl lg:text-[52px] font-bold text-[#16261E] leading-[1.13] tracking-tight">
+                  Nông Sản Chính Vụ <br />
+                  Minh Bạch Từ Đất Mẹ <br />
+                  Đến{" "}
+                  <span className="relative inline-block text-[#166534] italic">
+                    <span key={wordIdx} className="animate-fade-in-up inline-block not-italic font-bold">
+                      {heroWords[wordIdx]}
+                    </span>
+                    <span className="absolute -bottom-1 left-0 w-full h-2 bg-amber-300/45 -z-10 rounded-xs" />
+                  </span>
+                </h1>
+
+                <p className="text-stone-600 text-sm sm:text-base leading-relaxed max-w-xl">
+                  Không chỉ là cửa hàng rau củ — <strong className="text-[#16261E] font-semibold">AgriTrace AI</strong> là hồ sơ sinh thái sống của từng bó rau, trái ngọt. Quét mã QR độc bản để tra cứu hộ nông dân canh tác, dư lượng BVTV bằng 0 và hành trình xe lạnh <strong className="text-[#16261E] font-semibold">2°C – 5°C</strong> đến tận tay bạn.
+                </p>
+              </div>
+
+              {/* Dual Tactile CTAs */}
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href="/products"
+                  className="group px-6 py-3.5 rounded-xl text-sm font-bold text-white bg-[#16261E] hover:bg-[#166534] shadow-sm transition-all duration-200 flex items-center gap-2.5 cursor-pointer"
+                >
+                  <ShoppingBag size={16} className="text-amber-300" />
+                  <span>Đặt Mua Nông Sản Sáng Nay</span>
+                  <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+
+                <Link
+                  href="/traceability"
+                  className="group px-5 py-3.5 rounded-xl text-sm font-bold text-[#16261E] bg-white hover:bg-[#F3EFE6] border border-[#D8D2C5] shadow-2xs transition-all duration-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <QrCode size={16} className="text-[#A3630A]" />
+                  <span>Mở Trình Quét QR</span>
+                </Link>
+              </div>
+
+              {/* Interactive "Hộ Chiếu Nông Sản Số" (Digital Lot Passport Console) */}
+              <div className="rounded-2xl bg-white border border-[#E4DFD5] p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-mono font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+                    <QrCode size={13} className="text-[#166534]" />
+                    <span>TRA CỨU NHANH HỘ CHIẾU LÔ NÔNG SẢN (LOT PASSPORT)</span>
+                  </span>
+                  <span className="font-mono text-[10px] font-bold text-[#166534] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    ● Blockchain & KCS Verified
+                  </span>
+                </div>
+
+                <form
+                  onSubmit={handleQuickTrace}
+                  className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+                >
+                  <div className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#FBF9F5] border border-[#E4DFD5] focus-within:border-[#166534]">
+                    <span className="font-mono text-[11px] font-bold text-stone-400 select-none">MÃ LÔ:</span>
+                    <input
+                      id="quick-qr-input"
+                      type="text"
+                      value={quickQrInput}
+                      onChange={(e) => setQuickQrInput(e.target.value)}
+                      placeholder="Nhập mã lô (VD: AGRI-QR-XL-2026-08-DEMO)..."
+                      className="w-full text-xs font-mono font-bold text-[#16261E] bg-transparent outline-none placeholder:text-stone-400"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-[#A3630A] hover:bg-[#875006] text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+                  >
+                    <span>Kiểm Chứng Hồ Sơ</span>
+                    <ArrowUpRight size={14} />
+                  </button>
+                </form>
+
+                {/* Ledger Specs Row */}
+                <div className="grid grid-cols-3 divide-x divide-[#E4DFD5] pt-2 border-t border-[#F0ECE1] text-center sm:text-left">
+                  <div className="pr-3">
+                    <div className="font-mono text-xs sm:text-sm font-extrabold text-[#16261E]">0.00 ppm</div>
+                    <div className="text-[10px] text-stone-500">Dư lượng thuốc BVTV</div>
+                  </div>
+                  <div className="px-3">
+                    <div className="font-mono text-xs sm:text-sm font-extrabold text-[#166534]">&lt; 18 Giờ</div>
+                    <div className="text-[10px] text-stone-500">Từ vườn về bàn ăn</div>
+                  </div>
+                  <div className="pl-3">
+                    <div className="font-mono text-xs sm:text-sm font-extrabold text-[#A3630A]">100% FEFO</div>
+                    <div className="text-[10px] text-stone-500">Xuất kho theo độ tươi</div>
+                  </div>
                 </div>
               </div>
-              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Đang thu hái
-              </span>
+            </div>
+
+            {/* Right Column (5 cols): Asymmetric Botanical Dossier Bento */}
+            <div className="lg:col-span-5 grid grid-cols-2 gap-3.5 animate-fade-in-up delay-150">
+              {/* Main Specimen Photograph Card */}
+              <div className="col-span-2 relative rounded-2xl overflow-hidden border border-[#E4DFD5] bg-white p-2 shadow-sm group">
+                <div className="relative h-[250px] sm:h-[275px] rounded-xl overflow-hidden">
+                  <Image
+                    src="/images/hero-farm.png"
+                    alt="Nông trại sinh thái AgriTrace Đà Lạt & Mộc Châu"
+                    width={640}
+                    height={420}
+                    priority
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#16261E]/85 via-transparent to-transparent" />
+
+                  {/* Top Dossier Tag */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FBF9F5]/95 backdrop-blur-md text-[#16261E] font-mono text-[10px] font-bold shadow-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#166534] animate-ping" />
+                      <span>TRẠM CANH TÁC #DL-04 · LÂM ĐỒNG</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-md bg-[#16261E]/90 text-amber-300 font-mono text-[10px] font-bold">
+                      1,500m ASL
+                    </span>
+                  </div>
+
+                  {/* Bottom Specimen Caption */}
+                  <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3 text-white">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-amber-300">
+                        HỒ SƠ NÔNG TRẠI TIÊU BIỂU
+                      </p>
+                      <h3 className="font-serif text-base sm:text-lg font-bold leading-snug">
+                        Nông Trại Sinh Thái Đà Lạt & Mộc Châu
+                      </h3>
+                      <p className="text-[11px] text-stone-200">
+                        Nhiệt độ nhà màng: 18.5°C · Độ ẩm: 78% · Nước tưới RO
+                      </p>
+                    </div>
+                    <Link
+                      href="/traceability"
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[#FBF9F5] text-[#16261E] hover:bg-amber-300 transition-colors shrink-0"
+                    >
+                      Hồ sơ QR →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom-Left Bento Card: Cold Chain Telemetry Log */}
+              <div className="bento-card p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="w-8 h-8 rounded-lg bg-[#F6F3EC] text-[#16261E] border border-[#E4DFD5] flex items-center justify-center">
+                    <Thermometer size={16} className="text-[#166534]" />
+                  </span>
+                  <span className="font-mono px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-[#166534] border border-emerald-200">
+                    4.1°C · LIVE
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-stone-400">
+                    COLD-CHAIN TELEMETRY
+                  </div>
+                  <div className="text-xs font-extrabold text-[#16261E] mt-0.5">
+                    Chuỗi Kho & Xe Lạnh 24/7
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1 leading-snug">
+                    Giám sát nhiệt độ & hạn dùng FEFO theo từng lô thu hái.
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom-Right Bento Card: Harvest Ochre Voucher Stamp */}
+              <Link
+                href="/vouchers"
+                className="bento-card p-4 flex flex-col justify-between bg-[#16261E] text-white border-[#16261E] hover:border-amber-400 group cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="w-8 h-8 rounded-lg bg-white/10 text-amber-300 flex items-center justify-center">
+                    <Tag size={16} />
+                  </span>
+                  <span className="font-mono px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-300 text-[#16261E]">
+                    -30% VỤ MÙA
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-stone-400">
+                    MÃ TRỢ GIÁ NÔNG SẢN
+                  </div>
+                  <div className="text-xs font-bold text-amber-300 mt-0.5 flex items-center justify-between">
+                    <span className="font-mono text-sm">AGRI30</span>
+                    <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-stone-300 mt-1 leading-snug">
+                    Ưu đãi trực tiếp cho đơn hàng nông sản sạch đầu tiên.
+                  </p>
+                </div>
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Trust Badges Bar ── */}
-      <section className="border-y border-gray-200/80 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 grid grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* ── Architectural Quality Charter Strip (4 Columns with Hairline Dividers) ── */}
+      <section className="border-b border-[#E4DFD5] bg-[#F6F3EC]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#E4DFD5]">
           {[
             {
-              icon: <ShieldCheck size={20} strokeWidth={2} />,
-              color: "text-emerald-700 bg-emerald-50 border-emerald-200",
-              t: "100% Chuẩn VietGAP",
-              d: "Kiểm định vi sinh, không tồn dư BVTV",
+              code: "TIÊU CHUẨN 01",
+              icon: <ShieldCheck size={18} strokeWidth={2} className="text-[#166534]" />,
+              t: "100% Chuẩn VietGAP & GlobalGAP",
+              d: "Kiểm nghiệm vi sinh định kỳ, cam kết 0% tồn dư hóa chất BVTV",
             },
             {
-              icon: <Truck size={20} strokeWidth={2} />,
-              color: "text-blue-700 bg-blue-50 border-blue-200",
-              t: "Chuỗi Xe Lạnh 0 - 5°C",
-              d: "Bảo quản khép kín, giao nhanh trong 24H",
+              code: "TIÊU CHUẨN 02",
+              icon: <Truck size={18} strokeWidth={2} className="text-[#166534]" />,
+              t: "Chuỗi Lạnh Khép Kín 2°C – 5°C",
+              d: "Bảo quản kho lạnh FEFO, vận chuyển xe lạnh chuyên dụng trong 24H",
             },
             {
-              icon: <QrCode size={20} strokeWidth={2} />,
-              color: "text-amber-700 bg-amber-50 border-amber-200",
-              t: "Truy Xuất Tem QR Số",
-              d: "Rõ hộ nông dân, ngày hái & lô kiểm định",
+              code: "TIÊU CHUẨN 03",
+              icon: <QrCode size={18} strokeWidth={2} className="text-[#A3630A]" />,
+              t: "Tem QR Truy Xuất Độc Bản",
+              d: "Minh bạch hộ nông dân, giờ thu hái, nhật ký phân bón & chứng nhận KCS",
             },
             {
-              icon: <Award size={20} strokeWidth={2} />,
-              color: "text-purple-700 bg-purple-50 border-purple-200",
-              t: "Đổi Trả Uy Tín 24H",
-              d: "Hoàn tiền 100% nếu nông sản bị dập nát",
+              code: "TIÊU CHUẨN 04",
+              icon: <Award size={18} strokeWidth={2} className="text-[#A3630A]" />,
+              t: "Bảo Chứng Đổi Trả 1-Đổi-1",
+              d: "Hoàn tiền 100% trong 24H nếu rau củ dập nát hoặc sai lệch độ tươi",
             },
-          ].map((b) => (
-            <div key={b.t} className="flex items-start gap-3.5 p-2 rounded-xl">
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${b.color}`}
-              >
+          ].map((b, idx) => (
+            <div
+              key={b.t}
+              className={cn(
+                "py-5 flex items-start gap-3.5",
+                idx === 0 ? "sm:pr-5" : idx === 3 ? "sm:pl-5" : "sm:px-5"
+              )}
+            >
+              <div className="w-10 h-10 rounded-xl bg-white border border-[#E4DFD5] flex items-center justify-center shrink-0 shadow-2xs">
                 {b.icon}
               </div>
               <div>
-                <div className="font-bold text-xs sm:text-sm text-gray-900">{b.t}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5 leading-snug">{b.d}</div>
+                <span className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-stone-400">
+                  {b.code}
+                </span>
+                <div className="font-bold text-xs sm:text-sm text-[#16261E] mt-0.5">{b.t}</div>
+                <div className="text-[11px] text-stone-500 mt-0.5 leading-snug">{b.d}</div>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-16 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-16 py-12 sm:py-16">
         {/* ========================================================= */}
-        {/* PHẦN 1: DANH MỤC NÔNG SẢN TƯƠI TUYỂN CHỌN                 */}
+        {/* PHẦN 1: DANH MỤC NÔNG SẢN TƯƠI TUYỂN CHỌN (BOTANICAL GRID)*/}
         {/* ========================================================= */}
         <section>
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 mb-7 border-b border-[#E4DFD5]">
             <div>
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
-                <Sparkles size={14} className="text-emerald-600" />
-                <span>100% Nông sản tươi sạch từ trang trại</span>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#166534] flex items-center gap-1.5">
+                <span>CHUYÊN MỤC 01</span>
+                <span>·</span>
+                <span>PHÂN LOẠI NÔNG SẢN CHÍNH VỤ</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mt-1">
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] mt-1">
                 Danh Mục Nông Sản Tuyển Chọn
               </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Nông sản đạt chuẩn VietGAP & GlobalGAP thu hoạch mỗi sáng tại Đà Lạt & Mộc Châu.
-              </p>
             </div>
             <Link
               href="/products"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline shrink-0"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-[#E4DFD5] text-xs font-bold text-[#16261E] hover:bg-[#16261E] hover:text-white transition-all shadow-2xs shrink-0"
             >
-              <span>Xem tất cả danh mục</span>
-              <ArrowRight size={13} />
+              <span>Xem toàn bộ danh mục</span>
+              <ArrowRight size={14} />
             </Link>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories.map((c) => (
+            {isLoading && categories.length === 0
+              ? Array.from({ length: 6 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="bento-card p-3.5 h-56 animate-pulse flex flex-col justify-between"
+                  >
+                    <div className="aspect-square w-full rounded-xl bg-stone-200/70" />
+                    <div className="h-3 w-3/4 rounded bg-stone-200/70" />
+                    <div className="h-2.5 w-1/2 rounded bg-stone-200/60" />
+                  </div>
+                ))
+              : categories.map((c, idx) => (
               <Link
                 key={c.code}
                 href={`/products?cat=${c.code}`}
-                className="group p-3.5 rounded-2xl bg-white border border-gray-200/90 hover:border-emerald-500 hover:shadow-lg transition-all duration-300 flex flex-col justify-between"
+                className="bento-card group p-3.5 flex flex-col justify-between cursor-pointer"
               >
                 <div className="space-y-3">
                   {/* Category Thumbnail */}
-                  <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-gray-100">
+                  <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-[#F6F3EC] border border-[#EFECE4]">
                     <Image
                       src={c.image || "/images/categories/cat-rau.jpg"}
                       alt={c.name}
@@ -344,28 +504,24 @@ export default function HomePage() {
                       sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 16vw"
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
                     />
-                    <span
-                      className={`absolute top-2 left-2 text-[9px] font-bold px-2 py-0.5 rounded-full border shadow-2xs backdrop-blur-xs ${
-                        c.tagColor || "bg-emerald-50 text-emerald-800 border-emerald-200"
-                      }`}
-                    >
-                      {c.tag || "Tươi 24h"}
+                    <span className="absolute top-2 left-2 font-mono text-[9px] font-bold px-2 py-0.5 rounded bg-[#FBF9F5]/95 text-[#16261E] border border-[#E4DFD5] shadow-2xs">
+                      0{idx + 1} · {c.tag || "Tươi 24h"}
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-xs sm:text-sm text-gray-900 group-hover:text-emerald-700 transition-colors line-clamp-1">
+                    <h3 className="font-serif font-bold text-sm text-[#16261E] group-hover:text-[#166534] transition-colors line-clamp-1">
                       {c.name}
                     </h3>
-                    <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">{c.description}</p>
+                    <p className="text-[11px] text-stone-500 line-clamp-1 mt-0.5">{c.description}</p>
                   </div>
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-[11px] font-semibold text-emerald-700">
+                <div className="mt-3 pt-2.5 border-t border-[#F0ECE1] flex items-center justify-between text-[11px] font-bold text-[#166534]">
                   <span>Khám phá</span>
                   <ArrowRight
-                    size={12}
-                    className="group-hover:translate-x-1 transition-transform text-emerald-600"
+                    size={13}
+                    className="group-hover:translate-x-1 transition-transform"
                   />
                 </div>
               </Link>
@@ -374,37 +530,37 @@ export default function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* PHẦN 2: SẢN PHẨM MỚI THU HOẠCH & CAROUSEL QUAY LUI TỚI     */}
+        {/* PHẦN 2: SẢN PHẨM MỚI THU HOẠCH (BOTANICAL SPECIMEN CARDS) */}
         {/* ========================================================= */}
         <section>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-4 mb-7 border-b border-[#E4DFD5]">
             <div>
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
-                <Clock size={14} className="text-emerald-600" />
-                <span>Thu hoạch lúc 05:30 sáng nay · Chuỗi lạnh 2°C - 5°C</span>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#A3630A] flex items-center gap-1.5">
+                <Clock size={12} />
+                <span>CHUYÊN MỤC 02 · THU HOẠCH LÚC 05:30 SÁNG NAY · BẢO QUẢN LẠNH 2°C – 5°C</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mt-1">
-                Sản Phẩm Tươi Mới Trong Ngày ({products.length} sản phẩm)
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] mt-1">
+                Nông Sản Tươi Mới Trong Ngày ({products.length} lô)
               </h2>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Filter Tabs */}
-              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl text-xs font-semibold text-gray-500 overflow-x-auto">
+              <div className="flex gap-1 p-1 bg-[#F3EFE6] border border-[#E4DFD5] rounded-xl text-xs font-semibold text-stone-600 overflow-x-auto">
                 {[
-                  { id: "all", l: "Tất cả" },
+                  { id: "all", l: "Tất cả lô" },
                   { id: "rau", l: "Rau ăn lá" },
                   { id: "cu-qua", l: "Củ quả tươi" },
                   { id: "trai-cay", l: "Trái cây vụ này" },
-                  { id: "nam", l: "Nấm sạch" },
+                  { id: "nam", l: "Nấm hữu cơ" },
                 ].map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setTab(t.id)}
-                    className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
                       tab === t.id
-                        ? "bg-white text-emerald-800 font-bold shadow-xs"
-                        : "hover:text-gray-900"
+                        ? "bg-[#16261E] text-white font-bold shadow-2xs"
+                        : "hover:text-[#16261E] hover:bg-white/60"
                     }`}
                   >
                     {t.l}
@@ -412,25 +568,25 @@ export default function HomePage() {
                 ))}
               </div>
 
-              {/* Prev / Next Carousel Controls (Quay lui tới) */}
+              {/* Prev / Next Carousel Controls */}
               <div className="flex items-center gap-1.5 shrink-0 ml-1">
                 <button
                   type="button"
                   onClick={() => scrollProducts("left")}
-                  className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="w-9 h-9 rounded-xl bg-white border border-[#E4DFD5] text-[#16261E] hover:text-white hover:bg-[#16261E] flex items-center justify-center transition-all shadow-2xs cursor-pointer"
                   title="Quay lui sang trái"
                   aria-label="Quay lui"
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={17} />
                 </button>
                 <button
                   type="button"
                   onClick={() => scrollProducts("right")}
-                  className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="w-9 h-9 rounded-xl bg-white border border-[#E4DFD5] text-[#16261E] hover:text-white hover:bg-[#16261E] flex items-center justify-center transition-all shadow-2xs cursor-pointer"
                   title="Quay tới sang phải"
                   aria-label="Quay tới"
                 >
-                  <ChevronRight size={16} />
+                  <ChevronRight size={17} />
                 </button>
               </div>
             </div>
@@ -439,7 +595,7 @@ export default function HomePage() {
           {/* Carousel container with horizontal scroll & snap */}
           <div
             ref={productCarouselRef}
-            className="flex gap-5 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory"
+            className="flex gap-5 overflow-x-auto scroll-smooth pb-5 pt-1 snap-x snap-mandatory"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {shown.map((p) => {
@@ -452,11 +608,22 @@ export default function HomePage() {
                 <div
                   key={p.id}
                   onClick={() => setSelectedProduct(p)}
-                  className="w-[280px] sm:w-[305px] shrink-0 snap-start group bg-white rounded-2xl border border-gray-200/90 hover:border-emerald-400 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
+                  className="bento-card w-[285px] sm:w-[308px] shrink-0 snap-start group overflow-hidden flex flex-col justify-between cursor-pointer"
                 >
                   <div>
-                    {/* Product Image & Badges */}
-                    <div className="relative h-48 bg-gray-100 overflow-hidden">
+                    {/* Top Specimen Header Bar */}
+                    <div className="px-3.5 py-2 bg-[#FBF9F5] border-b border-[#EFECE4] flex items-center justify-between text-[10px] font-mono">
+                      <span className="font-bold text-[#166534] flex items-center gap-1">
+                        <QrCode size={11} />
+                        <span>LÔ #{p.batchCode}</span>
+                      </span>
+                      <span className="font-bold text-stone-500">
+                        CHỨNG NHẬN: <strong className="text-[#16261E]">{p.cert}</strong>
+                      </span>
+                    </div>
+
+                    {/* Product Image */}
+                    <div className="relative h-48 bg-[#F6F3EC] overflow-hidden">
                       <Image
                         src={p.image || "/images/products/xa-lach.jpg"}
                         alt={p.name}
@@ -465,26 +632,15 @@ export default function HomePage() {
                         className="object-cover group-hover:scale-105 transition-transform duration-500"
                       />
 
-                      {/* Top Badges */}
-                      <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-700 text-white shadow-xs">
-                          {p.cert}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/95 text-gray-800 shadow-xs backdrop-blur-xs flex items-center gap-1">
-                          <QrCode size={11} className="text-emerald-700" />
-                          <span>{p.batchCode}</span>
-                        </span>
-                      </div>
-
                       {discountPercent > 0 && (
-                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-xs">
+                        <span className="absolute top-2.5 right-2.5 font-mono px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#A3630A] text-white shadow-xs">
                           -{discountPercent}%
                         </span>
                       )}
 
                       {/* Harvest time tag */}
-                      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-[10px] font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#16261E]/85 backdrop-blur-md text-stone-100 text-[10px] font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                         <span>{p.harvest}</span>
                       </div>
                     </div>
@@ -492,11 +648,11 @@ export default function HomePage() {
                     {/* Content */}
                     <div className="p-4 space-y-2.5">
                       <div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mb-1">
-                          <MapPin size={12} className="text-emerald-600" />
-                          <span className="truncate">{p.origin || p.farm}</span>
+                        <div className="flex items-center gap-1 text-[11px] text-stone-500 mb-1">
+                          <MapPin size={12} className="text-[#166534] shrink-0" />
+                          <span className="truncate font-medium">{p.origin || p.farm}</span>
                         </div>
-                        <h3 className="font-bold text-sm text-gray-900 group-hover:text-emerald-700 transition-colors line-clamp-1">
+                        <h3 className="font-serif font-bold text-base text-[#16261E] group-hover:text-[#166534] transition-colors line-clamp-1">
                           {p.name}
                         </h3>
                       </div>
@@ -505,26 +661,26 @@ export default function HomePage() {
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1">
                           <Star size={13} className="fill-amber-400 text-amber-400" />
-                          <span className="font-bold text-gray-800">{p.rating}</span>
-                          <span className="text-gray-400">({p.reviews})</span>
+                          <span className="font-bold text-[#16261E]">{p.rating}</span>
+                          <span className="text-stone-400">({p.reviews})</span>
                         </div>
 
-                        <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                          Còn {p.stockLeft} suất
+                        <span className="font-mono text-[10px] text-[#166534] font-bold bg-emerald-50/80 px-2 py-0.5 rounded border border-emerald-200">
+                          CÒN {p.stockLeft} SUẤT
                         </span>
                       </div>
 
                       {/* Price Section */}
-                      <div className="pt-2 border-t border-gray-100 flex items-baseline justify-between">
+                      <div className="pt-2.5 border-t border-[#F0ECE1] flex items-baseline justify-between">
                         <div>
-                          <span className="text-base font-extrabold text-emerald-800">
+                          <span className="font-mono text-lg font-extrabold text-[#16261E]">
                             {p.price.toLocaleString("vi-VN")} đ
                           </span>
-                          <span className="text-xs text-gray-500 font-normal"> / {p.unit}</span>
+                          <span className="text-xs text-stone-500 font-medium"> / {p.unit}</span>
                           {p.oldPrice > p.price && (
-                            <div className="text-[11px] text-gray-400 line-through">
+                            <span className="ml-2 font-mono text-[11px] text-stone-400 line-through">
                               {p.oldPrice.toLocaleString("vi-VN")} đ
-                            </div>
+                            </span>
                           )}
                         </div>
                       </div>
@@ -536,15 +692,15 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={(e) => handleAddCart(p, e)}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="py-2.5 px-3 rounded-xl text-xs font-bold text-[#16261E] bg-[#F6F3EC] hover:bg-[#EAE5D9] border border-[#E4DFD5] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <ShoppingBag size={13} />
-                      <span>+ Giỏ</span>
+                      <span>+ Giỏ hàng</span>
                     </button>
                     <button
                       type="button"
                       onClick={(e) => handleBuyNow(p, e)}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      className="py-2.5 px-3 rounded-xl text-xs font-bold text-white bg-[#166534] hover:bg-[#14532D] shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <span>Mua ngay</span>
                       <ArrowRight size={13} />
@@ -555,22 +711,26 @@ export default function HomePage() {
             })}
           </div>
 
-          {/* Banner dẫn tới xem tất cả sản phẩm */}
-          <div className="mt-6 pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 bg-emerald-50/70 border border-emerald-200/70 rounded-2xl p-4 sm:p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+          {/* Editorial Callout Banner */}
+          <div className="mt-3 bento-card p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#F6F3EC]">
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-[#16261E] text-amber-300 flex items-center justify-center shrink-0 shadow-xs">
                 <Package size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-gray-900">Toàn bộ nông sản đạt chuẩn VietGAP & GlobalGAP</h4>
-                <p className="text-xs text-gray-600">Đầy đủ rau ăn lá thủy canh, củ quả tươi, trái cây vụ mùa và nấm sạch thu hoạch trực tiếp tại vườn.</p>
+                <h4 className="font-serif text-base font-bold text-[#16261E]">
+                  Kho Nông Sản Thực Thực Tế ({products.length} mặt hàng chính vụ)
+                </h4>
+                <p className="text-xs text-stone-600 mt-0.5">
+                  Đầy đủ rau ăn lá thủy canh, củ quả tươi, trái cây vụ mùa và nấm sạch thu hoạch trực tiếp tại vườn mỗi sáng.
+                </p>
               </div>
             </div>
             <Link
               href="/products"
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#16261E] hover:bg-[#166534] text-white font-bold text-xs shadow-sm transition-all shrink-0 cursor-pointer"
             >
-              <span>Xem tất cả sản phẩm ({products.length})</span>
+              <span>Xem toàn bộ cửa hàng</span>
               <ArrowRight size={14} />
             </Link>
           </div>
@@ -579,181 +739,163 @@ export default function HomePage() {
         {/* ========================================================= */}
         {/* PHẦN 3: HÀNH TRÌNH MINH BẠCH - NÔNG TRẠI ĐẾN BÀN ĂN        */}
         {/* ========================================================= */}
-        <section className="bg-gradient-to-br from-emerald-900 via-[#0e2c19] to-emerald-950 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <section className="bg-[#16261E] rounded-3xl p-6 sm:p-10 lg:p-12 text-white shadow-xl relative overflow-hidden border border-stone-800">
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 max-w-2xl mb-8 space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/80 text-emerald-200 text-xs font-bold border border-emerald-700">
-              <QrCode size={13} />
-              Tiêu chuẩn công nghệ số AgriTrace
-            </span>
-            <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Hành Trình Minh Bạch Từ Nông Trại Đến Bàn Ăn
-            </h2>
-            <p className="text-emerald-100/80 text-xs sm:text-sm leading-relaxed">
-              Mỗi sản phẩm đều gắn liền với một mã định danh duy nhất. Quét tem QR để kiểm chứng toàn bộ quá
-              trình sinh trưởng, nhiệt độ bảo quản lạnh và hồ sơ an toàn thực phẩm.
-            </p>
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 mb-8 border-b border-white/10">
+            <div className="max-w-2xl space-y-2.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-400/15 text-amber-300 font-mono text-[10px] font-bold uppercase tracking-wider border border-amber-400/30">
+                <QrCode size={12} />
+                <span>CHUYÊN MỤC 03 · GIAO THỨC TRUY XUẤT NGUỒN GỐC SỐ HÓA</span>
+              </span>
+              <h2 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight">
+                4 Chốt Kiểm Định Từ Đất Mẹ Đến Bàn Ăn
+              </h2>
+              <p className="text-stone-300 text-xs sm:text-sm leading-relaxed">
+                Mỗi sản phẩm đều gắn liền với một mã định danh QR duy nhất. Quét tem để kiểm chứng toàn bộ quá
+                trình sinh trưởng, kiểm định KCS, nhiệt độ bảo quản lạnh và lộ trình vận chuyển.
+              </p>
+            </div>
+
+            <Link
+              href="/traceability"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-[#16261E] text-xs font-extrabold transition-all shadow-md shrink-0"
+            >
+              <QrCode size={15} />
+              <span>Trình Quét QR Truy Xuất</span>
+              <ArrowRight size={14} />
+            </Link>
           </div>
 
           <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               {
-                step: "01",
-                title: "Canh Tác Chuẩn VietGAP",
-                desc: "Đất trồng và nguồn nước được kiểm nghiệm định kỳ, 100% không sử dụng thuốc trừ sâu cấm.",
-                tag: "Nông trại sinh thái",
+                step: "CHỐT 01",
+                title: "Canh Tác Sinh Thái VietGAP",
+                desc: "Đất trồng và nguồn nước được kiểm nghiệm định kỳ, 100% không sử dụng thuốc trừ sâu hóa học cấm.",
+                tag: "Tại Nông Trại",
               },
               {
-                step: "02",
-                title: "Số Hóa & Cấp Mã QR",
-                desc: "Mỗi lô thu hoạch được gán mã định danh số hóa trên blockchain, ghi nhận ngày hái và hộ nông dân.",
-                tag: "Tem điện tử chống giả",
+                step: "CHỐT 02",
+                title: "Thẩm Định KCS & Cấp Tem QR",
+                desc: "Mỗi lô thu hoạch được thẩm định tiêu chuẩn ISO 17025, ghi nhận ngày hái và hộ nông dân phụ trách.",
+                tag: "Kiểm Định Lô",
               },
               {
-                step: "03",
-                title: "Chuỗi Lạnh 0°C - 5°C",
-                desc: "Vận chuyển bằng xe lạnh chuyên dụng kiểm soát nhiệt độ liên tục theo thời gian thực.",
-                tag: "Giữ trọn độ tươi giòn",
+                step: "CHỐT 03",
+                title: "Kho Lạnh FEFO & Xe Lạnh 4°C",
+                desc: "Điều phối xuất kho tự động theo chuẩn FEFO và vận chuyển bằng xe lạnh giám sát nhiệt độ liên tục.",
+                tag: "Chuỗi Lạnh 24/7",
               },
               {
-                step: "04",
-                title: "Giao Nhanh 24H Tận Cửa",
-                desc: "Đến tay gia đình bạn chỉ sau vài giờ từ khi hái, cam kết bồi hoàn 100% nếu dập nát.",
-                tag: "Tươi ngon từng bữa ăn",
+                step: "CHỐT 04",
+                title: "Giao Tận Cửa & Đối Soát QR",
+                desc: "Đến tay gia đình bạn chỉ sau vài giờ từ khi thu hái, quét mã trên bao bì để đối soát toàn bộ lịch sử.",
+                tag: "Bàn Ăn Gia Đình",
               },
             ].map((st) => (
               <div
                 key={st.step}
-                className="p-5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex flex-col justify-between hover:bg-white/15 transition-all group"
+                className="p-5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex flex-col justify-between hover:bg-white/[0.09] hover:border-amber-300/40 transition-all duration-200 group"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl font-black text-emerald-400 group-hover:scale-110 transition-transform inline-block">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="font-mono text-xs font-extrabold text-amber-300 tracking-wider">
                       {st.step}
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/20">
+                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-stone-200">
                       {st.tag}
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold text-white mb-1.5">{st.title}</h3>
-                  <p className="text-xs text-emerald-100/70 leading-relaxed">{st.desc}</p>
+                  <h3 className="font-serif text-base font-bold text-white mb-2">{st.title}</h3>
+                  <p className="text-xs text-stone-300 leading-relaxed">{st.desc}</p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-1.5 text-[11px] text-emerald-300 font-semibold">
+                <div className="mt-5 pt-3 border-t border-white/10 flex items-center gap-1.5 text-[11px] font-mono text-emerald-300 font-semibold">
                   <CheckCircle2 size={13} />
-                  <span>Đã chuẩn hóa ISO & VietGAP</span>
+                  <span>VERIFIED ON AGRITRACE</span>
                 </div>
               </div>
             ))}
           </div>
-
-          <div className="relative z-10 mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold">
-                <QrCode size={20} />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-white">Bạn có tem QR trên bao bì?</p>
-                <p className="text-[11px] text-emerald-200/70">
-                  Dùng camera quét hoặc nhập mã lô để xem giấy kiểm nghiệm an toàn.
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/traceability"
-              className="px-5 py-2.5 rounded-xl bg-white text-emerald-900 text-xs font-bold hover:bg-emerald-50 transition-colors shadow-md flex items-center gap-1.5"
-            >
-              <span>Mở Trình Quét QR Truy Xuất</span>
-              <ArrowRight size={14} />
-            </Link>
-          </div>
         </section>
 
         {/* ========================================================= */}
-        {/* PHẦN 4: KHO VOUCHER & MÃ ƯU ĐÃI NÔNG SẢN                  */}
+        {/* PHẦN 4: KHO VOUCHER & MÃ ƯU ĐÃI NÔNG SẢN (HARVEST COUPONS)*/}
         {/* ========================================================= */}
         <section>
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 mb-7 border-b border-[#E4DFD5]">
             <div>
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
-                <Tag size={14} className="text-emerald-600" />
-                <span>Ưu đãi độc quyền nông sản sạch</span>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#A3630A] flex items-center gap-1.5">
+                <Tag size={12} />
+                <span>CHUYÊN MỤC 04 · PHIẾU TRỢ GIÁ NÔNG SẢN TRỰC TIẾP TỪ VƯỜN</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mt-1">
-                Mã Giảm Giá Hôm Nay
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] mt-1">
+                Mã Giảm Giá & Trợ Giá Mùa Vụ
               </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Sao chép mã voucher và nhập tại bước thanh toán để nhận ngay chiết khấu.
-              </p>
             </div>
 
             <Link
               href="/vouchers"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline shrink-0"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-[#E4DFD5] text-xs font-bold text-[#16261E] hover:bg-[#16261E] hover:text-white transition-all shadow-2xs shrink-0"
             >
               <span>Xem ví toàn bộ voucher ({vouchers.length})</span>
-              <ArrowRight size={13} />
+              <ArrowRight size={14} />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {vouchers.map((v) => {
               const isCopied = copiedCode === v.code;
 
               return (
                 <div
                   key={v.code}
-                  className="relative p-5 rounded-2xl bg-white border border-gray-200/90 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between overflow-hidden group"
+                  className="bento-card relative p-5 flex flex-col justify-between overflow-hidden group"
                 >
-                  <div className="absolute top-1/2 -left-2 w-4 h-4 bg-[#fbfdfb] rounded-full border-r border-gray-200 transform -translate-y-1/2" />
-                  <div className="absolute top-1/2 -right-2 w-4 h-4 bg-[#fbfdfb] rounded-full border-l border-gray-200 transform -translate-y-1/2" />
-
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          v.badgeColor || "bg-emerald-500 text-white"
-                        }`}
-                      >
+                      <span className="font-mono text-[10px] font-extrabold px-2.5 py-0.5 rounded bg-[#16261E] text-amber-300">
                         {v.badge}
                       </span>
-                      <span className="text-[11px] font-semibold text-gray-500">{v.exp}</span>
+                      <span className="font-mono text-[10px] font-semibold text-stone-500">
+                        HSD: {v.exp}
+                      </span>
                     </div>
 
                     <div>
-                      <div className="text-xl font-black text-emerald-800 tracking-tight">
+                      <div className="font-mono text-2xl font-black text-[#166534] tracking-tight">
                         {v.discount}
                       </div>
-                      <h3 className="font-bold text-sm text-gray-900 mt-0.5">{v.title}</h3>
-                      <p className="text-xs text-gray-500 mt-1">{v.description}</p>
+                      <h3 className="font-serif font-bold text-sm text-[#16261E] mt-1">{v.title}</h3>
+                      <p className="text-xs text-stone-500 mt-1 leading-relaxed">{v.description}</p>
                     </div>
                   </div>
 
-                  <div className="pt-4 mt-3 border-t border-dashed border-gray-200 flex items-center justify-between gap-2">
-                    <div className="px-2.5 py-1 rounded-lg bg-gray-100 border border-gray-200 text-xs font-mono font-bold text-gray-800">
+                  <div className="pt-4 mt-4 border-t border-dashed border-[#D8D2C5] flex items-center justify-between gap-2">
+                    <div className="px-2.5 py-1 rounded-lg bg-[#F6F3EC] border border-[#E4DFD5] text-xs font-mono font-bold text-[#16261E]">
                       {v.code}
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleCopyVoucher(v.code)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs ${
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer ${
                         isCopied
-                          ? "bg-emerald-700 text-white"
-                          : "bg-emerald-50 text-emerald-800 hover:bg-emerald-700 hover:text-white border border-emerald-200"
+                          ? "bg-[#166534] text-white"
+                          : "bg-[#16261E] text-white hover:bg-[#A3630A]"
                       }`}
                     >
                       {isCopied ? (
                         <>
                           <Check size={13} />
-                          <span>Đã sao chép!</span>
+                          <span>Đã chép</span>
                         </>
                       ) : (
                         <>
                           <Copy size={13} />
-                          <span>Sao chép mã</span>
+                          <span>Sao chép</span>
                         </>
                       )}
                     </button>
@@ -774,20 +916,23 @@ export default function HomePage() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in cursor-pointer"
         >
           <div
-            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col cursor-default"
+            className="relative w-full max-w-2xl bg-[#FBF9F5] rounded-3xl shadow-2xl border border-[#E4DFD5] overflow-hidden max-h-[92vh] flex flex-col cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header / Close */}
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-[#E4DFD5] bg-white flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-700 text-white">
+                <span className="px-2.5 py-0.5 rounded text-xs font-mono font-extrabold bg-[#16261E] text-amber-300">
                   {selectedProduct.cert}
                 </span>
-                <span className="text-xs font-bold text-gray-500">Mã lô: {selectedProduct.batchCode}</span>
+                <span className="text-xs font-mono font-bold text-stone-600">
+                  MÃ LÔ: #{selectedProduct.batchCode}
+                </span>
               </div>
               <button
                 onClick={() => setSelectedProduct(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                aria-label="Đóng chi tiết sản phẩm"
+                className="p-1.5 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -796,43 +941,43 @@ export default function HomePage() {
             {/* Modal Body */}
             <div className="overflow-y-auto p-5 sm:p-6 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100">
+                <div className="relative aspect-square rounded-2xl overflow-hidden bg-white border border-[#E4DFD5]">
                   <Image
                     src={selectedProduct.image || "/images/products/xa-lach.jpg"}
                     alt={selectedProduct.name}
                     fill
                     className="object-cover"
                   />
-                  <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-medium">
+                  <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-[#16261E]/85 backdrop-blur-md text-white text-[11px] font-mono">
                     {selectedProduct.harvest}
                   </div>
                 </div>
 
                 <div className="space-y-3 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <MapPin size={13} className="text-emerald-600" />
-                      <span>{selectedProduct.origin || selectedProduct.farm}</span>
+                    <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                      <MapPin size={13} className="text-[#166534]" />
+                      <span className="font-medium">{selectedProduct.origin || selectedProduct.farm}</span>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 leading-snug">
+                    <h3 className="font-serif text-xl font-bold text-[#16261E] leading-snug">
                       {selectedProduct.name}
                     </h3>
 
                     <div className="flex items-center gap-1.5 text-xs">
                       <div className="flex items-center text-amber-400">
                         <Star size={13} className="fill-amber-400" />
-                        <span className="ml-1 font-bold text-gray-800">{selectedProduct.rating}</span>
+                        <span className="ml-1 font-bold text-[#16261E]">{selectedProduct.rating}</span>
                       </div>
-                      <span className="text-gray-400">· {selectedProduct.reviews} đánh giá</span>
+                      <span className="text-stone-400">· {selectedProduct.reviews} đánh giá</span>
                     </div>
 
                     <div className="pt-2">
-                      <span className="text-2xl font-black text-emerald-800">
+                      <span className="font-mono text-2xl font-black text-[#166534]">
                         {selectedProduct.price.toLocaleString("vi-VN")} đ
                       </span>
-                      <span className="text-xs text-gray-500 font-normal"> / {selectedProduct.unit}</span>
+                      <span className="text-xs text-stone-500 font-normal"> / {selectedProduct.unit}</span>
                       {selectedProduct.oldPrice > selectedProduct.price && (
-                        <div className="text-xs text-gray-400 line-through">
+                        <div className="font-mono text-xs text-stone-400 line-through">
                           {selectedProduct.oldPrice.toLocaleString("vi-VN")} đ
                         </div>
                       )}
@@ -840,29 +985,29 @@ export default function HomePage() {
                   </div>
 
                   {/* Quantity selector */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <span className="text-xs font-semibold text-gray-700">Chọn số lượng:</span>
+                  <div className="space-y-2 pt-2 border-t border-[#E4DFD5]">
+                    <span className="text-xs font-bold text-[#16261E]">Chọn số lượng:</span>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="flex items-center border border-[#D8D2C5] bg-white rounded-xl overflow-hidden">
                         <button
                           type="button"
                           onClick={() => setModalQty(Math.max(1, modalQty - 1))}
-                          className="px-3 py-1.5 hover:bg-gray-100 text-gray-600 text-sm font-bold"
+                          className="px-3 py-1.5 hover:bg-stone-100 text-stone-700 text-sm font-bold cursor-pointer"
                         >
                           -
                         </button>
-                        <span className="px-3 py-1.5 text-xs font-bold text-gray-800 min-w-8 text-center">
+                        <span className="px-3 py-1.5 font-mono text-xs font-bold text-[#16261E] min-w-8 text-center">
                           {modalQty}
                         </span>
                         <button
                           type="button"
                           onClick={() => setModalQty(modalQty + 1)}
-                          className="px-3 py-1.5 hover:bg-gray-100 text-gray-600 text-sm font-bold"
+                          className="px-3 py-1.5 hover:bg-stone-100 text-stone-700 text-sm font-bold cursor-pointer"
                         >
                           +
                         </button>
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className="font-mono text-xs font-bold text-[#166534]">
                         = {(selectedProduct.price * modalQty).toLocaleString("vi-VN")} đ
                       </span>
                     </div>
@@ -871,51 +1016,51 @@ export default function HomePage() {
               </div>
 
               {/* Description */}
-              <div className="p-4 rounded-2xl bg-gray-50 text-xs text-gray-600 leading-relaxed">
+              <div className="p-4 rounded-2xl bg-white border border-[#E4DFD5] text-xs text-stone-700 leading-relaxed">
                 {selectedProduct.description}
               </div>
 
               {/* Specifications */}
               <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900">
-                  Thông số an toàn & Bảo quản
+                <h4 className="font-mono text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                  Hồ Sơ Kỹ Thuật & Bảo Quản Chuỗi Lạnh
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <Leaf size={14} className="text-emerald-600 shrink-0" />
+                  <div className="p-3 rounded-xl border border-[#E4DFD5] bg-white flex items-center gap-2.5">
+                    <Leaf size={15} className="text-[#166534] shrink-0" />
                     <div>
-                      <div className="text-[10px] text-gray-400">Phương pháp canh tác</div>
-                      <div className="font-semibold text-gray-800">
+                      <div className="text-[10px] text-stone-400">Phương pháp canh tác</div>
+                      <div className="font-bold text-[#16261E]">
                         {selectedProduct.cultivation || "Thủy canh / Hữu cơ VietGAP"}
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <Thermometer size={14} className="text-blue-600 shrink-0" />
+                  <div className="p-3 rounded-xl border border-[#E4DFD5] bg-white flex items-center gap-2.5">
+                    <Thermometer size={15} className="text-blue-600 shrink-0" />
                     <div>
-                      <div className="text-[10px] text-gray-400">Nhiệt độ bảo quản lạnh</div>
-                      <div className="font-semibold text-gray-800">
+                      <div className="text-[10px] text-stone-400">Nhiệt độ bảo quản lạnh</div>
+                      <div className="font-bold text-[#16261E]">
                         {selectedProduct.temperature || "2°C - 5°C xe lạnh"}
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+                  <div className="p-3 rounded-xl border border-[#E4DFD5] bg-white flex items-center gap-2.5">
+                    <ShieldCheck size={15} className="text-[#166534] shrink-0" />
                     <div>
-                      <div className="text-[10px] text-gray-400">Dư lượng thuốc BVTV</div>
-                      <div className="font-semibold text-gray-800">
+                      <div className="text-[10px] text-stone-400">Dư lượng thuốc BVTV</div>
+                      <div className="font-bold text-[#16261E]">
                         {selectedProduct.pesticide || "Không tồn dư hóa chất (BVTV = 0)"}
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2">
-                    <Package size={14} className="text-amber-600 shrink-0" />
+                  <div className="p-3 rounded-xl border border-[#E4DFD5] bg-white flex items-center gap-2.5">
+                    <Package size={15} className="text-[#A3630A] shrink-0" />
                     <div>
-                      <div className="text-[10px] text-gray-400">Đóng gói tiêu chuẩn</div>
-                      <div className="font-semibold text-gray-800">
+                      <div className="text-[10px] text-stone-400">Đóng gói tiêu chuẩn</div>
+                      <div className="font-bold text-[#16261E]">
                         {selectedProduct.packaging || "Màng thở vi lỗ bảo quản sinh học"}
                       </div>
                     </div>
@@ -925,13 +1070,13 @@ export default function HomePage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50/70 flex items-center justify-between gap-3">
+            <div className="p-4 sm:p-5 border-t border-[#E4DFD5] bg-white flex flex-wrap items-center justify-between gap-3">
               <Link
                 href={`/traceability?batch=${selectedProduct.batchCode}`}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 hover:border-emerald-500 bg-white text-gray-700 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-xl border border-[#D8D2C5] hover:border-[#16261E] bg-[#FBF9F5] text-[#16261E] text-xs font-bold transition-colors flex items-center gap-1.5"
               >
-                <QrCode size={14} className="text-emerald-700" />
-                <span>Xem nhật ký QR</span>
+                <QrCode size={14} className="text-[#166534]" />
+                <span>Xem hồ sơ QR</span>
               </Link>
 
               <div className="flex items-center gap-2">
@@ -956,7 +1101,7 @@ export default function HomePage() {
                     );
                     setSelectedProduct(null);
                   }}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 transition-colors"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-[#16261E] bg-[#F3EFE6] hover:bg-[#E5E0D4] border border-[#D8D2C5] transition-colors cursor-pointer"
                 >
                   + Thêm vào giỏ
                 </button>
@@ -964,7 +1109,7 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => handleBuyNow(selectedProduct, modalQty)}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-colors flex items-center gap-1"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#166534] hover:bg-[#14532D] shadow-sm transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <span>Mua ngay</span>
                   <ArrowRight size={13} />
