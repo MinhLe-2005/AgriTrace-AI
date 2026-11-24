@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body suppressHydrationWarning className="antialiased text-gray-800 bg-[#fbfdfb]">
+      <body suppressHydrationWarning className="antialiased text-[#16261E] bg-[#FBF9F5]">
         <Providers>
           <PublicLayoutWrapper>{children}</PublicLayoutWrapper>
         </Providers>
