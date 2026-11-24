@@ -34,6 +34,12 @@ public class Product {
     @Column(length = 128)
     private String farm;
 
+    @Column(name = "farm_code", length = 64)
+    private String farmCode;
+
+    @Column(name = "owner_id", length = 64)
+    private String ownerId;
+
     @Column(length = 64)
     private String cert;
 
