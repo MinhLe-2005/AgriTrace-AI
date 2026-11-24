@@ -3,6 +3,7 @@
 import { Building2, KeyRound, Lock, Mail, MapPin, Phone, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { DistributorPageHeader } from "@/components/distributor/distributor-ui";
+import { VerificationSubmission } from "@/features/verification/verification-submission";
 import { getApiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
 import { useAuthStore } from "@/stores/auth-store";
@@ -79,6 +80,7 @@ export default function DistributorSettingsPage() {
   return (
     <div className="space-y-6">
       <DistributorPageHeader title="Cài Đặt Tài Khoản" description="Cập nhật thông tin nhà phân phối và đổi mật khẩu truy cập an toàn." icon={UserRound} />
+      <VerificationSubmission type="DISTRIBUTOR" />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <section className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
           <div className="p-5 border-b border-gray-100"><h2 className="font-bold text-sm text-gray-900 flex items-center gap-2"><UserRound size={17} className="text-amber-700" /> Thông tin nhà phân phối</h2><p className="text-xs text-gray-500 mt-1">Thông tin này được dùng để nhận diện đơn vị điều phối.</p></div>

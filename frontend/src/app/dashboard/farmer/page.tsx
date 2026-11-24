@@ -37,6 +37,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { farmerService, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
+import { VerificationSubmission } from "@/features/verification/verification-submission";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -2307,6 +2308,8 @@ export default function FarmerPortalPage() {
           </button>
         </div>
       </div>
+
+      <VerificationSubmission type="FARMER" />
 
       {/* 2. Navigation Tabs (5 Khối nghiệp vụ chuẩn bài nói, QUẢN LÝ NÔNG TRẠI đứng đầu tiên) */}
       <div className="flex border-b border-gray-200 overflow-x-auto gap-2 text-xs font-bold">

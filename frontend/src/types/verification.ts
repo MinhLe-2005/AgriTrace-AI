@@ -25,7 +25,7 @@ export interface VerificationRequest {
   reviewedAt?: string | null;
 }
 
-export interface VerificationSubmitInput {
+export interface VerificationSubmission {
   type: VerificationType;
   organizationName: string;
   documentType: string;
@@ -33,3 +33,5 @@ export interface VerificationSubmitInput {
   note?: string;
   subjectEmail?: string;
 }
+
+export type VerificationSubmitInput = VerificationSubmission;

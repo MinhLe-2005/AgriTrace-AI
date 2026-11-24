@@ -88,6 +88,11 @@ public class VerificationService {
         return List.of();
     }
 
+    @Transactional(readOnly = true)
+    public List<VerificationResponse> listMine(UUID subjectId) {
+        return listMyRequests(subjectId, null);
+    }
+
     @Transactional
     public VerificationResponse decide(UUID id, VerificationDecision input, VerificationStatus target, UUID adminId) {
         VerificationRequest request = repository.findById(id)

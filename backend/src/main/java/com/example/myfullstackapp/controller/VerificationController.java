@@ -8,6 +8,7 @@ import com.example.myfullstackapp.service.VerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,7 +21,7 @@ public class VerificationController {
     private final VerificationService service;
 
     @PostMapping
-    public ApiResponse<VerificationResponse> submit(@Valid @RequestBody VerificationRequestCreate input, @org.springframework.security.core.annotation.AuthenticationPrincipal AppUserDetails principal) {
+    public ApiResponse<VerificationResponse> submit(@Valid @RequestBody VerificationRequestCreate input, @AuthenticationPrincipal AppUserDetails principal) {
         return ApiResponse.ok("Verification request submitted", service.submit(principal != null ? principal.getId() : null, input));
     }
 
@@ -32,7 +33,7 @@ public class VerificationController {
     @GetMapping("/my")
     public ApiResponse<List<VerificationResponse>> myRequests(
             @RequestParam(required = false) String email,
-            @org.springframework.security.core.annotation.AuthenticationPrincipal AppUserDetails principal
+            @AuthenticationPrincipal AppUserDetails principal
     ) {
         return ApiResponse.ok(
                 "My verification requests retrieved",
@@ -40,18 +41,23 @@ public class VerificationController {
         );
     }
 
+    @GetMapping("/mine")
+    public ApiResponse<List<VerificationResponse>> listMine(@AuthenticationPrincipal AppUserDetails principal) {
+        return ApiResponse.ok("My verification requests retrieved", service.listMine(principal != null ? principal.getId() : null));
+    }
+
     @PostMapping("/{id}/approve")
-    public ApiResponse<VerificationResponse> approve(@PathVariable UUID id, @Valid @RequestBody VerificationDecision input, @org.springframework.security.core.annotation.AuthenticationPrincipal AppUserDetails principal) {
+    public ApiResponse<VerificationResponse> approve(@PathVariable UUID id, @Valid @RequestBody VerificationDecision input, @AuthenticationPrincipal AppUserDetails principal) {
         return ApiResponse.ok("Verification approved", service.decide(id, input, VerificationStatus.APPROVED, principal != null ? principal.getId() : null));
     }
 
     @PostMapping("/{id}/reject")
-    public ApiResponse<VerificationResponse> reject(@PathVariable UUID id, @Valid @RequestBody VerificationDecision input, @org.springframework.security.core.annotation.AuthenticationPrincipal AppUserDetails principal) {
+    public ApiResponse<VerificationResponse> reject(@PathVariable UUID id, @Valid @RequestBody VerificationDecision input, @AuthenticationPrincipal AppUserDetails principal) {
         return ApiResponse.ok("Verification rejected", service.decide(id, input, VerificationStatus.REJECTED, principal != null ? principal.getId() : null));
     }
 
     @PostMapping("/{id}/request-changes")
-    public ApiResponse<VerificationResponse> requestChanges(@PathVariable UUID id, @Valid @RequestBody VerificationDecision input, @org.springframework.security.core.annotation.AuthenticationPrincipal AppUserDetails principal) {
+    public ApiResponse<VerificationResponse> requestChanges(@PathVariable UUID id, @Valid @RequestBody VerificationDecision input, @AuthenticationPrincipal AppUserDetails principal) {
         return ApiResponse.ok("Additional documents requested", service.decide(id, input, VerificationStatus.CHANGES_REQUESTED, principal != null ? principal.getId() : null));
     }
 }
