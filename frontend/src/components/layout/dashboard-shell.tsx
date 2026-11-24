@@ -135,25 +135,38 @@ function SidebarNavItems({
         const showGroup = item.group && item.group !== navItems[index - 1]?.group;
         return (
           <Fragment key={item.href}>
-          {showGroup && <div className={cn("px-3 pb-1 pt-4 text-[9px] font-bold uppercase tracking-[0.16em] text-gray-400", index === 0 && "pt-1")}>{item.group}</div>}
-          <Link
-            href={item.href}
-            onClick={onSelect}
-            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-[background-color,color,border-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
-              active
-                ? "bg-emerald-50 text-emerald-800 font-bold shadow-xs border border-emerald-100"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            }`}
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Icon
-                size={17}
-                className={active ? "text-emerald-700" : "text-gray-400"}
-              />
-              <span className="truncate">{item.label}</span>
-            </div>
-            {active && <ChevronRight size={14} className="text-emerald-700" />}
-          </Link>
+            {showGroup && (
+              <div
+                className={cn(
+                  "px-3.5 pb-1.5 pt-4 text-[10px] font-extrabold uppercase tracking-[0.16em] text-stone-400",
+                  index === 0 && "pt-1"
+                )}
+              >
+                {item.group}
+              </div>
+            )}
+            <Link
+              href={item.href}
+              onClick={onSelect}
+              className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534] ${
+                active
+                  ? "bg-[#166534] text-white font-bold shadow-sm"
+                  : "text-stone-600 hover:bg-stone-100/90 hover:text-stone-900"
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Icon
+                  size={17}
+                  className={
+                    active
+                      ? "text-amber-300"
+                      : "text-stone-400 group-hover:text-[#166534] transition-colors"
+                  }
+                />
+                <span className="truncate">{item.label}</span>
+              </div>
+              {active && <ChevronRight size={14} className="text-emerald-200 shrink-0" />}
+            </Link>
           </Fragment>
         );
       })}
@@ -251,34 +264,39 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50/70 font-sans text-gray-900">
+    <div className="min-h-screen flex bg-[#FBF9F5] font-sans text-[#16261E]">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <button
           aria-label="Đóng menu"
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/45 backdrop-blur-xs lg:hidden cursor-pointer"
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar: Fixed 280px on Desktop, Flex-synced so it NEVER overlaps main content */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] shrink-0 bg-[#F6F3EC] border-r border-[#E4DFD5] shadow-2xl lg:shadow-none flex flex-col transition-transform duration-200 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        {/* Brand */}
-        <div className="h-16 px-5 border-b border-gray-100 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center">
-              <Leaf size={18} strokeWidth={2.4} />
+        {/* Brand Header */}
+        <div className="h-16 px-5 border-b border-[#E4DFD5] flex items-center justify-between bg-[#FBF9F5]">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-[#16261E] text-amber-300 flex items-center justify-center shadow-xs group-hover:bg-[#166534] transition-colors">
+              <Leaf size={18} strokeWidth={2.3} />
             </div>
             <div>
-              <span className="font-extrabold text-base tracking-tight text-gray-900">
-                Agri<span className="text-emerald-700">Trace</span>
-              </span>
-              <span className="block text-[9px] uppercase tracking-wider text-gray-400 font-bold">
-                Nông sản sạch
+              <div className="flex items-center gap-1.5">
+                <span className="font-serif font-bold text-base tracking-tight text-[#16261E]">
+                  Agri<span className="text-[#166534]">Trace</span>
+                </span>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#166534]/10 text-[#166534]">
+                  v2.6
+                </span>
+              </div>
+              <span className="block text-[9px] uppercase tracking-[0.14em] text-stone-500 font-bold">
+                Botanical Supply OS
               </span>
             </div>
           </Link>
@@ -286,21 +304,21 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <button
             onClick={() => setSidebarOpen(false)}
             aria-label="Đóng menu điều hướng"
-            className="lg:hidden rounded p-1 text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+            className="lg:hidden rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534]"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* User Card */}
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+        {/* User Operator Dossier Card */}
+        <div className="p-4 border-b border-[#E4DFD5]">
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-[#E4DFD5] shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[#16261E] text-amber-300 flex items-center justify-center font-serif font-bold text-sm shadow-xs shrink-0">
               {user.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-gray-900 truncate">{user.name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs font-extrabold text-[#16261E] truncate">{user.name}</p>
+              <div className="flex items-center gap-1.5 mt-1">
                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeStyle.bg}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${badgeStyle.dot}`} />
                   {roleLabel}
@@ -311,12 +329,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Navigation Links */}
-        <nav className="p-3 flex-1 overflow-y-auto space-y-1">
-          <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-            {primaryRole === "CUSTOMER" ? "Khu Vực Cá Nhân" : "Bảng Chức Năng"}
+        <nav className="p-3.5 flex-1 overflow-y-auto space-y-1">
+          <div className="px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-stone-400">
+            {primaryRole === "CUSTOMER" ? "Khu Vực Cá Nhân" : "Điều Hành Chuỗi Cung Ứng"}
           </div>
 
-          <Suspense fallback={<div className="p-4 text-xs text-gray-400">Đang tải menu…</div>}>
+          <Suspense fallback={<div className="p-4 text-xs text-stone-400">Đang tải menu…</div>}>
             <SidebarNavItems
               navItems={navItems}
               pathname={pathname}
@@ -324,74 +342,81 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             />
           </Suspense>
 
-          <div className="pt-4 mt-3 border-t border-gray-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-            Lối Tắt Nhanh
+          <div className="pt-4 mt-3 border-t border-[#E4DFD5] px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-stone-400">
+            Lối Tắt Cổng Ngoài
           </div>
 
           <Link
             href="/"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-200/60 hover:text-[#16261E] transition-colors"
           >
-            <Home size={16} className="text-gray-400" />
-            <span>Trang Chủ</span>
+            <Home size={16} className="text-[#166534]" />
+            <span>Trang Chủ Nông Trại</span>
           </Link>
 
           <Link
             href="/products"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-200/60 hover:text-[#16261E] transition-colors"
           >
-            <Store size={16} className="text-gray-400" />
-            <span>Xem Cửa Hàng</span>
+            <Store size={16} className="text-[#A3630A]" />
+            <span>Cửa Hàng Nông Sản</span>
           </Link>
         </nav>
 
         {/* Footer Logout */}
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-3.5 border-t border-[#E4DFD5] bg-[#F2EFE8]">
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 border border-rose-200/80 rounded-xl transition-colors cursor-pointer shadow-2xs"
           >
-            <LogOut size={15} /> Đăng Xuất
+            <LogOut size={15} /> Đăng Xuất Hệ Thống
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
-        {/* Top Header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+      {/* Main Content Area: Exact lg:pl-[280px] matching w-[280px] sidebar so zero overlap occurs */}
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-[280px]">
+        {/* Top Architectural Bar */}
+        <header className="sticky top-0 z-30 h-16 bg-[#FBF9F5]/90 backdrop-blur-md border-b border-[#E4DFD5] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(true)}
               aria-label="Mở menu điều hướng"
-              className="lg:hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+              className="lg:hidden rounded-xl p-2 text-stone-700 hover:bg-stone-200/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534]"
             >
               <Menu size={20} />
             </button>
-            <h2 className="text-sm sm:text-base font-bold text-gray-800 truncate">
-              {primaryRole === "FARMER"
-                ? "Khu Vực Quản Lý Nông Trại"
-                : primaryRole === "ADMIN"
-                ? "Khu Vực Quản Trị Hệ Thống"
-                : primaryRole === "WAREHOUSE"
-                ? "Khu Vực Quản Lý Kho Bãi"
-                : primaryRole === "DISTRIBUTOR"
-                ? "Khu Vực Quản Lý Vận Chuyển"
-                : "Tài Khoản & Đơn Mua"}
-            </h2>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#16261E] text-amber-300 font-mono text-[10px] font-bold uppercase tracking-wider shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                LIVE OPS
+              </span>
+              <h2 className="font-serif text-sm sm:text-lg font-bold text-[#16261E] truncate">
+                {primaryRole === "FARMER"
+                  ? "Trung Tâm Quản Lý Nông Trại & Nhật Ký Mùa Vụ"
+                  : primaryRole === "ADMIN"
+                  ? "Trung Tâm Điều Hành Chuỗi Cung Ứng AgriTrace AI"
+                  : primaryRole === "WAREHOUSE"
+                  ? "Trung Tâm Quản Lý Kho Lạnh & Điều Phối FEFO"
+                  : primaryRole === "DISTRIBUTOR"
+                  ? "Trung Tâm Điều Phối Vận Chuyển Chuỗi Lạnh"
+                  : "Tài Khoản & Đơn Mua"}
+              </h2>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className={`hidden sm:inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${badgeStyle.bg}`}>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className={`hidden md:inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${badgeStyle.bg}`}>
               <span className={`w-2 h-2 rounded-full ${badgeStyle.dot}`} />
-              Vai trò: {roleLabel}
+              <span>{roleLabel}</span>
             </span>
 
             <Link
               href="/"
-              className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1"
+              className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#16261E] text-[#16261E] hover:text-white border border-[#E4DFD5] text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs"
             >
-              ← Về Trang Chủ
+              <Home size={13} />
+              <span>Trang Chủ</span>
             </Link>
           </div>
         </header>
