@@ -749,7 +749,7 @@ export default function FarmerPortalPage() {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
       if (tab && ["farms", "batches", "logs", "products", "certs"].includes(tab)) {
-        setActiveTab(tab as any);
+        setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs");
       }
     }
   }, []);
@@ -819,7 +819,7 @@ export default function FarmerPortalPage() {
   const [selectedLotForPrint, setSelectedLotForPrint] = useState<QrLabelLot | null>(null);
 
   const handleOpenPrintLabel = (lot: BatchItem | ApiHarvestLot) => {
-    const matchedFarm = farms.find((f) => f.code === (lot as any).farmCode);
+    const matchedFarm = farms.find((f) => f.code === lot.farmCode);
     setSelectedLotForPrint({
       code: lot.code,
       product: lot.product,
@@ -829,8 +829,8 @@ export default function FarmerPortalPage() {
       expiryDate: lot.expiryDate,
       cert: lot.cert,
       cultivation: lot.cultivation,
-      farmCode: (lot as any).farmCode,
-      farmName: matchedFarm ? matchedFarm.name : (lot as any).farmName,
+      farmCode: lot.farmCode,
+      farmName: matchedFarm ? matchedFarm.name : ("farmName" in lot ? lot.farmName : undefined),
       farmAddress: matchedFarm ? matchedFarm.address : undefined,
       transportDestination: lot.transportDestination,
     });
@@ -1007,9 +1007,9 @@ export default function FarmerPortalPage() {
               issuedBy: c.issuedBy || "Tổ chức Chứng nhận Nông nghiệp",
               issueDate: c.issueDate || "01/01/2026",
               expiryDate: c.expiryDate || "01/01/2027",
-              status: (c.status || "VALID") as any,
-              daysLeft: typeof c.daysLeft === "number" ? c.daysLeft : 365,
-              approvalStatus: (c.approvalStatus || "NONE") as any,
+              status: (c.status || "VALID") as CertificationItem["status"],
+              daysLeft: 365,
+              approvalStatus: (c.approvalStatus || "NONE") as CertificationItem["approvalStatus"],
               pendingRenewal: c.pendingNewCertNumber
                 ? {
                     newCertNumber: c.pendingNewCertNumber,
@@ -1036,12 +1036,12 @@ export default function FarmerPortalPage() {
           const mapped: FarmingLogItem[] = data.map((l) => ({
             id: String(l.id),
             farmCode: l.farmCode || "NT-DL-01",
-            batchCode: l.batchCode,
-            date: l.date,
-            stage: l.stage,
-            action: l.action,
-            materialsUsed: l.materialsUsed || "",
-            notes: l.notes || "",
+            batchCode: l.batchCode || "",
+            date: l.date || l.time || "",
+            stage: l.stage as FarmingLogItem["stage"],
+            action: l.action || l.stage,
+            materialsUsed: l.materialsUsed || l.materials || "",
+            notes: l.notes || l.note || "",
             proofImage: l.proofImage || undefined,
           }));
           setFarmingLogs(mapped);
@@ -1503,7 +1503,7 @@ export default function FarmerPortalPage() {
           },
         ]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Lỗi tải timeline lô:", err);
       setLotTimelineEvents([
         {
@@ -1584,8 +1584,8 @@ export default function FarmerPortalPage() {
       const freshEvents = await farmerService.getBatchTimeline(selectedLotForTimeline.code);
       setLotTimelineEvents(freshEvents);
       setAdminApprovalNote("");
-    } catch (err: any) {
-      toast.error(err.message || "Không thể cập nhật trạng thái duyệt");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không thể cập nhật trạng thái duyệt");
     } finally {
       setIsUpdatingLotStatus(false);
     }
@@ -1627,8 +1627,8 @@ export default function FarmerPortalPage() {
 
       const freshEvents = await farmerService.getBatchTimeline(selectedLotForTimeline.code);
       setLotTimelineEvents(freshEvents);
-    } catch (err: any) {
-      toast.error(err.message || "Không thể cập nhật vận chuyển");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không thể cập nhật vận chuyển");
     } finally {
       setIsUpdatingLotStatus(false);
     }
@@ -1663,8 +1663,8 @@ export default function FarmerPortalPage() {
         setLotTimelineEvents(freshEvents);
       }
       toast.success(`🚚 Tài xế đã quét mã QR tiếp nhận lô ${lotCode} lên xe lạnh thành công!`);
-    } catch (err: any) {
-      toast.error(err.message || "Không thể tiếp nhận hàng");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không thể tiếp nhận hàng");
     } finally {
       setIsUpdatingLotStatus(false);
     }
@@ -1699,8 +1699,8 @@ export default function FarmerPortalPage() {
         setLotTimelineEvents(freshEvents);
       }
       toast.success(`🏢 Thủ kho đã quét mã QR hoàn tất nhập kho đích cho lô ${lotCode}!`);
-    } catch (err: any) {
-      toast.error(err.message || "Không thể nhập kho đích");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không thể nhập kho đích");
     } finally {
       setIsUpdatingLotStatus(false);
     }
@@ -1727,8 +1727,8 @@ export default function FarmerPortalPage() {
       setCustomEventNote("");
       setCustomEventOperator("");
       setIsAddingCustomEvent(false);
-    } catch (err: any) {
-      toast.error(err.message || "Không thể thêm sự kiện");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không thể thêm sự kiện");
     } finally {
       setIsSubmittingCustomEvent(false);
     }
@@ -2153,7 +2153,7 @@ export default function FarmerPortalPage() {
           prev.filter((c) => c.certNumber !== certIdentifier && c.id !== certIdentifier)
         );
         toast.success(`Đã xóa vĩnh viễn chứng nhận "${name}" thành công!`);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn("Lỗi xóa chứng nhận phía server:", err);
         setCertifications((prev) =>
           prev.filter((c) => c.certNumber !== certIdentifier && c.id !== certIdentifier)
@@ -3772,7 +3772,7 @@ export default function FarmerPortalPage() {
                   <div>
                     <span className="font-bold text-emerald-950">Phạm vi nhật ký vòng đời lô thu hoạch:</span>
                     <p className="text-[10px] text-emerald-800/90 mt-0.5 leading-relaxed">
-                      Tiến trình dưới đây theo dõi chuỗi sự kiện <strong>hậu cần từ thời điểm thu hoạch trở đi</strong> (Thu hoạch → Kiểm định KCS → Admin duyệt xuất kho → Lưu kho lạnh & Vận chuyển). Các hoạt động chăm sóc ruộng đồng (Làm đất, Gieo trồng, Bón phân, Tưới tiêu) trước thu hoạch được lưu trữ riêng tại mục <strong>"Sổ Nhật Ký Canh Tác"</strong>.
+                      Tiến trình dưới đây theo dõi chuỗi sự kiện <strong>hậu cần từ thời điểm thu hoạch trở đi</strong> (Thu hoạch → Kiểm định KCS → Admin duyệt xuất kho → Lưu kho lạnh & Vận chuyển). Các hoạt động chăm sóc ruộng đồng (Làm đất, Gieo trồng, Bón phân, Tưới tiêu) trước thu hoạch được lưu trữ riêng tại mục <strong>&ldquo;Sổ Nhật Ký Canh Tác&rdquo;</strong>.
                     </p>
                   </div>
                 </div>
@@ -3997,7 +3997,7 @@ export default function FarmerPortalPage() {
                                 <Mail size={11} /> Gửi Lời Nhắc Đến Admin
                               </button>
                               <span className="text-[10px] text-amber-700 italic">
-                                (Yêu cầu sẽ hiển thị tại mục "Duyệt Lô Xuất Kho" của Admin)
+                                (Yêu cầu sẽ hiển thị tại mục &ldquo;Duyệt Lô Xuất Kho&rdquo; của Admin)
                               </span>
                             </div>
                           </div>

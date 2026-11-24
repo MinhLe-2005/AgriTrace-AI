@@ -14,9 +14,6 @@ import {
   Edit,
   Eye,
   FileCheck,
-  FileText,
-  Filter,
-  Gift,
   LayoutGrid,
   List,
   Package,
@@ -28,7 +25,6 @@ import {
   Shield,
   ShieldCheck,
   ShoppingBag,
-  Sparkles,
   CalendarDays,
   Ticket,
   Trash2,
@@ -47,7 +43,7 @@ import { useUsers } from "@/hooks/use-users";
 import { useVerificationMutations, useVerifications } from "@/hooks/use-verifications";
 import { getApiErrorMessage } from "@/lib/api";
 import { catalogService, type ApiOrder, type ApiVoucher } from "@/services/catalog.service";
-import { farmerService, type ApiHarvestLot } from "@/services/farmer.service";
+import { farmerService, type ApiFarmCertificate, type ApiHarvestLot } from "@/services/farmer.service";
 import { loyaltyService, type LoyaltyMemberAdmin } from "@/services/loyalty.service";
 import {
   useCampaignStore,
@@ -131,7 +127,7 @@ function AdminPortalContent() {
     try {
       const data = await farmerService.getBatches();
       setAdminBatches(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Lỗi tải danh sách lô thu hoạch phía Admin:", err);
     } finally {
       setAdminBatchesLoading(false);
@@ -202,20 +198,20 @@ function AdminPortalContent() {
       );
       setBatchDecisionTarget(null);
       setBatchDecisionReason("");
-    } catch (err: any) {
-      toast.error(err.message || "Không thể cập nhật phê duyệt lô");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
     } finally {
       setIsSubmittingBatchDecision(false);
     }
   };
 
   // Admin: Duyệt Chứng Nhận & Gia Hạn Nông Trại
-  const [adminCerts, setAdminCerts] = useState<any[]>([]);
+  const [adminCerts, setAdminCerts] = useState<ApiFarmCertificate[]>([]);
   const [adminCertsLoading, setAdminCertsLoading] = useState(false);
   const [adminCertSearch, setAdminCertSearch] = useState("");
   const [adminCertFilter, setAdminCertFilter] = useState<"ALL" | "PENDING" | "VALID" | "EXPIRED">("PENDING");
   const [certDecisionTarget, setCertDecisionTarget] = useState<{
-    cert: any;
+    cert: ApiFarmCertificate;
     action: "approve" | "reject";
   } | null>(null);
   const [certDecisionNote, setCertDecisionNote] = useState("");
@@ -229,7 +225,7 @@ function AdminPortalContent() {
     try {
       const data = await farmerService.getCertificates();
       setAdminCerts(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Lỗi tải danh sách chứng nhận phía Admin:", err);
     } finally {
       setAdminCertsLoading(false);
@@ -297,8 +293,8 @@ function AdminPortalContent() {
       );
       setCertDecisionTarget(null);
       setCertDecisionNote("");
-    } catch (err: any) {
-      toast.error(err.message || "Không thể cập nhật phê duyệt chứng nhận");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
     } finally {
       setIsSubmittingCertDecision(false);
     }
@@ -310,8 +306,8 @@ function AdminPortalContent() {
         await farmerService.deleteCertificate(certNumber);
         setAdminCerts((prev) => prev.filter((c) => c.certNumber !== certNumber));
         toast.success(`Đã xóa vĩnh viễn chứng nhận "${name}" thành công!`);
-      } catch (err: any) {
-        toast.error(err.message || "Không thể xóa chứng nhận");
+      } catch (err: unknown) {
+        toast.error(getApiErrorMessage(err));
       }
     }
   };
@@ -965,9 +961,53 @@ function AdminPortalContent() {
   } satisfies Record<AdminTab, { title: string; description: string; icon: typeof Shield; tone: "forest" | "ocean" | "violet" | "amber" | "teal" | "indigo"; meta: string }>;
   const pageHeader = headerByTab[activeTab];
 
+  const tabNavItems = [
+    { key: "verifications" as const, label: "Duyệt Hồ Sơ Vị Trí", icon: Shield, badge: pendingRequests.length },
+    { key: "batches" as const, label: "Duyệt Lô Xuất Kho", icon: Package, badge: pendingBatchesCount },
+    { key: "certs" as const, label: "Duyệt Chứng Nhận", icon: Award, badge: pendingCertsCount },
+    { key: "orders" as const, label: "Đơn Hàng", icon: ShoppingBag, badge: orders.length },
+    { key: "vouchers" as const, label: "Voucher", icon: Ticket, badge: vouchers.length },
+    { key: "loyalty" as const, label: "Hội Viên AgriClub", icon: Crown, badge: members.length },
+    { key: "events" as const, label: "Sự Kiện & Mùa Vụ", icon: CalendarDays, badge: campaigns.length },
+    { key: "blog" as const, label: "Blog & Cẩm Nang", icon: BookOpen, badge: blogPosts.length },
+  ];
+
   return (
     <div className="space-y-6 [&_button]:touch-manipulation [&_button]:focus-visible:outline-none [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-primary [&_input]:focus-visible:ring-2 [&_input]:focus-visible:ring-primary/30 [&_select]:focus-visible:ring-2 [&_select]:focus-visible:ring-primary/30 [&_textarea]:focus-visible:ring-2 [&_textarea]:focus-visible:ring-primary/30">
       <AdminPageHeader title={pageHeader.title} description={pageHeader.description} icon={pageHeader.icon} tone={pageHeader.tone} meta={pageHeader.meta} />
+
+      {/* Warm Botanical Editorial Quick-Tab Switcher */}
+      <nav aria-label="Điều hướng phân hệ quản trị" className="rounded-2xl border border-[#E4DFD5] bg-[#F6F3EC] p-1.5 flex items-center gap-1 overflow-x-auto">
+        {tabNavItems.map((t) => {
+          const Icon = t.icon;
+          const isCurrent = activeTab === t.key;
+          return (
+            <Link
+              key={t.key}
+              href={`/dashboard/admin?tab=${t.key}`}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer",
+                isCurrent
+                  ? "bg-[#16261E] text-white shadow-xs"
+                  : "text-stone-600 hover:text-[#16261E] hover:bg-white/80"
+              )}
+            >
+              <Icon size={14} className={isCurrent ? "text-amber-300" : "text-[#166534]"} />
+              <span>{t.label}</span>
+              <span
+                className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-extrabold",
+                  isCurrent
+                    ? "bg-amber-300 text-[#16261E]"
+                    : "bg-white border border-[#E4DFD5] text-stone-700"
+                )}
+              >
+                {t.badge}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* ========================================================= */}
       {/* TAB 1: PHÊ DUYỆT HỒ SƠ & TỔNG QUAN TÀI KHOẢN (MEMBER 1)     */}
@@ -981,14 +1021,14 @@ function AdminPortalContent() {
             <AdminStatCard label="Doanh thu hệ thống" value={`${totalRevenue.toLocaleString("vi-VN")} đ`} helper="Từ các đơn hàng đã xác nhận" icon={DollarSign} tone="success" />
           </div>
 
-          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 p-4">
+          <section className="bento-card overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4DFD5] bg-[#FBF9F5] p-5">
               <div>
-                <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-                  <UserCheck size={18} className="text-[#1a7a3a]" />
-                  Xét Duyệt Hồ Sơ Vị Trí & Cấp Quyền Hệ Thống
+                <h2 className="font-serif flex items-center gap-2 text-base font-bold text-[#16261E]">
+                  <UserCheck size={19} className="text-[#166534]" />
+                  <span>Xét Duyệt Hồ Sơ Vị Trí & Cấp Quyền Hệ Thống</span>
                 </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-stone-500 mt-0.5">
                   Khi bấm <strong>Phê duyệt</strong>, hệ thống sẽ tự động cấp quyền vào đúng vị trí (Nông dân / Thủ kho / Nhà phân phối) cho tài khoản ứng tuyển.
                 </p>
               </div>
@@ -1016,10 +1056,10 @@ function AdminPortalContent() {
                     type="button"
                     onClick={() => setVerificationFilterStatus(tab.key)}
                     className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
+                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer",
                       verificationFilterStatus === tab.key
-                        ? "bg-emerald-700 text-white shadow-xs"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        ? "bg-[#16261E] text-white shadow-xs"
+                        : "bg-white border border-[#E4DFD5] text-stone-600 hover:bg-stone-100"
                     )}
                   >
                     {tab.label}
@@ -1028,7 +1068,7 @@ function AdminPortalContent() {
                 <button
                   type="button"
                   onClick={() => void verifications.refetch()}
-                  className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 cursor-pointer"
+                  className="p-2 rounded-xl bg-white border border-[#E4DFD5] hover:bg-stone-100 text-[#166534] cursor-pointer"
                   title="Làm mới danh sách hồ sơ"
                 >
                   <RefreshCw size={14} className={verifications.isFetching ? "animate-spin" : ""} />
@@ -1037,14 +1077,14 @@ function AdminPortalContent() {
             </div>
 
             {/* Filter by Role Type */}
-            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-2.5 text-xs">
-              <span className="font-semibold text-gray-500">Vị trí ứng tuyển:</span>
+            <div className="flex flex-wrap items-center gap-2 border-b border-[#E4DFD5] bg-white px-5 py-3 text-xs">
+              <span className="font-bold text-stone-500">Vị trí ứng tuyển:</span>
               {(
                 [
                   { key: "ALL", label: "Tất cả vị trí" },
-                  { key: "FARMER", label: "🌾 Nông dân / Trang trại" },
-                  { key: "WAREHOUSE", label: "🏭 Nhân viên Kho lạnh" },
-                  { key: "DISTRIBUTOR", label: "🚚 Nhà phân phối / Xe lạnh" },
+                  { key: "FARMER", label: "Nông dân / Trang trại" },
+                  { key: "WAREHOUSE", label: "Nhân viên Kho lạnh" },
+                  { key: "DISTRIBUTOR", label: "Nhà phân phối / Xe lạnh" },
                 ] as const
               ).map((roleTab) => (
                 <button
@@ -1052,10 +1092,10 @@ function AdminPortalContent() {
                   type="button"
                   onClick={() => setVerificationFilterType(roleTab.key)}
                   className={cn(
-                    "px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer",
+                    "px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer",
                     verificationFilterType === roleTab.key
-                      ? "bg-white text-emerald-900 border border-emerald-300 shadow-2xs"
-                      : "text-gray-600 hover:bg-white/70"
+                      ? "bg-[#F6F3EC] text-[#166534] border border-[#166534]/40 shadow-2xs"
+                      : "text-stone-600 hover:bg-stone-100/70"
                   )}
                 >
                   {roleTab.label}
@@ -1078,10 +1118,10 @@ function AdminPortalContent() {
                   const isImageDoc = request.documentUrl?.startsWith("data:image/");
                   const roleBadge =
                     request.type === "FARMER"
-                      ? { label: "🌾 Nông dân (FARMER)", cls: "bg-emerald-50 text-emerald-800 border-emerald-200" }
+                      ? { label: "Nông dân (FARMER)", cls: "bg-emerald-50 text-[#15803D] border-emerald-200" }
                       : request.type === "WAREHOUSE"
-                      ? { label: "🏭 Nhân viên Kho (WAREHOUSE)", cls: "bg-blue-50 text-blue-800 border-blue-200" }
-                      : { label: "🚚 Nhà phân phối (DISTRIBUTOR)", cls: "bg-amber-50 text-amber-800 border-amber-200" };
+                      ? { label: "Nhân viên Kho (WAREHOUSE)", cls: "bg-blue-50 text-blue-800 border-blue-200" }
+                      : { label: "Nhà phân phối (DISTRIBUTOR)", cls: "bg-amber-50 text-[#A16207] border-amber-200" };
                   const statusBadge =
                     request.status === "APPROVED"
                       ? { label: "Đã phê duyệt & Cấp quyền", cls: "bg-emerald-100 text-emerald-900" }
@@ -1296,37 +1336,40 @@ function AdminPortalContent() {
         <div className="space-y-6 animate-fade-in">
           {/* Batch Approval KPIs */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Tổng lô khai báo</div>
-              <div className="text-2xl font-black text-gray-900">{adminBatches.length}</div>
-              <p className="mt-1 text-[11px] text-gray-400">Từ các nông trại trực thuộc</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Chờ duyệt xuất kho</div>
-              <div className="text-2xl font-black text-amber-600">{pendingBatchesCount}</div>
-              <p className="mt-1 text-[11px] text-amber-600/80 font-medium">Cần Admin thẩm định KCS</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Đã duyệt xuất kho</div>
-              <div className="text-2xl font-black text-emerald-700">
-                {adminBatches.filter((b) => b.status === "Đã duyệt xuất kho").length}
-              </div>
-              <p className="mt-1 text-[11px] text-emerald-600/80 font-medium">Đủ điều kiện lưu thông</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Đang vận chuyển / Giao</div>
-              <div className="text-2xl font-black text-blue-700">
-                {
-                  adminBatches.filter(
-                    (b) => b.transportStatus === "Đang vận chuyển" || b.transportStatus === "Đã nhập kho đích"
-                  ).length
-                }
-              </div>
-              <p className="mt-1 text-[11px] text-gray-400">Chuỗi logistics bảo quản lạnh</p>
-            </div>
+            <AdminStatCard
+              label="Tổng lô khai báo"
+              value={adminBatches.length}
+              helper="Từ các nông trại trực thuộc"
+              icon={Package}
+            />
+            <AdminStatCard
+              label="Chờ duyệt xuất kho"
+              value={pendingBatchesCount}
+              helper="Cần Admin thẩm định KCS"
+              icon={Clock}
+              tone="warning"
+            />
+            <AdminStatCard
+              label="Đã duyệt xuất kho"
+              value={adminBatches.filter((b) => b.status === "Đã duyệt xuất kho").length}
+              helper="Đủ điều kiện lưu thông"
+              icon={CheckCircle2}
+              tone="success"
+            />
+            <AdminStatCard
+              label="Đang vận chuyển / Giao"
+              value={
+                adminBatches.filter(
+                  (b) => b.transportStatus === "Đang vận chuyển" || b.transportStatus === "Đã nhập kho đích"
+                ).length
+              }
+              helper="Chuỗi logistics bảo quản lạnh"
+              icon={Truck}
+              tone="primary"
+            />
           </div>
 
-          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
+          <section className="bento-card overflow-hidden">
             {/* Header & Filter Controls */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 p-4">
               <div>
@@ -1638,12 +1681,12 @@ function AdminPortalContent() {
 
                   {batchDecisionTarget.action === "approve" ? (
                     <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-[11px] leading-relaxed">
-                      Khi xác nhận phê duyệt, lô hàng sẽ chuyển sang trạng thái <strong>"Đã duyệt xuất kho"</strong>.
+                      Khi xác nhận phê duyệt, lô hàng sẽ chuyển sang trạng thái <strong>&ldquo;Đã duyệt xuất kho&rdquo;</strong>.
                       Nông dân sẽ được mở khóa quyền điều phối xe lạnh và bắt đầu vận chuyển nông sản đến kho đích.
                     </div>
                   ) : (
                     <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-[11px] leading-relaxed">
-                      Lô hàng sẽ bị đánh dấu <strong>"Từ chối xuất kho"</strong>. Hệ thống sẽ khóa chức năng điều phối vận chuyển của nông dân cho đến khi có kết quả kiểm định mới.
+                      Lô hàng sẽ bị đánh dấu <strong>&ldquo;Từ chối xuất kho&rdquo;</strong>. Hệ thống sẽ khóa chức năng điều phối vận chuyển của nông dân cho đến khi có kết quả kiểm định mới.
                     </div>
                   )}
 
@@ -1704,33 +1747,36 @@ function AdminPortalContent() {
         <div className="space-y-6 animate-fade-in">
           {/* Certificate Approval KPIs */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Tổng chứng nhận nông trại</div>
-              <div className="text-2xl font-black text-gray-900">{adminCerts.length}</div>
-              <p className="mt-1 text-[11px] text-gray-400">VietGAP, GlobalGAP, Organic</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Chờ duyệt gia hạn & cấp mới</div>
-              <div className="text-2xl font-black text-amber-600">{pendingCertsCount}</div>
-              <p className="mt-1 text-[11px] text-amber-600/80 font-medium">Cần Admin thẩm định hồ sơ</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Đang có hiệu lực</div>
-              <div className="text-2xl font-black text-emerald-700">
-                {adminCerts.filter((c) => c.status === "VALID" && c.approvalStatus !== "PENDING").length}
-              </div>
-              <p className="mt-1 text-[11px] text-emerald-600/80 font-medium">Đạt chuẩn lưu hành nông sản</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
-              <div className="text-xs text-gray-500">Sắp hết hạn / Hết hạn</div>
-              <div className="text-2xl font-black text-rose-600">
-                {adminCerts.filter((c) => c.status === "EXPIRING_SOON" || c.status === "EXPIRED").length}
-              </div>
-              <p className="mt-1 text-[11px] text-rose-500/80 font-medium">Cảnh báo tự động gửi email</p>
-            </div>
+            <AdminStatCard
+              label="Tổng chứng nhận nông trại"
+              value={adminCerts.length}
+              helper="VietGAP, GlobalGAP, Organic"
+              icon={Award}
+            />
+            <AdminStatCard
+              label="Chờ duyệt gia hạn & cấp mới"
+              value={pendingCertsCount}
+              helper="Cần Admin thẩm định hồ sơ"
+              icon={Clock}
+              tone="warning"
+            />
+            <AdminStatCard
+              label="Đang có hiệu lực"
+              value={adminCerts.filter((c) => c.status === "VALID" && c.approvalStatus !== "PENDING").length}
+              helper="Đạt chuẩn lưu hành nông sản"
+              icon={ShieldCheck}
+              tone="success"
+            />
+            <AdminStatCard
+              label="Sắp hết hạn / Hết hạn"
+              value={adminCerts.filter((c) => c.status === "EXPIRING_SOON" || c.status === "EXPIRED").length}
+              helper="Cảnh báo tự động gửi email"
+              icon={AlertTriangle}
+              tone="danger"
+            />
           </div>
 
-          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
+          <section className="bento-card overflow-hidden">
             {/* Header & Filter Controls */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 p-4">
               <div>
@@ -1911,7 +1957,7 @@ function AdminPortalContent() {
                             {c.pendingProofImage ? (
                               <button
                                 type="button"
-                                onClick={() => setViewingProofImage(c.pendingProofImage)}
+                                onClick={() => setViewingProofImage(c.pendingProofImage ?? null)}
                                 className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer"
                               >
                                 <Eye size={11} /> Xem ảnh hồ sơ
@@ -2038,7 +2084,7 @@ function AdminPortalContent() {
                       {certDecisionTarget.cert.pendingRequestedExpiryDate && (
                         <span>
                           {" "}
-                          $\rightarrow$ Đề xuất hạn mới:{" "}
+                          → Đề xuất hạn mới:{" "}
                           <strong className="text-emerald-700 font-bold">
                             {certDecisionTarget.cert.pendingRequestedExpiryDate}
                           </strong>
@@ -2182,7 +2228,7 @@ function AdminPortalContent() {
           </div>
 
           {/* Filter & Search Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <div className="bento-card flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -2230,7 +2276,7 @@ function AdminPortalContent() {
           </div>
 
           {/* Orders Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold">
@@ -2383,7 +2429,7 @@ function AdminPortalContent() {
           </div>
 
           {/* Vouchers Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold">
@@ -2486,7 +2532,7 @@ function AdminPortalContent() {
           </div>
 
           {/* Members Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold">
@@ -2609,7 +2655,7 @@ function AdminPortalContent() {
           </div>
 
           {/* Filter & Search */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <div className="bento-card flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -2832,7 +2878,7 @@ function AdminPortalContent() {
           </div>
 
           {/* Filter & Search */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <div className="bento-card flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -2871,7 +2917,7 @@ function AdminPortalContent() {
           </div>
 
           {/* Blog Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold">

@@ -42,6 +42,47 @@ export type BatchChangeEvent = {
   timestamp: string;
 };
 
+export type ApiFarmingLog = {
+  id?: number | string;
+  batchCode: string;
+  farmCode?: string;
+  ownerId?: string;
+  stage: string;
+  time?: string;
+  date?: string;
+  action?: string;
+  note?: string;
+  notes?: string;
+  materials?: string;
+  materialsUsed?: string;
+  proofImage?: string;
+  image?: string;
+  operator?: string;
+  createdAt?: string;
+};
+
+export type ApiFarmCertificate = {
+  id?: number | string;
+  certNumber: string;
+  name: string;
+  farmCode?: string;
+  farmName?: string;
+  issuedBy?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  status?: string;
+  daysLeft?: number;
+  approvalStatus?: string;
+  pendingRequestedExpiryDate?: string;
+  pendingNewCertNumber?: string;
+  pendingProofImage?: string;
+  pendingNote?: string;
+  submittedAt?: string;
+  alertEmail?: string;
+  adminNote?: string;
+  ownerId?: string;
+};
+
 export type ApiProductItem = {
   id: string;
   name: string;
@@ -91,13 +132,13 @@ export const farmerService = {
     return res.data.data;
   },
 
-  async getLogs(params?: { ownerId?: string; farmCode?: string; batchCode?: string }): Promise<any[]> {
-    const res = await api.get<any[]>("/farmer/logs", { params });
+  async getLogs(params?: { ownerId?: string; farmCode?: string; batchCode?: string }): Promise<ApiFarmingLog[]> {
+    const res = await api.get<ApiFarmingLog[]>("/farmer/logs", { params });
     return res.data;
   },
 
-  async createLog(log: any): Promise<any> {
-    const res = await api.post<{ success: boolean; data?: any }>("/farmer/logs", log);
+  async createLog(log: Partial<ApiFarmingLog>): Promise<ApiFarmingLog | undefined> {
+    const res = await api.post<{ success: boolean; data?: ApiFarmingLog }>("/farmer/logs", log);
     return res.data?.data;
   },
 
@@ -213,13 +254,13 @@ export const farmerService = {
     return res.data;
   },
 
-  async getCertificates(): Promise<any[]> {
-    const res = await api.get<any[]>("/farmer/certificates");
+  async getCertificates(): Promise<ApiFarmCertificate[]> {
+    const res = await api.get<ApiFarmCertificate[]>("/farmer/certificates");
     return res.data;
   },
 
-  async saveCertificate(cert: any): Promise<any> {
-    const res = await api.post<{ success: boolean; data?: any }>("/farmer/certificates", cert);
+  async saveCertificate(cert: Partial<ApiFarmCertificate>): Promise<ApiFarmCertificate | undefined> {
+    const res = await api.post<{ success: boolean; data?: ApiFarmCertificate }>("/farmer/certificates", cert);
     return res.data?.data;
   },
 
@@ -229,8 +270,8 @@ export const farmerService = {
     requestedExpiryDate: string;
     proofImage?: string;
     note?: string;
-  }): Promise<any> {
-    const res = await api.post<{ success: boolean; message?: string; data?: any }>(
+  }): Promise<ApiFarmCertificate> {
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiFarmCertificate }>(
       "/farmer/certificates/renew",
       payload
     );
@@ -243,8 +284,8 @@ export const farmerService = {
   async decideCertificate(
     certNumber: string,
     payload: { action: "approve" | "reject"; adminNote?: string; newCertNumber?: string; approvedExpiryDate?: string }
-  ): Promise<any> {
-    const res = await api.patch<{ success: boolean; message?: string; data?: any }>(
+  ): Promise<ApiFarmCertificate> {
+    const res = await api.patch<{ success: boolean; message?: string; data?: ApiFarmCertificate }>(
       `/farmer/certificates/${encodeURIComponent(certNumber)}/decision`,
       payload
     );
@@ -254,8 +295,8 @@ export const farmerService = {
     return res.data.data;
   },
 
-  async triggerCertAutoScan(): Promise<{ success: boolean; message?: string; data?: any }> {
-    const res = await api.post<{ success: boolean; message?: string; data?: any }>("/farmer/certificates/trigger-auto-scan");
+  async triggerCertAutoScan(): Promise<{ success: boolean; message?: string; data?: Record<string, unknown> }> {
+    const res = await api.post<{ success: boolean; message?: string; data?: Record<string, unknown> }>("/farmer/certificates/trigger-auto-scan");
     return res.data;
   },
 

@@ -46,7 +46,7 @@ import { useSearchParams } from "next/navigation";
 import { useState, useRef, useEffect, useMemo } from "react";
 import jsQR from "jsqr";
 import { catalogService, ApiTraceability } from "@/services/catalog.service";
-import { farmerService, ApiHarvestLot } from "@/services/farmer.service";
+import { farmerService, ApiHarvestLot, ApiFarmingLog } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
@@ -1074,8 +1074,7 @@ export default function TraceabilityPage() {
   const [farmerBatches, setFarmerBatches] = useState<ApiHarvestLot[]>([]);
 
   // Nhật ký canh tác đồng ruộng & Ảnh minh chứng thực tế (Mục 2)
-  const [farmingLogs, setFarmingLogs] = useState<any[]>([]);
-  const [isLogsLoading, setIsLogsLoading] = useState(false);
+  const [farmingLogs, setFarmingLogs] = useState<ApiFarmingLog[]>([]);
   const [selectedProofImage, setSelectedProofImage] = useState<{
     url: string;
     title: string;
@@ -1097,7 +1096,7 @@ export default function TraceabilityPage() {
         const [traces, fBatches, fLogs] = await Promise.all([
           catalogService.getAllTraceability().catch(() => [] as ApiTraceability[]),
           farmerService.getBatches().catch(() => [] as ApiHarvestLot[]),
-          farmerService.getLogs().catch(() => [] as any[]),
+          farmerService.getLogs().catch(() => [] as ApiFarmingLog[]),
         ]);
 
         if (fBatches && fBatches.length > 0) {
@@ -1305,13 +1304,13 @@ export default function TraceabilityPage() {
         const clean = cleanParsedCode(searchedBatch);
         const [res, logs] = await Promise.all([
           catalogService.getTraceabilityByBatch(clean).catch(() => null),
-          farmerService.getLogs().catch(() => [] as any[]),
+          farmerService.getLogs().catch(() => [] as ApiFarmingLog[]),
         ]);
         if (!isCancelled) {
           if (res) setLiveRecord(res);
           if (Array.isArray(logs) && logs.length > 0) setFarmingLogs(logs);
         }
-      } catch (err) {
+      } catch {
         if (!isCancelled) setLiveRecord(null);
       }
     }
@@ -1833,7 +1832,7 @@ export default function TraceabilityPage() {
 
               {/* Grid các thẻ công đoạn canh tác kèm ảnh chụp */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayFarmingLogs.map((log: any, idx: number) => {
+                {displayFarmingLogs.map((log: ApiFarmingLog, idx: number) => {
                   const stageUpper = (log.stage || "").toLowerCase();
                   let stageBg = "bg-emerald-50 text-emerald-800 border-emerald-200";
                   let stageIcon = <Leaf size={14} className="text-emerald-600" />;
@@ -1868,10 +1867,10 @@ export default function TraceabilityPage() {
                             <div
                               onClick={() =>
                                 setSelectedProofImage({
-                                  url: log.proofImage,
+                                  url: log.proofImage || "",
                                   title: log.action || log.stage,
                                   stage: log.stage,
-                                  date: log.date,
+                                  date: log.date || log.time || "",
                                   materialsUsed: log.materialsUsed,
                                   notes: log.notes,
                                   batchCode: log.batchCode || currentData.batchCode,
@@ -1939,10 +1938,10 @@ export default function TraceabilityPage() {
                             type="button"
                             onClick={() =>
                               setSelectedProofImage({
-                                url: log.proofImage,
+                                url: log.proofImage || "",
                                 title: log.action || log.stage,
                                 stage: log.stage,
-                                date: log.date,
+                                date: log.date || log.time || "",
                                 materialsUsed: log.materialsUsed,
                                 notes: log.notes,
                                 batchCode: log.batchCode || currentData.batchCode,

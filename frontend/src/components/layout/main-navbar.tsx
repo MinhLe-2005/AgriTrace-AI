@@ -144,18 +144,18 @@ export function MainNavbar() {
   }, [user?.id, user?.email, isSpecialRole, updateUser]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/90 shadow-xs">
+    <header className="sticky top-0 z-50 bg-[#FBF9F5]/95 backdrop-blur-md border-b border-[#E4DFD5]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+        <Link href="/" className="flex items-center gap-3 shrink-0 group">
+          <div className="w-9 h-9 rounded-xl bg-[#16261E] text-amber-300 flex items-center justify-center shadow-xs group-hover:bg-[#166534] transition-colors">
             <Leaf size={18} strokeWidth={2.2} />
           </div>
           <div>
-            <span className="font-extrabold text-base tracking-tight text-gray-900">
-              Agri<span className="text-emerald-700">Trace</span>
+            <span className="font-serif font-bold text-base tracking-tight text-[#16261E]">
+              Agri<span className="text-[#166534]">Trace</span>
             </span>
-            <span className="block text-[9px] uppercase tracking-wider text-gray-400 font-bold">
+            <span className="block text-[9px] uppercase tracking-[0.12em] text-stone-500 font-bold">
               Nông sản sạch từ trang trại
             </span>
           </div>
