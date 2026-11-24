@@ -27,12 +27,15 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<UserResponse>> getAll() { return ApiResponse.ok("Users retrieved", userService.getAll()); }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<UserResponse> getById(@PathVariable UUID id) { return ApiResponse.ok("User retrieved", userService.getById(id)); }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> create(@Valid @RequestBody UserCreateRequest request) {
         UserResponse user = userService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(user.id()).toUri();
@@ -40,6 +43,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<UserResponse> update(@PathVariable UUID id, @Valid @RequestBody UserUpdateRequest request,
                                              @AuthenticationPrincipal AppUserDetails principal) {
         return ApiResponse.ok("User updated", userService.update(id, request, principal != null ? principal.getId() : null));
@@ -47,6 +51,7 @@ public class UserController {
 
     /** Lock or unlock another account without changing its active status or roles. */
     @PutMapping("/{id}/lock")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<UserResponse> setAccountLock(
             @PathVariable UUID id,
             @Valid @RequestBody AdminAccountLockRequest request,
@@ -58,6 +63,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id, @AuthenticationPrincipal AppUserDetails principal) {
         userService.delete(id, principal != null ? principal.getId() : null);
