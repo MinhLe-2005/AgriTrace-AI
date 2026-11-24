@@ -31,6 +31,8 @@ public class DistributorShipmentService {
     private static final Set<String> VALID_STATUSES = Set.of("PREPARING", "IN_TRANSIT", "DELIVERED", "RECEIVED", "CANCELLED");
     private static final Set<String> VALID_TRACKING_STATUSES = Set.of("ON_SCHEDULE", "DELAYED", "INCIDENT");
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Bangkok");
+    private static final double GPS_DUPLICATE_DISTANCE_METERS = 15;
+    private static final Duration GPS_DUPLICATE_WINDOW = Duration.ofMinutes(2);
 
     private final ShipmentRepository shipmentRepository;
     private final ShipmentTrackingEventRepository trackingEventRepository;
@@ -186,13 +188,28 @@ public class DistributorShipmentService {
         String suppliedStatus = optionalText(request.status());
         String eventStatus = suppliedStatus == null ? shipment.getStatus() : normalizeTrackingOrShipmentStatus(suppliedStatus);
         Instant now = Instant.now();
+        boolean lifecycleChanged = false;
         if (suppliedStatus != null && VALID_STATUSES.contains(eventStatus)) {
             if ("RECEIVED".equals(eventStatus)) throw new IllegalArgumentException("Chỉ có thể xác nhận đã tiếp nhận bằng quét QR bàn giao");
             if (!Objects.equals(shipment.getStatus(), eventStatus)) {
                 assertStatusTransition(shipment.getStatus(), eventStatus);
                 shipment.setStatus(eventStatus);
+                lifecycleChanged = true;
                 if ("IN_TRANSIT".equals(eventStatus) && shipment.getDispatchTime() == null) shipment.setDispatchTime(now);
             }
+        }
+        Optional<ShipmentTrackingEvent> duplicateGpsEvent = lifecycleChanged
+                ? Optional.empty()
+                : findDuplicateGpsEvent(shipment, request, eventStatus, now);
+        if (duplicateGpsEvent.isPresent()) {
+            ShipmentTrackingEvent previousEvent = duplicateGpsEvent.get();
+            // Keep a single meaningful journey marker while still refreshing the live GPS timestamp.
+            previousEvent.setLocation(request.location().trim());
+            previousEvent.setAccuracyMeters(request.accuracyMeters());
+            previousEvent.setEventTime(now);
+            trackingEventRepository.save(previousEvent);
+            publishChange(shipment);
+            return toResponse(shipment);
         }
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
         if (("DELIVERED".equals(eventStatus) || "RECEIVED".equals(eventStatus)) && shipment.getActualArrival() == null) shipment.setActualArrival(now);
@@ -201,6 +218,37 @@ public class DistributorShipmentService {
         synchronizeOrderStatuses(shipment, eventStatus);
         publishChange(shipment);
         return toResponse(shipment);
+    }
+
+    private Optional<ShipmentTrackingEvent> findDuplicateGpsEvent(Shipment shipment, CreateTrackingEventRequest request,
+                                                                    String eventStatus, Instant now) {
+        if (request.latitude() == null || request.longitude() == null || shipment.getId() == null) return Optional.empty();
+        return trackingEventRepository
+                .findFirstByShipmentIdAndLatitudeIsNotNullAndLongitudeIsNotNullOrderByEventTimeDesc(shipment.getId())
+                .filter(previousEvent -> isSameGpsHeartbeat(previousEvent, request, eventStatus, now));
+    }
+
+    private boolean isSameGpsHeartbeat(ShipmentTrackingEvent previousEvent, CreateTrackingEventRequest request,
+                                       String eventStatus, Instant now) {
+        if (previousEvent.getEventTime() == null
+                || Duration.between(previousEvent.getEventTime(), now).abs().compareTo(GPS_DUPLICATE_WINDOW) > 0
+                || !Objects.equals(previousEvent.getStatus(), eventStatus)
+                || !Objects.equals(previousEvent.getTemperatureC(), request.temperatureC())
+                || !Objects.equals(previousEvent.getHumidityPercent(), request.humidityPercent())
+                || !Objects.equals(previousEvent.getNote(), optionalText(request.note()))) {
+            return false;
+        }
+        return distanceInMeters(previousEvent.getLatitude(), previousEvent.getLongitude(), request.latitude(), request.longitude())
+                < GPS_DUPLICATE_DISTANCE_METERS;
+    }
+
+    private double distanceInMeters(double firstLatitude, double firstLongitude, double secondLatitude, double secondLongitude) {
+        double latitudeDelta = Math.toRadians(secondLatitude - firstLatitude);
+        double longitudeDelta = Math.toRadians(secondLongitude - firstLongitude);
+        double a = Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2)
+                + Math.cos(Math.toRadians(firstLatitude)) * Math.cos(Math.toRadians(secondLatitude))
+                * Math.sin(longitudeDelta / 2) * Math.sin(longitudeDelta / 2);
+        return 2 * 6_371_000 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     @Transactional

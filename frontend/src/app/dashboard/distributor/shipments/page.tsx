@@ -9,8 +9,8 @@ import {
   Truck,
 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   DistributorPageHeader,
   ShipmentStatusBadge,
@@ -69,6 +69,7 @@ function shipmentFormFromOrder(order: ApiOrder): CreateShipmentInput {
 }
 
 export default function DistributorShipmentsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const requestedOrderCode = searchParams.get("order");
   const [shipments, setShipments] = useState<DistributorShipment[]>([]);
@@ -78,6 +79,7 @@ export default function DistributorShipmentsPage() {
   const [form, setForm] = useState<CreateShipmentInput>(initialShipmentForm);
   const [prefilledOrder, setPrefilledOrder] = useState<ApiOrder | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const createInFlightRef = useRef(false);
 
   useEffect(() => {
     const refresh = () =>
@@ -129,6 +131,7 @@ export default function DistributorShipmentsPage() {
 
   async function createShipment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (createInFlightRef.current) return;
     if (
       !form.driverName.trim() ||
       !form.vehicleNumber.trim() ||
@@ -142,9 +145,26 @@ export default function DistributorShipmentsPage() {
       return;
     }
 
+    const requestedShipmentCode = form.shipmentCode.trim().toUpperCase();
+    const existingShipment = requestedShipmentCode
+      ? shipments.find(
+          (shipment) =>
+            shipment.shipmentCode.toUpperCase() === requestedShipmentCode
+        )
+      : undefined;
+    if (existingShipment) {
+      toast.info(
+        `Mã ${existingShipment.shipmentCode} đã tồn tại. Đang mở chuyến đã tạo.`
+      );
+      router.push(
+        `/dashboard/distributor/shipments/${encodeURIComponent(existingShipment.shipmentCode)}`
+      );
+      return;
+    }
+
+    createInFlightRef.current = true;
     setIsSubmitting(true);
-    const shipmentCode =
-      form.shipmentCode.trim().toUpperCase() || makeShipmentCode();
+    const shipmentCode = requestedShipmentCode || makeShipmentCode();
     const input: CreateShipmentInput = {
       ...form,
       shipmentCode,
@@ -159,9 +179,11 @@ export default function DistributorShipmentsPage() {
       ]);
       toast.success(`Đã tạo chuyến ${saved.shipmentCode}.`);
     } catch (error) {
-      toast.error(`Không thể tạo chuyến: ${getApiErrorMessage(error)}`);
+      const message = getApiErrorMessage(error);
+      toast.error(`Không thể tạo chuyến: ${message}`);
       return;
     } finally {
+      createInFlightRef.current = false;
       setIsSubmitting(false);
     }
     setIsCreating(false);
