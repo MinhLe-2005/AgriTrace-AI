@@ -3,7 +3,9 @@
 import {
   Calendar,
   Check,
+  Cherry,
   ChevronRight,
+  Citrus,
   Clock,
   Copy,
   ExternalLink,
@@ -14,6 +16,7 @@ import {
   Info,
   Leaf,
   Percent,
+  Salad,
   Search,
   ShieldCheck,
   ShoppingBag,
@@ -21,6 +24,7 @@ import {
   Tag,
   Ticket,
   Truck,
+  Wheat,
   X,
   Zap,
 } from "lucide-react";
@@ -36,6 +40,51 @@ import {
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
 
+function getEventIconConfig(event: CampaignItem) {
+  const text = `${event.title} ${event.slug} ${event.targetProductNames?.join(" ") || ""}`.toLowerCase();
+
+  if (text.includes("dâu") || text.includes("dau tay") || text.includes("strawberry")) {
+    return {
+      Icon: Cherry,
+      containerClass: "bg-rose-50 border-rose-200/80 text-rose-600",
+    };
+  }
+  if (
+    text.includes("rau") ||
+    text.includes("kale") ||
+    text.includes("xà lách") ||
+    text.includes("salad") ||
+    text.includes("cải")
+  ) {
+    return {
+      Icon: Salad,
+      containerClass: "bg-emerald-50 border-emerald-200/80 text-emerald-700",
+    };
+  }
+  if (text.includes("cam") || text.includes("sành") || text.includes("bưởi") || text.includes("citrus")) {
+    return {
+      Icon: Citrus,
+      containerClass: "bg-amber-50 border-amber-200/80 text-amber-600",
+    };
+  }
+  if (event.type === "harvest") {
+    return {
+      Icon: Wheat,
+      containerClass: "bg-emerald-50 border-emerald-200/80 text-emerald-700",
+    };
+  }
+  if (event.type === "flash_sale") {
+    return {
+      Icon: Zap,
+      containerClass: "bg-orange-50 border-orange-200/80 text-orange-600",
+    };
+  }
+  return {
+    Icon: Sparkles,
+    containerClass: "bg-emerald-50 border-emerald-200/80 text-emerald-700",
+  };
+}
+
 export default function EventsPage() {
   const router = useRouter();
   const { campaigns, getCampaignStatus, loadCampaigns } = useCampaignStore();
@@ -45,9 +94,7 @@ export default function EventsPage() {
   }, [loadCampaigns]);
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
-  const [selectedFilter, setSelectedFilter] = useState<
-    "all" | "active" | "upcoming" | "expired"
-  >("all");
+  const [selectedFilter, setSelectedFilter] = useState<"all" | "active" | "upcoming">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<CampaignItem | null>(null);
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
@@ -73,9 +120,17 @@ export default function EventsPage() {
     setTimeout(() => setCopiedVoucher(null), 2500);
   };
 
+  // Only consider active and upcoming events (expired events are completely hidden)
+  const availableCampaigns = useMemo(() => {
+    return campaigns.filter((c) => {
+      const status = getCampaignStatus(c);
+      return status !== "expired" && c.active !== false;
+    });
+  }, [campaigns, getCampaignStatus]);
+
   // Filtered campaigns
   const filteredEvents = useMemo(() => {
-    return campaigns.filter((c) => {
+    return availableCampaigns.filter((c) => {
       const matchSearch =
         !searchQuery.trim() ||
         c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -91,21 +146,19 @@ export default function EventsPage() {
 
       return matchSearch && matchStatus;
     });
-  }, [campaigns, searchQuery, selectedFilter, getCampaignStatus]);
+  }, [availableCampaigns, searchQuery, selectedFilter, getCampaignStatus]);
 
   // Counts for tabs
   const tabCounts = useMemo(() => {
     let active = 0;
     let upcoming = 0;
-    let expired = 0;
-    campaigns.forEach((c) => {
+    availableCampaigns.forEach((c) => {
       const st = getCampaignStatus(c);
       if (st === "active") active++;
       else if (st === "upcoming") upcoming++;
-      else expired++;
     });
-    return { all: campaigns.length, active, upcoming, expired };
-  }, [campaigns, getCampaignStatus]);
+    return { all: availableCampaigns.length, active, upcoming };
+  }, [availableCampaigns, getCampaignStatus]);
 
   // Calculate days remaining or days ago
   const getTimeRemainingText = (endDateStr: string, status: string) => {
@@ -249,37 +302,55 @@ export default function EventsPage() {
             </div>
           </div>
 
-          {/* Decorative Floating Emojis */}
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-25 sm:opacity-35 text-8xl sm:text-9xl pointer-events-none select-none">
-            🍓🥗🍊
+          {/* Decorative Vector Art */}
+          <div className="absolute -right-6 -bottom-10 opacity-20 pointer-events-none select-none flex items-center gap-4 text-emerald-200">
+            <Wheat size={180} strokeWidth={1} />
+            <Sparkles size={140} strokeWidth={1} />
           </div>
         </div>
 
         {/* Filter & Search Bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs">
           {/* Status Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {(
-              [
-                { key: "all", label: `Tất cả (${tabCounts.all})` },
-                { key: "active", label: `🔥 Đang diễn ra (${tabCounts.active})` },
-                { key: "upcoming", label: `⏳ Sắp diễn ra (${tabCounts.upcoming})` },
-                { key: "expired", label: `⏹️ Đã kết thúc (${tabCounts.expired})` },
-              ] as const
-            ).map((tab) => (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+            <button
+              onClick={() => setSelectedFilter("all")}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5",
+                selectedFilter === "all"
+                  ? "bg-emerald-800 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              <Sparkles size={13} />
+              <span>Tất cả ({tabCounts.all})</span>
+            </button>
+            <button
+              onClick={() => setSelectedFilter("active")}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5",
+                selectedFilter === "active"
+                  ? "bg-emerald-800 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              <Flame size={13} className={selectedFilter === "active" ? "text-rose-300" : "text-rose-500"} />
+              <span>Đang diễn ra ({tabCounts.active})</span>
+            </button>
+            {tabCounts.upcoming > 0 && (
               <button
-                key={tab.key}
-                onClick={() => setSelectedFilter(tab.key)}
+                onClick={() => setSelectedFilter("upcoming")}
                 className={cn(
-                  "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
-                  selectedFilter === tab.key
+                  "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5",
+                  selectedFilter === "upcoming"
                     ? "bg-emerald-800 text-white shadow-sm"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 )}
               >
-                {tab.label}
+                <Clock size={13} className={selectedFilter === "upcoming" ? "text-blue-300" : "text-blue-500"} />
+                <span>Sắp diễn ra ({tabCounts.upcoming})</span>
               </button>
-            ))}
+            )}
           </div>
 
           {/* Search Input */}
@@ -301,7 +372,9 @@ export default function EventsPage() {
         {/* Events Grid */}
         {filteredEvents.length === 0 ? (
           <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center space-y-3">
-            <div className="text-4xl">🌾</div>
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-700 flex items-center justify-center mx-auto shadow-2xs">
+              <Sparkles size={24} />
+            </div>
             <h3 className="text-base font-bold text-gray-900">
               Không tìm thấy sự kiện mùa vụ nào
             </h3>
@@ -341,10 +414,20 @@ export default function EventsPage() {
                   <div className="p-6 space-y-4">
                     {/* Top Row: Type & Status & Discount Badge */}
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-3xl p-2 rounded-2xl bg-gray-100 border border-gray-200 shrink-0">
-                          {event.bannerIcon || "🌾"}
-                        </span>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {(() => {
+                          const { Icon: EventIcon, containerClass } = getEventIconConfig(event);
+                          return (
+                            <div
+                              className={cn(
+                                "w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
+                                containerClass
+                              )}
+                            >
+                              <EventIcon size={24} strokeWidth={2} />
+                            </div>
+                          );
+                        })()}
                         <div>
                           <span
                             className={cn(
@@ -360,13 +443,10 @@ export default function EventsPage() {
                                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                                 Đang diễn ra
                               </span>
-                            ) : isExpired ? (
-                              <span className="text-[11px] font-bold text-gray-400">
-                                ⏹️ Đã hết hạn (Về giá gốc)
-                              </span>
                             ) : (
-                              <span className="text-[11px] font-bold text-blue-600">
-                                ⏳ Sắp diễn ra
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600">
+                                <Clock size={12} />
+                                Sắp diễn ra
                               </span>
                             )}
                           </div>
@@ -432,8 +512,8 @@ export default function EventsPage() {
                     {/* Direct Discount Banner */}
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">
-                          ⚡
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <Zap size={11} className="fill-white" />
                         </span>
                         <div>
                           <span className="text-emerald-950 font-bold block">
@@ -553,9 +633,19 @@ export default function EventsPage() {
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <span className="text-4xl p-2 rounded-2xl bg-gray-100 border border-gray-200 shrink-0">
-                  {selectedEvent.bannerIcon || "🌾"}
-                </span>
+                {(() => {
+                  const { Icon: ModalIcon, containerClass } = getEventIconConfig(selectedEvent);
+                  return (
+                    <div
+                      className={cn(
+                        "w-14 h-14 rounded-2xl border flex items-center justify-center shrink-0 shadow-xs",
+                        containerClass
+                      )}
+                    >
+                      <ModalIcon size={28} strokeWidth={2} />
+                    </div>
+                  );
+                })()}
                 <div>
                   <span
                     className={cn(
@@ -596,16 +686,9 @@ export default function EventsPage() {
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <span className="text-gray-500 block">Trạng thái:</span>
-                <strong
-                  className={cn(
-                    getCampaignStatus(selectedEvent) === "active"
-                      ? "text-emerald-700"
-                      : "text-gray-500"
-                  )}
-                >
-                  {getCampaignStatus(selectedEvent) === "active"
-                    ? "🔥 Đang áp dụng"
-                    : "⏹️ Đã kết thúc"}
+                <strong className="text-emerald-700 flex items-center gap-1 mt-0.5">
+                  <Flame size={13} className="text-rose-500 fill-rose-500" />
+                  <span>Đang áp dụng</span>
                 </strong>
               </div>
             </div>
@@ -642,8 +725,8 @@ export default function EventsPage() {
 
               {/* Direct discount explanation */}
               <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 text-lg font-bold shadow-xs">
-                  ⚡
+                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Zap size={18} className="fill-white" />
                 </div>
                 <div>
                   <span className="font-bold text-emerald-950 block text-xs sm:text-sm">

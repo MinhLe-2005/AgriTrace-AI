@@ -35,12 +35,14 @@ import {
   Sprout,
   Star,
   Tag,
+  ThermometerSnowflake,
   Trash2,
   Truck,
   Upload,
   User as UserIcon,
   Warehouse,
   X,
+  PhoneCall,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -122,36 +124,36 @@ function getOrderStatusDetails(
   }
 
   // 1. Payment Status Badge (Trạng thái Thanh toán tách biệt rõ ràng)
-  let paymentStatusText = "💵 Chưa thanh toán (Thu hộ COD khi giao)";
-  let paymentStatusColor = "bg-orange-50 text-orange-800 border-orange-200";
+  let paymentStatusText = "Chưa thanh toán (Thu hộ COD khi giao)";
+  let paymentStatusColor = "bg-orange-50 text-orange-800 border-orange-200/80";
 
   if (normStatus === "CANCELLED") {
     if (!!paidAt || (paymentRef || "").toUpperCase().startsWith("REFUND")) {
-      paymentStatusText = "↩️ Hoàn tiền 100% VietQR (Đơn hủy sau TT)";
-      paymentStatusColor = "bg-purple-50 text-purple-800 border-purple-200";
+      paymentStatusText = "Hoàn tiền 100% VietQR (Đơn hủy sau TT)";
+      paymentStatusColor = "bg-purple-50 text-purple-800 border-purple-200/80";
     } else {
-      paymentStatusText = isQr ? "⚪ Đã hủy QR (Chưa thu tiền)" : "⚪ Đã hủy COD (Không thu tiền)";
+      paymentStatusText = isQr ? "Đã hủy QR (Chưa thu tiền)" : "Đã hủy COD (Không thu tiền)";
       paymentStatusColor = "bg-gray-100 text-gray-500 border-gray-200";
     }
   } else if (normStatus === "REFUNDED") {
-    paymentStatusText = "↩️ Đã hoàn tiền 100%";
-    paymentStatusColor = "bg-purple-50 text-purple-800 border-purple-200";
+    paymentStatusText = "Đã hoàn tiền 100%";
+    paymentStatusColor = "bg-purple-50 text-purple-800 border-purple-200/80";
   } else if (isQr) {
     if (normStatus === "PENDING_PAYMENT") {
-      paymentStatusText = `⏳ Chưa thanh toán (Giữ hàng 30p · Còn ${holdMinutesLeft}p)`;
-      paymentStatusColor = "bg-amber-100/90 text-amber-900 border-amber-300";
+      paymentStatusText = `Chưa thanh toán (Giữ hàng 30p · Còn ${holdMinutesLeft}p)`;
+      paymentStatusColor = "bg-amber-100 text-amber-900 border-amber-300";
     } else {
-      paymentStatusText = "✅ Đã thanh toán (Chuyển khoản VietQR)";
-      paymentStatusColor = "bg-emerald-100/90 text-emerald-900 border-emerald-300";
+      paymentStatusText = "Đã thanh toán (Chuyển khoản VietQR)";
+      paymentStatusColor = "bg-emerald-100 text-emerald-900 border-emerald-300";
     }
   } else {
     // Tiền mặt (COD): Chỉ chuyển sang Đã thanh toán khi Đã giao hàng thành công (DELIVERED/COMPLETED) hoặc có paidAt
     if (normStatus === "DELIVERED" || normStatus === "COMPLETED" || !!paidAt) {
-      paymentStatusText = "✅ Đã thanh toán (Đã thu tiền mặt COD)";
-      paymentStatusColor = "bg-emerald-100/90 text-emerald-900 border-emerald-300";
+      paymentStatusText = "Đã thanh toán (Đã thu tiền mặt COD)";
+      paymentStatusColor = "bg-emerald-100 text-emerald-900 border-emerald-300";
     } else {
-      paymentStatusText = "💵 Chưa thanh toán (Thu hộ COD khi nhận hàng)";
-      paymentStatusColor = "bg-orange-50 text-orange-800 border-orange-200";
+      paymentStatusText = "Chưa thanh toán (Thu hộ COD khi nhận hàng)";
+      paymentStatusColor = "bg-orange-50 text-orange-800 border-orange-200/80";
     }
   }
 
@@ -159,15 +161,15 @@ function getOrderStatusDetails(
   switch (normStatus) {
     case "PENDING_PAYMENT":
       return {
-        text: "⏳ Chờ thanh toán (Giữ hàng 30p)",
-        color: "bg-amber-50 text-amber-800 border-amber-300",
+        text: "Chờ thanh toán (Giữ hàng 30p)",
+        color: "bg-amber-50 text-amber-900 border-amber-300",
         paymentStatusText,
         paymentStatusColor,
         holdMinutesLeft,
       };
     case "PAID":
       return {
-        text: "📦 Chờ đóng gói kho lạnh",
+        text: "Kho lạnh đang chuẩn bị hàng",
         color: "bg-teal-50 text-teal-800 border-teal-200",
         paymentStatusText,
         paymentStatusColor,
@@ -175,7 +177,7 @@ function getOrderStatusDetails(
       };
     case "CONFIRMED":
       return {
-        text: "📦 Chờ đóng gói kho lạnh",
+        text: "Kho lạnh đã xác nhận đơn",
         color: "bg-indigo-50 text-indigo-700 border-indigo-200",
         paymentStatusText,
         paymentStatusColor,
@@ -183,7 +185,7 @@ function getOrderStatusDetails(
       };
     case "PREPARING":
       return {
-        text: "❄️ Đang đóng gói bảo quản lạnh",
+        text: "Đang đóng gói bảo quản lạnh",
         color: "bg-purple-50 text-purple-700 border-purple-200",
         paymentStatusText,
         paymentStatusColor,
@@ -191,7 +193,7 @@ function getOrderStatusDetails(
       };
     case "SHIPPING":
       return {
-        text: "🚚 Đang giao hàng xe lạnh (2-5°C)",
+        text: "Đang giao hàng xe lạnh (2°C – 5°C)",
         color: "bg-blue-50 text-blue-700 border-blue-200",
         paymentStatusText,
         paymentStatusColor,
@@ -200,7 +202,7 @@ function getOrderStatusDetails(
     case "DELIVERED":
     case "COMPLETED":
       return {
-        text: "✅ Đã giao hàng thành công",
+        text: "Đã giao hàng thành công",
         color: "bg-emerald-50 text-emerald-700 border-emerald-200",
         paymentStatusText,
         paymentStatusColor,
@@ -208,7 +210,7 @@ function getOrderStatusDetails(
       };
     case "CANCELLED":
       return {
-        text: "❌ Đã hủy đơn hàng",
+        text: "Đã hủy đơn hàng",
         color: "bg-rose-50 text-rose-700 border-rose-200",
         paymentStatusText,
         paymentStatusColor,
@@ -216,7 +218,7 @@ function getOrderStatusDetails(
       };
     case "REFUNDED":
       return {
-        text: "↩️ Đã hoàn tiền",
+        text: "Đã hoàn tiền",
         color: "bg-gray-50 text-gray-700 border-gray-200",
         paymentStatusText,
         paymentStatusColor,
@@ -224,7 +226,7 @@ function getOrderStatusDetails(
       };
     default:
       return {
-        text: "📦 Chờ đóng gói kho lạnh",
+        text: "Kho lạnh đang chuẩn bị hàng",
         color: "bg-gray-50 text-gray-700 border-gray-200",
         paymentStatusText,
         paymentStatusColor,
@@ -238,9 +240,9 @@ const mockOrders: Order[] = [
     id: "AGRI-8841",
     date: "Hôm nay, 14:15",
     status: "SHIPPING",
-    statusText: "🚚 Đang giao hàng xe lạnh (2-5°C)",
-    statusColor: "bg-blue-50 text-blue-700 border-blue-200",
-    paymentStatusText: "💵 Chưa thanh toán (Thu hộ COD khi nhận hàng)",
+    statusText: "Đang giao hàng xe lạnh (2°C – 5°C)",
+    statusColor: "bg-blue-50 text-blue-800 border-blue-200",
+    paymentStatusText: "Chưa thanh toán (Thu hộ COD khi nhận hàng)",
     paymentStatusColor: "bg-orange-50 text-orange-800 border-orange-200",
     lotCode: "XL-2026-08",
     receiverName: "Lê Quang Minh",
@@ -285,9 +287,9 @@ const mockOrders: Order[] = [
     id: "AGRI-8790",
     date: "10/10/2026",
     status: "COMPLETED",
-    statusText: "✅ Đã giao hàng thành công",
-    statusColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    paymentStatusText: "✅ Đã thanh toán (Đã thu tiền mặt COD)",
+    statusText: "Đã giao hàng thành công",
+    statusColor: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    paymentStatusText: "Đã thanh toán (Đã thu tiền mặt COD)",
     paymentStatusColor: "bg-emerald-100/90 text-emerald-900 border-emerald-300",
     lotCode: "CS-BG-2026-03",
     receiverName: "Lê Quang Minh",
@@ -1424,8 +1426,10 @@ function CustomerDashboardContent() {
           </div>
 
           {/* Order Filter bar */}
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-gray-500 font-medium mr-1">Bộ lọc trạng thái:</span>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none text-xs">
+            <span className="text-gray-400 font-semibold text-[11px] uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+              <Tag size={12} className="text-emerald-700" /> Trạng thái:
+            </span>
             {(
               [
                 { key: "ALL", label: "Tất cả đơn hàng", count: orders.length },
@@ -1438,35 +1442,38 @@ function CustomerDashboardContent() {
                     return o.status === "PAID" || (isQr && !["PENDING_PAYMENT", "CANCELLED", "REFUNDED"].includes(o.status));
                   }).length,
                 },
-                { key: "PREPARING", label: "Chờ đóng gói", count: orders.filter((o) => ["CONFIRMED", "PREPARING", "PAID"].includes(o.status)).length },
+                { key: "PREPARING", label: "Chờ đóng gói KCS", count: orders.filter((o) => ["CONFIRMED", "PREPARING", "PAID"].includes(o.status)).length },
                 { key: "SHIPPING", label: "Đang giao hàng xe lạnh", count: orders.filter((o) => o.status === "SHIPPING").length },
                 { key: "DELIVERED", label: "Đã hoàn thành", count: orders.filter((o) => o.status === "DELIVERED" || o.status === "COMPLETED").length },
                 { key: "CANCELLED", label: "Đã hủy", count: orders.filter((o) => o.status === "CANCELLED" || o.status === "REFUNDED").length },
               ] as const
-            ).map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setOrderFilter(tab.key)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1.5",
-                  orderFilter === tab.key
-                    ? "bg-emerald-700 text-white shadow-xs"
-                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-                )}
-              >
-                <span>{tab.label}</span>
-                {tab.count > 0 && (
-                  <span
-                    className={cn(
-                      "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
-                      orderFilter === tab.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
-                    )}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
+            ).map((tab) => {
+              const isActive = orderFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setOrderFilter(tab.key)}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-full font-medium transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer text-xs",
+                    isActive
+                      ? "bg-emerald-800 text-white shadow-xs font-semibold ring-1 ring-emerald-900"
+                      : "bg-white border border-gray-200 text-gray-700 hover:border-emerald-300 hover:bg-emerald-50/40"
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count > 0 && (
+                    <span
+                      className={cn(
+                        "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                        isActive ? "bg-emerald-700 text-emerald-100" : "bg-gray-100 text-gray-600"
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Orders List */}
@@ -1479,93 +1486,227 @@ function CustomerDashboardContent() {
               const isQr =
                 (order.paymentMethod || "").toUpperCase() === "PAYOS" ||
                 (order.paymentMethod || "").toUpperCase() === "BANK";
+              const isCancelled = order.status === "CANCELLED" || order.status === "REFUNDED";
+
+              // 4-step Cold-Chain fulfillment journey
+              let currentStepIdx = 1;
+              if (isCancelled) {
+                currentStepIdx = 0;
+              } else if (order.status === "DELIVERED" || order.status === "COMPLETED") {
+                currentStepIdx = 4;
+              } else if (order.status === "SHIPPING") {
+                currentStepIdx = 3;
+              } else if (["CONFIRMED", "PREPARING", "PAID"].includes(order.status)) {
+                currentStepIdx = 2;
+              } else {
+                currentStepIdx = 1;
+              }
+
+              const steps = [
+                {
+                  step: 1,
+                  title: "Đặt hàng",
+                  desc: order.date || "Đã tiếp nhận",
+                  icon: CheckCircle2,
+                },
+                {
+                  step: 2,
+                  title: "Kho lạnh & KCS",
+                  desc: currentStepIdx > 2 ? "Kiểm định Đạt" : currentStepIdx === 2 ? "Đang xử lý 2-5°C" : "Chờ xử lý",
+                  icon: Warehouse,
+                },
+                {
+                  step: 3,
+                  title: "Xe lạnh thông minh",
+                  desc: currentStepIdx > 3 ? "Đã tới điểm giao" : currentStepIdx === 3 ? "Đang giao 4.2°C" : "Chờ xuất kho",
+                  icon: Truck,
+                },
+                {
+                  step: 4,
+                  title: "Giao tận tay",
+                  desc: currentStepIdx >= 4 ? "Đã nhận hàng" : "Dự kiến trong ngày",
+                  icon: Package,
+                },
+              ];
+
               return (
                 <div
                   key={order.id}
                   className={cn(
-                    "bg-white rounded-2xl border p-5 shadow-xs space-y-4 transition-all",
+                    "bg-white rounded-2xl border shadow-xs overflow-hidden transition-all duration-200 hover:shadow-md",
                     isHighlighted
-                      ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/10"
-                      : "border-gray-200/80 hover:border-emerald-300"
+                      ? "border-emerald-600 ring-2 ring-emerald-500/20 bg-gradient-to-b from-emerald-50/15 to-white"
+                      : "border-gray-200/90 hover:border-emerald-300"
                   )}
                 >
-                  {/* Header: Order ID + Date + Lot + TWO Status Badges (Delivery & Payment) */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-gray-100">
-                    <div className="flex items-center gap-2 text-xs flex-wrap">
-                      <span className="font-extrabold text-gray-900 text-sm">#{order.id}</span>
-                      {(isHighlighted || orderIdx === 0) && (
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wide">
-                          Mới nhất
-                        </span>
-                      )}
-                      <span className="text-gray-300">·</span>
-                      <span className="text-gray-500 font-medium">{order.date}</span>
-                      <span className="text-gray-300">·</span>
-                      <span className="text-emerald-700 font-semibold">Lô {order.lotCode}</span>
+                  {/* Header: Order ID + Date + Lot + Two Badges */}
+                  <div className="p-4 sm:p-5 pb-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800 shrink-0 shadow-2xs">
+                        <Package size={18} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-gray-900 text-sm tracking-tight">#{order.id}</span>
+                          {(isHighlighted || orderIdx === 0) && (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wide shadow-2xs">
+                              Mới nhất
+                            </span>
+                          )}
+                          <Link
+                            href={order.lotCode ? `/traceability?lot=${order.lotCode}` : "/traceability"}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-colors"
+                            title="Bấm để xem hồ sơ truy xuất nguồn gốc lô hàng"
+                          >
+                            <QrCode size={12} className="text-emerald-700" />
+                            <span>Lô {order.lotCode}</span>
+                          </Link>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Clock size={11} className="text-gray-400" /> {order.date}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       {/* Badge 1: Trạng thái Thanh toán */}
                       <span
                         className={cn(
-                          "px-2.5 py-0.5 rounded-full text-[11px] font-bold border",
+                          "px-3 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 shadow-2xs",
                           order.paymentStatusColor
                         )}
                         title="Trạng thái thanh toán đơn hàng"
                       >
-                        {order.paymentStatusText}
+                        <CreditCard size={12} />
+                        <span>{order.paymentStatusText}</span>
                       </span>
 
                       {/* Badge 2: Trạng thái Vận chuyển / Đơn hàng */}
                       <span
                         className={cn(
-                          "px-2.5 py-0.5 rounded-full text-xs font-bold border",
+                          "px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 shadow-2xs",
                           order.statusColor
                         )}
                         title="Trạng thái vận chuyển & xử lý kho lạnh"
                       >
-                        {order.statusText}
+                        <Truck size={12} />
+                        <span>{order.statusText}</span>
                       </span>
                     </div>
                   </div>
 
+                  {/* Cold-Chain Stepper (nếu không hủy) */}
+                  {!isCancelled && (
+                    <div className="bg-[#FBF9F5] border-b border-gray-100 px-4 sm:px-6 py-3.5">
+                      <div className="flex items-center justify-between relative">
+                        {/* Connecting line */}
+                        <div className="absolute left-6 right-6 top-4 -translate-y-1/2 h-0.5 bg-gray-200 -z-0 hidden sm:block" />
+                        <div
+                          className="absolute left-6 top-4 -translate-y-1/2 h-0.5 bg-emerald-600 transition-all duration-500 -z-0 hidden sm:block"
+                          style={{
+                            width:
+                              currentStepIdx === 1
+                                ? "0%"
+                                : currentStepIdx === 2
+                                ? "33%"
+                                : currentStepIdx === 3
+                                ? "66%"
+                                : "calc(100% - 3rem)",
+                          }}
+                        />
+
+                        {steps.map((st) => {
+                          const StepIcon = st.icon;
+                          const isDone = st.step < currentStepIdx;
+                          const isCurrent = st.step === currentStepIdx;
+                          return (
+                            <div
+                              key={st.step}
+                              className="flex flex-col sm:items-center relative z-10 sm:text-center flex-1 first:items-start last:items-end sm:first:items-center sm:last:items-center"
+                            >
+                              <div
+                                className={cn(
+                                  "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-2xs",
+                                  isDone
+                                    ? "bg-emerald-700 text-white"
+                                    : isCurrent
+                                    ? "bg-emerald-800 text-white ring-4 ring-emerald-100 shadow-xs"
+                                    : "bg-white text-gray-400 border border-gray-300"
+                                )}
+                              >
+                                {isDone ? <Check size={14} className="stroke-[3]" /> : <StepIcon size={14} />}
+                              </div>
+                              <div className="mt-1.5 space-y-0.5">
+                                <p
+                                  className={cn(
+                                    "text-xs font-bold leading-tight",
+                                    isDone || isCurrent ? "text-gray-900" : "text-gray-400"
+                                  )}
+                                >
+                                  {st.title}
+                                </p>
+                                <p
+                                  className={cn(
+                                    "text-[10px] leading-tight hidden sm:block",
+                                    isCurrent
+                                      ? "text-emerald-800 font-semibold flex items-center justify-center gap-1"
+                                      : "text-gray-500"
+                                  )}
+                                >
+                                  {isCurrent && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping inline-block" />
+                                  )}
+                                  {st.desc}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* 30-Minute Inventory Hold Banner if PENDING_PAYMENT */}
                   {order.status === "PENDING_PAYMENT" && (
-                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-                      <div className="flex items-start sm:items-center gap-2 text-amber-950">
+                    <div className="mx-4 sm:mx-5 my-3 p-3.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-start sm:items-center gap-2.5 text-amber-950">
                         <Clock size={16} className="text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
-                        <span>
-                          <strong>Kho lạnh đang tạm giữ hàng 30 phút</strong> (Còn{" "}
-                          <strong className="text-amber-800">{order.holdMinutesLeft || 30} phút</strong>). Quét mã VietQR hoặc bấm xác nhận nếu bạn vừa chuyển khoản xong!
-                        </span>
+                        <div>
+                          <strong>Kho lạnh đang tạm giữ nông sản 30 phút</strong> (Còn{" "}
+                          <strong className="text-amber-900 font-extrabold">{order.holdMinutesLeft || 30} phút</strong>).
+                          Vui lòng quét mã VietQR bên dưới hoặc ấn xác nhận nếu bạn vừa chuyển khoản!
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <button
                           onClick={() => handleQuickConfirmPaid(order.id)}
                           disabled={isProcessingPayos}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer disabled:opacity-50"
+                          className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
                         >
                           ✓ Tôi đã chuyển khoản
                         </button>
                         <button
                           onClick={() => handleOpenPayOS(order.id)}
-                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
                         >
-                          Mở mã QR →
+                          <QrCode size={13} />
+                          <span>Mở mã VietQR →</span>
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Items */}
-                  <div className="divide-y divide-gray-100 py-1 space-y-3">
+                  {/* Items List */}
+                  <div className="px-4 sm:px-5 py-3 divide-y divide-gray-100 space-y-3">
                     {(order.items || []).map((item, idx) => (
                       <div
                         key={idx}
                         className="flex items-center justify-between gap-4 pt-3 first:pt-0"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 border border-gray-100 shrink-0">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 border border-gray-200/80 shrink-0 shadow-2xs">
                             <Image
                               src={item.image}
                               alt={item.name}
@@ -1575,18 +1716,18 @@ function CustomerDashboardContent() {
                             />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">{item.name}</p>
-                            <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+                            <p className="text-sm font-bold text-gray-900 hover:text-emerald-800 transition-colors">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 flex-wrap">
                               <span>{item.origin}</span>
-                              <span>·</span>
-                              <span className="font-semibold text-emerald-700">{item.cert}</span>
-                              <span>·</span>
-                              <span>SL: {item.qty}</span>
+                              <span className="text-gray-300">·</span>
+                              <span className="px-2 py-0.2 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[11px]">{item.cert}</span>
+                              <span className="text-gray-300">·</span>
+                              <span className="font-semibold text-gray-700">SL: {item.qty}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-gray-900">
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-extrabold text-gray-900">
                             {(item.price || 0).toLocaleString("vi-VN")} đ
                           </div>
                         </div>
@@ -1594,79 +1735,107 @@ function CustomerDashboardContent() {
                     ))}
                   </div>
 
-                  {/* Delivery & Cold Chain Logistics Snapshot */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 rounded-xl bg-gray-50/90 border border-gray-100 text-xs">
-                    {/* Receiver & Delivery Address */}
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold text-gray-900">
-                        <MapPin size={13} className="text-emerald-700 shrink-0" />
-                        <span>Địa chỉ nhận hàng:</span>
-                      </div>
-                      <p className="font-semibold text-gray-800 pl-4">
-                        {order.receiverName} · {order.receiverPhone}
-                      </p>
-                      <p className="text-gray-600 pl-4 leading-relaxed line-clamp-2" title={order.receiverAddress}>
-                        {order.receiverAddress}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-4 text-[11px] text-gray-500 pt-0.5">
-                        <span className="flex items-center gap-1">
-                          <Clock size={11} className="text-gray-400" />
-                          <span>Khung giờ: <strong className="text-gray-700">{order.deliverySlot || "Giờ hành chính (08:00 - 17:00)"}</strong></span>
-                        </span>
-                        {order.deliveryNote && (
-                          <span className="text-gray-500 italic">
-                            · Dặn shipper: &ldquo;{order.deliveryNote}&rdquo;
+                  {/* Delivery & Cold Chain Logistics Snapshot Cards */}
+                  <div className="px-4 sm:px-5 pb-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {/* Card 1: Receiver & Delivery Address */}
+                      <div className="p-3.5 rounded-xl bg-stone-50/70 border border-stone-200/80 text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                            <MapPin size={14} className="text-emerald-700 shrink-0" />
+                            <span>Địa chỉ nhận hàng</span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            Giao tận nơi
                           </span>
-                        )}
+                        </div>
+                        <div className="pl-4 space-y-1">
+                          <div className="flex items-center gap-2 font-bold text-gray-900">
+                            <span>{order.receiverName}</span>
+                            <span className="text-gray-300 font-normal">|</span>
+                            <a
+                              href={`tel:${order.receiverPhone}`}
+                              className="text-emerald-800 hover:underline flex items-center gap-1 font-semibold"
+                            >
+                              <Phone size={11} className="text-emerald-700" />
+                              <span>{order.receiverPhone}</span>
+                            </a>
+                          </div>
+                          <p className="text-gray-600 leading-relaxed" title={order.receiverAddress}>
+                            {order.receiverAddress}
+                          </p>
+                        </div>
+                        <div className="pt-1.5 border-t border-stone-200/60 pl-4 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Clock size={11} className="text-gray-400" />
+                            <span>Khung giờ: <strong className="text-gray-700">{order.deliverySlot || "Giao hỏa tốc xe lạnh 24H"}</strong></span>
+                          </span>
+                          {order.deliveryNote && (
+                            <span className="text-gray-500 italic">
+                              · Dặn: &ldquo;{order.deliveryNote}&rdquo;
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Cold Chain Fleet & Payment Verification */}
-                    <div className="space-y-1 border-t md:border-t-0 md:border-l border-gray-200/80 pt-2.5 md:pt-0 md:pl-3.5">
-                      <div className="flex items-center gap-1.5 font-bold text-gray-900">
-                        <Truck size={13} className="text-blue-600 shrink-0" />
-                        <span>Vận chuyển xe lạnh & Đối soát:</span>
-                      </div>
-                      <div className="pl-4 text-xs">
-                        {order.status === "DELIVERED" || order.status === "COMPLETED" ? (
-                          <span className="font-semibold text-emerald-800 flex items-center gap-1">
-                            <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
-                            <span>Đã giao thành công · Thùng xe 4.2°C đạt chuẩn VietGAP</span>
+                      {/* Card 2: Cold Chain Fleet & Payment Verification */}
+                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold text-blue-950">
+                            <Truck size={14} className="text-blue-700 shrink-0" />
+                            <span>Vận chuyển xe lạnh & Đối soát IoT</span>
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100/80 text-blue-800 text-[10px] font-bold border border-blue-200">
+                            <ThermometerSnowflake size={11} className="text-blue-700" /> 4.2°C VietGAP
                           </span>
-                        ) : order.status === "SHIPPING" ? (
-                          <span className="font-semibold text-blue-700 flex items-center gap-1 animate-pulse">
-                            <Truck size={12} className="text-blue-600 shrink-0" />
-                            <span>Đang giao xe lạnh 4.2°C · Tài xế {order.driverName} ({order.driverPhone})</span>
-                          </span>
-                        ) : (
-                          <span className="text-gray-600">
-                            ❄️ Bảo quản kho mát 2-5°C, chuẩn bị bàn giao đội xe AgriCold
-                          </span>
-                        )}
-                      </div>
-                      <div className="pl-4 text-[11px] space-y-0.5 pt-0.5 text-gray-600">
-                        <div className="flex items-center gap-1.5">
-                          <CreditCard size={11} className="text-gray-400 shrink-0" />
+                        </div>
+
+                        <div className="pl-4 space-y-1 text-xs">
+                          {order.status === "DELIVERED" || order.status === "COMPLETED" ? (
+                            <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
+                              <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                              <span>Đã giao thành công · Thùng xe 4.2°C đạt chuẩn VietGAP</span>
+                            </div>
+                          ) : order.status === "SHIPPING" ? (
+                            <div className="space-y-1">
+                              <div className="font-bold text-blue-800 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping inline-block" />
+                                <span>Đang giao xe lạnh 4.2°C · Tài xế {order.driverName}</span>
+                              </div>
+                              <p className="text-[11px] text-blue-700">
+                                SĐT tài xế: <a href={`tel:${order.driverPhone}`} className="underline font-bold">{order.driverPhone}</a>
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-gray-600 flex items-center gap-1.5">
+                              <Warehouse size={13} className="text-gray-500 shrink-0" />
+                              <span>Bảo quản kho mát 2-5°C, chuẩn bị bàn giao đội xe AgriCold</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-1.5 border-t border-blue-100/70 pl-4 text-[11px] text-gray-600 flex items-center gap-1.5">
+                          <CreditCard size={12} className="text-gray-400 shrink-0" />
                           <span>
                             {isQr ? (
                               order.status === "PENDING_PAYMENT" ? (
                                 <span className="text-amber-800 font-semibold">
-                                  ⏳ Chờ quét mã VietQR để kho lạnh xuất hàng
+                                  Chờ quét mã VietQR để kho lạnh xuất hàng
                                 </span>
                               ) : (
                                 <span className="text-emerald-800 font-semibold">
-                                  ✅ Đã thanh toán VietQR 24/7{" "}
+                                  Đã thanh toán VietQR 24/7{" "}
                                   {order.paymentRef ? `· Mã GD: ${order.paymentRef}` : ""}
                                   {order.paidAt ? ` (${new Date(order.paidAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })})` : ""}
                                 </span>
                               )
                             ) : order.status === "DELIVERED" || order.status === "COMPLETED" ? (
                               <span className="text-emerald-800 font-semibold">
-                                ✅ Đã thanh toán (Tài xế đã thu đủ {(order.total || 0).toLocaleString("vi-VN")} đ tiền mặt COD)
+                                Đã thanh toán (Tài xế đã thu {(order.total || 0).toLocaleString("vi-VN")} đ tiền mặt COD)
                               </span>
                             ) : (
-                              <span className="text-orange-900 font-medium">
-                                💵 Thu hộ COD khi nhận hàng: <strong className="font-bold">{(order.total || 0).toLocaleString("vi-VN")} đ</strong>
+                              <span className="text-orange-950 font-medium">
+                                Thu hộ COD khi nhận hàng: <strong className="font-bold">{(order.total || 0).toLocaleString("vi-VN")} đ</strong>
                               </span>
                             )}
                           </span>
@@ -1675,9 +1844,9 @@ function CustomerDashboardContent() {
                     </div>
                   </div>
 
-                  {/* Real-time Status Alert Banner */}
+                  {/* Real-time Status Alert Banner if SHIPPING */}
                   {order.status === "SHIPPING" && (
-                    <div className="p-3 rounded-xl bg-blue-50/90 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-950">
+                    <div className="mx-4 sm:mx-5 mb-3 p-3 rounded-xl bg-blue-50/90 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-950">
                       <div className="flex items-start sm:items-center gap-2">
                         <Truck size={15} className="text-blue-600 shrink-0 mt-0.5 sm:mt-0" />
                         <span>
@@ -1696,7 +1865,7 @@ function CustomerDashboardContent() {
                   )}
 
                   {(order.status === "DELIVERED" || order.status === "COMPLETED") && (
-                    <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs text-emerald-900">
+                    <div className="mx-4 sm:mx-5 mb-3 p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs text-emerald-900">
                       <div className="flex items-center gap-2">
                         <CheckCircle2 size={14} className="text-emerald-700 shrink-0" />
                         <span>
@@ -1707,28 +1876,26 @@ function CustomerDashboardContent() {
                   )}
 
                   {/* Footer Actions */}
-                  <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
-                    <div className="text-xs text-gray-500 flex items-center gap-2">
-                      <Truck size={14} className="text-emerald-600" />
-                      <span>
-                        Vận chuyển xe lạnh chuyên dụng (+{order.pointsAwarded} điểm) · Phương thức:{" "}
-                        <strong className="text-gray-800">
-                          {(order.paymentMethod || "").toUpperCase() === "PAYOS" ||
-                          (order.paymentMethod || "").toUpperCase() === "BANK"
-                            ? "Chuyển khoản VietQR 24/7"
-                            : "Tiền mặt khi nhận hàng (COD)"}
-                        </strong>
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-right mr-2">
-                        <span className="text-xs text-gray-400 mr-2">Tổng thanh toán:</span>
-                        <span className="text-base font-extrabold text-emerald-800">
+                  <div className="p-4 sm:p-5 bg-gray-50/70 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="text-xs text-gray-500 flex items-center gap-2">
+                        <Truck size={13} className="text-emerald-700" />
+                        <span>
+                          Giao xe lạnh chuyên dụng (+{order.pointsAwarded} điểm) ·{" "}
+                          <strong className="text-gray-800">
+                            {isQr ? "Chuyển khoản VietQR 24/7" : "Tiền mặt khi nhận hàng (COD)"}
+                          </strong>
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 flex items-baseline gap-2">
+                        <span>Tổng thanh toán:</span>
+                        <span className="text-lg font-extrabold text-emerald-800">
                           {(order.total || 0).toLocaleString("vi-VN")} đ
                         </span>
                       </div>
+                    </div>
 
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* VietQR Payment Button if PENDING_PAYMENT */}
                       {order.status === "PENDING_PAYMENT" && (
                         <button
@@ -1773,12 +1940,21 @@ function CustomerDashboardContent() {
                             setReviewProductName(order.items[0]?.name || "Nông sản tươi");
                             setShowReviewModal(true);
                           }}
-                          className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-xl bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                         >
-                          <Star size={13} className="fill-emerald-700 text-emerald-700" />
+                          <Star size={13} className="fill-amber-500 text-amber-500" />
                           <span>Đánh giá</span>
                         </button>
                       )}
+
+                      <Link
+                        href={order.lotCode ? `/traceability?lot=${order.lotCode}` : "/traceability"}
+                        className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 hover:border-emerald-400"
+                        title="Bấm để truy xuất nguồn gốc lô hàng này"
+                      >
+                        <QrCode size={13} className="text-emerald-700" />
+                        <span>Truy xuất QR</span>
+                      </Link>
 
                       <button
                         onClick={() => setSelectedOrder(order)}

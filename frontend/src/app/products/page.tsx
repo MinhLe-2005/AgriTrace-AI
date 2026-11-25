@@ -663,135 +663,57 @@ function ProductsContent() {
         <span className="font-semibold text-gray-800">Cửa hàng nông sản sạch</span>
       </div>
 
-      {/* ── Header Banner ── */}
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-emerald-950 via-emerald-800 to-teal-900 p-6 sm:p-10 text-white shadow-md">
-        <div className="relative z-10 max-w-2xl space-y-3">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300">
-            <Sparkles size={13} />
-            100% Nông Sản Thu Hoạch Trực Tiếp Từ Nông Trại
+      {/* ── Header Banner (Gọn gàng, tinh tế, chuẩn phong cách Botanical) ── */}
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-[#16261E] via-[#1B3528] to-[#16261E] p-5 sm:p-7 text-white shadow-sm">
+        <div className="relative z-10 max-w-2xl space-y-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300">
+            <Sparkles size={12} />
+            100% Thu Hoạch Trong Ngày · Chuỗi Lạnh 2°C – 5°C
           </span>
-          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-serif font-bold tracking-tight">
             Nông Sản Sạch Có Mã QR Nguồn Gốc
           </h1>
-          <p className="text-emerald-100/80 text-xs sm:text-sm leading-relaxed">
-            100% rau củ quả được thu hoạch mỗi sáng, bảo quản bằng chuỗi lạnh khép kín và gắn mã định danh điện tử
-            truy xuất tận nông trại.
+          <p className="text-emerald-100/80 text-xs sm:text-sm leading-relaxed max-w-xl">
+            Rau củ quả tươi sạch thu hoạch mỗi sáng tại Đà Lạt & Mộc Châu, bảo quản lạnh khép kín và định danh điện tử truy xuất nguồn gốc minh bạch.
           </p>
         </div>
-        <div className="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
+        <div className="absolute -right-8 -bottom-8 w-56 h-56 rounded-full bg-emerald-500/10 blur-xl pointer-events-none" />
       </div>
 
-      {/* ── Seasonal Sale & Promotion Announcement Banner ── */}
-      <div className="rounded-3xl overflow-hidden border border-amber-300/90 bg-gradient-to-br from-amber-500/10 via-yellow-50/70 to-emerald-50/70 p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white shadow-xs animate-pulse">
-                <Flame size={13} className="text-yellow-200 fill-yellow-200" />
-                SỰ KIỆN ƯU ĐÃI ĐANG DIỄN RA
+      {/* ── Thanh Ưu Đãi & Hội Viên Tinh Gọn (Sleek, Thoáng Mắt, Không Còn Rối Rắm) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#F6F3EC] border border-[#E4DFD5] text-xs shadow-2xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-7 h-7 rounded-lg bg-[#16261E] text-amber-300 flex items-center justify-center shrink-0 shadow-2xs">
+            <Sparkles size={14} />
+          </span>
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="font-bold text-[#16261E]">
+              🌾 Ưu Đãi Mùa Vụ Thu Đông:
+            </span>
+            <span className="text-stone-600 truncate">
+              Trợ giá trực tiếp đến 18% tại vườn · Nhập mã <strong className="font-mono text-[#166534]">AGRI30</strong> giảm thêm 30%
+            </span>
+            {user && (
+              <span className="hidden md:inline-flex items-center gap-1 font-mono text-[11px] text-[#A3630A] bg-amber-100/90 px-2 py-0.5 rounded-md font-bold">
+                👑 {loyaltyProfile?.tier || "Vàng"}: {(loyaltyProfile?.currentPoints || 1150).toLocaleString("vi-VN")} điểm
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                🌾 Mùa Vụ Thu Đông 2026
-              </span>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200">
-                <Calendar size={12} className="text-emerald-700" /> Hiệu lực: 01/10 – 31/12/2026
-              </span>
-              <span className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-500">
-                <Clock size={12} className="text-emerald-600" /> Cập nhật đợt thu hoạch hôm nay
-              </span>
-            </div>
-
-            <h2 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight">
-              Nông Sản Chính Vụ Trợ Giá Trực Tiếp Đến 18% · Áp Thêm Voucher Giảm 30%
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-3xl">
-              Nông sản đang vào <strong>chính vụ thu hoạch rộ</strong> tại Đà Lạt, Mộc Châu và Hàm Yên nên được <strong>trợ giá trực tiếp tại vườn</strong> (tiết kiệm 10.000 đ - 35.000 đ/KG so với giá niêm yết, không cần nhập mã). Đồng thời, bạn được <strong>áp dụng thêm Mã Giảm Giá</strong> (như <span className="font-mono font-bold text-emerald-800">AGRI30</span>, <span className="font-mono font-bold text-emerald-800">FREESHIP</span>) khi thanh toán để trừ thêm tiền!
-            </p>
-          </div>
-
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap md:flex-col lg:flex-row items-center gap-2 shrink-0">
-            <Link
-              href="/vouchers"
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
-            >
-              <Ticket size={14} />
-              <span>Xem Kho Voucher (Giảm 30%)</span>
-            </Link>
-
-            <Link
-              href="/events"
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-amber-950 border border-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            >
-              <Flame size={14} className="text-rose-600 fill-rose-600" />
-              <span>Xem Các Sự Kiện Mùa Vụ →</span>
-            </Link>
+            )}
           </div>
         </div>
 
-        {/* 3 Explanation Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-amber-200/60 text-xs">
-          <div className="flex items-start gap-2.5 bg-white/80 p-2.5 rounded-xl border border-amber-100 shadow-2xs">
-            <span className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 font-bold flex items-center justify-center shrink-0 text-xs">1</span>
-            <div>
-              <strong className="text-gray-900 block font-bold">Giảm Giá Mùa Vụ (Trực Tiếp)</strong>
-              <span className="text-gray-500 text-[11px]">Trợ giá theo sản lượng thu hoạch tại vườn, giá gốc bị gạch ngang.</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2.5 bg-white/80 p-2.5 rounded-xl border border-amber-100 shadow-2xs">
-            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">2</span>
-            <div>
-              <strong className="text-gray-900 block font-bold">Mã Giảm Giá Voucher (Trừ Thêm)</strong>
-              <span className="text-gray-500 text-[11px]">Nhập mã tại bước Mua Ngay để trừ thêm 30.000 đ hoặc Freeship 25k.</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2.5 bg-white/80 p-2.5 rounded-xl border border-amber-100 shadow-2xs">
-            <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center shrink-0 text-xs">3</span>
-            <div>
-              <strong className="text-gray-900 block font-bold">Thông Báo Khuyến Mãi</strong>
-              <span className="text-gray-500 text-[11px]">Xem tại biểu tượng Chuông 🔔 ở góc trên hoặc mục Thông báo cá nhân.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── AgriClub VIP Points & Voucher Bar (Database Connected) ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-50 via-yellow-50 to-emerald-50 border border-amber-200/90 shadow-xs">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center font-black shadow-md shrink-0">
-            <Crown size={22} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs sm:text-sm text-gray-900">
-                Hội viên AgriClub: {user?.name || "Lê Quang Minh"}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
-                Hạng {loyaltyProfile?.tier || "VÀNG"} ({loyaltyProfile?.pointsMultiplier || 1.5}x Điểm)
-              </span>
-            </div>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Bạn đang có <strong className="text-emerald-700 font-extrabold">{(loyaltyProfile?.currentPoints || 1150)} điểm</strong> khả dụng · Mua nông sản hôm nay được tích lũy điểm tự động và trừ tiền voucher!
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <Link
-            href="/loyalty#redeem-section"
-            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5"
-          >
-            <Sparkles size={13} />
-            <span>Đổi Điểm Lấy Voucher →</span>
-          </Link>
-          <Link
-            href="/dashboard/customer?tab=vouchers"
-            className="px-3.5 py-2 rounded-xl bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs"
+            href="/vouchers"
+            className="px-3.5 py-1.5 rounded-xl bg-[#166534] hover:bg-[#14532D] text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
           >
             <Ticket size={13} />
-            <span>Ví Voucher</span>
+            <span>Kho Voucher</span>
+          </Link>
+          <Link
+            href="/loyalty#redeem-section"
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-50 text-stone-700 border border-[#E4DFD5] text-xs font-semibold transition-all shadow-2xs cursor-pointer active:scale-95"
+          >
+            <span>Đổi Điểm</span>
           </Link>
         </div>
       </div>
@@ -1017,11 +939,11 @@ function ProductsContent() {
                         />
 
                         {/* Top Badges */}
-                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1 pointer-events-none">
+                          <div className="flex items-center gap-1 min-w-0">
                             <span
                               className={cn(
-                                "px-2.5 py-1 rounded-full text-[11px] font-extrabold text-white shadow-md flex items-center gap-1",
+                                "px-2 py-0.5 rounded-full text-[10px] font-extrabold text-white shadow-md flex items-center gap-1 whitespace-nowrap shrink-0",
                                 p.cert?.toLowerCase().includes("organic")
                                   ? "bg-teal-700"
                                   : p.cert?.toLowerCase().includes("globalgap")
@@ -1029,11 +951,11 @@ function ProductsContent() {
                                   : "bg-emerald-700"
                               )}
                             >
-                              <ShieldCheck size={12} />
+                              <ShieldCheck size={11} />
                               {p.cert}
                             </span>
                             {p.batchCode && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-black/65 text-white backdrop-blur-xs shadow-xs">
+                              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-black/65 text-white backdrop-blur-xs shadow-xs truncate whitespace-nowrap">
                                 #{p.batchCode}
                               </span>
                             )}
@@ -1046,10 +968,10 @@ function ProductsContent() {
                                 e.stopPropagation();
                                 setShowPromoInfoModal(true);
                               }}
-                              className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md flex items-center gap-1 animate-pulse pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
+                              className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md flex items-center gap-1 whitespace-nowrap shrink-0 pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
                               title="Bấm để xem căn cứ & quyết định trợ giá vụ mùa"
                             >
-                              <Flame size={11} className="text-yellow-200 fill-yellow-200" />
+                              <Flame size={11} className="text-yellow-200 fill-yellow-200 shrink-0" />
                               <span>Vụ mùa -{discountPercent}%</span>
                             </button>
                           )}

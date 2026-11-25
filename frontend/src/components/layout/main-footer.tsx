@@ -208,6 +208,12 @@ export function MainFooter() {
                   Thẻ hội viên VIP & Tích điểm
                 </Link>
               </li>
+              <li className="pt-2 border-t border-white/10">
+                <Link href="/partner-register" className="text-emerald-300 font-bold hover:text-emerald-200 transition-colors flex items-center gap-1.5">
+                  <Sprout size={13} />
+                  <span>Đăng ký Đối tác Nông trại & Xe lạnh</span>
+                </Link>
+              </li>
             </ul>
           </div>
 

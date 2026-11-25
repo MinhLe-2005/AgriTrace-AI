@@ -69,15 +69,58 @@ export default function HomePage() {
 
   const addItem = useCartStore((s) => s.addItem);
   const productCarouselRef = useRef<HTMLDivElement | null>(null);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const [autoSlideDirection, setAutoSlideDirection] = useState<"right" | "left">("right");
+  const [activeSlideIdx, setActiveSlideIdx] = useState(0);
 
   function scrollProducts(direction: "left" | "right") {
     if (!productCarouselRef.current) return;
-    const scrollAmount = 330;
-    productCarouselRef.current.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
+    const el = productCarouselRef.current;
+    const firstCard = el.firstElementChild as HTMLElement | null;
+    const step = firstCard ? firstCard.offsetWidth + 16 : 300;
+    el.scrollBy({
+      left: direction === "left" ? -step : step,
       behavior: "smooth",
     });
   }
+
+  const shown =
+    tab === "all" ? products : products.filter((p) => p.categoryCode === tab);
+
+  // Tự động di chuyển qua về (Ping-Pong Auto-Slide) sau mỗi 3.5 giây, tự tạm dừng khi hover chuột
+  useEffect(() => {
+    if (isCarouselPaused || shown.length <= 4) return;
+
+    const timer = setInterval(() => {
+      const el = productCarouselRef.current;
+      if (!el) return;
+
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      if (maxScroll <= 5) return;
+
+      const cur = el.scrollLeft;
+      const firstCard = el.firstElementChild as HTMLElement | null;
+      const step = firstCard ? firstCard.offsetWidth + 16 : 300;
+
+      if (autoSlideDirection === "right") {
+        if (cur + step >= maxScroll - 15) {
+          el.scrollBy({ left: step, behavior: "smooth" });
+          setAutoSlideDirection("left");
+        } else {
+          el.scrollBy({ left: step, behavior: "smooth" });
+        }
+      } else {
+        if (cur - step <= 15) {
+          el.scrollBy({ left: -step, behavior: "smooth" });
+          setAutoSlideDirection("right");
+        } else {
+          el.scrollBy({ left: -step, behavior: "smooth" });
+        }
+      }
+    }, 3500);
+
+    return () => clearInterval(timer);
+  }, [isCarouselPaused, autoSlideDirection, shown.length]);
 
   useEffect(() => {
     const iv = setInterval(() => setWordIdx((i) => (i + 1) % heroWords.length), 2800);
@@ -104,9 +147,6 @@ export default function HomePage() {
     }
     loadSupabaseData();
   }, []);
-
-  const shown =
-    tab === "all" ? products : products.filter((p) => p.categoryCode === tab);
 
   function handleAddCart(p: ApiProduct, e?: React.MouseEvent) {
     if (e) e.stopPropagation();
@@ -570,10 +610,17 @@ export default function HomePage() {
 
               {/* Prev / Next Carousel Controls */}
               <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-[#166534] border border-emerald-200 text-[10px] font-mono font-bold mr-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isCarouselPaused ? 'bg-amber-500' : 'bg-emerald-600 animate-pulse'}`} />
+                  <span>{isCarouselPaused ? "Tạm dừng khi rê chuột" : "Tự động trượt qua về"}</span>
+                </span>
                 <button
                   type="button"
-                  onClick={() => scrollProducts("left")}
-                  className="w-9 h-9 rounded-xl bg-white border border-[#E4DFD5] text-[#16261E] hover:text-white hover:bg-[#16261E] flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+                  onClick={() => {
+                    scrollProducts("left");
+                    setAutoSlideDirection("left");
+                  }}
+                  className="w-9 h-9 rounded-xl bg-white border border-[#E4DFD5] text-[#16261E] hover:text-white hover:bg-[#16261E] flex items-center justify-center transition-all shadow-2xs cursor-pointer active:scale-95"
                   title="Quay lui sang trái"
                   aria-label="Quay lui"
                 >
@@ -581,8 +628,11 @@ export default function HomePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => scrollProducts("right")}
-                  className="w-9 h-9 rounded-xl bg-white border border-[#E4DFD5] text-[#16261E] hover:text-white hover:bg-[#16261E] flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+                  onClick={() => {
+                    scrollProducts("right");
+                    setAutoSlideDirection("right");
+                  }}
+                  className="w-9 h-9 rounded-xl bg-white border border-[#E4DFD5] text-[#16261E] hover:text-white hover:bg-[#16261E] flex items-center justify-center transition-all shadow-2xs cursor-pointer active:scale-95"
                   title="Quay tới sang phải"
                   aria-label="Quay tới"
                 >
@@ -592,123 +642,197 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Carousel container with horizontal scroll & snap */}
+          {/* Carousel container with 4 cards per frame on desktop & Ping-Pong Auto-Play */}
           <div
-            ref={productCarouselRef}
-            className="flex gap-5 overflow-x-auto scroll-smooth pb-5 pt-1 snap-x snap-mandatory"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            className="relative group/carousel"
+            onMouseEnter={() => setIsCarouselPaused(true)}
+            onMouseLeave={() => setIsCarouselPaused(false)}
           >
-            {shown.map((p) => {
-              const discountPercent =
-                p.oldPrice > p.price
-                  ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100)
-                  : 0;
+            {/* Floating Side Left Arrow */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                scrollProducts("left");
+                setAutoSlideDirection("left");
+              }}
+              className="hidden lg:flex absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 border border-[#E4DFD5] text-[#16261E] hover:bg-[#16261E] hover:text-white items-center justify-center shadow-md transition-all opacity-0 group-hover/carousel:opacity-100 cursor-pointer active:scale-95"
+              title="Trượt về bên trái"
+              aria-label="Trượt trái"
+            >
+              <ChevronLeft size={20} />
+            </button>
 
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedProduct(p)}
-                  className="bento-card w-[285px] sm:w-[308px] shrink-0 snap-start group overflow-hidden flex flex-col justify-between cursor-pointer"
-                >
-                  <div>
-                    {/* Top Specimen Header Bar */}
-                    <div className="px-3.5 py-2 bg-[#FBF9F5] border-b border-[#EFECE4] flex items-center justify-between text-[10px] font-mono">
-                      <span className="font-bold text-[#166534] flex items-center gap-1">
-                        <QrCode size={11} />
-                        <span>LÔ #{p.batchCode}</span>
-                      </span>
-                      <span className="font-bold text-stone-500">
-                        CHỨNG NHẬN: <strong className="text-[#16261E]">{p.cert}</strong>
-                      </span>
-                    </div>
+            {/* Floating Side Right Arrow */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                scrollProducts("right");
+                setAutoSlideDirection("right");
+              }}
+              className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 border border-[#E4DFD5] text-[#16261E] hover:bg-[#16261E] hover:text-white items-center justify-center shadow-md transition-all opacity-0 group-hover/carousel:opacity-100 cursor-pointer active:scale-95"
+              title="Trượt sang bên phải"
+              aria-label="Trượt phải"
+            >
+              <ChevronRight size={20} />
+            </button>
 
-                    {/* Product Image */}
-                    <div className="relative h-48 bg-[#F6F3EC] overflow-hidden">
-                      <Image
-                        src={p.image || "/images/products/xa-lach.jpg"}
-                        alt={p.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
+            {/* Horizontal Scroll Track - 4 cards visible per frame on LG */}
+            <div
+              ref={productCarouselRef}
+              onScroll={() => {
+                const el = productCarouselRef.current;
+                if (!el) return;
+                const firstCard = el.firstElementChild as HTMLElement | null;
+                const step = firstCard ? firstCard.offsetWidth + 16 : 300;
+                const idx = Math.round(el.scrollLeft / step);
+                setActiveSlideIdx(Math.max(0, idx));
+              }}
+              className="flex gap-4 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              {shown.map((p) => {
+                const discountPercent =
+                  p.oldPrice > p.price
+                    ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100)
+                    : 0;
 
-                      {discountPercent > 0 && (
-                        <span className="absolute top-2.5 right-2.5 font-mono px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#A3630A] text-white shadow-xs">
-                          -{discountPercent}%
+                const displayBatch = p.batchCode || (p.id ? `LÔ-${p.id.slice(0, 5).toUpperCase()}` : "AGRI-01");
+
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => setSelectedProduct(p)}
+                    className="bento-card w-[84%] sm:w-[calc((100%-16px)/2)] md:w-[calc((100%-32px)/3)] lg:w-[calc((100%-48px)/4)] shrink-0 snap-start group overflow-hidden flex flex-col justify-between cursor-pointer transition-all duration-300 hover:shadow-md"
+                  >
+                    <div>
+                      {/* Top Specimen Header Bar */}
+                      <div className="px-3 py-2 bg-[#FBF9F5] border-b border-[#EFECE4] flex items-center justify-between gap-1 text-[10px] font-mono">
+                        <span className="font-bold text-[#166534] flex items-center gap-1 whitespace-nowrap truncate">
+                          <QrCode size={11} className="shrink-0" />
+                          <span className="truncate">LÔ #{displayBatch}</span>
                         </span>
-                      )}
-
-                      {/* Harvest time tag */}
-                      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#16261E]/85 backdrop-blur-md text-stone-100 text-[10px] font-mono">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                        <span>{p.harvest}</span>
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-4 space-y-2.5">
-                      <div>
-                        <div className="flex items-center gap-1 text-[11px] text-stone-500 mb-1">
-                          <MapPin size={12} className="text-[#166534] shrink-0" />
-                          <span className="truncate font-medium">{p.origin || p.farm}</span>
-                        </div>
-                        <h3 className="font-serif font-bold text-base text-[#16261E] group-hover:text-[#166534] transition-colors line-clamp-1">
-                          {p.name}
-                        </h3>
-                      </div>
-
-                      {/* Rating & Stock */}
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1">
-                          <Star size={13} className="fill-amber-400 text-amber-400" />
-                          <span className="font-bold text-[#16261E]">{p.rating}</span>
-                          <span className="text-stone-400">({p.reviews})</span>
-                        </div>
-
-                        <span className="font-mono text-[10px] text-[#166534] font-bold bg-emerald-50/80 px-2 py-0.5 rounded border border-emerald-200">
-                          CÒN {p.stockLeft} SUẤT
+                        <span className="font-bold text-stone-500 whitespace-nowrap shrink-0">
+                          CHỨNG NHẬN: <strong className="text-[#16261E]">{p.cert}</strong>
                         </span>
                       </div>
 
-                      {/* Price Section */}
-                      <div className="pt-2.5 border-t border-[#F0ECE1] flex items-baseline justify-between">
-                        <div>
-                          <span className="font-mono text-lg font-extrabold text-[#16261E]">
-                            {p.price.toLocaleString("vi-VN")} đ
+                      {/* Product Image */}
+                      <div className="relative h-48 bg-[#F6F3EC] overflow-hidden">
+                        <Image
+                          src={p.image || "/images/products/xa-lach.jpg"}
+                          alt={p.name}
+                          fill
+                          sizes="(max-width: 640px) 84vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+
+                        {discountPercent > 0 && (
+                          <span className="absolute top-2.5 right-2.5 font-mono px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#A3630A] text-white shadow-xs">
+                            -{discountPercent}%
                           </span>
-                          <span className="text-xs text-stone-500 font-medium"> / {p.unit}</span>
-                          {p.oldPrice > p.price && (
-                            <span className="ml-2 font-mono text-[11px] text-stone-400 line-through">
-                              {p.oldPrice.toLocaleString("vi-VN")} đ
+                        )}
+
+                        {/* Harvest time tag */}
+                        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#16261E]/85 backdrop-blur-md text-stone-100 text-[10px] font-mono">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          <span>{p.harvest}</span>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-4 space-y-2.5">
+                        <div>
+                          <div className="flex items-center gap-1 text-[11px] text-stone-500 mb-1">
+                            <MapPin size={12} className="text-[#166534] shrink-0" />
+                            <span className="truncate font-medium">{p.origin || p.farm}</span>
+                          </div>
+                          <h3 className="font-serif font-bold text-base text-[#16261E] group-hover:text-[#166534] transition-colors line-clamp-1 capitalize">
+                            {p.name}
+                          </h3>
+                        </div>
+
+                        {/* Rating & Stock */}
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1">
+                            <Star size={13} className="fill-amber-400 text-amber-400" />
+                            <span className="font-bold text-[#16261E]">{p.rating}</span>
+                            <span className="text-stone-400">({p.reviews})</span>
+                          </div>
+
+                          <span className="font-mono text-[10px] text-[#166534] font-bold bg-emerald-50/80 px-2 py-0.5 rounded border border-emerald-200">
+                            CÒN {p.stockLeft} SUẤT
+                          </span>
+                        </div>
+
+                        {/* Price Section */}
+                        <div className="pt-2.5 border-t border-[#F0ECE1] flex items-baseline justify-between">
+                          <div>
+                            <span className="font-mono text-lg font-extrabold text-[#16261E]">
+                              {p.price.toLocaleString("vi-VN")} đ
                             </span>
-                          )}
+                            <span className="text-xs text-stone-500 font-medium"> / {p.unit}</span>
+                            {p.oldPrice > p.price && (
+                              <span className="ml-2 font-mono text-[11px] text-stone-400 line-through">
+                                {p.oldPrice.toLocaleString("vi-VN")} đ
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => handleAddCart(p, e)}
-                      className="py-2.5 px-3 rounded-xl text-xs font-bold text-[#16261E] bg-[#F6F3EC] hover:bg-[#EAE5D9] border border-[#E4DFD5] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <ShoppingBag size={13} />
-                      <span>+ Giỏ hàng</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleBuyNow(p, e)}
-                      className="py-2.5 px-3 rounded-xl text-xs font-bold text-white bg-[#166534] hover:bg-[#14532D] shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <span>Mua ngay</span>
-                      <ArrowRight size={13} />
-                    </button>
+                    {/* Actions */}
+                    <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => handleAddCart(p, e)}
+                        className="py-2.5 px-3 rounded-xl text-xs font-bold text-[#16261E] bg-[#F6F3EC] hover:bg-[#EAE5D9] border border-[#E4DFD5] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <ShoppingBag size={13} />
+                        <span>+ Giỏ hàng</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleBuyNow(p, e)}
+                        className="py-2.5 px-3 rounded-xl text-xs font-bold text-white bg-[#166534] hover:bg-[#14532D] shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <span>Mua ngay</span>
+                        <ArrowRight size={13} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            {/* Pagination Dots */}
+            {shown.length > 4 && (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                {Array.from({ length: shown.length - 3 }).map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      const el = productCarouselRef.current;
+                      if (!el) return;
+                      const firstCard = el.firstElementChild as HTMLElement | null;
+                      const step = firstCard ? firstCard.offsetWidth + 16 : 300;
+                      el.scrollTo({ left: i * step, behavior: "smooth" });
+                      setActiveSlideIdx(i);
+                    }}
+                    className={cn(
+                      "h-1.5 rounded-full transition-all duration-300 cursor-pointer",
+                      activeSlideIdx === i
+                        ? "w-7 bg-[#166534]"
+                        : "w-2 bg-[#D5CEC2] hover:bg-stone-400"
+                    )}
+                    title={`Xem nhóm nông sản ${i + 1}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Editorial Callout Banner */}

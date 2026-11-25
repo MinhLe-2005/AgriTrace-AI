@@ -1,7 +1,7 @@
 import { AuthForm } from "@/features/auth/auth-form";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ShieldCheck, QrCode, Sparkles, Leaf } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ShieldCheck, QrCode, Sparkles, Leaf, Sprout, ArrowRight } from "lucide-react";
 
 export const metadata = { title: "Đăng ký tài khoản | AgriTrace" };
 
@@ -45,26 +45,43 @@ export default function RegisterPage() {
             </span>
           </div>
 
-          <div className="mb-5">
+          <div className="mb-6">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold mb-2.5">
+              <Sparkles className="h-3 w-3" /> Thành viên Mua Sắm & Tích Điểm
+            </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-              Tạo tài khoản & Chọn vai trò
+              Đăng ký tài khoản khách hàng
             </h1>
             <p className="text-sm text-gray-500 mt-1.5">
-              Chọn vai trò phù hợp trong chuỗi cung ứng nông sản sạch AgriTrace AI.
-            </p>
-          </div>
-
-          {/* Role notice - cleanly styled */}
-          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/70 mb-5 text-xs text-emerald-900">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-[11px] mt-0.5">
-              i
-            </span>
-            <p className="leading-relaxed">
-              Tài khoản <strong className="font-semibold text-emerald-950">Khách hàng</strong> được kích hoạt mua sắm ngay. Với vị trí <strong className="font-semibold text-emerald-950">Nông dân, Thủ kho, Nhà phân phối</strong>, vui lòng điền kèm <strong>Hồ sơ năng lực</strong> bên dưới — tài khoản chỉ được vào vị trí công việc sau khi <strong>Ban Quản Trị phê duyệt</strong>.
+              Tạo tài khoản để mua sắm nông sản hữu cơ tươi sạch, truy xuất nguồn gốc QR và nhận voucher giảm 30%.
             </p>
           </div>
 
           <AuthForm mode="register" />
+
+          {/* Partner Onboarding Link Card */}
+          <div className="mt-8 p-4 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-stone-50 border border-emerald-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white shadow-sm mt-0.5">
+                <Sprout className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-gray-900">
+                  Bạn là Chủ Trang Trại hoặc Đơn Vị Vận Chuyển?
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                  Đăng ký gia nhập mạng lưới đối tác cung ứng và xe lạnh cùng AgriTrace AI.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/partner-register"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-2xs hover:shadow-xs shrink-0"
+            >
+              <span>Đăng ký đối tác</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
 
           <p className="text-center text-xs text-gray-400 mt-8">
             Bằng việc đăng ký, bạn đồng ý với{" "}

@@ -65,7 +65,7 @@ const vouchersList: VoucherItem[] = [
     discount: "Giảm 10% (Tối đa 30.000 đ)",
     shortDiscount: "10%",
     minOrder: "Đơn từ 150.000 đ",
-    expiry: "Hết hạn ngày 31/10/2026",
+    expiry: "Đến 31/12/2026",
     usagePercent: 82,
     usageLeft: "Còn 85 lượt",
     tag: "Mùa vụ",

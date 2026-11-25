@@ -82,6 +82,12 @@ function CartContent() {
   const { items, updateQty, removeItem, clearCart, getSubtotal } = useCartStore();
   const { addNotification } = useNotificationStore();
 
+  // Sync isolated cart whenever logged in user changes or logs out
+  useEffect(() => {
+    const owner = user?.id ? `user:${user.id}` : user?.email ? `email:${user.email}` : "guest";
+    useCartStore.getState().syncUser(owner);
+  }, [user?.id, user?.email]);
+
   const stepParam = searchParams.get("step");
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(() => {
     if (stepParam === "2") return 2;

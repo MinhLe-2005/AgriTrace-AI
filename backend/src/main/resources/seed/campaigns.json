@@ -92,34 +92,5 @@
     "fullContent": "Cam sành chính vụ vỏ mỏng, tép vàng giòn, hàm lượng đường tự nhiên cao. Được hái mới lúc sáng sớm tại Tuyên Quang và chuyển về kho lạnh trung tâm trong ngày.",
     "active": true,
     "createdAt": "2026-09-01T08:00:00Z"
-  },
-  {
-    "id": "camp-bo-sap",
-    "title": "Tuần Lễ Xả Kho Tươi Cuối Vụ Bơ Sáp 034 Tây Nguyên",
-    "slug": "tuan-le-xa-kho-bo-sap-034",
-    "type": "flash_sale",
-    "typeLabel": "Xả Kho Tươi Cuối Vụ",
-    "typeColor": "bg-gray-100 text-gray-800 border-gray-300",
-    "startDate": "2026-10-01",
-    "endDate": "2026-10-31",
-    "discountPercent": 17,
-    "discountAmount": 15000,
-    "targetType": "product",
-    "targetProductIds": [
-      "dddd6666-dddd-6666-dddd-666666666666",
-      "SP-BO-06"
-    ],
-    "targetProductNames": [
-      "Bơ Sáp 034",
-      "Bơ"
-    ],
-    "targetCategoryCodes": [],
-    "voucherCode": "BOSAP15",
-    "bannerIcon": "🥑",
-    "badgeText": "Đã kết thúc",
-    "description": "Đợt bơ sáp 034 cuối cùng của niên vụ 2026. Ưu tiên xuất kho nhanh theo nguyên tắc FEFO bảo quản lạnh.",
-    "fullContent": "Chiến dịch đã kết thúc ngày 31/10/2026. Sản phẩm bơ sáp hiện đã trở về biểu giá niêm yết thông thường.",
-    "active": true,
-    "createdAt": "2026-10-01T08:00:00Z"
   }
 ]

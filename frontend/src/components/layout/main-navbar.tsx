@@ -37,6 +37,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 
 import { authService } from "@/services/auth.service";
+import { catalogService } from "@/services/catalog.service";
 import { verificationsService } from "@/services/verifications.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCartStore } from "@/stores/cart-store";
@@ -61,9 +62,15 @@ export function MainNavbar() {
   // Mobile Accordions state
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null);
 
-  const { notifications, markAsRead, markAllAsRead } = useNotificationStore();
+  const { notifications, markAsRead, markAllAsRead, syncFromLiveSystem } = useNotificationStore();
   const unreadNotifs = notifications.filter((n) => !n.read);
-  const cartCount = useCartStore((s) => s.getItemCount());
+  const cartCount = useCartStore((s) => s.items.reduce((sum, it) => sum + it.qty, 0));
+
+  // Sync isolated cart whenever logged in user changes or logs out
+  useEffect(() => {
+    const owner = user?.id ? `user:${user.id}` : user?.email ? `email:${user.email}` : "guest";
+    useCartStore.getState().syncUser(owner);
+  }, [user?.id, user?.email]);
 
   const handleMouseEnter = (key: string) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -86,6 +93,7 @@ export function MainNavbar() {
       /* ignore */
     }
     clearSession();
+    useNotificationStore.setState({ notifications: [] });
     setUserOpen(false);
     setMobileOpen(false);
     toast.info("Đã đăng xuất thành công.");
@@ -127,8 +135,12 @@ export function MainNavbar() {
           setMyVerification(reqs[0]);
           if (reqs[0].status === "APPROVED") {
             const me = await authService.getMe().catch(() => null);
-            if (mounted && me && me.roles && me.roles.length > (user.roles?.length || 0)) {
-              updateUser({ roles: me.roles, companyName: me.companyName });
+            if (mounted && me && me.roles) {
+              const rolesChanged = JSON.stringify(me.roles) !== JSON.stringify(user.roles);
+              const companyChanged = me.companyName !== user.companyName;
+              if (rolesChanged || companyChanged) {
+                updateUser({ roles: me.roles, companyName: me.companyName });
+              }
             }
           }
         } else if (mounted) {
@@ -142,6 +154,35 @@ export function MainNavbar() {
       mounted = false;
     };
   }, [user?.id, user?.email, isSpecialRole, updateUser]);
+
+  // Sync live notifications from user orders, vouchers, and verification
+  useEffect(() => {
+    if (!user) {
+      useNotificationStore.setState({ notifications: [] });
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      try {
+        const [ordersRes, vouchersRes] = await Promise.all([
+          user.email ? catalogService.getOrders(user.email).catch(() => []) : Promise.resolve([]),
+          catalogService.getVouchers().catch(() => []),
+        ]);
+        if (mounted) {
+          syncFromLiveSystem({
+            orders: ordersRes || [],
+            vouchers: vouchersRes || [],
+            verification: myVerification,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user, user?.email, myVerification, syncFromLiveSystem]);
 
   return (
     <header className="sticky top-0 z-50 bg-[#FBF9F5]/95 backdrop-blur-md border-b border-[#E4DFD5]">
@@ -690,7 +731,7 @@ export function MainNavbar() {
         {/* RIGHT SECTION: NOTIFICATIONS, CART, ROLE DASHBOARD & USER       */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center gap-2">
-          {/* Notifications Bell */}
+          {/* Notifications Bell - Chỉ hiển thị cho người dùng đã đăng nhập */}
           {user && (
             <div className="relative">
               <button
@@ -734,7 +775,7 @@ export function MainNavbar() {
 
                   <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
                     {notifications.length === 0 ? (
-                      <div className="p-6 text-center text-gray-400">Không có thông báo nào</div>
+                      <div className="p-6 text-center text-gray-400 text-xs">Không có thông báo nào</div>
                     ) : (
                       notifications.slice(0, 6).map((n) => (
                         <Link
@@ -745,19 +786,13 @@ export function MainNavbar() {
                             setNotifOpen(false);
                           }}
                           className={`p-3.5 block transition-colors hover:bg-gray-50/80 ${
-                            n.id === "notif-season-pricing"
-                              ? "bg-gradient-to-r from-amber-50/90 via-rose-50/60 to-white border-l-4 border-rose-500"
-                              : !n.read
-                              ? "bg-emerald-50/40"
-                              : ""
+                            !n.read ? "bg-emerald-50/40" : ""
                           }`}
                         >
                           <div className="flex items-start gap-2.5">
                             <div
                               className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                                n.id === "notif-season-pricing"
-                                  ? "bg-rose-600 text-white shadow-xs"
-                                  : n.type === "order"
+                                n.type === "order"
                                   ? "bg-blue-100 text-blue-700"
                                   : n.type === "voucher"
                                   ? "bg-amber-100 text-amber-700"
@@ -768,9 +803,7 @@ export function MainNavbar() {
                                   : "bg-emerald-100 text-emerald-700"
                               }`}
                             >
-                              {n.id === "notif-season-pricing" ? (
-                                <Megaphone size={14} />
-                              ) : n.type === "order" ? (
+                              {n.type === "order" ? (
                                 <Truck size={14} />
                               ) : n.type === "voucher" ? (
                                 <Gift size={14} />
@@ -779,19 +812,28 @@ export function MainNavbar() {
                               ) : n.type === "season" ? (
                                 <Sprout size={14} />
                               ) : (
-                                <Leaf size={14} />
+                                <ShieldCheck size={14} />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center justify-between gap-1.5">
                                 <p className="font-semibold text-gray-900 text-xs truncate">{n.title}</p>
-                                {n.id === "notif-season-pricing" ? (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-600 text-white shrink-0 animate-pulse">
-                                    QĐ MỚI
-                                  </span>
-                                ) : !n.read ? (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
-                                ) : null}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {n.badge && (
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                        n.type === "order"
+                                          ? "bg-blue-100 text-blue-700"
+                                          : n.type === "voucher"
+                                          ? "bg-amber-100 text-amber-800"
+                                          : "bg-emerald-100 text-emerald-700"
+                                      }`}
+                                    >
+                                      {n.badge}
+                                    </span>
+                                  )}
+                                  {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />}
+                                </div>
                               </div>
                               <p className="text-gray-500 text-[11px] line-clamp-2 mt-0.5 leading-snug">
                                 {n.message}
@@ -805,14 +847,24 @@ export function MainNavbar() {
                   </div>
 
                   <div className="p-2.5 border-t border-gray-100 bg-gray-50/70 flex items-center justify-between text-xs px-3">
-                    <Link
-                      href="/events"
-                      onClick={() => setNotifOpen(false)}
-                      className="font-bold text-emerald-800 hover:text-emerald-950 hover:underline flex items-center gap-1"
-                    >
-                      <Flame size={13} className="text-rose-600 fill-rose-600" />
-                      <span>Xem Tất Cả Sự Kiện Mùa Vụ →</span>
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href="/dashboard/customer?tab=orders"
+                        onClick={() => setNotifOpen(false)}
+                        className="font-bold text-emerald-800 hover:text-emerald-950 hover:underline flex items-center gap-1"
+                      >
+                        <Truck size={13} className="text-emerald-700" />
+                        <span>Đơn hàng của tôi</span>
+                      </Link>
+                      <Link
+                        href="/vouchers"
+                        onClick={() => setNotifOpen(false)}
+                        className="font-semibold text-amber-800 hover:text-amber-950 hover:underline flex items-center gap-1"
+                      >
+                        <Gift size={13} className="text-amber-600" />
+                        <span>Kho Voucher</span>
+                      </Link>
+                    </div>
                     <Link
                       href="/dashboard/customer?tab=notifications"
                       onClick={() => setNotifOpen(false)}
@@ -911,7 +963,7 @@ export function MainNavbar() {
                   )}
                   <Link
                     href="/dashboard/customer?tab=orders"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors whitespace-nowrap shrink-0"
                     title="Xem đơn mua của bạn"
                   >
                     <ShoppingBag size={14} strokeWidth={1.75} />
@@ -921,10 +973,10 @@ export function MainNavbar() {
               )}
 
               {/* User Dropdown */}
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   onClick={() => setUserOpen(!userOpen)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-gray-200 hover:border-emerald-400 bg-white text-xs font-semibold text-gray-700 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-gray-200 hover:border-emerald-400 bg-white text-xs font-semibold text-gray-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 >
                   {user.avatarUrl ? (
                     <img
@@ -1067,24 +1119,33 @@ export function MainNavbar() {
                         </>
                       ) : (
                         <>
-                          <Link
-                            href="/dashboard"
-                            onClick={() => setUserOpen(false)}
-                            className="flex items-center gap-2 px-3 py-2 text-emerald-800 hover:bg-emerald-50 font-bold transition-colors"
-                          >
-                            <ShieldCheck size={14} className="text-emerald-700" />
-                            <span>
-                              {myVerification
-                                ? `Hồ sơ vị trí (${
-                                    myVerification.status === "PENDING" || myVerification.status === "UNDER_REVIEW"
-                                      ? "Chờ duyệt"
-                                      : myVerification.status === "APPROVED"
-                                      ? "Đã duyệt"
-                                      : "Cần bổ sung"
-                                  })`
-                                : "Ứng tuyển Vị trí & Đối tác"}
-                            </span>
-                          </Link>
+                          {myVerification ? (
+                            <Link
+                              href="/dashboard"
+                              onClick={() => setUserOpen(false)}
+                              className="flex items-center gap-2 px-3 py-2 text-emerald-800 hover:bg-emerald-50 font-bold transition-colors"
+                            >
+                              <ShieldCheck size={14} className="text-emerald-700" />
+                              <span>
+                                {`Hồ sơ đối tác (${
+                                  myVerification.status === "PENDING" || myVerification.status === "UNDER_REVIEW"
+                                    ? "Chờ duyệt"
+                                    : myVerification.status === "APPROVED"
+                                    ? "Đã duyệt"
+                                    : "Cần bổ sung"
+                                })`}
+                              </span>
+                            </Link>
+                          ) : (
+                            <Link
+                              href="/partner-register"
+                              onClick={() => setUserOpen(false)}
+                              className="flex items-center gap-2 px-3 py-2 text-emerald-800 hover:bg-emerald-50 font-bold transition-colors"
+                            >
+                              <Sprout size={14} className="text-emerald-700" />
+                              <span>Đăng ký Đối tác Nông trại & Xe lạnh</span>
+                            </Link>
+                          )}
                           <Link
                             href="/dashboard/customer?tab=profile"
                             onClick={() => setUserOpen(false)}
@@ -1151,18 +1212,10 @@ export function MainNavbar() {
               </div>
             </>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <Link
-                href="/dashboard/customer?tab=orders"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                title="Xem đơn mua của bạn"
-              >
-                <ShoppingBag size={14} strokeWidth={1.75} />
-                <span>Đơn Mua</span>
-              </Link>
+            <div className="flex items-center gap-2 shrink-0">
               <Link
                 href="/login"
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 transition-all shadow-xs"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 transition-all shadow-xs whitespace-nowrap shrink-0"
               >
                 Đăng Nhập
               </Link>

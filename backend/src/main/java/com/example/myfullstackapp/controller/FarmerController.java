@@ -1240,7 +1240,7 @@ public class FarmerController {
                 .action("Bón phân hữu cơ sinh học trùn quế và chế phẩm vi sinh Trichoderma")
                 .materialsUsed("Phân trùn quế 50kg, Chế phẩm Trichoderma 2L")
                 .notes("Độ ẩm đạt chuẩn 75%, cây phát triển đồng đều, không sâu bệnh")
-                .proofImage("https://images.unsplash.com/photo-1592417817098-8f3d69102a56?w=600&auto=format&fit=crop&q=80")
+                .proofImage("/images/categories/cat-rau.jpg")
                 .build();
 
         FarmingLog l2 = FarmingLog.builder()
@@ -1252,7 +1252,7 @@ public class FarmerController {
                 .action("Tưới phun sương tự động theo lịch hẹn giờ IoT công nghệ cao")
                 .materialsUsed("Nước giếng khoan qua hệ thống lọc RO khử khuẩn")
                 .notes("Thời gian tưới 30 phút buổi sáng sớm, nhiệt độ nhà màng ổn định 22°C")
-                .proofImage("https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&auto=format&fit=crop&q=80")
+                .proofImage("/images/products/cai-kale.jpg")
                 .build();
 
         FarmingLog l3 = FarmingLog.builder()
@@ -1264,7 +1264,7 @@ public class FarmerController {
                 .action("Thu hái chọn lọc thủ công từng quả dâu tây chín đỏ đạt tiêu chuẩn VietGAP")
                 .materialsUsed("Kéo cắt chuyên dụng khử trùng cồn 70 độ, khay nhựa lót đệm xốp")
                 .notes("Thu hoạch lúc sáng sớm tránh dập nát, chuyển ngay vào kho lạnh tiền đông bảo quản")
-                .proofImage("https://images.unsplash.com/photo-1543528176-61b239494933?w=600&auto=format&fit=crop&q=80")
+                .proofImage("/images/products/dau-tay.jpg")
                 .build();
 
         FarmingLog l4 = FarmingLog.builder()
@@ -1276,7 +1276,7 @@ public class FarmerController {
                 .action("Tưới phun sương tự động theo lịch hẹn giờ IoT cho vườn Mận Hậu")
                 .materialsUsed("Nguồn nước tự nhiên đầu nguồn lọc sinh học")
                 .notes("Độ ẩm đất ổn định 75%, cây sinh trưởng tốt trong khí hậu cao nguyên Mộc Châu")
-                .proofImage("https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&auto=format&fit=crop&q=80")
+                .proofImage("/images/products/cam-sanh.jpg")
                 .build();
 
         FarmingLog l5 = FarmingLog.builder()
@@ -1288,7 +1288,7 @@ public class FarmerController {
                 .action("Thu hái mận hậu chọn lọc từng quả chín giòn ráo sương sáng")
                 .materialsUsed("Giỏ tre lót lá thông thoáng khí, bao bì carton màng thở")
                 .notes("Sản lượng 800 kg đạt chuẩn xuất khẩu sang các chuỗi siêu thị sạch")
-                .proofImage("https://images.unsplash.com/photo-1601039641847-7857b994d704?w=600&auto=format&fit=crop&q=80")
+                .proofImage("/images/products/bo-sap.jpg")
                 .build();
 
         farmingLogRepository.saveAll(List.of(l1, l2, l3, l4, l5));

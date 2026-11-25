@@ -51,6 +51,7 @@ import {
   type AdminBlogPost,
   type CampaignType,
 } from "@/stores/campaign-store";
+import { useNotificationStore } from "@/stores/notification-store";
 import { toast } from "@/stores/toast-store";
 import type { VerificationRequest } from "@/types/verification";
 import { cn } from "@/utils/cn";
@@ -554,6 +555,14 @@ function AdminPortalContent() {
         active: true,
       });
       toast.success(`Tạo thành công voucher [${created.code}]!`);
+      useNotificationStore.getState().addNotification({
+        id: `notif-voucher-${created.code}`,
+        title: `🎟️ Voucher Mới: ${created.code} (${created.badge || "Ưu đãi"})`,
+        message: `Hệ thống vừa phát hành ưu đãi "${created.title}". Giảm ${created.discount}đ cho đơn từ ${created.minOrder}đ. Hạn dùng: ${created.exp}!`,
+        type: "voucher",
+        link: "/vouchers",
+        badge: created.badge || "Voucher",
+      });
       setShowCreateVoucherModal(false);
       setNewVoucher({
         code: "",

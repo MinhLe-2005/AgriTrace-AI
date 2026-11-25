@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { ApiOrder, ApiVoucher } from "@/services/catalog.service";
+import type { VerificationRequest } from "@/types/verification";
 
 export type NotificationType = "order" | "voucher" | "promo" | "season" | "system";
 
@@ -11,6 +13,7 @@ export type NotificationItem = {
   createdAt: string;
   read: boolean;
   link?: string;
+  badge?: string;
 };
 
 type NotificationStore = {
@@ -22,77 +25,19 @@ type NotificationStore = {
     type: NotificationType;
     createdAt?: string;
     link?: string;
+    badge?: string;
+  }) => void;
+  syncFromLiveSystem: (params: {
+    orders?: ApiOrder[];
+    vouchers?: ApiVoucher[];
+    verification?: VerificationRequest | null;
   }) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   deleteNotification: (id: string) => void;
 };
 
-const initialNotifications: NotificationItem[] = [
-  {
-    id: "notif-season-pricing",
-    title: "📢 Thông báo Quyết định Trợ giá Mùa Vụ Thu Đông 2026 (QĐ #88/QĐ-AGRI)",
-    message: "Quyết định số 88/2026/QĐ-AGRI: Trợ giá trực tiếp 13% - 18% cho rau củ quả chính vụ tại Đà Lạt & Mộc Châu (01/10 – 31/12/2026). Bấm để xem toàn văn quyết định & lịch biểu!",
-    type: "season",
-    createdAt: "Vừa xong",
-    read: false,
-    link: "/announcements#decision-88",
-  },
-  {
-    id: "notif-season-1",
-    title: "🍓 Mở bán Mùa Dâu Tây Mộc Châu Vụ Đông",
-    message: "Dâu tây New Zealand Mộc Châu chính thức vào vụ thu hái chín rộ. Chuỗi xe lạnh 2-5°C giao tận bàn ăn trong 24h!",
-    type: "season",
-    createdAt: "30 phút trước",
-    read: false,
-    link: "/products?cat=trai_cay",
-  },
-  {
-    id: "notif-promo-1",
-    title: "🎉 Tuần Lễ Nông Sản Xanh - Giảm 20% & Freeship",
-    message: "Áp mã NONGNGHIEPXANH giảm ngay 20.000đ cho đơn nông sản VietGAP. Tích thêm x1.5 điểm AgriClub!",
-    type: "promo",
-    createdAt: "1 giờ trước",
-    read: false,
-    link: "/vouchers",
-  },
-  {
-    id: "notif-order-1",
-    title: "🚚 Đang giao hàng xe lạnh (AGRI-8841)",
-    message: "Đơn hàng AGRI-8841 đang được tài xế giao bằng xe lạnh 4.1°C. Dự kiến nhận trước 16:30 chiều nay.",
-    type: "order",
-    createdAt: "2 giờ trước",
-    read: false,
-    link: "/dashboard/customer?tab=orders",
-  },
-  {
-    id: "notif-season-2",
-    title: "🍊 Sự kiện Mùa Vụ Cam Sành Hàm Yên",
-    message: "HTX Mộc Châu vừa thu hoạch đợt Cam Sành tép vàng mọng nước chuẩn VietGAP, dồi dào Vitamin C tươi ngon.",
-    type: "season",
-    createdAt: "1 ngày trước",
-    read: true,
-    link: "/products",
-  },
-  {
-    id: "notif-voucher-1",
-    title: "🎁 Tặng Voucher AGRI30K mừng Hội Viên VIP",
-    message: "Hệ thống tặng bạn mã giảm giá 30.000đ trong ví voucher mừng nâng hạng Hội Viên AgriClub.",
-    type: "voucher",
-    createdAt: "2 ngày trước",
-    read: true,
-    link: "/dashboard/customer?tab=vouchers",
-  },
-  {
-    id: "notif-system-1",
-    title: "🛡️ Nhật ký VietGAP được cập nhật",
-    message: "Lô Xà Lách Thủy Canh XL-2026-08 vừa bổ sung kết quả kiểm định phòng Lab: Dư lượng thuốc BVTV = 0.",
-    type: "system",
-    createdAt: "3 ngày trước",
-    read: true,
-    link: "/traceability?batch=LOT-XL-2026-08",
-  },
-];
+const initialNotifications: NotificationItem[] = [];
 
 export const useNotificationStore = create<NotificationStore>()(
   persist(
@@ -110,10 +55,121 @@ export const useNotificationStore = create<NotificationStore>()(
             createdAt: item.createdAt || "Vừa xong",
             read: false,
             link: item.link,
+            badge: item.badge,
           };
           return {
             notifications: [newNotif, ...filtered],
           };
+        }),
+      syncFromLiveSystem: ({ orders, vouchers, verification }) =>
+        set((state) => {
+          // Remove legacy fake notifications
+          const currentList = state.notifications.filter(
+            (n) =>
+              n.id !== "notif-season-pricing" &&
+              !n.title.includes("QĐ #88") &&
+              !n.title.includes("Quyết định")
+          );
+
+          const newItems: NotificationItem[] = [];
+
+          // 1. Sync live orders
+          if (orders && orders.length > 0) {
+            orders.slice(0, 5).forEach((ord) => {
+              const code = ord.orderCode || `DH-${ord.id}`;
+              const exists = currentList.some((n) => n.id === `notif-order-${code}`);
+              if (!exists) {
+                let title = `📦 Đơn hàng #${code} đã được tiếp nhận`;
+                let message = `Đơn hàng gồm ${ord.items?.length || 1} món nông sản đang được xử lý tại kho lạnh. Bấm để xem chi tiết!`;
+                let badge = "Đã đặt";
+                if (ord.status === "SHIPPING") {
+                  title = `🚚 Đơn hàng #${code} đang giao xe lạnh`;
+                  message = `Nông sản đang trên tuyến xe lạnh 2°C – 5°C. Bấm để theo dõi lộ trình và định vị tài xế!`;
+                  badge = "Đang giao";
+                } else if (ord.status === "PENDING_PAYMENT") {
+                  title = `⏳ Đơn hàng #${code} chờ thanh toán VietQR`;
+                  message = `Kho lạnh đang giữ đơn hàng trong 30 phút. Vui lòng quét mã VietQR để kho xuất hàng!`;
+                  badge = "Chờ chuyển khoản";
+                } else if (ord.status === "DELIVERED" || ord.status === "COMPLETED") {
+                  title = `✅ Đơn hàng #${code} đã giao thành công`;
+                  message = `Nông sản tươi sạch đã được giao an toàn. Chúc bạn và gia đình có bữa ăn ngon lành!`;
+                  badge = "Đã nhận";
+                }
+                newItems.push({
+                  id: `notif-order-${code}`,
+                  title,
+                  message,
+                  type: "order",
+                  createdAt: "Gần đây",
+                  read: false,
+                  link: `/dashboard/customer?tab=orders&order=${code}`,
+                  badge,
+                });
+              }
+            });
+          }
+
+          // 2. Sync live vouchers created by Admin
+          if (vouchers && vouchers.length > 0) {
+            vouchers
+              .filter((v) => v.active)
+              .slice(0, 3)
+              .forEach((v) => {
+                const exists = currentList.some((n) => n.id === `notif-voucher-${v.code}`);
+                if (!exists) {
+                  const discountText = v.discount.toLowerCase().startsWith("giảm")
+                    ? v.discount
+                    : `Giảm ${v.discount}`;
+                  const minOrderText = v.minOrder.toLowerCase().startsWith("đơn từ")
+                    ? v.minOrder
+                    : `đơn từ ${v.minOrder}`;
+                  const expText = v.exp.replace(/^HSD:\s*/i, "");
+                  newItems.push({
+                    id: `notif-voucher-${v.code}`,
+                    title: `🎟️ Voucher Mới: ${v.code} (${v.badge || "Ưu đãi"})`,
+                    message: `${discountText} cho ${minOrderText}. HSD: ${expText}. Bấm để nhận và áp dụng!`,
+                    type: "voucher",
+                    createdAt: "Mới cập nhật",
+                    read: false,
+                    link: `/vouchers`,
+                    badge: v.badge || "Voucher",
+                  });
+                }
+              });
+          }
+
+          // 3. Sync partner verification status
+          if (verification) {
+            const exists = currentList.some((n) => n.id === `notif-verify-${verification.id}-${verification.status}`);
+            if (!exists) {
+              const roleTitle = verification.type === "FARMER" ? "Nông dân" : "Vận chuyển";
+              let title = `📋 Hồ sơ đối tác ${roleTitle}: Đang thẩm định`;
+              let message = `Hồ sơ ${roleTitle} (${verification.organizationName}) đang được Ban Quản Trị xem xét trong 24h.`;
+              let badge = "Chờ duyệt";
+              if (verification.status === "APPROVED") {
+                title = `🎉 Chúc mừng! Hồ sơ đối tác ${roleTitle} đã được phê duyệt!`;
+                message = `Bạn đã có quyền truy cập Cổng Quản Trị Vận Hành. Bấm để bắt đầu!`;
+                badge = "Đã duyệt";
+              } else if (verification.status === "CHANGES_REQUESTED") {
+                title = `⚠️ Hồ sơ đối tác ${roleTitle}: Cần bổ sung tài liệu`;
+                message = `${verification.decisionReason || "Vui lòng cập nhật lại hồ sơ năng lực."} Bấm để hoàn thiện.`;
+                badge = "Cần bổ sung";
+              }
+              newItems.push({
+                id: `notif-verify-${verification.id}-${verification.status}`,
+                title,
+                message,
+                type: "system",
+                createdAt: "Mới nhất",
+                read: false,
+                link: `/dashboard`,
+                badge,
+              });
+            }
+          }
+
+          if (newItems.length === 0) return { notifications: currentList };
+          return { notifications: [...newItems, ...currentList] };
         }),
       markAsRead: (id) =>
         set((state) => ({
@@ -131,7 +187,7 @@ export const useNotificationStore = create<NotificationStore>()(
         })),
     }),
     {
-      name: "agritrace-notifications-v2",
+      name: "agritrace-notifications-v8",
     }
   )
 );

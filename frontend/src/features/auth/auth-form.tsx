@@ -52,12 +52,12 @@ type FormValues = {
   confirmPassword: string;
 };
 
-const REGISTER_ROLES: {
-  id: RegisterRoleOption;
+const PARTNER_REGISTER_ROLES: {
+  id: "FARMER" | "DISTRIBUTOR";
   label: string;
   subtitle: string;
   badge: string;
-  icon: typeof ShoppingBag;
+  icon: typeof Sprout;
   orgLabel: string;
   orgPlaceholder: string;
   docOptions: string[];
@@ -65,22 +65,10 @@ const REGISTER_ROLES: {
   notePlaceholder: string;
 }[] = [
   {
-    id: "CUSTOMER",
-    label: "Khách hàng",
-    subtitle: "Mua sắm & Truy xuất QR",
-    badge: "Kích hoạt ngay",
-    icon: ShoppingBag,
-    orgLabel: "",
-    orgPlaceholder: "",
-    docOptions: [],
-    noteLabel: "",
-    notePlaceholder: "",
-  },
-  {
     id: "FARMER",
-    label: "Nông dân / Trang trại",
-    subtitle: "Canh tác & Cấp mã QR lô hàng",
-    badge: "Cần duyệt hồ sơ",
+    label: "Nông dân / Trang trại canh tác",
+    subtitle: "Canh tác, cấp mã QR & cung ứng nông sản sạch",
+    badge: "Thẩm định VietGAP",
     icon: Sprout,
     orgLabel: "Tên Nông trại / Hợp tác xã canh tác",
     orgPlaceholder: "VD: Nông trại Xanh Đà Lạt / HTX Rau Sạch Mộc Châu",
@@ -94,26 +82,10 @@ const REGISTER_ROLES: {
     notePlaceholder: "VD: Diện tích 2.5ha tại Đà Lạt, sản lượng 10 tấn/tháng (Xà lách thủy canh, Dâu tây, Cà chua bi)...",
   },
   {
-    id: "WAREHOUSE",
-    label: "Nhân viên Kho lạnh",
-    subtitle: "Kiểm định QC & Xuất nhập FEFO",
-    badge: "Cần duyệt hồ sơ",
-    icon: Package,
-    orgLabel: "Kho lạnh đăng ký công tác / Bộ phận",
-    orgPlaceholder: "VD: Kho Lạnh Trung Tâm Đà Lạt - Bộ phận Kiểm định QC",
-    docOptions: [
-      "Chứng chỉ Vận hành Kho lạnh & Bảo quản FEFO",
-      "Hồ sơ Nhân sự / CCCD & Hợp đồng lao động",
-      "Chứng nhận An toàn Vệ sinh Thực phẩm",
-    ],
-    noteLabel: "Kinh nghiệm chuyên môn kho vận & Ca trực đăng ký",
-    notePlaceholder: "VD: 2 năm kinh nghiệm vận hành kho lạnh nông sản 2°C - 5°C, kiểm soát cảm biến IoT & quy trình FEFO...",
-  },
-  {
     id: "DISTRIBUTOR",
-    label: "Nhà phân phối / Xe lạnh",
-    subtitle: "Vận chuyển lạnh & Giao hàng",
-    badge: "Cần duyệt hồ sơ",
+    label: "Nhà phân phối / Đội xe lạnh",
+    subtitle: "Vận chuyển lạnh 2°C - 5°C, điều phối chặng cuối",
+    badge: "Thẩm định Xe lạnh IoT",
     icon: Truck,
     orgLabel: "Tên Đội xe lạnh / Đơn vị vận chuyển",
     orgPlaceholder: "VD: Đội Xe Lạnh AgriTrans Express / Hợp tác xã Vận tải",
@@ -135,7 +107,15 @@ const DEMO_ACCOUNTS = [
   { username: "admin", email: "admin@sportvenue.com", label: "Quản trị viên", role: "Toàn quyền hệ thống", icon: ShieldCheck },
 ];
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({
+  mode,
+  isPartnerFlow = false,
+  defaultPartnerRole = "FARMER",
+}: {
+  mode: Mode;
+  isPartnerFlow?: boolean;
+  defaultPartnerRole?: "FARMER" | "DISTRIBUTOR";
+}) {
   const router = useRouter();
   const setSession = useAuthStore((state) => state.setSession);
 
@@ -144,8 +124,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
 
-  // Role & Dossier states (for register)
-  const [selectedRole, setSelectedRole] = useState<RegisterRoleOption>("CUSTOMER");
+  // Role & Dossier states (only active in partner flow)
+  const [selectedRole, setSelectedRole] = useState<RegisterRoleOption>(
+    isPartnerFlow ? defaultPartnerRole : "CUSTOMER"
+  );
   const [organizationName, setOrganizationName] = useState("");
   const [documentType, setDocumentType] = useState("Chứng nhận VietGAP");
   const [documentUrl, setDocumentUrl] = useState("");
@@ -265,10 +247,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
         toast.error(getApiErrorMessage(error));
       }
     } else {
-      // Validate role dossier if a partner/staff role is selected
-      if (selectedRole !== "CUSTOMER") {
+      // Validate role dossier if in partner onboarding flow
+      if (isPartnerFlow && selectedRole !== "CUSTOMER") {
         if (!organizationName.trim() || organizationName.trim().length < 3) {
-          const msg = "Vui lòng nhập tên đơn vị / nông trại / kho lạnh / đội xe để xét duyệt.";
+          const msg = "Vui lòng nhập tên đơn vị / nông trại / đội xe để xét duyệt.";
           setDossierError(msg);
           toast.error(msg);
           return;
@@ -399,8 +381,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
       setSession(session);
 
-      // 3. Nếu người dùng chọn vai trò Nông dân / Thủ kho / Nhà phân phối -> Gửi hồ sơ chờ duyệt!
-      if (selectedRole !== "CUSTOMER") {
+      // 3. Nếu là luồng đăng ký đối tác (FARMER / DISTRIBUTOR) -> Gửi hồ sơ chờ duyệt!
+      if (isPartnerFlow && selectedRole !== "CUSTOMER") {
         try {
           await verificationsService.submit({
             type: selectedRole,
@@ -413,9 +395,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
         } catch (verifyErr) {
           console.error("Failed to submit verification dossier:", verifyErr);
         }
-        const roleObj = REGISTER_ROLES.find((r) => r.id === selectedRole);
+        const roleObj = PARTNER_REGISTER_ROLES.find((r) => r.id === selectedRole);
         toast.success(
-          `Đăng ký tài khoản & gửi hồ sơ vị trí "${roleObj?.label || selectedRole}" thành công! Vui lòng chờ Ban Quản Trị phê duyệt để vào vị trí.`
+          `Đăng ký tài khoản & gửi hồ sơ đối tác "${roleObj?.label || selectedRole}" thành công! Vui lòng chờ Ban Quản Trị thẩm định.`
         );
         router.replace("/dashboard");
         return;
@@ -456,10 +438,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
     requestAnimationFrame(() => setFocus("email"));
   }
 
-  function handleSelectRole(role: RegisterRoleOption) {
+  function handleSelectRole(role: "FARMER" | "DISTRIBUTOR") {
     setSelectedRole(role);
     setDossierError(null);
-    const roleConfig = REGISTER_ROLES.find((r) => r.id === role);
+    const roleConfig = PARTNER_REGISTER_ROLES.find((r) => r.id === role);
     if (roleConfig && roleConfig.docOptions.length > 0) {
       setDocumentType(roleConfig.docOptions[0]);
     }
@@ -482,7 +464,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
-  const activeRoleConfig = REGISTER_ROLES.find((r) => r.id === selectedRole) || REGISTER_ROLES[0];
+  const activeRoleConfig = PARTNER_REGISTER_ROLES.find((r) => r.id === selectedRole) || PARTNER_REGISTER_ROLES[0];
 
   // ==========================================
   // VIEW: STEP 2 - OTP VERIFICATION
@@ -611,19 +593,19 @@ export function AuthForm({ mode }: { mode: Mode }) {
   // ==========================================
   return (
     <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {/* 0. Chọn Vai Trò Đăng Ký (Register only) */}
-      {!isLogin && (
+      {/* 0. Chọn Vai Trò Đối Tác (Chỉ hiển thị trong luồng Đăng ký đối tác) */}
+      {!isLogin && isPartnerFlow && (
         <div className="space-y-2.5 pb-1">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
-              Vai trò đăng ký tham gia
+              Mô hình đối tác hợp tác
             </label>
             <span className="text-[11px] font-medium text-emerald-700">
-              {selectedRole === "CUSTOMER" ? "Kích hoạt mua sắm ngay" : "Cần nộp hồ sơ & chờ Admin duyệt"}
+              Thẩm định & kích hoạt quyền trong 24h
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {REGISTER_ROLES.map((roleOpt) => {
+            {PARTNER_REGISTER_ROLES.map((roleOpt) => {
               const Icon = roleOpt.icon;
               const isSelected = selectedRole === roleOpt.id;
               return (
@@ -650,10 +632,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
                     <span
                       className={cn(
                         "text-[10px] font-bold px-2 py-0.5 rounded-full",
-                        roleOpt.id === "CUSTOMER"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : isSelected
-                          ? "bg-amber-100 text-amber-800 border border-amber-300"
+                        isSelected
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                           : "bg-gray-100 text-gray-600"
                       )}
                     >
@@ -831,25 +811,25 @@ export function AuthForm({ mode }: { mode: Mode }) {
         </Field>
       )}
 
-      {/* 6. Hồ Sơ Năng Lực Xét Duyệt Vị Trí (Khi chọn Nông dân / Kho lạnh / Nhà phân phối) */}
-      {!isLogin && selectedRole !== "CUSTOMER" && (
-        <div className="rounded-2xl border-2 border-amber-300/80 bg-amber-50/40 p-4 space-y-3.5 animate-fade-in">
-          <div className="flex items-start justify-between gap-2 border-b border-amber-200/70 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white shrink-0">
+      {/* 6. Hồ Sơ Năng Lực Xét Duyệt Vị Trí (Chỉ khi trong luồng Đăng ký đối tác) */}
+      {!isLogin && isPartnerFlow && selectedRole !== "CUSTOMER" && (
+        <div className="rounded-2xl border border-gray-200/90 bg-[#FBF9F5]/80 p-5 space-y-4 animate-fade-in shadow-2xs">
+          <div className="flex items-start justify-between gap-2 border-b border-gray-200/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-700 text-white shrink-0 shadow-2xs">
                 <FileText className="h-4 w-4" />
               </span>
               <div>
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-950">
-                  Hồ sơ ứng tuyển: {activeRoleConfig.label}
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#16261E]">
+                  Hồ sơ năng lực: {activeRoleConfig.label}
                 </h3>
-                <p className="text-[11px] text-amber-800">
-                  Ban Quản Trị sẽ thẩm định hồ sơ này trước khi mở khóa quyền truy cập vị trí.
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Ban Quản Trị AgriTrace thẩm định hồ sơ trong 24 giờ trước khi kích hoạt quyền.
                 </p>
               </div>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-300 shrink-0">
-              <Clock className="h-3 w-3" /> Chờ duyệt
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200 shrink-0">
+              <Clock className="h-3 w-3" /> Thẩm định 24h
             </span>
           </div>
 
@@ -867,7 +847,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
                   setDossierError(null);
                 }}
                 placeholder={activeRoleConfig.orgPlaceholder}
-                className="w-full h-10 pl-10 pr-3.5 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
+                className="w-full h-10 pl-10 pr-3.5 text-xs sm:text-sm rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 shadow-2xs"
               />
             </div>
           </Field>
@@ -877,7 +857,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             <select
               value={documentType}
               onChange={(e) => setDocumentType(e.target.value)}
-              className="w-full h-10 px-3.5 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
+              className="w-full h-10 px-3.5 text-xs sm:text-sm rounded-xl border border-gray-300 bg-white text-gray-900 outline-none transition-all focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 shadow-2xs cursor-pointer"
             >
               {activeRoleConfig.docOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -888,51 +868,73 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </Field>
 
           {/* Mã số giấy phép / Link hồ sơ hoặc Tải ảnh */}
-          <Field label="Mã số chứng nhận / Link tài liệu hoặc Ảnh chụp hồ sơ">
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={documentUrl.startsWith("data:image/") ? `[Đã đính kèm ảnh: ${uploadedDocName || "Chứng chỉ xác minh"}]` : documentUrl}
-                  onChange={(e) => {
-                    setUploadedDocName(null);
-                    setDocumentUrl(e.target.value);
-                    setDossierError(null);
-                  }}
-                  placeholder="Nhập mã số giấy phép, link Google Drive hoặc bấm tải ảnh..."
-                  className="flex-1 h-10 px-3.5 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
-                />
-                <input
-                  ref={docFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleDocFileChange}
-                  className="hidden"
-                />
+          <Field label="Mã số chứng nhận / Link tra cứu hoặc Bản chụp hồ sơ">
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={documentUrl.startsWith("data:image/") ? "" : documentUrl}
+                onChange={(e) => {
+                  setUploadedDocName(null);
+                  setDocumentUrl(e.target.value);
+                  setDossierError(null);
+                }}
+                placeholder="Nhập mã chứng nhận VietGAP (VD: VG-2026-ĐL-0899) hoặc link hồ sơ..."
+                className="w-full h-10 px-3.5 text-xs sm:text-sm rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 shadow-2xs"
+              />
+
+              <input
+                ref={docFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleDocFileChange}
+                className="hidden"
+              />
+
+              {documentUrl.startsWith("data:image/") ? (
+                <div className="p-3 rounded-xl border border-emerald-300 bg-emerald-50/70 flex items-center justify-between text-xs text-emerald-900">
+                  <span className="truncate font-medium flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-700 shrink-0" />
+                    Đã đính kèm ảnh: {uploadedDocName || "Hồ sơ minh chứng"}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => docFileInputRef.current?.click()}
+                      className="text-emerald-800 underline hover:text-emerald-950 font-semibold cursor-pointer"
+                    >
+                      Đổi ảnh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDocumentUrl("");
+                        setUploadedDocName(null);
+                      }}
+                      className="text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              ) : (
                 <button
                   type="button"
                   disabled={isUploadingDoc}
                   onClick={() => docFileInputRef.current?.click()}
-                  className="px-3 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                  className="w-full py-2.5 px-3 rounded-xl border border-dashed border-gray-300 hover:border-emerald-600 bg-white hover:bg-emerald-50/20 text-xs font-semibold text-gray-700 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
                 >
-                  <Upload className="h-3.5 w-3.5" />
-                  <span>{isUploadingDoc ? "Đang tải..." : "Tải ảnh"}</span>
+                  {isUploadingDoc ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-emerald-700" />
+                      <span>Đang nén và xử lý ảnh...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 text-emerald-700" />
+                      <span>Bấm để tải ảnh chụp giấy phép / chứng chỉ VietGAP</span>
+                    </>
+                  )}
                 </button>
-              </div>
-              {documentUrl.startsWith("data:image/") && (
-                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 text-xs text-emerald-900">
-                  <span className="truncate font-medium">✅ Đã đính kèm ảnh: {uploadedDocName || "Hồ sơ minh chứng"}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDocumentUrl("");
-                      setUploadedDocName(null);
-                    }}
-                    className="text-rose-600 hover:underline font-semibold ml-2 shrink-0"
-                  >
-                    Xóa ảnh
-                  </button>
-                </div>
               )}
             </div>
           </Field>
@@ -940,15 +942,21 @@ export function AuthForm({ mode }: { mode: Mode }) {
           {/* Ghi chú năng lực / kinh nghiệm */}
           <Field label={activeRoleConfig.noteLabel}>
             <textarea
-              rows={2}
+              rows={3}
               value={dossierNote}
               onChange={(e) => {
                 setDossierNote(e.target.value);
                 setDossierError(null);
               }}
               placeholder={activeRoleConfig.notePlaceholder}
-              className="w-full p-3 text-xs sm:text-sm rounded-xl border border-amber-200 bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15"
+              className="w-full p-3 text-xs sm:text-sm rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 shadow-2xs leading-relaxed"
             />
+            <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
+              <span>Mô tả diện tích canh tác, sản lượng hoặc phương tiện xe lạnh.</span>
+              <span className={dossierNote.trim().length >= 10 ? "text-emerald-700 font-semibold" : "text-gray-400"}>
+                {dossierNote.trim().length} ký tự
+              </span>
+            </div>
           </Field>
 
           {dossierError && (
@@ -978,43 +986,54 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </>
         ) : (
           <>
-            <span>{isLogin ? "Đăng nhập" : "Nhận mã OTP qua Email"}</span>
+            <span>
+              {isLogin
+                ? "Đăng nhập"
+                : isPartnerFlow
+                ? "Nhận mã OTP & Gửi hồ sơ đối tác"
+                : "Nhận mã OTP tạo tài khoản"}
+            </span>
             <ArrowRight className="h-4 w-4" />
           </>
         )}
       </button>
 
-      {/* Demo Accounts Quick-Select for Login */}
-      {isLogin && (
-        <div className="pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-500">Tài khoản demo (Pass: 123456)</span>
-            <span className="text-[11px] text-emerald-600 font-medium">Bấm để tự điền</span>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {DEMO_ACCOUNTS.map((acc) => {
-              const Icon = acc.icon;
-              const isSelected = activeDemo === acc.username;
-              return (
-                <button
-                  key={acc.username}
-                  type="button"
-                  onClick={() => fillDemoAccount(acc)}
-                  className={cn(
-                    "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-all",
-                    isSelected
-                      ? "border-emerald-600 bg-emerald-50 text-emerald-900 font-medium ring-2 ring-emerald-500/20"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50/40"
-                  )}
-                >
-                  <Icon className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-emerald-700" : "text-gray-500")} />
-                  <span className="truncate">{acc.label}</span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Demo Accounts Quick-Select for Login & Reference */}
+      <div className="pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-500">
+            {isLogin ? "Tài khoản demo (Pass: 123456)" : "Tài khoản trải nghiệm nhanh (Pass: 123456)"}
+          </span>
+          <span className="text-[11px] text-emerald-600 font-medium">Bấm để tự điền</span>
         </div>
-      )}
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {DEMO_ACCOUNTS.map((acc) => {
+            const Icon = acc.icon;
+            const isSelected = activeDemo === acc.username;
+            return (
+              <button
+                key={acc.username}
+                type="button"
+                onClick={() => {
+                  if (!isLogin) {
+                    router.push("/login");
+                  }
+                  fillDemoAccount(acc);
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-all",
+                  isSelected
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-900 font-medium ring-2 ring-emerald-500/20"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50/40"
+                )}
+              >
+                <Icon className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-emerald-700" : "text-gray-500")} />
+                <span className="truncate">{acc.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </form>
   );
 }
