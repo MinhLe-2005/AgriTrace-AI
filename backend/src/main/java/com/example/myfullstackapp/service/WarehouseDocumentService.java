@@ -8,6 +8,8 @@ import com.example.myfullstackapp.repository.*;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,9 @@ public class WarehouseDocumentService {
     private final WarehouseLotQuery lots;
     private final StockBalanceRepository balances;
     private final QualityInspectionRepository inspections;
+
+    @Autowired(required = false)
+    private ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public DocumentView create(UUID warehouseId, Type type, DocumentInput input, String actor) {
@@ -292,7 +297,19 @@ public class WarehouseDocumentService {
         }
         document.setConfirmedAt(Instant.now());
         document.setConfirmedBy(actor);
-        return view(documents.saveAndFlush(document));
+        var saved = documents.saveAndFlush(document);
+        if (type == Type.INBOUND && eventPublisher != null && !lotData.isEmpty()) {
+            String warehouseName = inventory.requireWarehouse(warehouseId).getName();
+            List<String> lotCodes = lotData.values().stream()
+                    .map(LotSummary::lotCode)
+                    .filter(code -> code != null && !code.isBlank())
+                    .distinct()
+                    .toList();
+            if (!lotCodes.isEmpty()) {
+                eventPublisher.publishEvent(new WarehouseLotInboundEvent(warehouseName, actor, lotCodes));
+            }
+        }
+        return view(saved);
     }
 
     private void validateOutbound(WarehouseDocument document, Map<String, LotSummary> lotData) {

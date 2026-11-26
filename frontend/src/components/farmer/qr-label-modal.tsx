@@ -1,8 +1,61 @@
 "use client";
 
-import { CheckCircle2, Copy, Download, Layers, Printer, QrCode, ShieldCheck, Sparkles, X } from "lucide-react";
+import { CheckCircle2, Copy, Download, FileText, Layers, Printer, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPdfBlobFromCanvas } from "@/lib/pdf-label";
 import { toast } from "@/stores/toast-store";
+
+function formatGs1Date(raw?: string): string {
+  if (!raw) return "000000";
+  const cleaned = raw.trim();
+  const vnMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (vnMatch) {
+    return `${vnMatch[3].slice(-2)}${vnMatch[2].padStart(2, "0")}${vnMatch[1].padStart(2, "0")}`;
+  }
+  const isoMatch = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    return `${isoMatch[1].slice(-2)}${isoMatch[2].padStart(2, "0")}${isoMatch[3].padStart(2, "0")}`;
+  }
+  return "261125";
+}
+
+function CertSealBadge({ certName }: { certName: string }) {
+  const lower = certName.toLowerCase();
+  const isGlobal = lower.includes("global");
+  const isOrganic = lower.includes("organic") || lower.includes("hữu cơ");
+  const primary = isGlobal ? "#0f766e" : isOrganic ? "#65a30d" : "#15803d";
+  const shortLabel = isGlobal ? "GLOBALG.A.P" : isOrganic ? "ORGANIC" : "VIETGAP";
+
+  return (
+    <svg
+      width="56"
+      height="56"
+      viewBox="0 0 64 64"
+      aria-label={`Logo chứng nhận ${certName}`}
+      className="shrink-0"
+    >
+      <circle cx="32" cy="32" r="29" fill="#ffffff" stroke={primary} strokeWidth="3" />
+      <circle cx="32" cy="32" r="24" fill="#ecfdf5" stroke={primary} strokeWidth="1.2" strokeDasharray="3 2" />
+      <path
+        d="M32 14 C38 20, 41 28, 32 37 C23 28, 26 20, 32 14 Z"
+        fill={primary}
+      />
+      <path d="M32 19 L32 35" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="8" y="38" width="48" height="12" rx="4" fill={primary} />
+      <text
+        x="32"
+        y="46.5"
+        textAnchor="middle"
+        fill="#ffffff"
+        fontSize={shortLabel.length > 8 ? "7" : "8.5"}
+        fontWeight="800"
+        fontFamily="Arial, sans-serif"
+      >
+        {shortLabel}
+      </text>
+    </svg>
+  );
+}
 
 export interface QrLabelLot {
   code: string;
@@ -78,16 +131,24 @@ export function QrLabelModal({
     }
   };
 
-  const handleDownloadPng = () => {
+  const gs1Harvest = formatGs1Date(lot.harvestDate);
+  const gs1Expiry = formatGs1Date(lot.expiryDate);
+  const gs1BarcodeLine = `(01) 8938501234567 (10) ${lot.code} (11) ${gs1Harvest} (17) ${gs1Expiry}`;
+
+  const renderGs1Canvas = (onRendered: (canvas: HTMLCanvasElement) => void, onFailMessage: string) => {
     setIsDownloading(true);
     try {
       const canvas = canvasRef.current;
       if (!canvas) {
-        toast.error("Không thể khởi tạo ảnh nhãn");
+        toast.error("Không thể khởi tạo khung tem");
+        setIsDownloading(false);
         return;
       }
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        setIsDownloading(false);
+        return;
+      }
 
       canvas.width = 800;
       canvas.height = 600;
@@ -107,17 +168,51 @@ export function QrLabelModal({
 
       // Chữ Header
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 26px sans-serif";
-      ctx.fillText("AGRITRACE AI • TEM TRUY XUẤT NGUỒN GỐC GS1", 30, 48);
-      ctx.font = "14px sans-serif";
-      ctx.fillText("TIÊU CHUẨN NÔNG SẢN MINH BẠCH • ĐỊNH DANH SỐ QUỐC GIA", 30, 74);
+      ctx.font = "bold 24px sans-serif";
+      ctx.fillText("AGRITRACE AI • TEM TRUY XUẤT NGUỒN GỐC GS1", 30, 46);
+      ctx.font = "13px sans-serif";
+      ctx.fillText("TIÊU CHUẨN NÔNG SẢN MINH BẠCH • ĐỊNH DANH SỐ QUỐC GIA", 30, 72);
 
-      // Tải và vẽ QR
-      const qrImg = new Image();
-      qrImg.crossOrigin = "anonymous";
-      qrImg.onload = () => {
-        ctx.drawImage(qrImg, 35, 120, 240, 240);
+      // Vẽ huy hiệu logo chứng nhận VietGAP/GlobalGAP góc phải
+      const drawCertLogoOnCanvas = () => {
+        const lowerCert = certName.toLowerCase();
+        const badgeColor = lowerCert.includes("global")
+          ? "#0f766e"
+          : lowerCert.includes("organic") || lowerCert.includes("hữu cơ")
+          ? "#65a30d"
+          : "#15803d";
+        const badgeLabel = lowerCert.includes("global")
+          ? "GLOBALG.A.P"
+          : lowerCert.includes("organic") || lowerCert.includes("hữu cơ")
+          ? "ORGANIC"
+          : "VIETGAP";
 
+        const cx = 720;
+        const cy = 152;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 42, 0, Math.PI * 2);
+        ctx.fillStyle = "#ecfdf5";
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = badgeColor;
+        ctx.stroke();
+
+        ctx.fillStyle = badgeColor;
+        ctx.fillRect(cx - 38, cy + 6, 76, 18);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = badgeLabel.length > 8 ? "bold 10px sans-serif" : "bold 12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(badgeLabel, cx, cy + 19);
+
+        ctx.fillStyle = badgeColor;
+        ctx.font = "bold 11px sans-serif";
+        ctx.fillText("CERTIFIED", cx, cy - 8);
+        ctx.restore();
+        ctx.textAlign = "left";
+      };
+
+      const finishCanvasBody = () => {
         // Chú thích dưới QR
         ctx.fillStyle = "#15803d";
         ctx.font = "bold 13px monospace";
@@ -127,60 +222,104 @@ export function QrLabelModal({
         ctx.font = "12px sans-serif";
         ctx.fillText("Dùng camera quét để xem nhật ký", 40, 405);
 
+        // Logo chứng nhận
+        drawCertLogoOnCanvas();
+
         // Khối thông tin bên phải
         ctx.fillStyle = "#111827";
-        ctx.font = "bold 24px sans-serif";
-        ctx.fillText(lot.product.toUpperCase(), 300, 145);
+        ctx.font = "bold 22px sans-serif";
+        ctx.fillText(lot.product.toUpperCase().slice(0, 24), 300, 145);
 
         ctx.fillStyle = "#166534";
-        ctx.font = "bold 20px monospace";
+        ctx.font = "bold 19px monospace";
         ctx.fillText(`MÃ LÔ: #${lot.code}`, 300, 180);
 
         ctx.fillStyle = "#047857";
         ctx.font = "bold 15px sans-serif";
-        ctx.fillText(`TIÊU CHUẨN: ${certName.toUpperCase()} (ĐẠT CHUẨN KCS)`, 300, 215);
+        ctx.fillText(`CHỨNG NHẬN: ${certName.toUpperCase()}`, 300, 215);
 
         ctx.fillStyle = "#374151";
         ctx.font = "15px sans-serif";
-        ctx.fillText(`Nông trại: ${farmName}`, 300, 245);
-        ctx.fillText(`Vùng trồng: ${farmAddress}`, 300, 275);
-        ctx.fillText(`Ngày thu hoạch: ${lot.harvestDate}    |    HSD: ${lot.expiryDate || "—"}`, 300, 305);
-        ctx.fillText(`Khối lượng lô: ${lot.qty} ${lot.unit}    |    Quy cách: ${packSpec}`, 300, 335);
-        ctx.fillText(`Bảo quản: ${storageTemp}`, 300, 365);
+        ctx.fillText(`Nông trại: ${farmName}`, 300, 248);
+        ctx.fillText(`Vùng trồng: ${farmAddress}`, 300, 278);
+        ctx.fillText(`Ngày thu hoạch: ${lot.harvestDate}    |    HSD: ${lot.expiryDate || "—"}`, 300, 308);
+        ctx.fillText(`Sản lượng lô: ${lot.qty} ${lot.unit}    |    Quy cách: ${packSpec}`, 300, 338);
+        ctx.fillText(`Bảo quản: ${storageTemp}`, 300, 368);
         if (lot.transportDestination) {
-          ctx.fillText(`Điểm giao / Kho đích: ${lot.transportDestination}`, 300, 395);
+          ctx.fillText(`Điểm giao / Kho đích: ${lot.transportDestination}`, 300, 398);
         }
 
-        // Đường phân cách
+        // Đường phân cách & mã GS1-128
         ctx.strokeStyle = "#e5e7eb";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(30, 430);
-        ctx.lineTo(770, 430);
+        ctx.moveTo(30, 435);
+        ctx.lineTo(770, 435);
         ctx.stroke();
 
-        // Footer Barcode GS1-128
+        // Vẽ dải vạch tượng trưng GS1-128
         ctx.fillStyle = "#111827";
-        ctx.font = "bold 14px monospace";
-        ctx.fillText(`(01) 8938501234567 (10) ${lot.code} (11) 261113 (17) 261127`, 200, 560);
+        for (let bx = 180; bx < 620; bx += 7) {
+          const barW = (bx % 14 === 0) ? 4 : 2;
+          ctx.fillRect(bx, 462, barW, 56);
+        }
 
-        // Xuất file tải
-        const link = document.createElement("a");
-        link.download = `TEM_GS1_${lot.code}.png`;
-        link.href = canvas.toDataURL("image/png");
-        link.click();
-        toast.success(`Đã tải tem nhãn ${lot.code} thành công!`);
+        ctx.font = "bold 14px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(gs1BarcodeLine, 400, 545);
+        ctx.textAlign = "left";
+
+        onRendered(canvas);
         setIsDownloading(false);
       };
+
+      const qrImg = new Image();
+      qrImg.crossOrigin = "anonymous";
+      qrImg.onload = () => {
+        ctx.drawImage(qrImg, 35, 120, 240, 240);
+        finishCanvasBody();
+      };
       qrImg.onerror = () => {
-        toast.error("Không thể tải ảnh QR để ghép tem");
-        setIsDownloading(false);
+        // Fallback khung QR nếu môi trường không truy cập được qrserver
+        ctx.strokeStyle = "#166534";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(45, 130, 220, 220);
+        ctx.fillStyle = "#166534";
+        ctx.font = "bold 16px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("QR TRACE", 155, 225);
+        ctx.fillText(lot.code, 155, 255);
+        ctx.textAlign = "left";
+        finishCanvasBody();
       };
       qrImg.src = qrImageUrl;
     } catch {
-      toast.error("Lỗi xuất ảnh tem");
+      toast.error(onFailMessage);
       setIsDownloading(false);
     }
+  };
+
+  const handleDownloadPng = () => {
+    renderGs1Canvas((canvas) => {
+      const link = document.createElement("a");
+      link.download = `TEM_GS1_${lot.code}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast.success(`Đã tải ảnh tem ${lot.code} (PNG) thành công!`);
+    }, "Lỗi xuất ảnh tem");
+  };
+
+  const handleDownloadPdf = () => {
+    renderGs1Canvas((canvas) => {
+      const pdfBlob = createPdfBlobFromCanvas(canvas, layoutMode === "grid4" ? "a4Grid4" : "label100x75");
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.download = `TEM_GS1_${lot.code}_${layoutMode === "grid4" ? "A4_4TEM" : "100x75"}.pdf`;
+      link.href = url;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Đã xuất file PDF tem nhãn ${lot.code} thành công!`);
+    }, "Lỗi xuất file PDF tem nhãn");
   };
 
   const SingleLabel = ({ isPrintOnly = false }: { isPrintOnly?: boolean }) => (
@@ -229,21 +368,24 @@ export function QrLabelModal({
 
         {/* Right: Product & Farm Info */}
         <div className="sm:col-span-8 text-xs space-y-1.5">
-          <div className="border-b border-gray-100 pb-1.5">
-            <h2 className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-              {lot.product}
-            </h2>
-            <div className="flex flex-wrap items-center gap-2 mt-0.5">
-              <span className="font-mono font-extrabold text-emerald-800 text-xs bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                MÃ LÔ: {lot.code}
-              </span>
-              <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.2 rounded text-[10px]">
-                {certName}
-              </span>
-              <span className="text-[10px] text-gray-500 italic">
-                {lot.cultivation || "Theo quy trình an toàn"}
-              </span>
+          <div className="border-b border-gray-100 pb-1.5 flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                {lot.product}
+              </h2>
+              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                <span className="font-mono font-extrabold text-emerald-800 text-xs bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  MÃ LÔ: {lot.code}
+                </span>
+                <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.2 rounded text-[10px]">
+                  {certName}
+                </span>
+                <span className="text-[10px] text-gray-500 italic">
+                  {lot.cultivation || "Theo quy trình an toàn"}
+                </span>
+              </div>
             </div>
+            <CertSealBadge certName={certName} />
           </div>
 
           <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
@@ -454,18 +596,27 @@ export function QrLabelModal({
                 type="button"
                 disabled={isDownloading}
                 onClick={handleDownloadPng}
-                className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#1a7a3a] border border-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#1a7a3a] border border-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
               >
                 <Download size={14} />
-                {isDownloading ? "Đang xuất ảnh..." : "Tải Ảnh Tem (PNG)"}
+                {isDownloading ? "Đang xuất..." : "Tải Ảnh PNG"}
+              </button>
+              <button
+                type="button"
+                disabled={isDownloading}
+                onClick={handleDownloadPdf}
+                className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+              >
+                <FileText size={14} />
+                Xuất File PDF
               </button>
               <button
                 type="button"
                 onClick={handlePrint}
-                className="px-5 py-2 bg-[#1a7a3a] hover:bg-[#14632e] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                className="px-4 py-2 bg-[#1a7a3a] hover:bg-[#14632e] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
               >
                 <Printer size={14} />
-                In Tem Ngay (Print)
+                In Tem Ngay
               </button>
             </div>
           </div>

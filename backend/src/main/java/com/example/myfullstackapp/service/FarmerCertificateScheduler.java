@@ -148,10 +148,10 @@ public class FarmerCertificateScheduler {
                 continue;
             }
 
-            // Cập nhật trạng thái chứng nhận
+            // Cập nhật trạng thái chứng nhận đúng ngưỡng: >30 ngày hợp lệ, <=30 ngày sắp hết hạn, <0 ngày hết hiệu lực
             if (daysLeft < 0) {
                 cert.setStatus("EXPIRED");
-            } else if (daysLeft <= 5) {
+            } else if (daysLeft <= 30) {
                 cert.setStatus("EXPIRING_SOON");
             } else {
                 cert.setStatus("VALID");

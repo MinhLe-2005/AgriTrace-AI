@@ -6,7 +6,6 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
-  ChevronRight,
   Clock,
   Edit3,
   FileCheck,
@@ -22,14 +21,12 @@ import {
   QrCode,
   RefreshCw,
   Save,
-  Send,
   ShieldCheck,
   Sparkles,
   Sprout,
   Trash2,
   Star,
   MessageCircle,
-  ThumbsUp,
   Truck,
   Upload,
   User,
@@ -37,10 +34,10 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { farmerService, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot } from "@/services/farmer.service";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { farmerService, parseFarmDocUrls, serializeFarmDocUrls, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
-import { VerificationSubmission } from "@/features/verification/verification-submission";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { reviewService, type ApiReview } from "@/services/review.service";
@@ -63,6 +60,12 @@ export type FarmItem = {
   rating: number;
   activeBatchCount: number;
   isDefault?: boolean;
+  verificationStatus?: string;
+  verificationDocType?: string;
+  verificationDocUrl?: string;
+  verificationNote?: string;
+  verificationDecisionReason?: string;
+  verificationRequestId?: string;
 };
 
 export type BatchItem = {
@@ -742,13 +745,40 @@ function getApiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export default function FarmerPortalPage() {
-  const { user } = useAuthStore();
-  // 5 Tab nghiệp vụ rõ ràng, tách riêng "Quản Lý Nông Trại" lên vị trí nổi bật
+function resolveFarmerOwnerId(user: { id?: string; name?: string; email?: string } | null): string {
+  if (!user) return "farmer_hung";
+  const email = (user.email || "").trim().toLowerCase();
+  const name = (user.name || "").trim().toLowerCase();
+  if (email === "nguyenthieuu052@gmail.com" || name.includes("thiệu") || name.includes("thieu")) {
+    return "farmer_thieu";
+  }
+  if (
+    email === "farmer@agritrace.vn" ||
+    email === "hung.farmer@agritrace.vn" ||
+    email === "farmer@sportvenue.com" ||
+    name.includes("hùng") ||
+    email === ""
+  ) {
+    return "farmer_hung";
+  }
+  return user.id ? `farmer_${user.id}` : email;
+}
+
+function FarmerPortalContent() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews">("farms");
   const [farmerReviews, setFarmerReviews] = useState<ApiReview[]>([]);
   const [farmerReplyText, setFarmerReplyText] = useState<{ [id: number]: string }>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [id: number]: boolean }>({});
+  const [storageLoaded, setStorageLoaded] = useState(false);
+  const [clientNowMs, setClientNowMs] = useState<number | null>(null);
+  const authUser = useAuthStore((state) => state.user);
+  const authHydrated = useAuthStore((state) => state.hasHydrated);
+  const activeOwnerId = resolveFarmerOwnerId(authUser);
+  const activeAlertEmail = authUser?.email || "";
+  const isCustomFarmerAccount = activeOwnerId !== "farmer_hung" && activeOwnerId !== "farmer_thieu";
+  const [isUploadingLogImage, setIsUploadingLogImage] = useState(false);
+  const [isUploadingRenewImage, setIsUploadingRenewImage] = useState(false);
 
   useEffect(() => {
     reviewService.getAllReviews()
@@ -763,7 +793,7 @@ export default function FarmerPortalPage() {
       return;
     }
     setIsSubmittingReply((prev) => ({ ...prev, [reviewId]: true }));
-    const authorName = `${user?.name || "Nguyễn Văn Hùng"} (${farmName || "Chủ Nhà Vườn"})`;
+    const authorName = `${authUser?.name || "Nguyễn Văn Hùng"} (${farmName || "Chủ Nhà Vườn"})`;
     try {
       const updated = await reviewService.replyReview(reviewId, text, authorName);
       setFarmerReviews((prev) =>
@@ -786,18 +816,13 @@ export default function FarmerPortalPage() {
       setIsSubmittingReply((prev) => ({ ...prev, [reviewId]: false }));
     }
   }
-  const [storageLoaded, setStorageLoaded] = useState(false);
-  const [clientNowMs, setClientNowMs] = useState<number | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get("tab");
-      if (tab && ["farms", "batches", "logs", "products", "certs"].includes(tab)) {
-        setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs");
-      }
+    const tab = searchParams.get("tab");
+    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews"].includes(tab)) {
+      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews");
     }
-  }, []);
+  }, [searchParams]);
 
   // =========================================================================
   // 1. DỮ LIỆU QUẢN LÝ NÔNG TRẠI (Quản lý nhiều nông trại canh tác)
@@ -818,9 +843,20 @@ export default function FarmerPortalPage() {
   const [newFarmProvince, setNewFarmProvince] = useState("Lâm Đồng");
   const [newFarmArea, setNewFarmArea] = useState("2.5");
   const [newFarmCert, setNewFarmCert] = useState("VietGAP Trồng trọt");
+  const [newFarmDocUrls, setNewFarmDocUrls] = useState<string[]>([]);
+  const [newFarmDocUrlInput, setNewFarmDocUrlInput] = useState("");
+  const [newFarmDocNote, setNewFarmDocNote] = useState("");
+  const [isUploadingFarmDoc, setIsUploadingFarmDoc] = useState(false);
 
   // Modal Sửa Nông Trại
   const [editingFarm, setEditingFarm] = useState<FarmItem | null>(null);
+
+  // Modal Gửi Lại Hồ Sơ Xác Minh Nông Trại
+  const [resubmitFarm, setResubmitFarm] = useState<FarmItem | null>(null);
+  const [resubmitDocUrls, setResubmitDocUrls] = useState<string[]>([]);
+  const [resubmitDocUrlInput, setResubmitDocUrlInput] = useState("");
+  const [resubmitDocNote, setResubmitDocNote] = useState("");
+  const [isUploadingResubmitDoc, setIsUploadingResubmitDoc] = useState(false);
 
   // =========================================================================
   // 2. DỮ LIỆU LÔ THU HOẠCH
@@ -853,7 +889,6 @@ export default function FarmerPortalPage() {
   const [lotTimelineEvents, setLotTimelineEvents] = useState<LotTimelineEvent[]>([]);
   const [isLoadingLotTimeline, setIsLoadingLotTimeline] = useState(false);
   const [isUpdatingLotStatus, setIsUpdatingLotStatus] = useState(false);
-  const [adminApprovalNote, setAdminApprovalNote] = useState("");
   const [editTransportStatus, setEditTransportStatus] = useState<"Chưa vận chuyển" | "Đang vận chuyển" | "Đã nhập kho đích">("Chưa vận chuyển");
   const [editTransportDest, setEditTransportDest] = useState("");
   const [sseConnected, setSseConnected] = useState(false);
@@ -952,29 +987,24 @@ export default function FarmerPortalPage() {
   const [isSubmittingRenewal, setIsSubmittingRenewal] = useState(false);
 
   useEffect(() => {
+    if (!authHydrated) return;
+
     const savedFarms = readStoredJson<FarmItem[]>(STORAGE_KEYS.farms);
-    const effectiveFarms = Array.isArray(savedFarms) && savedFarms.length > 0 ? savedFarms : DEFAULT_FARMS;
-    if (savedFarms && savedFarms.length > 0) {
-      setFarms(savedFarms);
-    }
+    const localFarms = Array.isArray(savedFarms) && savedFarms.length > 0 ? savedFarms : DEFAULT_FARMS;
+    const ownerScopedDefaults = isCustomFarmerAccount
+      ? []
+      : DEFAULT_FARMS.filter((f) => (f.ownerId || "farmer_hung") === activeOwnerId);
+    setFarms(
+      isCustomFarmerAccount
+        ? []
+        : localFarms.filter((f) => (f.ownerId || "farmer_hung") === activeOwnerId)
+    );
 
-    try {
-      const savedSelectedId = localStorage.getItem(STORAGE_KEYS.selectedFarmId);
-      if (savedSelectedId && effectiveFarms.some((f) => f.id === savedSelectedId)) {
-        setSelectedFarmId(savedSelectedId);
-      }
-    } catch {
-      // Ignore storage access errors
-    }
-
-    const savedLogs = readStoredJson<FarmingLogItem[]>(STORAGE_KEYS.logs);
-    if (Array.isArray(savedLogs) && savedLogs.length > 0) {
-      setFarmingLogs(savedLogs);
-    }
-
-    const savedCerts = readStoredJson<CertificationItem[]>(STORAGE_KEYS.certs);
-    if (Array.isArray(savedCerts) && savedCerts.length > 0) {
-      setCertifications(savedCerts);
+    if (isCustomFarmerAccount) {
+      setBatches([]);
+      setProducts([]);
+      setCertifications([]);
+      setFarmingLogs([]);
     }
 
     setClientNowMs(Date.now());
@@ -986,13 +1016,51 @@ export default function FarmerPortalPage() {
     setNewCertExpiryDate(getLocalIsoDate(365));
     setStorageLoaded(true);
 
+    let effectiveFarms = ownerScopedDefaults;
+
     farmerService
-      .getBatches()
+      .getFarms({ ownerId: activeOwnerId })
+      .then((farmData) => {
+        if (Array.isArray(farmData)) {
+          if (farmData.length > 0 || isCustomFarmerAccount) {
+            const mappedFarms: FarmItem[] = farmData.map((f) => ({
+              id: f.id ? String(f.id) : f.code,
+              code: f.code,
+              name: f.name,
+              owner: f.owner,
+              ownerId: f.ownerId || activeOwnerId,
+              phone: f.phone || "",
+              address: f.address,
+              province: f.province || "Việt Nam",
+              areaHectares: Number(f.areaHectares) || 1.0,
+              certStandard: f.certStandard || "VietGAP Trồng trọt",
+              rating: Number(f.rating) || 5.0,
+              activeBatchCount: 0,
+              isDefault: Boolean(f.isDefault),
+              verificationStatus: f.verificationStatus || "APPROVED",
+              verificationDocType: f.verificationDocType,
+              verificationDocUrl: f.verificationDocUrl,
+              verificationNote: f.verificationNote,
+              verificationDecisionReason: f.verificationDecisionReason,
+              verificationRequestId: f.verificationRequestId,
+            }));
+            effectiveFarms = mappedFarms;
+            setFarms(mappedFarms);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("Không thể tải nông trại từ API:", err);
+      });
+
+    farmerService
+      .getBatches({ ownerId: activeOwnerId })
       .then((data) => {
-        if (data && data.length > 0) {
+        if (Array.isArray(data) && (data.length > 0 || isCustomFarmerAccount)) {
           const mapped: BatchItem[] = data.map((b) => ({
             code: b.code,
-            farmCode: extractFarmCode(b.farmName, undefined, effectiveFarms),
+            farmCode: b.farmCode || extractFarmCode(b.farmName, undefined, effectiveFarms),
+            ownerId: b.ownerId || activeOwnerId,
             product: b.product,
             plantingDate: b.plantingDate || "",
             harvestDate: b.harvestDate,
@@ -1014,15 +1082,16 @@ export default function FarmerPortalPage() {
       });
 
     farmerService
-      .getProducts()
+      .getProducts({ ownerId: activeOwnerId, scope: "farmer" })
       .then((data) => {
-        if (data && data.length > 0) {
+        if (Array.isArray(data) && (data.length > 0 || isCustomFarmerAccount)) {
           const mapped: ProductItem[] = data.map((p) => {
-            const farmCode = extractFarmCode(p.farm, p.origin, effectiveFarms);
+            const farmCode = p.farmCode || extractFarmCode(p.farm, p.origin, effectiveFarms);
             const matchedFarm = effectiveFarms.find((f) => f.code === farmCode);
             return {
               id: p.id,
               farmCode,
+              ownerId: p.ownerId || activeOwnerId,
               name: p.name,
               category: p.categoryCode || "trai_cay",
               price: Number(p.price) || 50000,
@@ -1039,21 +1108,23 @@ export default function FarmerPortalPage() {
         console.warn("Không thể tải sản phẩm từ API:", err);
       });
 
+    const nowMs = Date.now();
     farmerService
-      .getCertificates()
+      .getCertificates({ ownerId: activeOwnerId })
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data) && (data.length > 0 || isCustomFarmerAccount)) {
           const mapped: CertificationItem[] = data.map((c) => {
             const rawItem: CertificationItem = {
               id: c.id ? String(c.id) : c.certNumber,
-              farmCode: c.farmCode || "NT-DL-01",
+              farmCode: c.farmCode || effectiveFarms[0]?.code || "NT-DL-01",
+              ownerId: c.ownerId || activeOwnerId,
               name: c.name,
               certNumber: c.certNumber,
               issuedBy: c.issuedBy || "Tổ chức Chứng nhận Nông nghiệp",
               issueDate: c.issueDate || "01/01/2026",
               expiryDate: c.expiryDate || "01/01/2027",
               status: (c.status || "VALID") as CertificationItem["status"],
-              daysLeft: 365,
+              daysLeft: typeof c.daysLeft === "number" ? c.daysLeft : 365,
               approvalStatus: (c.approvalStatus || "NONE") as CertificationItem["approvalStatus"],
               pendingRenewal: c.pendingNewCertNumber
                 ? {
@@ -1065,7 +1136,7 @@ export default function FarmerPortalPage() {
                   }
                 : undefined,
             };
-            return evaluateCertification(rawItem, clientNowMs ?? Date.now());
+            return evaluateCertification(rawItem, nowMs);
           });
           setCertifications(mapped);
         }
@@ -1075,12 +1146,13 @@ export default function FarmerPortalPage() {
       });
 
     farmerService
-      .getLogs()
+      .getLogs({ ownerId: activeOwnerId })
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data) && (data.length > 0 || isCustomFarmerAccount)) {
           const mapped: FarmingLogItem[] = data.map((l) => ({
             id: String(l.id),
-            farmCode: l.farmCode || "NT-DL-01",
+            farmCode: l.farmCode || effectiveFarms[0]?.code || "NT-DL-01",
+            ownerId: l.ownerId || activeOwnerId,
             batchCode: l.batchCode || "",
             date: l.date || l.time || "",
             stage: l.stage as FarmingLogItem["stage"],
@@ -1095,7 +1167,7 @@ export default function FarmerPortalPage() {
       .catch((err) => {
         console.warn("Không thể tải nhật ký canh tác từ API:", err);
       });
-  }, []);
+  }, [authHydrated, activeOwnerId, isCustomFarmerAccount]);
 
   // 2.3. ĐỒNG BỘ TRẠNG THÁI THỜI GIAN THỰC (SERVER-SENT EVENTS - SSE)
   useEffect(() => {
@@ -1181,9 +1253,9 @@ export default function FarmerPortalPage() {
 
     connectSse();
 
-    // Fallback polling an toàn mỗi 5s
+    // Fallback polling an toàn mỗi 5s theo đúng ownerId hiện tại
     pollTimer = setInterval(() => {
-      farmerService.getBatches().then((data) => {
+      farmerService.getBatches({ ownerId: activeOwnerId }).then((data) => {
         if (data && data.length > 0) {
           setBatches((prev) => {
             const map = new Map(data.map((d) => [d.code.toUpperCase(), d]));
@@ -1207,7 +1279,7 @@ export default function FarmerPortalPage() {
       if (eventSource) eventSource.close();
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, []);
+  }, [activeOwnerId]);
 
   useEffect(() => {
     if (!storageLoaded) return;
@@ -1258,11 +1330,101 @@ export default function FarmerPortalPage() {
     setNewFarmProvince(activeOwnerId === "farmer_thieu" ? "Sơn La" : "Lâm Đồng");
     setNewFarmArea("2.5");
     setNewFarmCert(activeOwnerId === "farmer_thieu" ? "Hữu cơ TCVN" : "VietGAP Trồng trọt");
+    setNewFarmDocUrls([]);
+    setNewFarmDocUrlInput("");
+    setNewFarmDocNote("");
+    setIsUploadingFarmDoc(false);
     setIsAddFarmModalOpen(true);
   };
 
-  // Thêm Nông Trại mới
-  const handleCreateFarm = (e: React.FormEvent) => {
+  const handleUploadFarmDocs = async (files: FileList | null, target: "create" | "resubmit" = "create") => {
+    if (!files || files.length === 0) return;
+    if (target === "create") setIsUploadingFarmDoc(true);
+    else setIsUploadingResubmitDoc(true);
+    try {
+      const selectedFiles = Array.from(files);
+      const uploadedUrls: string[] = [];
+      for (const file of selectedFiles) {
+        const uploaded = await farmerService.uploadProofImage(file, {
+          ownerId: activeOwnerId,
+          category: "farm-verification",
+        });
+        uploadedUrls.push(uploaded.url);
+      }
+      if (target === "create") {
+        setNewFarmDocUrls((prev) => Array.from(new Set([...prev, ...uploadedUrls])));
+      } else {
+        setResubmitDocUrls((prev) => Array.from(new Set([...prev, ...uploadedUrls])));
+      }
+      toast.success(`Đã tải ${uploadedUrls.length} ảnh hồ sơ lên hệ thống!`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể tải ảnh hồ sơ nông trại"));
+    } finally {
+      if (target === "create") setIsUploadingFarmDoc(false);
+      else setIsUploadingResubmitDoc(false);
+    }
+  };
+
+  const handleAddManualDocUrl = (target: "create" | "resubmit") => {
+    const raw = (target === "create" ? newFarmDocUrlInput : resubmitDocUrlInput).trim();
+    if (!raw) return;
+    if (target === "create") {
+      setNewFarmDocUrls((prev) => Array.from(new Set([...prev, raw])));
+      setNewFarmDocUrlInput("");
+    } else {
+      setResubmitDocUrls((prev) => Array.from(new Set([...prev, raw])));
+      setResubmitDocUrlInput("");
+    }
+  };
+
+  const openResubmitVerificationModal = (farm: FarmItem) => {
+    setResubmitFarm(farm);
+    setResubmitDocUrls(parseFarmDocUrls(farm.verificationDocUrl));
+    setResubmitDocUrlInput("");
+    setResubmitDocNote(farm.verificationNote || "");
+    setIsUploadingResubmitDoc(false);
+  };
+
+  const handleResubmitFarmVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resubmitFarm) return;
+    const allUrls = Array.from(
+      new Set([...resubmitDocUrls, ...(resubmitDocUrlInput.trim() ? [resubmitDocUrlInput.trim()] : [])])
+    );
+    if (allUrls.length === 0) {
+      toast.error("Vui lòng tải ảnh hoặc nhập đường dẫn hồ sơ đất & chứng nhận!");
+      return;
+    }
+    try {
+      const updated = await farmerService.resubmitFarmVerification(resubmitFarm.code || resubmitFarm.id, {
+        verificationDocType: resubmitFarm.verificationDocType || "Hồ sơ giấy tờ đất & chứng nhận",
+        verificationDocUrl: serializeFarmDocUrls(allUrls),
+        verificationNote: resubmitDocNote.trim() || undefined,
+      });
+      setFarms((prev) =>
+        prev.map((f) =>
+          f.id === resubmitFarm.id
+            ? {
+                ...f,
+                verificationStatus: updated.verificationStatus || "PENDING",
+                verificationDocType: updated.verificationDocType,
+                verificationDocUrl: updated.verificationDocUrl,
+                verificationNote: updated.verificationNote,
+                verificationDecisionReason: updated.verificationDecisionReason,
+                verificationRequestId: updated.verificationRequestId,
+              }
+            : f
+        )
+      );
+      toast.success(`Đã gửi lại hồ sơ xác minh nông trại "${resubmitFarm.name}" cho Admin!`);
+      setResubmitFarm(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể gửi lại hồ sơ xác minh nông trại"));
+    }
+  };
+
+  // Thêm Nông Trại mới (Lưu DB PostgreSQL; nếu chưa đính kèm giấy tờ đất thì mở ngay bước đính kèm hồ sơ)
+  const handleCreateFarm = async (e: React.FormEvent) => {
     e.preventDefault();
     const codeUpper = newFarmCode.trim().toUpperCase();
     const areaNum = Number(newFarmArea);
@@ -1282,9 +1444,15 @@ export default function FarmerPortalPage() {
       toast.error("Quy mô diện tích phải lớn hơn 0 ha!");
       return;
     }
+    const allDocUrls = Array.from(
+      new Set([...newFarmDocUrls, ...(newFarmDocUrlInput.trim() ? [newFarmDocUrlInput.trim()] : [])])
+    );
+    if (allDocUrls.length === 0) {
+      toast.error("Vui lòng đính kèm ít nhất 1 ảnh hoặc link giấy tờ đất / chứng nhận!");
+      return;
+    }
 
-    const newFarm: FarmItem = {
-      id: "f_" + Date.now(),
+    const payload = {
       code: codeUpper,
       name: newFarmName.trim(),
       owner: newFarmOwner.trim() || currentProfile.name,
@@ -1295,18 +1463,66 @@ export default function FarmerPortalPage() {
       areaHectares: areaNum,
       certStandard: newFarmCert,
       rating: 5.0,
-      activeBatchCount: 0,
+      verificationDocType: "Hồ sơ giấy tờ đất & chứng nhận",
+      verificationDocUrl: serializeFarmDocUrls(allDocUrls),
+      verificationNote: newFarmDocNote.trim() || undefined,
     };
 
-    setFarms([...farms, newFarm]);
-    setIsAddFarmModalOpen(false);
-    setNewFarmName("");
-    setNewFarmAddress("");
-    toast.success(`Đã thêm thành công trang trại "${newFarm.name}" (Mã: ${newFarm.code})!`);
+    try {
+      const saved = await farmerService.createFarm(payload);
+      const newFarm: FarmItem = {
+        id: saved.id ? String(saved.id) : "f_" + Date.now(),
+        code: saved.code,
+        name: saved.name,
+        owner: saved.owner,
+        ownerId: saved.ownerId || activeOwnerId,
+        phone: saved.phone || "",
+        address: saved.address,
+        province: saved.province || "Việt Nam",
+        areaHectares: Number(saved.areaHectares) || areaNum,
+        certStandard: saved.certStandard || newFarmCert,
+        rating: Number(saved.rating) || 5.0,
+        activeBatchCount: 0,
+        verificationStatus: saved.verificationStatus || "PENDING",
+        verificationDocType: saved.verificationDocType || payload.verificationDocType,
+        verificationDocUrl: saved.verificationDocUrl || payload.verificationDocUrl,
+        verificationNote: saved.verificationNote || payload.verificationNote,
+        verificationDecisionReason: saved.verificationDecisionReason,
+        verificationRequestId: saved.verificationRequestId,
+      };
+      setFarms([...farms, newFarm]);
+      setIsAddFarmModalOpen(false);
+      setNewFarmName("");
+      setNewFarmAddress("");
+      setNewFarmDocUrls([]);
+      setNewFarmDocUrlInput("");
+      setNewFarmDocNote("");
+      toast.success(`Đã thêm nông trại "${newFarm.name}" (Mã: ${newFarm.code}) kèm ${allDocUrls.length} tài liệu chờ Admin duyệt!`);
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 409 || status === 400 || status === 403) {
+        toast.error(getApiErrorMessage(err, "Không thể tạo nông trại mới!"));
+        return;
+      }
+      const fallbackFarm: FarmItem = {
+        id: "f_" + Date.now(),
+        ...payload,
+        verificationStatus: "PENDING",
+        activeBatchCount: 0,
+      };
+      setFarms([...farms, fallbackFarm]);
+      setIsAddFarmModalOpen(false);
+      setNewFarmName("");
+      setNewFarmAddress("");
+      setNewFarmDocUrls([]);
+      setNewFarmDocUrlInput("");
+      setNewFarmDocNote("");
+      toast.info(`Đã lưu tạm trang trại "${fallbackFarm.name}" trên máy!`);
+    }
   };
 
-  // Cập nhật Nông Trại
-  const handleUpdateFarm = (e: React.FormEvent) => {
+  // Cập nhật Nông Trại (Lưu DB PostgreSQL)
+  const handleUpdateFarm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingFarm) return;
     if (!editingFarm.name.trim()) {
@@ -1326,19 +1542,46 @@ export default function FarmerPortalPage() {
       address: editingFarm.address.trim(),
       province: (editingFarm.province || "").trim(),
     };
+    try {
+      await farmerService.updateFarm(updated.code || updated.id, {
+        name: updated.name,
+        owner: updated.owner,
+        phone: updated.phone,
+        address: updated.address,
+        province: updated.province,
+        areaHectares: updated.areaHectares,
+        certStandard: updated.certStandard,
+      });
+      toast.success(`Đã cập nhật trang trại "${updated.name}" vào Database!`);
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        toast.error(getApiErrorMessage(err, "Bạn không có quyền chỉnh sửa nông trại này!"));
+        return;
+      }
+      toast.success(`Đã cập nhật thông tin trang trại "${updated.name}"!`);
+    }
     setFarms(farms.map((f) => (f.id === updated.id ? updated : f)));
     setEditingFarm(null);
-    toast.success(`Đã cập nhật thông tin trang trại "${updated.name}"!`);
   };
 
-  // Xóa Nông Trại
-  const handleDeleteFarm = (id: string, name: string) => {
-    if (farms.length <= 1) {
+  // Xóa Nông Trại (Lưu DB PostgreSQL)
+  const handleDeleteFarm = async (id: string, name: string) => {
+    if (visibleFarms.length <= 1) {
       toast.error("Hệ thống yêu cầu duy trì ít nhất 1 nông trại!");
       return;
     }
     const targetFarm = farms.find((f) => f.id === id);
     if (confirm(`Bạn có chắc muốn xóa nông trại "${name}"?`)) {
+      try {
+        await farmerService.deleteFarm(targetFarm?.code || id);
+      } catch (err) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 403) {
+          toast.error(getApiErrorMessage(err, "Bạn không có quyền xóa nông trại này!"));
+          return;
+        }
+      }
       const remaining = farms.filter((f) => f.id !== id);
       setFarms(remaining);
       if (selectedFarmId === id && remaining[0]) {
@@ -1360,7 +1603,7 @@ export default function FarmerPortalPage() {
     setFormLotCode(generateLotCodeForProduct(productName, batches));
   };
 
-  const openCreateBatchModal = (preferredFarmCode?: string, preferredProductName?: string) => {
+  const openCreateBatchModal = (preferredFarmCode?: string, preferredProductName?: string, preferredQty?: string) => {
     const defaultFarmForOwner = visibleFarms[0]?.code || "NT-DL-01";
     const targetFarmCode =
       preferredFarmCode ||
@@ -1378,7 +1621,7 @@ export default function FarmerPortalPage() {
     setFormPlantingDate(getLocalIsoDate(-30));
     setFormHarvestDate(getLocalIsoDate(0));
     setFormExpiryDate(getLocalIsoDate(14));
-    setFormQty("500");
+    setFormQty(preferredQty || "500");
     setFormUnit("kg");
     setFormCultivation(
       targetFarm?.certStandard?.toLowerCase().includes("globalgap")
@@ -1508,7 +1751,6 @@ export default function FarmerPortalPage() {
     setSelectedLotForTimeline(lot);
     setEditTransportStatus(lot.transportStatus || "Chưa vận chuyển");
     setEditTransportDest(lot.transportDestination || "Kho phân phối");
-    setAdminApprovalNote("");
     setIsAddingCustomEvent(false);
     setIsLotTimelineModalOpen(true);
     setIsLoadingLotTimeline(true);
@@ -1581,58 +1823,6 @@ export default function FarmerPortalPage() {
       ]);
     } finally {
       setIsLoadingLotTimeline(false);
-    }
-  };
-
-  const handleUpdateLotApproval = async (newStatus: "Đã duyệt xuất kho" | "Chờ duyệt xuất kho") => {
-    if (!selectedLotForTimeline) return;
-    setIsUpdatingLotStatus(true);
-    try {
-      const updated = await farmerService.updateBatchStatus(selectedLotForTimeline.code, {
-        status: newStatus,
-        statusColor: newStatus === "Đã duyệt xuất kho" ? "#10b981" : "#f59e0b",
-        adminNote:
-          adminApprovalNote.trim() ||
-          (newStatus === "Đã duyệt xuất kho"
-            ? "Admin đã phê duyệt xuất kho lô hàng thành công"
-            : "Chuyển về trạng thái chờ duyệt"),
-      });
-
-      setBatches((prev) =>
-        prev.map((b) =>
-          b.code === updated.code
-            ? {
-                ...b,
-                status: updated.status as BatchItem["status"],
-                statusColor: updated.statusColor || (updated.status === "Đã duyệt xuất kho" ? "#10b981" : "#f59e0b"),
-              }
-            : b
-        )
-      );
-
-      setSelectedLotForTimeline((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: updated.status as BatchItem["status"],
-              statusColor: updated.statusColor || (updated.status === "Đã duyệt xuất kho" ? "#10b981" : "#f59e0b"),
-            }
-          : null
-      );
-
-      toast.success(
-        newStatus === "Đã duyệt xuất kho"
-          ? "Đã phê duyệt xuất kho lô hàng thành công!"
-          : "Đã chuyển về trạng thái chờ duyệt!"
-      );
-
-      const freshEvents = await farmerService.getBatchTimeline(selectedLotForTimeline.code);
-      setLotTimelineEvents(freshEvents);
-      setAdminApprovalNote("");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Không thể cập nhật trạng thái duyệt");
-    } finally {
-      setIsUpdatingLotStatus(false);
     }
   };
 
@@ -1800,7 +1990,7 @@ export default function FarmerPortalPage() {
     setIsLogModalOpen(true);
   };
 
-  const handleLogImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -1808,13 +1998,25 @@ export default function FarmerPortalPage() {
       return;
     }
     setLogProofFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === "string") {
-        setLogProofImage(event.target.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingLogImage(true);
+    try {
+      const uploaded = await farmerService.uploadProofImage(file, {
+        ownerId: activeOwnerId,
+        category: "farming-log",
+      });
+      setLogProofImage(uploaded.url);
+      toast.success(`Đã tải ảnh "${file.name}" lên Storage thành công!`);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (typeof event.target?.result === "string") {
+          setLogProofImage(event.target.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingLogImage(false);
+    }
   };
 
   // Ghi nhật ký canh tác
@@ -1892,24 +2094,38 @@ export default function FarmerPortalPage() {
     }
   };
 
-  const handleDeleteLog = (id: string, actionName: string) => {
+  const handleDeleteLog = async (id: string, actionName: string) => {
     if (confirm(`Bạn có chắc muốn xóa ghi chép "${actionName}"?`)) {
-      setFarmingLogs((prev) => prev.filter((item) => item.id !== id));
       if (!id.startsWith("l_")) {
-        farmerService.deleteLog(id).catch((err) => console.warn("Lỗi xóa log trên server:", err));
+        try {
+          await farmerService.deleteLog(id);
+        } catch (err) {
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          if (status === 403) {
+            toast.error(getApiErrorMessage(err, "Bạn không có quyền xóa nhật ký của chủ vườn khác!"));
+            return;
+          }
+          console.warn("Lỗi xóa log trên server:", err);
+        }
       }
+      setFarmingLogs((prev) => prev.filter((item) => item.id !== id));
       toast.info("Đã xóa ghi chép nhật ký!");
     }
   };
 
   // Upload ảnh nông sản
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Vui lòng chọn ảnh dung lượng dưới 5MB!");
-        return;
-      }
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Vui lòng chọn ảnh dung lượng dưới 5MB!");
+      return;
+    }
+    try {
+      const uploadedUrl = await farmerService.uploadProductImage(file, activeOwnerId);
+      setNewProdImage(uploadedUrl);
+      toast.success("Đã tải ảnh nông sản lên Storage thành công!");
+    } catch {
       const reader = new FileReader();
       reader.onloadend = () => {
         setNewProdImage(reader.result as string);
@@ -2083,11 +2299,6 @@ export default function FarmerPortalPage() {
     toast.success(`Đã thêm chứng nhận "${evaluated.name}"!`);
   };
 
-  const authUser = useAuthStore((state) => state.user);
-  const activeAlertEmail = authUser?.email || "";
-
-
-
   const calculateRenewExpiry = (startDateStr: string, durationYears: string) => {
     const sDate = parseVnOrIsoDate(startDateStr);
     if (!sDate) return renewRequestedExpiryDate;
@@ -2129,7 +2340,7 @@ export default function FarmerPortalPage() {
     setIsRenewModalOpen(true);
   };
 
-  const handleRenewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRenewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -2137,26 +2348,45 @@ export default function FarmerPortalPage() {
       return;
     }
     setRenewProofFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === "string") {
-        setRenewProofImage(event.target.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingRenewImage(true);
+    try {
+      const uploaded = await farmerService.uploadProofImage(file, {
+        ownerId: activeOwnerId,
+        category: "certificate-renewal",
+      });
+      setRenewProofImage(uploaded.url);
+      toast.success(`Đã tải chứng từ "${file.name}" lên Storage thành công!`);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (typeof event.target?.result === "string") {
+          setRenewProofImage(event.target.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingRenewImage(false);
+    }
   };
 
-  const handleSubmitRenewal = (e: React.FormEvent) => {
+  const handleSubmitRenewal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!renewingCert) return;
 
-    // Nếu để trống mã mới thì giữ nguyên mã cũ theo thiết kế modal
     const finalCertNumber = renewNewCertNumber.trim()
       ? renewNewCertNumber.trim().toUpperCase()
       : renewingCert.certNumber;
 
     setIsSubmittingRenewal(true);
     try {
+      await farmerService.renewCertificate({
+        certNumber: renewingCert.certNumber,
+        newCertNumber: finalCertNumber,
+        requestedExpiryDate: renewRequestedExpiryDate,
+        proofImage: renewProofImage || undefined,
+        note: renewNote.trim(),
+      });
+
       const updated = certifications.map((c) => {
         if (c.id === renewingCert.id) {
           return {
@@ -2182,9 +2412,11 @@ export default function FarmerPortalPage() {
       }
 
       toast.success(
-        `Đã nộp yêu cầu gia hạn cho "${renewingCert.name}" thành công! Hồ sơ đang chờ Quản trị viên (Admin) xét duyệt.`
+        `Đã nộp yêu cầu gia hạn cho "${renewingCert.name}" lên Quản trị viên (Admin) thẩm định thành công!`
       );
       setIsRenewModalOpen(false);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể gửi yêu cầu gia hạn chứng nhận!"));
     } finally {
       setIsSubmittingRenewal(false);
     }
@@ -2199,6 +2431,11 @@ export default function FarmerPortalPage() {
         );
         toast.success(`Đã xóa vĩnh viễn chứng nhận "${name}" thành công!`);
       } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 403) {
+          toast.error(getApiErrorMessage(err, "Bạn không có quyền xóa chứng nhận này!"));
+          return;
+        }
         console.warn("Lỗi xóa chứng nhận phía server:", err);
         setCertifications((prev) =>
           prev.filter((c) => c.certNumber !== certIdentifier && c.id !== certIdentifier)
@@ -2209,15 +2446,19 @@ export default function FarmerPortalPage() {
   };
 
   // 🛡️ PHÂN QUYỀN DỮ LIỆU THEO TÀI KHOẢN ĐĂNG NHẬP (DATA OWNERSHIP / ISOLATION)
-  const activeOwnerId =
-    authUser?.email === "nguyenthieuu052@gmail.com" || (authUser?.name || "").toLowerCase().includes("thiệu")
-      ? "farmer_thieu"
-      : "farmer_hung";
-
-  const currentProfile = FARMER_PROFILES.find((p) => p.ownerId === activeOwnerId) || FARMER_PROFILES[0];
+  const matchedProfile = FARMER_PROFILES.find((p) => p.ownerId === activeOwnerId);
+  const currentProfile: FarmerProfile = matchedProfile || {
+    ownerId: activeOwnerId,
+    name: authUser?.name || "Chủ Trang Trại",
+    email: authUser?.email || "",
+    phone: authUser?.phone || "",
+    farmCodes: farms.map((f) => f.code),
+    avatarText: (authUser?.name || "N").slice(0, 2).toUpperCase(),
+    title: "Chủ Trang Trại AgriTrace",
+  };
 
   useEffect(() => {
-    const ownerFarms = farms.filter((f) => (f.ownerId || "farmer_hung") === activeOwnerId);
+    const ownerFarms = farms.filter((f) => (f.ownerId || activeOwnerId) === activeOwnerId);
     if (ownerFarms.length > 0 && !ownerFarms.some((f) => f.id === selectedFarmId)) {
       setSelectedFarmId(ownerFarms[0].id);
       setFormFarmCode(ownerFarms[0].code);
@@ -2225,7 +2466,7 @@ export default function FarmerPortalPage() {
   }, [activeOwnerId, farms, selectedFarmId]);
 
   // DỮ LIỆU ĐƯỢC CÔ LẬP THEO CHỦ VƯỜN HIỆN TẠI (STRICT DATA OWNERSHIP ISOLATION)
-  const visibleFarms = farms.filter((f) => (f.ownerId || "farmer_hung") === activeOwnerId);
+  const visibleFarms = farms.filter((f) => (f.ownerId || activeOwnerId) === activeOwnerId);
 
   const visibleBatches = batches.filter((b) => {
     const oId = b.ownerId || (b.farmCode === "NT-MC-03" ? "farmer_thieu" : "farmer_hung");
@@ -2276,6 +2517,14 @@ export default function FarmerPortalPage() {
       const sentKey = `${cert.certNumber}_${cert.daysLeft}_${todayStr}`;
       if (sentRecords[sentKey]) return;
 
+      // Đánh dấu ngay trước khi gửi async để tránh duplicate request/toast khi state re-render
+      sentRecords[sentKey] = "pending";
+      try {
+        localStorage.setItem(STORAGE_KEYS.certEmailSent, JSON.stringify(sentRecords));
+      } catch {
+        // Ignore storage errors
+      }
+
       const farm = visibleFarms.find((f) => f.code === cert.farmCode);
       try {
         await farmerService.notifyCertExpiry({
@@ -2295,6 +2544,12 @@ export default function FarmerPortalPage() {
           );
         }
       } catch (err) {
+        delete sentRecords[sentKey];
+        try {
+          localStorage.setItem(STORAGE_KEYS.certEmailSent, JSON.stringify(sentRecords));
+        } catch {
+          // Ignore storage errors
+        }
         console.warn("Lỗi tự động gửi email cảnh báo:", err);
       }
     });
@@ -2353,8 +2608,6 @@ export default function FarmerPortalPage() {
           </button>
         </div>
       </div>
-
-      <VerificationSubmission type="FARMER" />
 
       {/* 2. Navigation Tabs (5 Khối nghiệp vụ chuẩn bài nói, QUẢN LÝ NÔNG TRẠI đứng đầu tiên) */}
       <div className="flex border-b border-gray-200 overflow-x-auto gap-2 text-xs font-bold">
@@ -2498,13 +2751,46 @@ export default function FarmerPortalPage() {
                     }`}
                   >
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
                           Mã: {farm.code}
                         </span>
-                        <span className="text-emerald-700 bg-emerald-100 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                          <CheckCircle2 size={11} /> Đang quản lý
-                        </span>
+                        {(() => {
+                          const vStatus = (farm.verificationStatus || "APPROVED").toUpperCase();
+                          if (vStatus === "NOT_SUBMITTED") {
+                            return (
+                              <span className="text-slate-700 bg-slate-100 border border-slate-300 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <FileText size={11} /> Chưa nộp hồ sơ đất
+                              </span>
+                            );
+                          }
+                          if (vStatus === "PENDING" || vStatus === "UNDER_REVIEW") {
+                            return (
+                              <span className="text-amber-800 bg-amber-100 border border-amber-200 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <Clock size={11} /> Chờ Admin duyệt hồ sơ đất
+                              </span>
+                            );
+                          }
+                          if (vStatus === "REJECTED") {
+                            return (
+                              <span className="text-rose-700 bg-rose-100 border border-rose-200 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <AlertTriangle size={11} /> Từ chối hồ sơ đất
+                              </span>
+                            );
+                          }
+                          if (vStatus === "CHANGES_REQUESTED" || vStatus === "SUSPENDED") {
+                            return (
+                              <span className="text-orange-800 bg-orange-100 border border-orange-200 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <AlertTriangle size={11} /> Cần bổ sung hồ sơ đất
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="text-emerald-700 bg-emerald-100 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                              <CheckCircle2 size={11} /> Đã xác minh
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div>
@@ -2544,13 +2830,69 @@ export default function FarmerPortalPage() {
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-gray-100 mt-4 flex items-center justify-between">
-                      <button
-                        onClick={() => setEditingFarm({ ...farm })}
-                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Edit3 size={13} /> Sửa thông tin
-                      </button>
+                    {farm.verificationStatus === "NOT_SUBMITTED" && !farm.verificationDocUrl && (
+                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[11px] text-amber-900">
+                        Nông trại mới chưa có giấy tờ đất canh tác. Hãy bấm <strong>Đính kèm hồ sơ đất</strong> để gửi Admin duyệt.
+                      </div>
+                    )}
+
+                    {(farm.verificationDocUrl || farm.verificationDecisionReason) && (
+                      <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] space-y-1">
+                        {farm.verificationDocType && (
+                          <div className="font-semibold text-gray-700">
+                            Giấy tờ đất: <span className="text-gray-900">{farm.verificationDocType}</span>
+                          </div>
+                        )}
+                        {farm.verificationDecisionReason && (
+                          <div className={farm.verificationStatus === "APPROVED" ? "text-emerald-700 font-medium" : "text-rose-700 font-medium"}>
+                            Phản hồi Admin: {farm.verificationDecisionReason}
+                          </div>
+                        )}
+                        {(() => {
+                          const farmDocs = parseFarmDocUrls(farm.verificationDocUrl);
+                          return (
+                            farmDocs.length > 0 && (
+                              <div className="flex flex-wrap gap-2 pt-0.5">
+                                {farmDocs.map((docUrl, idx) => (
+                                  <a
+                                    key={`${docUrl}-${idx}`}
+                                    href={docUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-emerald-700 font-bold hover:underline bg-white px-2 py-0.5 rounded-lg border border-emerald-200"
+                                  >
+                                    <FileCheck size={12} /> Hồ sơ #{idx + 1}
+                                  </a>
+                                ))}
+                              </div>
+                            )
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t border-gray-100 mt-4 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => setEditingFarm({ ...farm })}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Edit3 size={13} /> Sửa thông tin
+                        </button>
+                        {(farm.verificationStatus === "NOT_SUBMITTED" ||
+                          farm.verificationStatus === "REJECTED" ||
+                          farm.verificationStatus === "CHANGES_REQUESTED" ||
+                          farm.verificationStatus === "SUSPENDED") && (
+                          <button
+                            type="button"
+                            onClick={() => openResubmitVerificationModal(farm)}
+                            className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Upload size={13} />{" "}
+                            {farm.verificationStatus === "NOT_SUBMITTED" ? "Đính kèm hồ sơ đất" : "Bổ sung / Gửi lại hồ sơ đất"}
+                          </button>
+                        )}
+                      </div>
                       <button
                         onClick={() => handleDeleteFarm(farm.id, farm.name)}
                         className="p-2 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
@@ -2584,21 +2926,21 @@ export default function FarmerPortalPage() {
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-gray-500 font-semibold uppercase">Đã duyệt xuất kho</div>
               <div className="text-xl font-extrabold text-emerald-600 mt-1">
-                {batches.filter((b) => b.status === "Đã duyệt xuất kho").length} Lô
+                {visibleBatches.filter((b) => b.status === "Đã duyệt xuất kho").length} Lô
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">Sẵn sàng xuất bán / nhập kho</div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-blue-700 font-semibold uppercase">Đang vận chuyển</div>
               <div className="text-xl font-extrabold text-blue-600 mt-1">
-                {batches.filter((b) => b.transportStatus === "Đang vận chuyển").length} Lô
+                {visibleBatches.filter((b) => b.transportStatus === "Đang vận chuyển").length} Lô
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">Đang trên đường đến kho đích</div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-amber-700 font-semibold uppercase">Lưu tại kho vườn</div>
               <div className="text-xl font-extrabold text-amber-600 mt-1">
-                {batches.filter((b) => !b.transportStatus || b.transportStatus === "Chưa vận chuyển").length} Lô
+                {visibleBatches.filter((b) => !b.transportStatus || b.transportStatus === "Chưa vận chuyển").length} Lô
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">Chưa vận chuyển đi</div>
             </div>
@@ -3164,7 +3506,10 @@ export default function FarmerPortalPage() {
                       <div className="flex items-center justify-between mb-2.5">
                         <div className="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center text-3xl border border-emerald-100 overflow-hidden shrink-0 shadow-xs">
                           {p.image && (p.image.startsWith("data:") || p.image.startsWith("http") || p.image.startsWith("/")) ? (
-                            <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                            </>
                           ) : (
                             <Sprout size={24} className="text-emerald-700" />
                           )}
@@ -3358,20 +3703,20 @@ export default function FarmerPortalPage() {
                             <Clock size={11} /> Chờ Admin xét duyệt
                           </span>
                         ) : cert.daysLeft <= 5 && cert.daysLeft >= 0 ? (
-                          <span className="bg-rose-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-pulse shadow-xs">
-                            <AlertTriangle size={11} /> Sắp hết hạn: Còn {cert.daysLeft} ngày
+                          <span className="bg-amber-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-pulse shadow-xs">
+                            <AlertTriangle size={11} /> Cảnh báo: Sắp hết hạn - Hãy gia hạn (Còn {cert.daysLeft} ngày)
                           </span>
                         ) : cert.status === "EXPIRED" ? (
                           <span className="bg-rose-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                            <AlertTriangle size={11} /> Đã hết hạn ({Math.abs(cert.daysLeft)} ngày)
+                            <AlertTriangle size={11} /> Chứng nhận đã hết hiệu lực (Quá {Math.abs(cert.daysLeft)} ngày)
                           </span>
                         ) : cert.status === "EXPIRING_SOON" ? (
                           <span className="bg-amber-500 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                            <AlertTriangle size={11} /> Còn {cert.daysLeft} ngày
+                            <AlertTriangle size={11} /> Cảnh báo: Sắp hết hạn - Hãy gia hạn ({cert.daysLeft} ngày)
                           </span>
                         ) : (
                           <span className="bg-emerald-600 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full">
-                            Hiệu lực ({cert.daysLeft} ngày)
+                            Chứng nhận hợp lệ ({cert.daysLeft} ngày)
                           </span>
                         )}
                       </div>
@@ -3468,7 +3813,7 @@ export default function FarmerPortalPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                🌿 Người đại diện: {user?.name || "Nguyễn Văn Hùng"} (Chủ Vườn)
+                🌿 Người đại diện: {authUser?.name || "Nguyễn Văn Hùng"} (Chủ Vườn)
               </span>
             </div>
           </div>
@@ -3531,6 +3876,7 @@ export default function FarmerPortalPage() {
                       <div className="space-y-1">
                         <span className="text-xs font-bold text-gray-700">Ảnh thực tế khách hàng mở thùng:</span>
                         <div className="w-24 h-24 rounded-xl overflow-hidden border border-gray-300 shadow-2xs">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={photoUrl} alt="Ảnh thực tế" className="w-full h-full object-cover" />
                         </div>
                       </div>
@@ -3606,8 +3952,8 @@ export default function FarmerPortalPage() {
       {/* ========================================================================= */}
       {isAddFarmModalOpen && (
         <div onClick={() => setIsAddFarmModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
-          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
-            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Home size={18} className="text-emerald-400" />
                 <h3 className="text-sm font-bold">Khai Báo Nông Trại Canh Tác Mới</h3>
@@ -3617,7 +3963,7 @@ export default function FarmerPortalPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateFarm} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateFarm} className="p-6 space-y-4 text-xs overflow-y-auto">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Mã Nông Trại *</label>
@@ -3715,6 +4061,97 @@ export default function FarmerPortalPage() {
                 </select>
               </div>
 
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold">
+                  <ShieldCheck size={15} className="text-emerald-700 shrink-0" />
+                  <span>Hồ Sơ Giấy Tờ Đất & Chứng Nhận (Tải nhiều ảnh: Sổ đỏ, Chứng nhận...) *</span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-gray-700 font-bold">Tải ảnh sổ đỏ / chứng nhận hoặc dán link tài liệu *</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="px-3 py-2 rounded-xl border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-2xs">
+                      <Upload size={13} />
+                      {isUploadingFarmDoc ? "Đang tải ảnh..." : "Chọn ảnh Sổ đỏ / Chứng nhận (chọn nhiều ảnh)"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={isUploadingFarmDoc}
+                        onChange={(e) => {
+                          void handleUploadFarmDocs(e.target.files, "create");
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {newFarmDocUrls.length > 0 && (
+                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                        <CheckCircle2 size={13} /> Đã đính kèm {newFarmDocUrls.length} hình/tài liệu
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Hoặc dán URL ảnh / link PDF Google Drive..."
+                      value={newFarmDocUrlInput}
+                      onChange={(e) => setNewFarmDocUrlInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddManualDocUrl("create");
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-xl bg-white"
+                    />
+                    {newFarmDocUrlInput.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddManualDocUrl("create")}
+                        className="px-3 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold shrink-0 cursor-pointer"
+                      >
+                        + Thêm link
+                      </button>
+                    )}
+                  </div>
+                  {newFarmDocUrls.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                      {newFarmDocUrls.map((url, idx) => (
+                        <div key={`${url}-${idx}`} className="relative rounded-xl border border-emerald-200 bg-white p-1.5 group">
+                          <span className="block text-[10px] font-bold text-emerald-800 mb-1">Hình #{idx + 1}</span>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={farmerService.resolveMediaUrl(url)}
+                            alt={`Giấy tờ nông trại ${idx + 1}`}
+                            className="h-24 w-full rounded-lg object-contain bg-gray-50"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setNewFarmDocUrls((prev) => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-90 hover:opacity-100 cursor-pointer"
+                            title="Xóa ảnh này"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Ghi chú gửi Admin (không bắt buộc)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="VD: Số tờ, số thửa, diện tích canh tác và nguồn gốc đất..."
+                    value={newFarmDocNote}
+                    onChange={(e) => setNewFarmDocNote(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white resize-none"
+                  />
+                </div>
+              </div>
+
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -3725,9 +4162,134 @@ export default function FarmerPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  disabled={isUploadingFarmDoc}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <Save size={15} /> Lưu Nông Trại
+                  <Save size={15} /> Lưu Nông Trại & Gửi Duyệt
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {resubmitFarm && (
+        <div onClick={() => setResubmitFarm(null)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs cursor-pointer">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col cursor-default">
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={18} className="text-emerald-300" />
+                <h3 className="text-sm font-bold">Đính Kèm Hồ Sơ Đất Canh Tác: {resubmitFarm.name}</h3>
+              </div>
+              <button onClick={() => setResubmitFarm(null)} className="text-emerald-200 hover:text-white cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleResubmitFarmVerification} className="p-6 space-y-4 text-xs overflow-y-auto">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-emerald-900">
+                Nông trại: <strong>{resubmitFarm.name}</strong> (<span className="font-mono">{resubmitFarm.code}</span>) • Diện tích: <strong>{resubmitFarm.areaHectares} ha</strong>
+              </div>
+              {resubmitFarm.verificationDecisionReason && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800 font-medium">
+                  Phản hồi từ Admin: {resubmitFarm.verificationDecisionReason}
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="block text-gray-700 font-bold">Tải ảnh sổ đỏ / chứng nhận hoặc dán link tài liệu *</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold cursor-pointer inline-flex items-center gap-1.5">
+                    <Upload size={13} />
+                    {isUploadingResubmitDoc ? "Đang tải ảnh..." : "Chọn ảnh (có thể chọn nhiều ảnh)"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={isUploadingResubmitDoc}
+                      onChange={(e) => {
+                        void handleUploadFarmDocs(e.target.files, "resubmit");
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {resubmitDocUrls.length > 0 && (
+                    <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle2 size={13} /> Đã đính kèm {resubmitDocUrls.length} hình/tài liệu
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="URL ảnh hoặc tài liệu giấy tờ đất / chứng nhận..."
+                    value={resubmitDocUrlInput}
+                    onChange={(e) => setResubmitDocUrlInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddManualDocUrl("resubmit");
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-xl bg-white"
+                  />
+                  {resubmitDocUrlInput.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => handleAddManualDocUrl("resubmit")}
+                      className="px-3 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold shrink-0 cursor-pointer"
+                    >
+                      + Thêm link
+                    </button>
+                  )}
+                </div>
+                {resubmitDocUrls.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                    {resubmitDocUrls.map((url, idx) => (
+                      <div key={`${url}-${idx}`} className="relative rounded-xl border border-emerald-200 bg-white p-1.5">
+                        <span className="block text-[10px] font-bold text-emerald-800 mb-1">Hình #{idx + 1}</span>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={farmerService.resolveMediaUrl(url)}
+                          alt={`Hồ sơ bổ sung ${idx + 1}`}
+                          className="h-24 w-full rounded-lg object-contain bg-gray-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setResubmitDocUrls((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-90 hover:opacity-100 cursor-pointer"
+                          title="Xóa ảnh này"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">Ghi chú về thửa đất / vùng trồng gửi Admin</label>
+                <textarea
+                  rows={2}
+                  placeholder="VD: Số thửa, tờ bản đồ, thời hạn thuê đất / sử dụng đất nông nghiệp..."
+                  value={resubmitDocNote}
+                  onChange={(e) => setResubmitDocNote(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white resize-none"
+                />
+              </div>
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResubmitFarm(null)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-xl cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingResubmitDoc}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Save size={15} /> Nộp Hồ Sơ Đất Cho Admin
                 </button>
               </div>
             </form>
@@ -4622,7 +5184,13 @@ export default function FarmerPortalPage() {
                           {p.name}
                         </option>
                       ))}
-                    {visibleProducts.filter((p) => !p.farmCode || p.farmCode === formFarmCode).length === 0 && (
+                    {formProduct &&
+                      !visibleProducts
+                        .filter((p) => !p.farmCode || p.farmCode === formFarmCode)
+                        .some((p) => p.name === formProduct) && (
+                        <option value={formProduct}>{formProduct}</option>
+                      )}
+                    {visibleProducts.filter((p) => !p.farmCode || p.farmCode === formFarmCode).length === 0 && !formProduct && (
                       <option value="Nông sản sạch">Nông sản sạch của nông trại</option>
                     )}
                   </select>
@@ -4953,10 +5521,11 @@ export default function FarmerPortalPage() {
                         Hỗ trợ ảnh JPG, PNG, WEBP (tối đa 5MB)
                       </p>
                       <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold rounded-xl cursor-pointer text-xs">
-                        <Upload size={13} /> Chọn ảnh từ thiết bị
+                        <Upload size={13} /> {isUploadingLogImage ? "Đang tải ảnh lên..." : "Chọn ảnh từ thiết bị"}
                         <input
                           type="file"
                           accept="image/*"
+                          disabled={isUploadingLogImage}
                           onChange={handleLogImageUpload}
                           className="hidden"
                         />
@@ -5060,7 +5629,10 @@ export default function FarmerPortalPage() {
                 <div className="flex items-center gap-4 p-3.5 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
                   <div className="w-20 h-20 rounded-xl bg-white border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                     {newProdImage ? (
-                      <img src={newProdImage} alt="Xem trước" className="w-full h-full object-cover" />
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={newProdImage} alt="Xem trước" className="w-full h-full object-cover" />
+                      </>
                     ) : (
                       <div className="text-center p-2">
                         <Upload className="mx-auto text-gray-300 mb-1" size={22} />
@@ -5443,10 +6015,11 @@ export default function FarmerPortalPage() {
                     </div>
                   ) : (
                     <label className="w-full py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:text-emerald-700 hover:border-emerald-300 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer bg-white transition-all shadow-2xs hover:bg-gray-50">
-                      <span>⭡</span> Tải tài liệu lên
+                      <span>⭡</span> {isUploadingRenewImage ? "Đang tải chứng từ..." : "Tải tài liệu lên"}
                       <input
                         type="file"
                         accept="image/*,.pdf"
+                        disabled={isUploadingRenewImage}
                         onChange={handleRenewImageUpload}
                         className="hidden"
                       />
@@ -5467,14 +6040,14 @@ export default function FarmerPortalPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmittingRenewal}
+                    disabled={isSubmittingRenewal || isUploadingRenewImage}
                     className="flex-1 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
                   >
-                    <span>✓</span> Xác nhận gia hạn
+                    <span>✓</span> {isSubmittingRenewal ? "Đang gửi..." : "Gửi yêu cầu gia hạn"}
                   </button>
                 </div>
                 <p className="text-center text-[10px] text-gray-400 mt-2.5">
-                  Minh họa bố cục Modal, chưa phải biểu mẫu gia hạn pháp lý.
+                  Hồ sơ gia hạn sẽ được gửi trực tiếp lên Quản trị viên (Admin) thẩm định.
                 </p>
               </div>
             </form>
@@ -5488,5 +6061,13 @@ export default function FarmerPortalPage() {
         lot={selectedLotForPrint}
       />
     </div>
+  );
+}
+
+export default function FarmerPortalPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500">Đang tải cổng Nông dân...</div>}>
+      <FarmerPortalContent />
+    </Suspense>
   );
 }

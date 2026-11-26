@@ -16,6 +16,7 @@ import {
   FileCheck,
   LayoutGrid,
   List,
+  MapPin,
   Package,
   Plus,
   Power,
@@ -25,6 +26,7 @@ import {
   Shield,
   ShieldCheck,
   ShoppingBag,
+  Sprout,
   CalendarDays,
   Ticket,
   Trash2,
@@ -33,8 +35,6 @@ import {
   Users,
   X,
   ArrowRight,
-  MapPin,
-  Phone,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -46,7 +46,7 @@ import { useUsers } from "@/hooks/use-users";
 import { useVerificationMutations, useVerifications } from "@/hooks/use-verifications";
 import { getApiErrorMessage } from "@/lib/api";
 import { catalogService, type ApiOrder, type ApiVoucher } from "@/services/catalog.service";
-import { farmerService, type ApiFarmCertificate, type ApiHarvestLot } from "@/services/farmer.service";
+import { farmerService, parseFarmDocUrls, type ApiFarmCertificate, type ApiFarmItem, type ApiHarvestLot } from "@/services/farmer.service";
 import { loyaltyService, type LoyaltyMemberAdmin } from "@/services/loyalty.service";
 import {
   useCampaignStore,
@@ -59,9 +59,25 @@ import { toast } from "@/stores/toast-store";
 import type { VerificationRequest } from "@/types/verification";
 import { cn } from "@/utils/cn";
 
-function documentHref(value: string) {
+function resolveDocumentUrl(value?: string) {
+  if (!value) return undefined;
+  return value.startsWith("/api/") ? farmerService.resolveMediaUrl(value) : value;
+}
+
+function isImageDocumentUrl(resolvedUrl?: string) {
+  return Boolean(
+    resolvedUrl &&
+      (resolvedUrl.startsWith("data:image/") ||
+        resolvedUrl.includes("/api/v1/farmer/uploads/") ||
+        /\.(png|jpe?g|webp|gif)(\?|$)/i.test(resolvedUrl))
+  );
+}
+
+function documentHref(value?: string) {
+  if (!value) return undefined;
   try {
-    const url = new URL(value);
+    const resolved = resolveDocumentUrl(value) || value;
+    const url = new URL(resolved);
     return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
   } catch {
     return undefined;
@@ -72,8 +88,8 @@ function submittedAt(value: string) {
   return new Date(value).toLocaleString("vi-VN");
 }
 
-type AdminTab = "verifications" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog";
-const ADMIN_TABS: AdminTab[] = ["verifications", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"];
+type AdminTab = "verifications" | "farms" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog";
+const ADMIN_TABS: AdminTab[] = ["verifications", "farms", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"];
 
 function AdminPortalContent() {
   const searchParams = useSearchParams();
@@ -313,6 +329,95 @@ function AdminPortalContent() {
       } catch (err: unknown) {
         toast.error(getApiErrorMessage(err));
       }
+    }
+  };
+
+  // Admin: Duyệt Hồ Sơ Đất Canh Tác & Nông Trại Mới
+  const [adminFarms, setAdminFarms] = useState<ApiFarmItem[]>([]);
+  const [adminFarmsLoading, setAdminFarmsLoading] = useState(false);
+  const [adminFarmSearch, setAdminFarmSearch] = useState("");
+  const [adminFarmFilter, setAdminFarmFilter] = useState<"PENDING" | "APPROVED" | "ISSUE" | "ALL">("PENDING");
+  const [farmDecisionTarget, setFarmDecisionTarget] = useState<{
+    farm: ApiFarmItem;
+    action: "approve" | "changes" | "reject";
+  } | null>(null);
+  const [farmDecisionReason, setFarmDecisionReason] = useState("");
+  const [isSubmittingFarmDecision, setIsSubmittingFarmDecision] = useState(false);
+
+  const fetchAdminFarms = async () => {
+    setAdminFarmsLoading(true);
+    try {
+      const data = await farmerService.getFarms();
+      setAdminFarms((data || []).map((f) => ({ ...f, verificationStatus: f.verificationStatus || "APPROVED" })));
+    } catch (err: unknown) {
+      console.warn("Lỗi tải danh sách nông trại phía Admin:", err);
+    } finally {
+      setAdminFarmsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminFarms();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "farms") {
+      fetchAdminFarms();
+    }
+  }, [activeTab]);
+
+  const pendingFarmsCount = useMemo(() => {
+    return adminFarms.filter((f) => f.verificationStatus === "PENDING" || f.verificationStatus === "UNDER_REVIEW").length;
+  }, [adminFarms]);
+
+  const filteredAdminFarms = useMemo(() => {
+    const q = adminFarmSearch.trim().toLowerCase();
+    return adminFarms.filter((f) => {
+      const matchQuery =
+        !q ||
+        f.code.toLowerCase().includes(q) ||
+        f.name.toLowerCase().includes(q) ||
+        (f.owner && f.owner.toLowerCase().includes(q)) ||
+        (f.address && f.address.toLowerCase().includes(q));
+      const status = (f.verificationStatus || "APPROVED").toUpperCase();
+      const matchStatus =
+        adminFarmFilter === "ALL" ||
+        (adminFarmFilter === "PENDING" && (status === "PENDING" || status === "UNDER_REVIEW")) ||
+        (adminFarmFilter === "APPROVED" && status === "APPROVED") ||
+        (adminFarmFilter === "ISSUE" &&
+          (status === "NOT_SUBMITTED" || status === "REJECTED" || status === "CHANGES_REQUESTED" || status === "SUSPENDED"));
+      return matchQuery && matchStatus;
+    });
+  }, [adminFarms, adminFarmSearch, adminFarmFilter]);
+
+  const handleConfirmFarmDecision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!farmDecisionTarget) return;
+    const { farm, action } = farmDecisionTarget;
+    if ((action === "reject" || action === "changes") && !farmDecisionReason.trim()) {
+      toast.error("Vui lòng nhập lý do hoặc nội dung yêu cầu bổ sung!");
+      return;
+    }
+    setIsSubmittingFarmDecision(true);
+    try {
+      const updated = await farmerService.decideFarmVerification(farm.code || String(farm.id), {
+        action,
+        reason: farmDecisionReason.trim() || undefined,
+      });
+      setAdminFarms((prev) => prev.map((item) => (item.code === farm.code ? updated : item)));
+      toast.success(
+        action === "approve"
+          ? `Đã xác minh hồ sơ đất nông trại "${farm.name}"!`
+          : action === "changes"
+          ? `Đã gửi yêu cầu bổ sung giấy tờ đất cho "${farm.name}".`
+          : `Đã từ chối hồ sơ nông trại "${farm.name}".`
+      );
+      setFarmDecisionTarget(null);
+      setFarmDecisionReason("");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
+    } finally {
+      setIsSubmittingFarmDecision(false);
     }
   };
 
@@ -990,7 +1095,8 @@ function AdminPortalContent() {
   const lockedUsers = users.isPending ? "…" : users.isError ? "—" : (users.data?.filter((user) => !user.active).length ?? 0).toLocaleString("vi-VN");
   const pendingCount = verifications.isPending ? "…" : verifications.isError ? "—" : pendingRequests.length.toLocaleString("vi-VN");
   const headerByTab = {
-    verifications: { title: "Tổng quan & duyệt hồ sơ", description: "Theo dõi tài khoản hệ thống và xử lý hồ sơ xác minh của nông dân, nhà phân phối.", icon: Shield, tone: "forest" as const, meta: `${pendingCount} hồ sơ chờ` },
+    verifications: { title: "Tổng quan & duyệt hồ sơ", description: "Theo dõi tài khoản hệ thống và xử lý hồ sơ đăng ký quyền Nông dân, Thủ kho, Nhà phân phối.", icon: Shield, tone: "forest" as const, meta: `${pendingCount} hồ sơ chờ` },
+    farms: { title: "Duyệt hồ sơ đất & nông trại", description: "Kiểm tra giấy tờ quyền sử dụng đất canh tác, địa chỉ vườn và xác minh nông trại mới do Nông dân khai báo.", icon: Sprout, tone: "forest" as const, meta: `${pendingFarmsCount} nông trại chờ` },
     batches: { title: "Duyệt lô thu hoạch & xuất kho", description: "Thẩm định hồ sơ kiểm nghiệm KCS và tiêu chuẩn VietGAP/GlobalGAP trước khi cấp lệnh xuất kho.", icon: Package, tone: "forest" as const, meta: `${pendingBatchesCount} lô chờ duyệt` },
     certs: { title: "Duyệt chứng nhận & gia hạn", description: "Thẩm định hồ sơ đăng ký cấp mới hoặc gia hạn chứng chỉ chất lượng nông trại.", icon: Award, tone: "amber" as const, meta: `${pendingCertsCount} chứng nhận chờ` },
     orders: { title: "Quản lý đơn hàng hệ thống", description: "Giám sát vòng đời đơn hàng và điều phối các bước chuyển trạng thái được phép.", icon: ShoppingBag, tone: "ocean" as const, meta: `${orders.length} đơn hàng` },
@@ -1003,6 +1109,7 @@ function AdminPortalContent() {
 
   const tabNavItems = [
     { key: "verifications" as const, label: "Duyệt Hồ Sơ Vị Trí", icon: Shield, badge: pendingRequests.length },
+    { key: "farms" as const, label: "Duyệt Hồ Sơ Nông Trại", icon: Sprout, badge: pendingFarmsCount },
     { key: "batches" as const, label: "Duyệt Lô Xuất Kho", icon: Package, badge: pendingBatchesCount },
     { key: "certs" as const, label: "Duyệt Chứng Nhận", icon: Award, badge: pendingCertsCount },
     { key: "orders" as const, label: "Đơn Hàng", icon: ShoppingBag, badge: orders.length },
@@ -1154,8 +1261,9 @@ function AdminPortalContent() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {filteredVerificationRequests.map((request) => {
+                  const resolvedDocUrl = resolveDocumentUrl(request.documentUrl);
                   const href = documentHref(request.documentUrl);
-                  const isImageDoc = request.documentUrl?.startsWith("data:image/");
+                  const isImageDoc = isImageDocumentUrl(resolvedDocUrl);
                   const roleBadge =
                     request.type === "FARMER"
                       ? { label: "Nông dân (FARMER)", cls: "bg-emerald-50 text-[#15803D] border-emerald-200" }
@@ -1214,12 +1322,23 @@ function AdminPortalContent() {
                         <div className="text-xs">
                           <span className="font-semibold text-gray-700">Minh chứng đính kèm: </span>
                           {isImageDoc ? (
-                            <div className="mt-1.5">
+                            <div className="mt-1.5 space-y-1.5">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={request.documentUrl}
+                                src={resolvedDocUrl || request.documentUrl}
                                 alt="Hồ sơ đính kèm"
                                 className="max-h-40 rounded-xl border border-gray-200 object-contain bg-white p-1"
                               />
+                              {href && (
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-block text-[11px] text-emerald-700 font-semibold underline"
+                                >
+                                  Mở ảnh hồ sơ toàn màn hình
+                                </a>
+                              )}
                             </div>
                           ) : href ? (
                             <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-emerald-700 font-semibold underline">
@@ -1361,6 +1480,388 @@ function AdminPortalContent() {
                       : decisionTarget.action === "changes"
                       ? "Gửi yêu cầu bổ sung"
                       : "Xác nhận Từ chối"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 1.2: DUYỆT HỒ SƠ ĐẤT CANH TÁC & NÔNG TRẠI MỚI           */}
+      {/* ========================================================= */}
+      {activeTab === "farms" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <AdminStatCard
+              label="Tổng nông trại"
+              value={adminFarms.length}
+              helper="Nông trại đã đăng ký trên hệ thống"
+              icon={Sprout}
+            />
+            <AdminStatCard
+              label="Chờ duyệt hồ sơ đất"
+              value={pendingFarmsCount}
+              helper="Đã nộp giấy tờ đất cần Admin kiểm tra"
+              icon={Clock}
+              tone="warning"
+            />
+            <AdminStatCard
+              label="Đã xác minh"
+              value={adminFarms.filter((f) => (f.verificationStatus || "APPROVED") === "APPROVED").length}
+              helper="Đủ điều kiện xuất nông sản"
+              icon={ShieldCheck}
+              tone="success"
+            />
+            <AdminStatCard
+              label="Chưa nộp / Từ chối"
+              value={
+                adminFarms.filter((f) =>
+                  ["NOT_SUBMITTED", "REJECTED", "CHANGES_REQUESTED", "SUSPENDED"].includes(
+                    (f.verificationStatus || "").toUpperCase()
+                  )
+                ).length
+              }
+              helper="Cần nông dân đính kèm hoặc bổ sung"
+              icon={AlertTriangle}
+              tone="danger"
+            />
+          </div>
+
+          <section className="bento-card overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4DFD5] bg-[#FBF9F5] p-5">
+              <div>
+                <h2 className="font-serif flex items-center gap-2 text-base font-bold text-[#16261E]">
+                  <MapPin size={19} className="text-[#166534]" />
+                  <span>Xét Duyệt Hồ Sơ Đất Canh Tác & Nông Trại</span>
+                </h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Chỉ kiểm tra và xác minh giấy tờ đất canh tác của từng nông trại mới khai báo — không thay đổi quyền tài khoản Nông dân.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { key: "PENDING", label: `Chờ duyệt (${pendingFarmsCount})` },
+                    {
+                      key: "APPROVED",
+                      label: `Đã xác minh (${adminFarms.filter((f) => (f.verificationStatus || "APPROVED") === "APPROVED").length})`,
+                    },
+                    {
+                      key: "ISSUE",
+                      label: `Chưa nộp / Từ chối (${
+                        adminFarms.filter((f) =>
+                          ["NOT_SUBMITTED", "REJECTED", "CHANGES_REQUESTED", "SUSPENDED"].includes(
+                            (f.verificationStatus || "").toUpperCase()
+                          )
+                        ).length
+                      })`,
+                    },
+                    { key: "ALL", label: `Tất cả (${adminFarms.length})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setAdminFarmFilter(tab.key)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer",
+                      adminFarmFilter === tab.key
+                        ? "bg-[#16261E] text-white shadow-xs"
+                        : "bg-white border border-[#E4DFD5] text-stone-600 hover:bg-stone-100"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={fetchAdminFarms}
+                  className="p-2 rounded-xl bg-white border border-[#E4DFD5] hover:bg-stone-100 text-[#166534] cursor-pointer"
+                  title="Tải lại danh sách nông trại"
+                >
+                  <RefreshCw size={14} className={adminFarmsLoading ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 border-b border-gray-100 bg-white flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={adminFarmSearch}
+                  onChange={(e) => setAdminFarmSearch(e.target.value)}
+                  placeholder="Tìm theo mã nông trại (NT-...), tên vườn, chủ trang trại, địa chỉ..."
+                  className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-800 outline-none focus:border-emerald-600"
+                />
+              </div>
+              {adminFarmSearch && (
+                <button
+                  type="button"
+                  onClick={() => setAdminFarmSearch("")}
+                  className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-800 bg-white border border-gray-200 rounded-lg cursor-pointer"
+                >
+                  Xóa lọc
+                </button>
+              )}
+            </div>
+
+            {adminFarmsLoading ? (
+              <div className="p-4"><LoadingSkeleton rows={3} /></div>
+            ) : filteredAdminFarms.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 text-xs">
+                <Sprout size={28} className="mx-auto text-gray-300 mb-2" />
+                Không có hồ sơ nông trại nào trong mục lọc hiện tại.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {filteredAdminFarms.map((farm) => {
+                  const status = (farm.verificationStatus || "APPROVED").toUpperCase();
+                  const farmDocUrls = parseFarmDocUrls(farm.verificationDocUrl);
+
+                  const statusPill =
+                    status === "APPROVED"
+                      ? { label: "Đã xác minh nông trại", cls: "bg-emerald-100 text-emerald-900" }
+                      : status === "NOT_SUBMITTED"
+                      ? { label: "Chưa nộp giấy tờ đất", cls: "bg-slate-100 text-slate-700 border border-slate-300" }
+                      : status === "REJECTED"
+                      ? { label: "Từ chối hồ sơ", cls: "bg-rose-100 text-rose-800" }
+                      : status === "CHANGES_REQUESTED"
+                      ? { label: "Cần bổ sung hồ sơ đất", cls: "bg-orange-100 text-orange-900" }
+                      : { label: "Chờ duyệt hồ sơ đất", cls: "bg-amber-50 text-amber-800 border border-amber-300" };
+
+                  return (
+                    <article key={farm.code} className="flex flex-col justify-between gap-4 p-5 lg:flex-row lg:items-start hover:bg-gray-50/40 transition-colors">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {farm.code}
+                          </span>
+                          <span className="font-extrabold text-sm text-gray-900">{farm.name}</span>
+                          <span className={cn("px-2.5 py-0.5 rounded-full text-[11px] font-bold", statusPill.cls)}>
+                            {statusPill.label}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-gray-50/80 p-3 rounded-xl border border-gray-100">
+                          <div>
+                            <span className="text-gray-400 font-semibold">Chủ vườn: </span>
+                            <strong className="text-gray-900">{farm.owner}</strong>
+                            {farm.phone && <span className="text-gray-500"> ({farm.phone})</span>}
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-semibold">Quy mô & Tiêu chuẩn: </span>
+                            <strong className="text-gray-900">{farm.areaHectares} ha</strong>
+                            <span className="text-gray-600"> • {farm.certStandard || "VietGAP"}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-semibold">Địa chỉ vùng trồng: </span>
+                            <span className="text-gray-800">{farm.address}{farm.province ? `, ${farm.province}` : ""}</span>
+                          </div>
+                        </div>
+
+                        {farm.verificationDocType && (
+                          <div className="text-xs text-gray-700">
+                            <span className="font-semibold text-gray-500">Loại giấy tờ đất canh tác: </span>
+                            <strong className="text-gray-900">{farm.verificationDocType}</strong>
+                          </div>
+                        )}
+
+                        {farm.verificationNote && (
+                          <p className="text-xs text-gray-700 bg-white p-2.5 rounded-lg border border-gray-100">
+                            <strong className="text-gray-900">Ghi chú từ Nông dân:</strong> {farm.verificationNote}
+                          </p>
+                        )}
+
+                        {farmDocUrls.length > 0 && (
+                          <div className="text-xs">
+                            <span className="font-semibold text-gray-700">
+                              Hồ sơ giấy tờ đất & chứng nhận đính kèm ({farmDocUrls.length} tài liệu):{" "}
+                            </span>
+                            <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {farmDocUrls.map((docUrl, idx) => {
+                                const docHref = documentHref(docUrl);
+                                const docIsImg = isImageDocumentUrl(docUrl);
+                                return docIsImg ? (
+                                  <div key={`${docUrl}-${idx}`} className="rounded-xl border border-gray-200 bg-white p-2 space-y-1">
+                                    <div className="text-[10px] font-bold text-gray-500">Hình #{idx + 1}</div>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={docUrl}
+                                      alt={`Hồ sơ nông trại ${idx + 1}`}
+                                      className="max-h-40 w-full rounded-lg object-contain bg-gray-50"
+                                    />
+                                    {docHref && (
+                                      <a
+                                        href={docHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-block text-[11px] text-emerald-700 font-semibold underline"
+                                      >
+                                        Mở ảnh #{idx + 1} toàn màn hình
+                                      </a>
+                                    )}
+                                  </div>
+                                ) : docHref ? (
+                                  <a
+                                    key={`${docUrl}-${idx}`}
+                                    href={docHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="break-all text-emerald-700 font-semibold underline p-2 rounded-lg border border-gray-200 bg-white"
+                                  >
+                                    Mở tài liệu #{idx + 1} ({docUrl})
+                                  </a>
+                                ) : (
+                                  <span key={`${docUrl}-${idx}`} className="break-all font-mono text-emerald-800 bg-emerald-50 px-2 py-1 rounded">
+                                    {docUrl}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {farm.verificationDecisionReason && (
+                          <div className="text-xs text-gray-600 italic bg-gray-100/80 px-3 py-1.5 rounded-lg">
+                            <strong>Nhận xét của Admin:</strong> {farm.verificationDecisionReason}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {status !== "APPROVED" && (
+                          <button
+                            type="button"
+                            disabled={isSubmittingFarmDecision}
+                            onClick={() => {
+                              setFarmDecisionTarget({ farm, action: "approve" });
+                              setFarmDecisionReason("Giấy tờ quyền sử dụng đất hợp lệ, xác minh vùng trồng đạt yêu cầu.");
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a7a3a] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#156e34] disabled:opacity-50 cursor-pointer"
+                          >
+                            <Check size={14} />
+                            <span>Xác minh nông trại</span>
+                          </button>
+                        )}
+                        {(status === "PENDING" || status === "UNDER_REVIEW") && (
+                          <button
+                            type="button"
+                            disabled={isSubmittingFarmDecision}
+                            onClick={() => {
+                              setFarmDecisionTarget({ farm, action: "changes" });
+                              setFarmDecisionReason("");
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 cursor-pointer"
+                          >
+                            <span>Yêu cầu bổ sung</span>
+                          </button>
+                        )}
+                        {status !== "REJECTED" && status !== "NOT_SUBMITTED" && (
+                          <button
+                            type="button"
+                            disabled={isSubmittingFarmDecision}
+                            onClick={() => {
+                              setFarmDecisionTarget({ farm, action: "reject" });
+                              setFarmDecisionReason("");
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+                          >
+                            <X size={14} />
+                            <span>Từ chối</span>
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {farmDecisionTarget && (
+            <div
+              onClick={() => setFarmDecisionTarget(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+            >
+              <form
+                onSubmit={handleConfirmFarmDecision}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 animate-fade-in"
+              >
+                <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900">
+                      {farmDecisionTarget.action === "approve"
+                        ? "✅ Xác Minh Hồ Sơ Đất & Nông Trại"
+                        : farmDecisionTarget.action === "changes"
+                        ? "⚠️ Yêu Cầu Bổ Sung Giấy Tờ Đất Canh Tác"
+                        : "❌ Từ Chối Hồ Sơ Nông Trại"}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Nông trại: <strong>{farmDecisionTarget.farm.name}</strong> ({farmDecisionTarget.farm.code}) · Chủ vườn:{" "}
+                      <strong>{farmDecisionTarget.farm.owner}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFarmDecisionTarget(null)}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {farmDecisionTarget.action === "approve" && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
+                    Xác nhận nông trại <strong>{farmDecisionTarget.farm.name}</strong> có hồ sơ đất canh tác hợp lệ và chuyển sang trạng thái{" "}
+                    <strong>Đã xác minh</strong> trên Cổng Nông Dân.
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Nhận xét thẩm định hồ sơ đất <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={farmDecisionReason}
+                    onChange={(e) => setFarmDecisionReason(e.target.value)}
+                    placeholder="Nhập kết quả kiểm tra giấy tờ đất hoặc yêu cầu chỉnh sửa..."
+                    className="w-full rounded-xl border border-gray-200 p-3 text-xs sm:text-sm outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setFarmDecisionTarget(null)}
+                    className="rounded-xl px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingFarmDecision}
+                    className={cn(
+                      "rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs cursor-pointer disabled:opacity-50",
+                      farmDecisionTarget.action === "approve"
+                        ? "bg-emerald-700 hover:bg-emerald-800"
+                        : farmDecisionTarget.action === "changes"
+                        ? "bg-amber-600 hover:bg-amber-700"
+                        : "bg-rose-600 hover:bg-rose-700"
+                    )}
+                  >
+                    {isSubmittingFarmDecision
+                      ? "Đang lưu..."
+                      : farmDecisionTarget.action === "approve"
+                      ? "Xác Nhận Đã Xác Minh"
+                      : farmDecisionTarget.action === "changes"
+                      ? "Gửi Yêu Cầu Bổ Sung"
+                      : "Xác Nhận Từ Chối"}
                   </button>
                 </div>
               </form>
@@ -2234,6 +2735,7 @@ function AdminPortalContent() {
                   </button>
                 </div>
                 <div className="rounded-xl overflow-hidden border border-gray-200 max-h-[70vh]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={viewingProofImage}
                     alt="Hồ sơ chứng nhận"
@@ -2732,7 +3234,7 @@ function AdminPortalContent() {
                         type="button"
                         onClick={async () => {
                           await handleUpdateOrderStatus(selectedOrder.orderCode, st);
-                          setSelectedOrder((prev) => (prev ? { ...prev, status: st as any } : null));
+                          setSelectedOrder((prev) => (prev ? { ...prev, status: st as ApiOrder["status"] } : null));
                         }}
                         className="px-4 py-2 rounded-xl bg-[#16261E] hover:bg-emerald-900 text-white font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                       >
@@ -4063,18 +4565,6 @@ function AdminPortalContent() {
   );
 }
 
-const ORDER_STATUS_OPTIONS = [
-  { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },
-  { value: "PAID", label: "Chờ đóng gói" },
-  { value: "CONFIRMED", label: "Chờ lấy hàng" },
-  { value: "PREPARING", label: "Đang đóng gói" },
-  { value: "SHIPPING", label: "Đang giao hàng" },
-  { value: "DELIVERED", label: "Đã giao hàng" },
-  { value: "COMPLETED", label: "Đã hoàn tất" },
-  { value: "CANCELLED", label: "Đã hủy" },
-  { value: "REFUNDED", label: "Đã hoàn tiền" },
-];
-
 function orderStatusLabel(status?: string) {
   switch (status) {
     case "PENDING_PAYMENT":
@@ -4133,15 +4623,6 @@ function formatCompactDateTime(dateStr?: string | Date) {
   } catch {
     return String(dateStr);
   }
-}
-
-function getShortAddress(addr?: string) {
-  if (!addr) return "";
-  const parts = addr.split(",").map((s) => s.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    return parts.slice(-2).join(", ");
-  }
-  return addr;
 }
 
 /** Chỉ tính doanh thu cho đơn đã thanh toán hoặc COD đã được xác nhận. */
