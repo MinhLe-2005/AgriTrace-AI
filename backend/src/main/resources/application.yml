@@ -18,6 +18,10 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 8MB
   flyway:
     enabled: false
   jackson:

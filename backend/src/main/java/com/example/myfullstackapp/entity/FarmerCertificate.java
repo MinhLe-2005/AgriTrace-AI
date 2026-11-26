@@ -81,6 +81,26 @@ public class FarmerCertificate {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Transient
+    public Integer getDaysLeft() {
+        return calculateDaysLeft();
+    }
+
+    @Transient
+    public String evaluateValidityStatus() {
+        Integer daysLeft = calculateDaysLeft();
+        if (daysLeft == null) {
+            return status != null && !status.isBlank() ? status : "VALID";
+        }
+        if (daysLeft < 0) {
+            return "EXPIRED";
+        }
+        if (daysLeft <= 30) {
+            return "EXPIRING_SOON";
+        }
+        return "VALID";
+    }
+
     public Integer calculateDaysLeft() {
         LocalDate exp = parseExpiryDate();
         if (exp == null) return null;

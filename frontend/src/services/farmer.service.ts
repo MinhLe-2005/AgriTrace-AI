@@ -1,5 +1,27 @@
 import { api } from "@/lib/api";
 
+export type ApiFarmItem = {
+  id?: number | string;
+  code: string;
+  name: string;
+  owner: string;
+  ownerId?: string;
+  phone?: string;
+  address: string;
+  province?: string;
+  areaHectares: number;
+  certStandard?: string;
+  rating?: number;
+  isDefault?: boolean;
+  verificationStatus?: string;
+  verificationDocType?: string;
+  verificationDocUrl?: string;
+  verificationDocUrls?: string[];
+  verificationNote?: string;
+  verificationDecisionReason?: string;
+  verificationRequestId?: string;
+};
+
 export type ApiHarvestLot = {
   id?: number;
   code: string;
@@ -104,7 +126,143 @@ export type ApiProductItem = {
   description?: string;
 };
 
+export function parseFarmDocUrls(raw?: string): string[] {
+  if (!raw || !raw.trim()) return [];
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return Array.from(
+          new Set(
+            parsed
+              .map((item) => (typeof item === "string" ? item.trim() : ""))
+              .filter(Boolean)
+              .map((item) => farmerService.resolveMediaUrl(item))
+          )
+        );
+      }
+    } catch {
+      // Fallback to single string handling
+    }
+  }
+  return [farmerService.resolveMediaUrl(trimmed)];
+}
+
+export function serializeFarmDocUrls(urls: string[]): string {
+  const cleaned = Array.from(new Set(urls.map((u) => u.trim()).filter(Boolean)));
+  if (cleaned.length === 0) return "";
+  if (cleaned.length === 1) return cleaned[0];
+  return JSON.stringify(cleaned);
+}
+
+function normalizeFarmItem(farm: ApiFarmItem): ApiFarmItem {
+  const urls = parseFarmDocUrls(farm.verificationDocUrl);
+  return {
+    ...farm,
+    verificationDocUrls: urls,
+    verificationDocUrl: urls.length > 0 ? serializeFarmDocUrls(urls) : undefined,
+  };
+}
+
 export const farmerService = {
+  resolveMediaUrl(rawUrl?: string): string {
+    if (!rawUrl) return "";
+    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:")) {
+      return rawUrl;
+    }
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1").replace(/\/api\/v1\/?$/, "");
+    return rawUrl.startsWith("/") ? `${apiBase}${rawUrl}` : `${apiBase}/${rawUrl}`;
+  },
+
+  async uploadProofImage(
+    file: File,
+    params?: { ownerId?: string; category?: string }
+  ): Promise<{ url: string; fileName: string; provider: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (params?.ownerId) formData.append("ownerId", params.ownerId);
+    if (params?.category) formData.append("category", params.category);
+
+    const res = await api.post<{
+      success: boolean;
+      message?: string;
+      data?: { url: string; fileName: string; provider: string };
+    }>("/farmer/uploads", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    if (!res.data?.success || !res.data?.data?.url) {
+      throw new Error(res.data?.message || "Không thể tải ảnh minh chứng lên máy chủ");
+    }
+    return {
+      ...res.data.data,
+      url: farmerService.resolveMediaUrl(res.data.data.url),
+    };
+  },
+
+  async getFarms(params?: { ownerId?: string }): Promise<ApiFarmItem[]> {
+    const res = await api.get<ApiFarmItem[]>("/farmer/farms", { params });
+    return (res.data || []).map((farm) => normalizeFarmItem(farm));
+  },
+
+  async createFarm(farm: Partial<ApiFarmItem>): Promise<ApiFarmItem> {
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiFarmItem }>("/farmer/farms", farm);
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể tạo nông trại");
+    }
+    return normalizeFarmItem(res.data.data);
+  },
+
+  async resubmitFarmVerification(
+    idOrCode: string | number,
+    payload: {
+      verificationDocType: string;
+      verificationDocUrl: string;
+      verificationNote?: string;
+    }
+  ): Promise<ApiFarmItem> {
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiFarmItem }>(
+      `/farmer/farms/${encodeURIComponent(String(idOrCode))}/land-docs`,
+      payload
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể đính kèm hồ sơ giấy tờ đất canh tác");
+    }
+    return normalizeFarmItem(res.data.data);
+  },
+
+  async decideFarmVerification(
+    idOrCode: string | number,
+    payload: {
+      action: "approve" | "reject" | "changes";
+      reason?: string;
+    }
+  ): Promise<ApiFarmItem> {
+    const res = await api.patch<{ success: boolean; message?: string; data?: ApiFarmItem }>(
+      `/farmer/farms/${encodeURIComponent(String(idOrCode))}/verification-decision`,
+      payload
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể cập nhật kết quả duyệt hồ sơ nông trại");
+    }
+    return normalizeFarmItem(res.data.data);
+  },
+
+  async updateFarm(idOrCode: string | number, farm: Partial<ApiFarmItem>): Promise<ApiFarmItem> {
+    const res = await api.put<{ success: boolean; message?: string; data?: ApiFarmItem }>(
+      `/farmer/farms/${encodeURIComponent(String(idOrCode))}`,
+      farm
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể cập nhật nông trại");
+    }
+    return res.data.data;
+  },
+
+  async deleteFarm(idOrCode: string | number): Promise<void> {
+    await api.delete(`/farmer/farms/${encodeURIComponent(String(idOrCode))}`);
+  },
+
   async getBatches(params?: { ownerId?: string; farmCode?: string }): Promise<ApiHarvestLot[]> {
     const res = await api.get<ApiHarvestLot[]>("/farmer/batches", { params });
     return res.data;
@@ -134,7 +292,11 @@ export const farmerService = {
 
   async getLogs(params?: { ownerId?: string; farmCode?: string; batchCode?: string }): Promise<ApiFarmingLog[]> {
     const res = await api.get<ApiFarmingLog[]>("/farmer/logs", { params });
-    return res.data;
+    return (res.data || []).map((item) => ({
+      ...item,
+      proofImage: item.proofImage ? farmerService.resolveMediaUrl(item.proofImage) : undefined,
+      image: item.image ? farmerService.resolveMediaUrl(item.image) : undefined,
+    }));
   },
 
   async createLog(log: Partial<ApiFarmingLog>): Promise<ApiFarmingLog | undefined> {
@@ -226,7 +388,12 @@ export const farmerService = {
     return res.data.data;
   },
 
-  async getProducts(params?: { ownerId?: string; farmCode?: string; category?: string }): Promise<ApiProductItem[]> {
+  async uploadProductImage(file: File, ownerId?: string): Promise<string> {
+    const res = await farmerService.uploadProofImage(file, { ownerId, category: "product" });
+    return res.url;
+  },
+
+  async getProducts(params?: { ownerId?: string; farmCode?: string; category?: string; scope?: string }): Promise<ApiProductItem[]> {
     const res = await api.get<ApiProductItem[]>("/products", { params });
     return res.data;
   },
@@ -254,9 +421,14 @@ export const farmerService = {
     return res.data;
   },
 
-  async getCertificates(): Promise<ApiFarmCertificate[]> {
-    const res = await api.get<ApiFarmCertificate[]>("/farmer/certificates");
-    return res.data;
+  async getCertificates(params?: { ownerId?: string; farmCode?: string }): Promise<ApiFarmCertificate[]> {
+    const res = await api.get<ApiFarmCertificate[]>("/farmer/certificates", { params });
+    return (res.data || []).map((cert) => ({
+      ...cert,
+      pendingProofImage: cert.pendingProofImage
+        ? farmerService.resolveMediaUrl(cert.pendingProofImage)
+        : undefined,
+    }));
   },
 
   async saveCertificate(cert: Partial<ApiFarmCertificate>): Promise<ApiFarmCertificate | undefined> {

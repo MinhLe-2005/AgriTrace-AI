@@ -1,19 +1,41 @@
 package com.example.myfullstackapp.controller;
 
 import com.example.myfullstackapp.dto.ApiResponse;
+import com.example.myfullstackapp.entity.Farm;
+import com.example.myfullstackapp.entity.FarmerCertificate;
+import com.example.myfullstackapp.entity.FarmerUploadedMedia;
+import com.example.myfullstackapp.entity.FarmingLog;
 import com.example.myfullstackapp.entity.HarvestLot;
+import com.example.myfullstackapp.entity.RoleName;
 import com.example.myfullstackapp.entity.TraceabilityRecord;
+import com.example.myfullstackapp.entity.User;
+import com.example.myfullstackapp.repository.FarmRepository;
+import com.example.myfullstackapp.repository.FarmerCertificateRepository;
+import com.example.myfullstackapp.repository.FarmingLogRepository;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
 import com.example.myfullstackapp.repository.TraceabilityRecordRepository;
+import com.example.myfullstackapp.repository.UserRepository;
+import com.example.myfullstackapp.service.EmailService;
+import com.example.myfullstackapp.service.FarmerBatchEventStream;
+import com.example.myfullstackapp.service.FarmerCertificateScheduler;
+import com.example.myfullstackapp.service.FarmerMediaStorageService;
+import com.example.myfullstackapp.service.FarmerOwnershipResolver;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDate;
@@ -24,20 +46,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import com.example.myfullstackapp.service.EmailService;
-import com.example.myfullstackapp.service.FarmerBatchEventStream;
-import com.example.myfullstackapp.entity.FarmerCertificate;
-import com.example.myfullstackapp.entity.FarmingLog;
-import com.example.myfullstackapp.entity.RoleName;
-import com.example.myfullstackapp.entity.User;
-import com.example.myfullstackapp.repository.FarmerCertificateRepository;
-import com.example.myfullstackapp.repository.FarmingLogRepository;
-import com.example.myfullstackapp.repository.UserRepository;
-import com.example.myfullstackapp.service.FarmerCertificateScheduler;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
@@ -57,6 +67,336 @@ public class FarmerController {
     private final UserRepository userRepository;
     private final FarmingLogRepository farmingLogRepository;
     private final FarmerBatchEventStream batchEventStream;
+    private final FarmRepository farmRepository;
+    private final FarmerMediaStorageService mediaStorageService;
+    private final FarmerOwnershipResolver ownershipResolver;
+
+    @PostMapping(value = "/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<FarmerMediaStorageService.StoredMediaResult>> uploadProofImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String ownerId,
+            @RequestParam(required = false, defaultValue = "farming-log") String category
+    ) {
+        try {
+            String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(ownerId, null);
+            FarmerMediaStorageService.StoredMediaResult result =
+                    mediaStorageService.storeImage(file, effectiveOwner, category);
+            return ResponseEntity.ok(ApiResponse.ok("Tải ảnh minh chứng lên hệ thống thành công!", result));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+        } catch (Exception ex) {
+            log.warn("Lỗi lưu tệp ảnh minh chứng: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Không thể lưu ảnh minh chứng: " + ex.getMessage()));
+        }
+    }
+
+    @GetMapping("/uploads/{id}")
+    public ResponseEntity<byte[]> getUploadedMedia(@PathVariable UUID id) {
+        return mediaStorageService.getMedia(id)
+                .map(media -> ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_TYPE, media.getContentType())
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + media.getFileName() + "\"")
+                        .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic())
+                        .body(media.getData()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/farms")
+    public ResponseEntity<List<Farm>> getAllFarms(@RequestParam(required = false) String ownerId) {
+        List<Farm> farms = farmRepository.findAllByOrderByIdAsc();
+        if (farms.isEmpty()) {
+            initSampleFarms();
+            farms = farmRepository.findAllByOrderByIdAsc();
+        }
+        farms.forEach(f -> {
+            if (f.getVerificationStatus() == null || f.getVerificationStatus().isBlank()) {
+                f.setVerificationStatus("APPROVED");
+            }
+        });
+        Authentication auth = ownershipResolver.currentAuthentication();
+        if (ownershipResolver.isStrictFarmerSession(auth) || (ownerId != null && !ownerId.isBlank())) {
+            String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(ownerId, null);
+            farms = farms.stream()
+                    .filter(f -> f.getOwnerId() != null && f.getOwnerId().equalsIgnoreCase(effectiveOwner))
+                    .toList();
+        }
+        return ResponseEntity.ok(farms);
+    }
+
+    @PostMapping("/farms")
+    @Transactional
+    public ResponseEntity<ApiResponse<Farm>> createFarm(@RequestBody Farm req) {
+        if (req.getCode() == null || req.getCode().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Mã nông trại không được để trống"));
+        }
+        if (req.getName() == null || req.getName().isBlank() || req.getAddress() == null || req.getAddress().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Tên và địa chỉ nông trại không được để trống"));
+        }
+        if (req.getAreaHectares() == null || req.getAreaHectares() <= 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Quy mô diện tích phải lớn hơn 0 ha"));
+        }
+        String codeUpper = req.getCode().trim().toUpperCase(Locale.ROOT);
+        if (farmRepository.existsByCodeIgnoreCase(codeUpper)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiResponse.error("Mã nông trại " + codeUpper + " đã tồn tại!"));
+        }
+        String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(req.getOwnerId(), codeUpper);
+        req.setId(null);
+        req.setCode(codeUpper);
+        req.setName(req.getName().trim());
+        req.setOwner(req.getOwner() != null && !req.getOwner().isBlank() ? req.getOwner().trim() : "Chủ trang trại");
+        req.setOwnerId(effectiveOwner);
+        req.setAddress(req.getAddress().trim());
+        if (req.getProvince() != null) req.setProvince(req.getProvince().trim());
+        if (req.getPhone() != null) req.setPhone(req.getPhone().trim());
+        if (req.getCertStandard() == null || req.getCertStandard().isBlank()) {
+            req.setCertStandard("VietGAP Trồng trọt");
+        }
+        if (req.getRating() == null) req.setRating(5.0);
+        if (req.getIsDefault() == null) req.setIsDefault(false);
+
+        boolean hasLandDoc = req.getVerificationDocUrl() != null && !req.getVerificationDocUrl().isBlank();
+        if (hasLandDoc) {
+            req.setVerificationStatus("PENDING");
+            req.setVerificationDocType(
+                    req.getVerificationDocType() != null && !req.getVerificationDocType().isBlank()
+                            ? req.getVerificationDocType().trim()
+                            : "Giấy chứng nhận QSDĐ (Sổ đỏ) / Hợp đồng thuê đất canh tác"
+            );
+            req.setVerificationDocUrl(req.getVerificationDocUrl().trim());
+            req.setVerificationNote(
+                    req.getVerificationNote() != null && !req.getVerificationNote().isBlank()
+                            ? req.getVerificationNote().trim()
+                            : null
+            );
+        } else {
+            req.setVerificationStatus("NOT_SUBMITTED");
+            req.setVerificationDocType(null);
+            req.setVerificationDocUrl(null);
+            req.setVerificationNote(null);
+        }
+        req.setVerificationDecisionReason(null);
+        req.setVerificationRequestId(null);
+
+        Farm saved = farmRepository.save(req);
+        String msg = hasLandDoc
+                ? "Đã thêm nông trại và gửi hồ sơ giấy tờ đất canh tác chờ Admin duyệt!"
+                : "Đã thêm nông trại mới! Vui lòng đính kèm hồ sơ giấy tờ đất canh tác.";
+        return ResponseEntity.ok(ApiResponse.ok(msg, saved));
+    }
+
+    @PutMapping("/farms/{idOrCode}")
+    @Transactional
+    public ResponseEntity<ApiResponse<Farm>> updateFarm(
+            @PathVariable String idOrCode,
+            @RequestBody Farm req
+    ) {
+        Farm existing = findFarmByIdOrCode(idOrCode);
+        if (existing == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Không tìm thấy nông trại " + idOrCode));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(existing.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền chỉnh sửa nông trại của chủ vườn khác!"));
+        }
+        if (req.getName() != null && !req.getName().isBlank()) existing.setName(req.getName().trim());
+        if (req.getOwner() != null && !req.getOwner().isBlank()) existing.setOwner(req.getOwner().trim());
+        if (req.getPhone() != null) existing.setPhone(req.getPhone().trim());
+        if (req.getAddress() != null && !req.getAddress().isBlank()) existing.setAddress(req.getAddress().trim());
+        if (req.getProvince() != null) existing.setProvince(req.getProvince().trim());
+        if (req.getAreaHectares() != null && req.getAreaHectares() > 0) existing.setAreaHectares(req.getAreaHectares());
+        if (req.getCertStandard() != null && !req.getCertStandard().isBlank()) existing.setCertStandard(req.getCertStandard().trim());
+
+        Farm saved = farmRepository.save(existing);
+        return ResponseEntity.ok(ApiResponse.ok("Đã cập nhật thông tin nông trại!", saved));
+    }
+
+    @DeleteMapping("/farms/{idOrCode}")
+    @Transactional
+    public ResponseEntity<ApiResponse<Void>> deleteFarm(@PathVariable String idOrCode) {
+        Farm existing = findFarmByIdOrCode(idOrCode);
+        if (existing == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Không tìm thấy nông trại " + idOrCode));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(existing.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền xóa nông trại của chủ vườn khác!"));
+        }
+        farmRepository.delete(existing);
+        return ResponseEntity.ok(ApiResponse.ok("Đã xóa nông trại thành công", null));
+    }
+
+    @PostMapping({"/farms/{idOrCode}/land-docs", "/farms/{idOrCode}/resubmit-verification"})
+    @Transactional
+    public ResponseEntity<ApiResponse<Farm>> resubmitFarmVerification(
+            @PathVariable String idOrCode,
+            @RequestBody Map<String, String> payload
+    ) {
+        Farm existing = findFarmByIdOrCode(idOrCode);
+        if (existing == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Không tìm thấy nông trại " + idOrCode));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(existing.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền nộp hồ sơ đất canh tác cho nông trại khác!"));
+        }
+        String docUrl = payload != null
+                ? firstNonBlank(payload.get("verificationDocUrl"), payload.get("documentUrl"))
+                : null;
+        if (docUrl == null || docUrl.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Vui lòng đính kèm ảnh hoặc tài liệu giấy tờ đất canh tác!"));
+        }
+        String docType = payload != null
+                ? firstNonBlank(payload.get("verificationDocType"), payload.get("documentType"))
+                : null;
+        String note = payload != null
+                ? firstNonBlank(payload.get("verificationNote"), payload.get("note"))
+                : null;
+
+        existing.setVerificationDocType(
+                docType != null ? docType : (existing.getVerificationDocType() != null
+                        ? existing.getVerificationDocType()
+                        : "Giấy chứng nhận QSDĐ (Sổ đỏ) / Hợp đồng thuê đất canh tác")
+        );
+        existing.setVerificationDocUrl(docUrl);
+        existing.setVerificationNote(note);
+        existing.setVerificationStatus("PENDING");
+        existing.setVerificationDecisionReason(null);
+
+        Farm saved = farmRepository.save(existing);
+        return ResponseEntity.ok(ApiResponse.ok("Đã đính kèm hồ sơ giấy tờ đất canh tác! Đang chờ Admin duyệt.", saved));
+    }
+
+    @PatchMapping("/farms/{idOrCode}/verification-decision")
+    @Transactional
+    public ResponseEntity<ApiResponse<Farm>> decideFarmVerification(
+            @PathVariable String idOrCode,
+            @RequestBody Map<String, String> payload
+    ) {
+        Authentication auth = ownershipResolver.currentAuthentication();
+        boolean isAdmin = auth != null && auth.isAuthenticated() && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        if (!isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Chỉ Quản trị viên (ADMIN) mới có quyền duyệt hồ sơ đất nông trại!"));
+        }
+
+        Farm existing = findFarmByIdOrCode(idOrCode);
+        if (existing == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Không tìm thấy nông trại " + idOrCode));
+        }
+
+        String action = payload != null && payload.get("action") != null
+                ? payload.get("action").trim().toLowerCase(Locale.ROOT)
+                : "";
+        String reason = payload != null && payload.get("reason") != null
+                ? payload.get("reason").trim()
+                : "";
+
+        switch (action) {
+            case "approve" -> {
+                existing.setVerificationStatus("APPROVED");
+                existing.setVerificationDecisionReason(
+                        reason.isBlank() ? "Hồ sơ giấy tờ đất canh tác hợp lệ, đã xác minh vùng trồng." : reason
+                );
+            }
+            case "changes" -> {
+                if (reason.isBlank()) {
+                    return ResponseEntity.badRequest().body(ApiResponse.error("Vui lòng nhập nội dung cần nông dân bổ sung!"));
+                }
+                existing.setVerificationStatus("CHANGES_REQUESTED");
+                existing.setVerificationDecisionReason(reason);
+            }
+            case "reject" -> {
+                if (reason.isBlank()) {
+                    return ResponseEntity.badRequest().body(ApiResponse.error("Vui lòng nhập lý do từ chối hồ sơ!"));
+                }
+                existing.setVerificationStatus("REJECTED");
+                existing.setVerificationDecisionReason(reason);
+            }
+            default -> {
+                return ResponseEntity.badRequest().body(ApiResponse.error("Hành động duyệt hồ sơ không hợp lệ: " + action));
+            }
+        }
+
+        Farm saved = farmRepository.save(existing);
+        String msg = switch (action) {
+            case "approve" -> "Đã xác minh hồ sơ đất nông trại " + saved.getName() + "!";
+            case "changes" -> "Đã gửi yêu cầu bổ sung giấy tờ đất cho nông trại " + saved.getName() + ".";
+            default -> "Đã từ chối hồ sơ nông trại " + saved.getName() + ".";
+        };
+        return ResponseEntity.ok(ApiResponse.ok(msg, saved));
+    }
+
+    private static String firstNonBlank(String primary, String secondary) {
+        if (primary != null && !primary.isBlank()) return primary.trim();
+        if (secondary != null && !secondary.isBlank()) return secondary.trim();
+        return null;
+    }
+
+    private Farm findFarmByIdOrCode(String idOrCode) {
+        if (idOrCode == null || idOrCode.isBlank()) return null;
+        String clean = idOrCode.trim();
+        Farm byCode = farmRepository.findByCodeIgnoreCase(clean).orElse(null);
+        if (byCode != null) return byCode;
+        try {
+            return farmRepository.findById(Long.parseLong(clean)).orElse(null);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private void initSampleFarms() {
+        Farm f1 = Farm.builder()
+                .code("NT-DL-01")
+                .name("Nông Trại Xanh Đà Lạt")
+                .owner("Bác Nguyễn Văn Hùng")
+                .ownerId("farmer_hung")
+                .phone("0912 345 678")
+                .address("Xã Xuân Thọ, TP. Đà Lạt")
+                .province("Lâm Đồng")
+                .areaHectares(4.5)
+                .certStandard("VietGAP & GlobalGAP")
+                .rating(4.9)
+                .isDefault(true)
+                .verificationStatus("APPROVED")
+                .build();
+        Farm f2 = Farm.builder()
+                .code("NT-DT-02")
+                .name("Vườn Cây Ăn Trái Cao Lãnh")
+                .owner("Bác Nguyễn Văn Hùng")
+                .ownerId("farmer_hung")
+                .phone("0912 345 678")
+                .address("Xã Mỹ Xương, Huyện Cao Lãnh")
+                .province("Đồng Tháp")
+                .areaHectares(3.2)
+                .certStandard("VietGAP Trồng trọt")
+                .rating(4.8)
+                .isDefault(false)
+                .verificationStatus("APPROVED")
+                .build();
+        Farm f3 = Farm.builder()
+                .code("NT-MC-03")
+                .name("Vườn Sinh Thái Mộc Châu")
+                .owner("Nguyễn Thiệu")
+                .ownerId("farmer_thieu")
+                .phone("0988 776 655")
+                .address("Tiểu khu Chè Đen, Thị trấn Nông trường Mộc Châu")
+                .province("Sơn La")
+                .areaHectares(5.0)
+                .certStandard("Hữu cơ TCVN & VietGAP")
+                .rating(5.0)
+                .isDefault(false)
+                .verificationStatus("APPROVED")
+                .build();
+        farmRepository.saveAll(List.of(f1, f2, f3));
+    }
 
     @GetMapping(value = "/batches/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<SseEmitter> streamBatchEvents() {
@@ -77,12 +417,14 @@ public class FarmerController {
             lots = harvestLotRepository.findAllByOrderByCreatedAtDesc();
         }
 
-        if (ownerId != null && !ownerId.isBlank()) {
-            String cleanOwner = ownerId.trim().toLowerCase(Locale.ROOT);
+        Authentication auth = ownershipResolver.currentAuthentication();
+        if (ownershipResolver.isStrictFarmerSession(auth) || (ownerId != null && !ownerId.isBlank())) {
+            String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(ownerId, farmCode);
             lots = lots.stream()
-                    .filter(l -> l.getOwnerId() != null && l.getOwnerId().toLowerCase(Locale.ROOT).contains(cleanOwner))
+                    .filter(l -> l.getOwnerId() != null && l.getOwnerId().equalsIgnoreCase(effectiveOwner))
                     .toList();
-        } else if (farmCode != null && !farmCode.isBlank()) {
+        }
+        if (farmCode != null && !farmCode.isBlank()) {
             String cleanFarm = farmCode.trim().toLowerCase(Locale.ROOT);
             lots = lots.stream()
                     .filter(l -> (l.getFarmCode() != null && l.getFarmCode().equalsIgnoreCase(cleanFarm))
@@ -143,9 +485,7 @@ public class FarmerController {
         if (req.getFarmCode() == null || req.getFarmCode().isBlank()) {
             req.setFarmCode(resolveFarmCode(req.getFarmName()));
         }
-        if (req.getOwnerId() == null || req.getOwnerId().isBlank()) {
-            req.setOwnerId(resolveOwnerId(req.getFarmCode()));
-        }
+        req.setOwnerId(ownershipResolver.resolveEffectiveOwnerId(req.getOwnerId(), req.getFarmCode()));
         if (req.getTransportStatus() == null || req.getTransportStatus().isBlank()) {
             req.setTransportStatus("Chưa vận chuyển");
         }
@@ -182,6 +522,10 @@ public class FarmerController {
         if (lot == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error("Không tìm thấy lô thu hoạch " + code));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(lot.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền ghi nhật ký cho lô hàng của chủ vườn khác!"));
         }
 
         String stage = req.getOrDefault("stage", req.getOrDefault("action", "")).trim();
@@ -242,10 +586,17 @@ public class FarmerController {
                     .body(ApiResponse.error("Không thể cập nhật nhật ký QR: " + ex.getMessage()));
         }
 
-        // Lưu vào bảng agri_farming_logs để duy trì dữ liệu nhật ký canh tác chuẩn
+        // Lưu vào bảng agri_farming_logs để duy trì dữ liệu nhật ký canh tác chuẩn (kèm ownerId & farmCode)
         try {
+            String logFarmCode = lot.getFarmCode() != null && !lot.getFarmCode().isBlank()
+                    ? lot.getFarmCode()
+                    : resolveFarmCode(lot.getFarmName());
+            String logOwnerId = lot.getOwnerId() != null && !lot.getOwnerId().isBlank()
+                    ? lot.getOwnerId()
+                    : ownershipResolver.inferOwnerIdFromFarm(logFarmCode);
             FarmingLog logRecord = FarmingLog.builder()
-                    .farmCode(lot.getFarmName() != null ? resolveFarmCode(lot.getFarmName()) : "NT-DL-01")
+                    .farmCode(logFarmCode)
+                    .ownerId(logOwnerId)
                     .batchCode(lot.getCode())
                     .date(time)
                     .stage(stage)
@@ -265,9 +616,14 @@ public class FarmerController {
     @DeleteMapping("/batches/{code}")
     @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteBatch(@PathVariable String code) {
-        if (!harvestLotRepository.existsByCodeIgnoreCase(code.trim())) {
+        HarvestLot existing = harvestLotRepository.findByCodeIgnoreCase(code.trim()).orElse(null);
+        if (existing == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error("Không tìm thấy lô " + code));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(existing.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền xóa lô thu hoạch của chủ vườn khác!"));
         }
         String normalizedCode = code.trim();
         harvestLotRepository.deleteByCodeIgnoreCase(normalizedCode);
@@ -694,7 +1050,7 @@ public class FarmerController {
                 .batchCode(lot.getCode())
                 .productName(lot.getProduct())
                 .farmName(lot.getFarmName() != null ? lot.getFarmName() : DEFAULT_FARM_NAME)
-                .location(resolveFarmLocation(lot.getFarmName()))
+                .location(resolveFarmLocation(lot.getFarmCode(), lot.getFarmName()))
                 .harvestDate(lot.getHarvestDate())
                 .certType(lot.getCert() != null ? lot.getCert() : "VietGAP")
                 .labResult("Đạt chuẩn an toàn dư lượng thực phẩm (ISO/IEC 17025)")
@@ -704,13 +1060,24 @@ public class FarmerController {
                 .build();
     }
 
-    private String resolveFarmLocation(String farmName) {
+    private String resolveFarmLocation(String farmCode, String farmName) {
+        if (farmCode != null && !farmCode.isBlank()) {
+            Farm farm = farmRepository.findByCodeIgnoreCase(farmCode.trim()).orElse(null);
+            if (farm != null && farm.getAddress() != null && !farm.getAddress().isBlank()) {
+                return farm.getProvince() != null && !farm.getProvince().isBlank()
+                        ? farm.getAddress() + ", " + farm.getProvince()
+                        : farm.getAddress();
+            }
+        }
         if (farmName == null || farmName.isBlank()) {
             return "Xã Xuân Thọ, TP. Đà Lạt, Tỉnh Lâm Đồng";
         }
-        String lower = farmName.toLowerCase();
+        String lower = farmName.toLowerCase(Locale.ROOT);
         if (lower.contains("cao lãnh") || lower.contains("đồng tháp") || lower.contains("nt-dt")) {
-            return "Hợp tác xã Cao Lãnh, Đồng Tháp";
+            return "Xã Mỹ Xương, Huyện Cao Lãnh, Đồng Tháp";
+        }
+        if (lower.contains("mộc châu") || lower.contains("sơn la") || lower.contains("nt-mc")) {
+            return "Thị trấn Nông trường Mộc Châu, Sơn La";
         }
         if (lower.contains("đà lạt") || lower.contains("nt-dl")) {
             return "Xã Xuân Thọ, TP. Đà Lạt, Tỉnh Lâm Đồng";
@@ -974,12 +1341,17 @@ public class FarmerController {
             certificateScheduler.bootstrapDefaultCertificates();
             certs = certificateRepository.findAllByOrderByCreatedAtDesc();
         }
-        if (ownerId != null && !ownerId.isBlank()) {
-            String cleanOwner = ownerId.trim().toLowerCase(Locale.ROOT);
+        for (FarmerCertificate cert : certs) {
+            cert.setStatus(cert.evaluateValidityStatus());
+        }
+        Authentication auth = ownershipResolver.currentAuthentication();
+        if (ownershipResolver.isStrictFarmerSession(auth) || (ownerId != null && !ownerId.isBlank())) {
+            String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(ownerId, farmCode);
             certs = certs.stream()
-                    .filter(c -> c.getOwnerId() != null && c.getOwnerId().toLowerCase(Locale.ROOT).contains(cleanOwner))
+                    .filter(c -> c.getOwnerId() != null && c.getOwnerId().equalsIgnoreCase(effectiveOwner))
                     .toList();
-        } else if (farmCode != null && !farmCode.isBlank()) {
+        }
+        if (farmCode != null && !farmCode.isBlank()) {
             String cleanFarm = farmCode.trim().toLowerCase(Locale.ROOT);
             certs = certs.stream()
                     .filter(c -> c.getFarmCode() != null && c.getFarmCode().equalsIgnoreCase(cleanFarm))
@@ -997,19 +1369,19 @@ public class FarmerController {
         String certNum = req.getCertNumber().trim().toUpperCase();
         FarmerCertificate cert = certificateRepository.findByCertNumberIgnoreCase(certNum)
                 .orElse(FarmerCertificate.builder().certNumber(certNum).build());
+        if (cert.getId() != null && !ownershipResolver.canModifyOwnedResource(cert.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền chỉnh sửa chứng nhận của chủ vườn khác!"));
+        }
 
         if (req.getName() != null && !req.getName().isBlank()) cert.setName(req.getName().trim());
         if (req.getFarmCode() != null && !req.getFarmCode().isBlank()) cert.setFarmCode(req.getFarmCode().trim());
-        if (req.getOwnerId() != null && !req.getOwnerId().isBlank()) {
-            cert.setOwnerId(req.getOwnerId().trim());
-        } else if (cert.getOwnerId() == null || cert.getOwnerId().isBlank()) {
-            cert.setOwnerId(resolveOwnerId(cert.getFarmCode()));
-        }
+        cert.setOwnerId(ownershipResolver.resolveEffectiveOwnerId(req.getOwnerId(), cert.getFarmCode()));
         if (req.getFarmName() != null && !req.getFarmName().isBlank()) cert.setFarmName(req.getFarmName().trim());
         if (req.getIssuedBy() != null && !req.getIssuedBy().isBlank()) cert.setIssuedBy(req.getIssuedBy().trim());
         if (req.getIssueDate() != null && !req.getIssueDate().isBlank()) cert.setIssueDate(req.getIssueDate().trim());
         if (req.getExpiryDate() != null && !req.getExpiryDate().isBlank()) cert.setExpiryDate(req.getExpiryDate().trim());
-        if (req.getStatus() != null && !req.getStatus().isBlank()) cert.setStatus(req.getStatus().trim());
+        cert.setStatus(cert.evaluateValidityStatus());
         if (req.getAlertEmail() != null && !req.getAlertEmail().isBlank()) cert.setAlertEmail(req.getAlertEmail().trim());
         if (req.getApprovalStatus() != null && !req.getApprovalStatus().isBlank()) cert.setApprovalStatus(req.getApprovalStatus().trim());
         if (req.getPendingNewCertNumber() != null) cert.setPendingNewCertNumber(req.getPendingNewCertNumber().trim());
@@ -1031,6 +1403,10 @@ public class FarmerController {
         FarmerCertificate cert = certificateRepository.findByCertNumberIgnoreCase(req.getCertNumber().trim()).orElse(null);
         if (cert == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Không tìm thấy chứng chỉ " + req.getCertNumber()));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(cert.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền gửi gia hạn chứng chỉ của chủ vườn khác!"));
         }
 
         String finalNewNum = req.getNewCertNumber() != null && !req.getNewCertNumber().isBlank()
@@ -1119,6 +1495,10 @@ public class FarmerController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error("Không tìm thấy chứng nhận " + certNumber));
         }
+        if (!ownershipResolver.canModifyOwnedResource(cert.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền xóa chứng nhận của chủ vườn khác!"));
+        }
         certificateRepository.delete(cert);
         return ResponseEntity.ok(ApiResponse.ok("Đã xóa chứng nhận thành công", null));
     }
@@ -1134,17 +1514,20 @@ public class FarmerController {
             initSampleLogs();
             logs = farmingLogRepository.findAllByOrderByCreatedAtDesc();
         }
-        if (ownerId != null && !ownerId.isBlank()) {
-            String cleanOwner = ownerId.trim().toLowerCase(Locale.ROOT);
+        Authentication auth = ownershipResolver.currentAuthentication();
+        if (ownershipResolver.isStrictFarmerSession(auth) || (ownerId != null && !ownerId.isBlank())) {
+            String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(ownerId, farmCode);
             logs = logs.stream()
-                    .filter(l -> l.getOwnerId() != null && l.getOwnerId().toLowerCase(Locale.ROOT).contains(cleanOwner))
+                    .filter(l -> l.getOwnerId() != null && l.getOwnerId().equalsIgnoreCase(effectiveOwner))
                     .toList();
-        } else if (farmCode != null && !farmCode.isBlank()) {
+        }
+        if (farmCode != null && !farmCode.isBlank()) {
             String cleanFarm = farmCode.trim().toLowerCase(Locale.ROOT);
             logs = logs.stream()
                     .filter(l -> l.getFarmCode() != null && l.getFarmCode().equalsIgnoreCase(cleanFarm))
                     .toList();
-        } else if (batchCode != null && !batchCode.isBlank()) {
+        }
+        if (batchCode != null && !batchCode.isBlank()) {
             String cleanBatch = batchCode.trim().toLowerCase(Locale.ROOT);
             logs = logs.stream()
                     .filter(l -> l.getBatchCode() != null && l.getBatchCode().equalsIgnoreCase(cleanBatch))
@@ -1171,9 +1554,7 @@ public class FarmerController {
         if (req.getFarmCode() == null || req.getFarmCode().isBlank()) {
             req.setFarmCode(resolveFarmCode(null));
         }
-        if (req.getOwnerId() == null || req.getOwnerId().isBlank()) {
-            req.setOwnerId(resolveOwnerId(req.getFarmCode()));
-        }
+        req.setOwnerId(ownershipResolver.resolveEffectiveOwnerId(req.getOwnerId(), req.getFarmCode()));
         FarmingLog saved = farmingLogRepository.save(req);
 
         // Chỉ đồng bộ lên timeline vòng đời lô nếu là sự kiện sau thu hoạch (không phải bón phân, tưới nước đồng ruộng)
@@ -1222,11 +1603,16 @@ public class FarmerController {
     @DeleteMapping("/logs/{id}")
     @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteLog(@PathVariable Long id) {
-        if (!farmingLogRepository.existsById(id)) {
+        FarmingLog existing = farmingLogRepository.findById(id).orElse(null);
+        if (existing == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error("Không tìm thấy nhật ký ID " + id));
         }
-        farmingLogRepository.deleteById(id);
+        if (!ownershipResolver.canModifyOwnedResource(existing.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền xóa nhật ký canh tác của chủ vườn khác!"));
+        }
+        farmingLogRepository.delete(existing);
         return ResponseEntity.ok(ApiResponse.ok("Đã xóa nhật ký thành công", null));
     }
 
