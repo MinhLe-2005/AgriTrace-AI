@@ -886,13 +886,18 @@ export default function FAQPage() {
                 </p>
               </div>
               <div>
-                <Link
-                  href="/chat"
-                  className="w-full py-2.5 px-4 rounded-xl bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-black transition-all shadow-sm flex items-center justify-center gap-1.5"
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("open-agritrace-chat"));
+                    }
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-black transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <MessageSquare size={14} />
-                  <span>Trò Chuyện Với AI Ngay</span>
-                </Link>
+                  <span>Mở Trợ Lý AI (24/7)</span>
+                </button>
               </div>
             </div>
 

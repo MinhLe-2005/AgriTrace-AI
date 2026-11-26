@@ -1,11 +1,17 @@
 "use client";
 
 import { Bot, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GeminiChatWidget } from "./gemini-chat-widget";
 
 export function GeminiFloatingBubble() {
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("open-agritrace-chat", handleOpen);
+    return () => window.removeEventListener("open-agritrace-chat", handleOpen);
+  }, []);
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end pointer-events-none">
