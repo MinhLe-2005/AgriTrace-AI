@@ -301,13 +301,25 @@ export default function LoyaltyPage() {
             </p>
           </div>
 
-          <Link
-            href="/dashboard/customer?tab=vouchers"
-            className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 hover:text-emerald-700 hover:border-emerald-300 text-xs font-semibold transition-colors flex items-center gap-2 self-start sm:self-auto shadow-xs"
-          >
-            <Ticket size={15} />
-            <span>Xem Ví Voucher của tôi</span>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+            <Link
+              href="/vouchers"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
+              title="Xem tất cả mã giảm giá nông sản trên toàn sàn"
+            >
+              <Gift size={16} />
+              <span>🎁 Kho Mã Giảm Giá (Toàn Sàn)</span>
+            </Link>
+
+            <Link
+              href="/dashboard/customer?tab=vouchers"
+              className="px-4 py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold transition-colors flex items-center gap-2 shadow-2xs"
+              title="Xem các voucher đã lưu vào ví của tài khoản"
+            >
+              <Ticket size={15} />
+              <span>🎫 Ví Voucher Của Tôi</span>
+            </Link>
+          </div>
         </div>
 
         {/* ── Digital VIP Membership Card ── */}
@@ -406,12 +418,21 @@ export default function LoyaltyPage() {
               </div>
             </div>
 
-            <a
-              href="#redeem-section"
-              className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold text-center transition-colors shadow-xs block"
-            >
-              Đổi Điểm Lấy Voucher Ngay ↓
-            </a>
+            <div className="space-y-2">
+              <a
+                href="#redeem-section"
+                className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold text-center transition-colors shadow-xs block"
+              >
+                Đổi Điểm Lấy Voucher Ngay ↓
+              </a>
+              <Link
+                href="/vouchers"
+                className="w-full py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+              >
+                <Gift size={14} className="text-amber-600" />
+                <span>Đến Kho Mã Giảm Giá Toàn Sàn →</span>
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -488,10 +509,18 @@ export default function LoyaltyPage() {
                 Lưu mã đặc quyền theo hạng thành viên hoặc đổi điểm tích lũy lấy voucher giảm giá, freeship xe lạnh trên giỏ hàng.
               </p>
             </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
               <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
                 Điểm của bạn: <strong className="font-mono text-sm">{currentPoints} điểm</strong>
               </span>
+              <Link
+                href="/vouchers"
+                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs"
+                title="Mở toàn bộ Kho Mã Giảm Giá"
+              >
+                <Gift size={13} />
+                <span>Kho Voucher Toàn Sàn →</span>
+              </Link>
             </div>
           </div>
 
