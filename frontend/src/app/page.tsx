@@ -387,51 +387,106 @@ export default function HomePage() {
               </div>
 
               {/* Bottom-Left Bento Card: Cold Chain Telemetry Log */}
-              <div className="bento-card p-4 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="w-8 h-8 rounded-lg bg-[#F6F3EC] text-[#16261E] border border-[#E4DFD5] flex items-center justify-center">
-                    <Thermometer size={16} className="text-[#166534]" />
-                  </span>
-                  <span className="font-mono px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-[#166534] border border-emerald-200">
-                    4.1°C · LIVE
-                  </span>
+              <Link
+                href="/traceability"
+                className="relative rounded-2xl overflow-hidden border border-[#E4DFD5] bg-white p-3 shadow-xs hover:border-emerald-500 hover:shadow-md transition-all duration-300 group flex flex-col justify-between"
+              >
+                {/* Visual Image Window with Live Telemetry Badges */}
+                <div className="relative h-28 sm:h-30 w-full rounded-xl overflow-hidden mb-2.5 bg-emerald-50">
+                  <Image
+                    src="/images/qr-scan.png"
+                    alt="Cold-Chain Telemetry & Quét Mã QR"
+                    fill
+                    sizes="(max-width: 640px) 100vw, 300px"
+                    className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#16261E]/80 via-[#16261E]/20 to-transparent" />
+
+                  {/* Top Floating Badges */}
+                  <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
+                    <span className="w-7 h-7 rounded-lg bg-white/95 backdrop-blur-md text-[#166534] border border-white/60 flex items-center justify-center shadow-xs">
+                      <Thermometer size={14} className="text-[#166534]" />
+                    </span>
+                    <span className="font-mono px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600/95 text-white backdrop-blur-md shadow-xs flex items-center gap-1 border border-emerald-400/40">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                      4.1°C · LIVE
+                    </span>
+                  </div>
+
+                  {/* Bottom Image Caption inside Window */}
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white font-mono text-[10px]">
+                    <span className="bg-[#16261E]/85 backdrop-blur-md px-1.5 py-0.5 rounded text-emerald-300 font-semibold border border-emerald-500/20">
+                      XE LẠNH: 49C-188.24
+                    </span>
+                    <span className="bg-white/20 backdrop-blur-md px-1.5 py-0.5 rounded text-stone-100">
+                      2°C ~ 5°C
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-3">
-                  <div className="font-mono text-[10px] uppercase tracking-wider text-stone-400">
+
+                {/* Card Specimen Info */}
+                <div className="px-0.5">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-stone-400 font-semibold">
                     COLD-CHAIN TELEMETRY
                   </div>
-                  <div className="text-xs font-extrabold text-[#16261E] mt-0.5">
-                    Chuỗi Kho & Xe Lạnh 24/7
+                  <div className="text-xs font-extrabold text-[#16261E] mt-0.5 flex items-center justify-between">
+                    <span>Chuỗi Kho & Xe Lạnh</span>
+                    <ArrowRight size={13} className="text-emerald-700 group-hover:translate-x-1 transition-transform shrink-0" />
                   </div>
                   <p className="text-[11px] text-stone-500 mt-1 leading-snug">
-                    Giám sát nhiệt độ & hạn dùng FEFO theo từng lô thu hái.
+                    Giám sát nhiệt độ & hạn dùng FEFO theo lô thu hái.
                   </p>
                 </div>
-              </div>
+              </Link>
 
               {/* Bottom-Right Bento Card: Harvest Ochre Voucher Stamp */}
               <Link
                 href="/vouchers"
-                className="bento-card p-4 flex flex-col justify-between bg-[#16261E] text-white border-[#16261E] hover:border-amber-400 group cursor-pointer"
+                className="relative rounded-2xl overflow-hidden border border-[#E4DFD5] bg-white p-3 shadow-xs hover:border-amber-400 hover:shadow-md transition-all duration-300 group flex flex-col justify-between"
               >
-                <div className="flex items-center justify-between">
-                  <span className="w-8 h-8 rounded-lg bg-white/10 text-amber-300 flex items-center justify-center">
-                    <Tag size={16} />
-                  </span>
-                  <span className="font-mono px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-300 text-[#16261E]">
-                    -30% VỤ MÙA
-                  </span>
+                {/* Visual Image Window with Promo Badges */}
+                <div className="relative h-28 sm:h-30 w-full rounded-xl overflow-hidden mb-2.5 bg-amber-50">
+                  <Image
+                    src="/images/fresh-produce.png"
+                    alt="Mã trợ giá nông sản vụ mùa tươi sạch"
+                    fill
+                    sizes="(max-width: 640px) 100vw, 300px"
+                    className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#16261E]/80 via-[#16261E]/20 to-transparent" />
+
+                  {/* Top Floating Badges */}
+                  <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
+                    <span className="w-7 h-7 rounded-lg bg-white/95 backdrop-blur-md text-[#A3630A] border border-white/60 flex items-center justify-center shadow-xs">
+                      <Tag size={14} className="text-[#A3630A]" />
+                    </span>
+                    <span className="font-mono px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-400 text-[#16261E] shadow-xs border border-amber-300">
+                      -30% VỤ MÙA
+                    </span>
+                  </div>
+
+                  {/* Bottom Image Caption inside Window */}
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white font-mono text-[10px]">
+                    <span className="bg-[#16261E]/85 backdrop-blur-md px-1.5 py-0.5 rounded text-amber-300 font-extrabold tracking-wider border border-amber-400/30">
+                      MÃ: AGRI30
+                    </span>
+                    <span className="bg-amber-500/80 backdrop-blur-md px-1.5 py-0.5 rounded text-white font-medium">
+                      Nhận ngay →
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-3">
-                  <div className="font-mono text-[10px] uppercase tracking-wider text-stone-400">
+
+                {/* Card Specimen Info */}
+                <div className="px-0.5">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#A3630A] font-semibold">
                     MÃ TRỢ GIÁ NÔNG SẢN
                   </div>
-                  <div className="text-xs font-bold text-amber-300 mt-0.5 flex items-center justify-between">
-                    <span className="font-mono text-sm">AGRI30</span>
-                    <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                  <div className="text-xs font-bold text-[#16261E] mt-0.5 flex items-center justify-between">
+                    <span className="font-mono font-extrabold text-amber-800">AGRI30 · Giảm 30%</span>
+                    <ArrowRight size={13} className="text-[#A3630A] group-hover:translate-x-1 transition-transform shrink-0" />
                   </div>
-                  <p className="text-[11px] text-stone-300 mt-1 leading-snug">
-                    Ưu đãi trực tiếp cho đơn hàng nông sản sạch đầu tiên.
+                  <p className="text-[11px] text-stone-500 mt-1 leading-snug">
+                    Ưu đãi trực tiếp cho đơn nông sản đầu tiên.
                   </p>
                 </div>
               </Link>
