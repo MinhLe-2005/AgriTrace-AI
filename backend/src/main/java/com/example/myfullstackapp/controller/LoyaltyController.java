@@ -125,6 +125,17 @@ public class LoyaltyController {
         return ApiResponse.ok("Đổi voucher thành công! Mã ưu đãi của bạn: " + voucher.getCode(), voucher);
     }
 
+    @PostMapping("/review-reward")
+    public ApiResponse<LoyaltyProfileResponse> awardReviewBonus(
+            @RequestParam(required = false) String email,
+            @RequestParam String orderCode,
+            Authentication authentication
+    ) {
+        String targetEmail = resolveEmail(email, authentication);
+        loyaltyService.awardReviewPoints(targetEmail, orderCode, 20);
+        return getMyLoyalty(targetEmail, authentication);
+    }
+
     /** Email đích = email của token hoặc email truyền vào (cho phép demo/OAuth session). */
     private String resolveEmail(String requestedEmail, Authentication authentication) {
         if (authentication != null && authentication.isAuthenticated()

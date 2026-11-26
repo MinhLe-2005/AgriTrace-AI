@@ -156,6 +156,41 @@ public class LoyaltyService {
     }
 
     @Transactional
+    public void awardReviewPoints(String email, String orderCode, int points) {
+        try {
+            if (email == null || email.isBlank()) email = "customer@gmail.com";
+            LoyaltyMembership membership = getOrCreateMembership(email);
+            if (membership == null) return;
+
+            String marker = "Đồng kiểm #" + orderCode;
+            List<LoyaltyTransaction> existingTxs = loyaltyTransactionRepository.findByUserEmailIgnoreCaseOrderByCreatedAtDesc(email);
+            boolean alreadyAwarded = existingTxs.stream().anyMatch(t ->
+                    t.getDescription() != null && t.getDescription().contains(marker));
+            if (alreadyAwarded) {
+                log.info("Review points already awarded for order #{}", orderCode);
+                return;
+            }
+
+            int cur = membership.getCurrentPoints() != null ? membership.getCurrentPoints() : 0;
+            int life = membership.getLifetimePoints() != null ? membership.getLifetimePoints() : 0;
+            membership.setCurrentPoints(cur + points);
+            membership.setLifetimePoints(life + points);
+            loyaltyMembershipRepository.save(membership);
+
+            LoyaltyTransaction tx = LoyaltyTransaction.builder()
+                    .user(membership.getUser())
+                    .points(points)
+                    .transactionType("BONUS")
+                    .description("Thưởng " + points + " điểm: Đồng kiểm độ tươi & Đánh giá đơn #" + orderCode)
+                    .build();
+            loyaltyTransactionRepository.save(tx);
+            log.info("Awarded {} review points to user {} for order #{}", points, email, orderCode);
+        } catch (Exception e) {
+            log.error("Failed to award review points: {}", e.getMessage(), e);
+        }
+    }
+
+    @Transactional
     public Voucher redeemVoucher(String email, int pointsCost, String voucherType, String title) {
         LoyaltyMembership membership = getOrCreateMembership(email);
         if (membership == null) {

@@ -26,6 +26,7 @@ public class ReviewController {
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final com.example.myfullstackapp.service.LoyaltyService loyaltyService;
 
     @GetMapping("/product/{productName}")
     public ApiResponse<List<Review>> getProductReviews(@PathVariable String productName) {
@@ -72,6 +73,13 @@ public class ReviewController {
                 .build();
 
         Review saved = reviewRepository.save(review);
+
+        // Award +20 points for photo freshness co-inspection & review
+        try {
+            loyaltyService.awardReviewPoints(email, request.getOrderCode(), 20);
+        } catch (Exception ex) {
+            // non-blocking
+        }
 
         // Update product rating and reviews count if matching product found
         List<Product> products = productRepository.findAll();

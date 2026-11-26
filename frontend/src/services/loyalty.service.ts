@@ -114,4 +114,15 @@ export const loyaltyService = {
     const res = await api.delete<{ success: boolean }>(`/vouchers/${id}`);
     return res.data?.success || false;
   },
+
+  async awardReviewReward(orderCode: string, email?: string): Promise<LoyaltyProfile | null> {
+    try {
+      const url = `/loyalty/review-reward?orderCode=${encodeURIComponent(orderCode)}${email ? `&email=${encodeURIComponent(email)}` : ""}`;
+      const res = await api.post<{ success: boolean; data: LoyaltyProfile }>(url);
+      return res.data?.data || null;
+    } catch (err) {
+      console.error("Failed to award review reward:", err);
+      return null;
+    }
+  },
 };
