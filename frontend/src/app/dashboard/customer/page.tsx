@@ -1821,7 +1821,15 @@ function CustomerDashboardContent() {
                               NÔNG DÂN
                             </span>
                             <span className="text-gray-600">
-                              <strong>{order.items?.[0]?.origin || "Nông Trại Xanh Thủy Canh Đà Lạt"}</strong> · Cấp Lô <strong>#{order.lotCode || "SP-KL-05"}</strong> (VietGAP)
+                              <strong>{order.items?.[0]?.origin || "Nông Trại Xanh Thủy Canh Đà Lạt"}</strong> · Cấp Lô{" "}
+                              <Link
+                                href={`/traceability?lot=${order.lotCode || "SP-KL-05"}`}
+                                className="font-mono font-bold text-emerald-900 underline hover:text-emerald-700 decoration-emerald-400"
+                                title="Xem hồ sơ nông trại & nhật ký canh tác của Nông Dân"
+                              >
+                                #{order.lotCode || "SP-KL-05"}
+                              </Link>{" "}
+                              ({order.items?.[0]?.cert || "VietGAP"})
                             </span>
                           </div>
 

@@ -135,6 +135,17 @@ public class DistributorShipmentService {
                 .estimatedArrival(parseInstant(request.estimatedArrival()))
                 .build();
         Shipment saved = shipmentRepository.save(shipment);
+        for (com.example.myfullstackapp.entity.Order order : claimedOrders) {
+            if (saved.getDriverName() != null && !saved.getDriverName().isBlank()) {
+                order.setDriverName(saved.getDriverName());
+            }
+            if (saved.getDriverPhone() != null && !saved.getDriverPhone().isBlank()) {
+                order.setDriverPhone(saved.getDriverPhone());
+            }
+            if (saved.getLotCode() != null && !saved.getLotCode().isBlank()) {
+                order.setLotCode(saved.getLotCode());
+            }
+        }
         orderRepository.saveAll(claimedOrders);
         recordEvent(saved, saved.getOrigin(), saved.getTemperatureC(), null, null, null, null,
                 "PREPARING", "Đã tạo phiếu vận chuyển, chờ xuất phát.", Instant.now());
@@ -158,6 +169,18 @@ public class DistributorShipmentService {
         if (request.temperatureC() != null) shipment.setTemperatureC(request.temperatureC());
         if (request.dispatchTime() != null) shipment.setDispatchTime(parseInstant(request.dispatchTime()));
         if (request.estimatedArrival() != null) shipment.setEstimatedArrival(parseInstant(request.estimatedArrival()));
+        splitCodes(shipment.getOrderCodes()).forEach(orderCode -> orderRepository.findByOrderCode(orderCode).ifPresent(order -> {
+            if (shipment.getDriverName() != null && !shipment.getDriverName().isBlank()) {
+                order.setDriverName(shipment.getDriverName());
+            }
+            if (shipment.getDriverPhone() != null && !shipment.getDriverPhone().isBlank()) {
+                order.setDriverPhone(shipment.getDriverPhone());
+            }
+            if (shipment.getLotCode() != null && !shipment.getLotCode().isBlank()) {
+                order.setLotCode(shipment.getLotCode());
+            }
+            orderRepository.save(order);
+        }));
         publishChange(shipment);
         return toResponse(shipment);
     }
@@ -323,6 +346,15 @@ public class DistributorShipmentService {
         splitCodes(shipment.getOrderCodes()).forEach(orderCode -> orderRepository.findByOrderCode(orderCode)
                 .ifPresent(order -> {
                     order.setStatus(orderStatus);
+                    if (shipment.getDriverName() != null && !shipment.getDriverName().isBlank()) {
+                        order.setDriverName(shipment.getDriverName());
+                    }
+                    if (shipment.getDriverPhone() != null && !shipment.getDriverPhone().isBlank()) {
+                        order.setDriverPhone(shipment.getDriverPhone());
+                    }
+                    if (shipment.getLotCode() != null && !shipment.getLotCode().isBlank()) {
+                        order.setLotCode(shipment.getLotCode());
+                    }
                     orderRepository.save(order);
                 }));
     }
