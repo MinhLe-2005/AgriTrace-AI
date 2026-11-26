@@ -105,6 +105,55 @@ export type ApiFarmCertificate = {
   ownerId?: string;
 };
 
+export type ApiForecastProductItem = {
+  productId: string;
+  productName: string;
+  categoryCode: string;
+  unit: string;
+  farmCode: string;
+  farmName: string;
+  soldLast7Days: number;
+  soldLast30Days: number;
+  avgDailyDemand: number;
+  seasonalMultiplier: number;
+  seasonPhase: string;
+  campaignBoostMultiplier: number;
+  activeCampaignTitle?: string | null;
+  currentSupply: number;
+  predictedDemand: number;
+  supplyGap: number;
+  recommendedPrepQty: number;
+  growthPercent: number;
+  riskStatus: "DEFICIT" | "SURPLUS" | "BALANCED" | string;
+  recommendation: string;
+  dataBasis: string;
+  confidencePercent: number;
+};
+
+export type ApiForecastTimelinePoint = {
+  label: string;
+  predictedDemand: number;
+  supplyBaseline: number;
+};
+
+export type ApiDemandForecastResponse = {
+  ownerId: string;
+  farmCode: string;
+  horizonDays: number;
+  currentSeasonName: string;
+  generatedAt: string;
+  modelEngine: string;
+  analyzedOrdersCount: number;
+  totalPredictedDemand: number;
+  totalAvailableSupply: number;
+  deficitCount: number;
+  surplusCount: number;
+  balancedCount: number;
+  executiveSummary: string;
+  items: ApiForecastProductItem[];
+  timeline: ApiForecastTimelinePoint[];
+};
+
 export type ApiProductItem = {
   id: string;
   name: string;
@@ -474,5 +523,36 @@ export const farmerService = {
 
   async deleteCertificate(certNumber: string): Promise<void> {
     await api.delete(`/farmer/certificates/${encodeURIComponent(certNumber)}`);
+  },
+
+  async getDemandForecast(params?: {
+    ownerId?: string;
+    farmCode?: string;
+    horizonDays?: 7 | 14 | 30;
+  }): Promise<ApiDemandForecastResponse> {
+    const res = await api.get<{
+      success: boolean;
+      message?: string;
+      data?: ApiDemandForecastResponse;
+    }>("/farmer/ai/demand-forecast", { params });
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể tải dữ liệu dự báo nhu cầu AI");
+    }
+    return res.data.data;
+  },
+
+  async askForecastAdvisor(
+    forecast: ApiDemandForecastResponse,
+    question?: string
+  ): Promise<{ advice: string; model: string }> {
+    const res = await fetch("/api/farmer-forecast-ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ forecast, question }),
+    });
+    if (!res.ok) {
+      throw new Error("Không thể kết nối trợ lý chiến lược AI");
+    }
+    return (await res.json()) as { advice: string; model: string };
   },
 };

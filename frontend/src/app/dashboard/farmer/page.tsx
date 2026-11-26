@@ -27,6 +27,7 @@ import {
   Trash2,
   Star,
   MessageCircle,
+  TrendingUp,
   Truck,
   Upload,
   User,
@@ -36,8 +37,9 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { farmerService, parseFarmDocUrls, serializeFarmDocUrls, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot } from "@/services/farmer.service";
+import { farmerService, parseFarmDocUrls, serializeFarmDocUrls, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot, ApiForecastProductItem } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
+import { DemandForecastPanel } from "@/components/farmer/demand-forecast-panel";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { reviewService, type ApiReview } from "@/services/review.service";
@@ -766,7 +768,7 @@ function resolveFarmerOwnerId(user: { id?: string; name?: string; email?: string
 
 function FarmerPortalContent() {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews">("farms");
+  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "forecast">("farms");
   const [farmerReviews, setFarmerReviews] = useState<ApiReview[]>([]);
   const [farmerReplyText, setFarmerReplyText] = useState<{ [id: number]: string }>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [id: number]: boolean }>({});
@@ -819,8 +821,10 @@ function FarmerPortalContent() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews"].includes(tab)) {
-      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews");
+    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "forecast"].includes(tab)) {
+      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "forecast");
+    } else if (!tab) {
+      setActiveTab((prev) => (prev === "forecast" ? "farms" : prev));
     }
   }, [searchParams]);
 
@@ -1630,6 +1634,13 @@ function FarmerPortalContent() {
     );
     setFormTransportDest("Kho Tổng Logistics TP.HCM");
     setIsBatchModalOpen(true);
+  };
+
+  const handlePlanHarvestBatchFromForecast = (item: ApiForecastProductItem) => {
+    const suggestedQty = String(Math.max(10, Math.round(item.recommendedPrepQty || item.predictedDemand || 100)));
+    setActiveTab("batches");
+    openCreateBatchModal(item.farmCode || undefined, item.productName, suggestedQty);
+    toast.info(`Đã nạp sản lượng AI gợi ý (${suggestedQty} ${item.unit}) cho "${item.productName}"!`);
   };
 
   const handleBatchFarmChange = (nextFarmCode: string) => {
@@ -2700,6 +2711,20 @@ function FarmerPortalContent() {
         >
           <Star size={16} className={activeTab === "reviews" ? "fill-amber-400 text-amber-500" : "text-gray-400"} />
           <span>Đánh Giá Khách Hàng ({farmerReviews.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("forecast")}
+          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "forecast"
+              ? "border-emerald-600 text-emerald-800 font-extrabold"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <TrendingUp size={16} /> AI Dự Báo Nhu Cầu
+          <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+            7-30 Ngày
+          </span>
         </button>
       </div>
 
@@ -3945,6 +3970,17 @@ function FarmerPortalContent() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 7: AI DỰ BÁO NHU CẦU TIÊU THỤ (7 - 30 NGÀY TỚI) */}
+      {/* ========================================================================= */}
+      {activeTab === "forecast" && (
+        <DemandForecastPanel
+          ownerId={activeOwnerId}
+          farms={visibleFarms.map((f) => ({ code: f.code, name: f.name }))}
+          onPlanHarvestBatch={handlePlanHarvestBatchFromForecast}
+        />
       )}
 
       {/* ========================================================================= */}
