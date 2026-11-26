@@ -1498,27 +1498,31 @@ function CustomerDashboardContent() {
               const steps = [
                 {
                   step: 1,
-                  title: "Đặt hàng",
-                  desc: order.date || "Đã tiếp nhận",
-                  icon: CheckCircle2,
+                  role: "NÔNG DÂN",
+                  title: "Trang trại thu hoạch",
+                  desc: order.lotCode ? `Lô ${order.lotCode} · KCS Xuất vườn` : "Thu hoạch & KCS Đạt",
+                  icon: Sprout,
                 },
                 {
                   step: 2,
-                  title: "Kho lạnh & KCS",
-                  desc: currentStepIdx > 2 ? "Kiểm định Đạt" : currentStepIdx === 2 ? "Đang xử lý 2-5°C" : "Chờ xử lý",
+                  role: "THỦ KHO",
+                  title: "Kho lạnh & Đóng gói",
+                  desc: currentStepIdx > 2 ? "Bảo quản 2-5°C · Đã đóng thùng" : currentStepIdx === 2 ? "Đang đóng thùng lạnh FEFO" : "Chờ nhập kho mát",
                   icon: Warehouse,
                 },
                 {
                   step: 3,
-                  title: "Xe lạnh thông minh",
-                  desc: currentStepIdx > 3 ? "Đã tới điểm giao" : currentStepIdx === 3 ? "Đang giao 4.2°C" : "Chờ xuất kho",
+                  role: "XE LẠNH IOT",
+                  title: "Vận chuyển xe lạnh",
+                  desc: currentStepIdx > 3 ? "Đã tới điểm giao" : currentStepIdx === 3 ? `Xe 49C · 4.2°C (${order.driverName})` : "Chờ xếp lên xe lạnh",
                   icon: Truck,
                 },
                 {
                   step: 4,
+                  role: "KHÁCH HÀNG",
                   title: "Giao tận tay",
-                  desc: currentStepIdx >= 4 ? "Đã nhận hàng" : "Dự kiến trong ngày",
-                  icon: Package,
+                  desc: currentStepIdx >= 4 ? "Đồng kiểm & Đã nhận" : "Dự kiến trong ngày",
+                  icon: CheckCircle2,
                 },
               ];
 
@@ -1632,6 +1636,16 @@ function CustomerDashboardContent() {
                                 {isDone ? <Check size={14} className="stroke-[3]" /> : <StepIcon size={14} />}
                               </div>
                               <div className="mt-1.5 space-y-0.5">
+                                <span
+                                  className={cn(
+                                    "text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded font-extrabold inline-block mb-0.5 shadow-2xs",
+                                    isDone || isCurrent
+                                      ? "bg-emerald-100 text-emerald-900 border border-emerald-300/70"
+                                      : "bg-gray-100 text-gray-500 border border-gray-200"
+                                  )}
+                                >
+                                  {st.role}
+                                </span>
                                 <p
                                   className={cn(
                                     "text-xs font-bold leading-tight",
@@ -1747,24 +1761,24 @@ function CustomerDashboardContent() {
                     ))}
                   </div>
 
-                  {/* Delivery & Cold Chain Logistics Snapshot Cards */}
+                  {/* Consolidated Clean Supply Chain & Delivery Section */}
                   <div className="px-4 sm:px-5 pb-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      {/* Card 1: Receiver & Delivery Address */}
-                      <div className="p-3.5 rounded-xl bg-stone-50/70 border border-stone-200/80 text-xs space-y-2">
+                    <div className="rounded-2xl border border-gray-200/90 bg-[#FBF9F5] p-3.5 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-gray-200/80 text-xs">
+                      {/* Left: Receiver & Delivery Destination */}
+                      <div className="space-y-2 md:pr-4">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                          <div className="flex items-center gap-1.5 font-bold text-gray-900">
                             <MapPin size={14} className="text-emerald-700 shrink-0" />
-                            <span>Địa chỉ nhận hàng</span>
+                            <span>Địa chỉ nhận hàng (Khách Hàng)</span>
                           </div>
-                          <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                            Giao tận nơi
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            Giao tận nơi 24H
                           </span>
                         </div>
-                        <div className="pl-4 space-y-1">
+                        <div className="space-y-1 pl-4">
                           <div className="flex items-center gap-2 font-bold text-gray-900">
                             <span>{order.receiverName}</span>
-                            <span className="text-gray-300 font-normal">|</span>
+                            <span className="text-gray-300">|</span>
                             <a
                               href={`tel:${order.receiverPhone}`}
                               className="text-emerald-800 hover:underline flex items-center gap-1 font-semibold"
@@ -1773,106 +1787,97 @@ function CustomerDashboardContent() {
                               <span>{order.receiverPhone}</span>
                             </a>
                           </div>
-                          <p className="text-gray-600 leading-relaxed" title={order.receiverAddress}>
+                          <p className="text-gray-600 leading-relaxed text-[11px]" title={order.receiverAddress}>
                             {order.receiverAddress}
                           </p>
                         </div>
-                        <div className="pt-1.5 border-t border-stone-200/60 pl-4 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                        <div className="pt-2 border-t border-gray-200/60 pl-4 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                           <span className="flex items-center gap-1">
                             <Clock size={11} className="text-gray-400" />
-                            <span>Khung giờ: <strong className="text-gray-700">{order.deliverySlot || "Giao hỏa tốc xe lạnh 24H"}</strong></span>
+                            <span>Khung giờ: <strong className="text-gray-700">{order.deliverySlot || "Hỏa tốc xe lạnh trong ngày"}</strong></span>
                           </span>
                           {order.deliveryNote && (
-                            <span className="text-gray-500 italic">
-                              · Dặn: &ldquo;{order.deliveryNote}&rdquo;
-                            </span>
+                            <span className="text-gray-500 italic">· Dặn: &ldquo;{order.deliveryNote}&rdquo;</span>
                           )}
                         </div>
                       </div>
 
-                      {/* Card 2: Cold Chain Fleet & Payment Verification */}
-                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 text-xs space-y-2">
+                      {/* Right: Multi-role Supply Chain Coordination */}
+                      <div className="space-y-2.5 md:pl-4 pt-3 md:pt-0">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 font-bold text-blue-950">
-                            <Truck size={14} className="text-blue-700 shrink-0" />
-                            <span>Vận chuyển xe lạnh & Đối soát IoT</span>
+                          <div className="flex items-center gap-1.5 font-bold text-gray-900">
+                            <Truck size={14} className="text-emerald-700 shrink-0" />
+                            <span>Điều phối chuỗi lạnh liên vai trò</span>
                           </div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100/80 text-blue-800 text-[10px] font-bold border border-blue-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 text-[10px] font-bold border border-blue-200">
                             <ThermometerSnowflake size={11} className="text-blue-700" /> 4.2°C VietGAP
                           </span>
                         </div>
 
-                        <div className="pl-4 space-y-1 text-xs">
-                          {order.status === "DELIVERED" || order.status === "COMPLETED" ? (
-                            <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
-                              <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                              <span>Đã giao thành công · Thùng xe 4.2°C đạt chuẩn VietGAP</span>
-                            </div>
-                          ) : order.status === "SHIPPING" ? (
-                            <div className="space-y-1">
-                              <div className="font-bold text-blue-800 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping inline-block" />
-                                <span>Đang giao xe lạnh 4.2°C · Tài xế {order.driverName}</span>
-                              </div>
-                              <p className="text-[11px] text-blue-700">
-                                SĐT tài xế: <a href={`tel:${order.driverPhone}`} className="underline font-bold">{order.driverPhone}</a>
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="text-gray-600 flex items-center gap-1.5">
-                              <Warehouse size={13} className="text-gray-500 shrink-0" />
-                              <span>Bảo quản kho mát 2-5°C, chuẩn bị bàn giao đội xe AgriCold</span>
-                            </div>
-                          )}
-                        </div>
+                        <div className="space-y-2 text-[11px] pl-4">
+                          {/* Role: Nông Dân */}
+                          <div className="flex items-start gap-2">
+                            <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 font-extrabold border border-emerald-300/70 shrink-0 mt-0.5">
+                              NÔNG DÂN
+                            </span>
+                            <span className="text-gray-600">
+                              <strong>{order.items?.[0]?.origin || "Nông Trại Xanh Thủy Canh Đà Lạt"}</strong> · Cấp Lô <strong>#{order.lotCode || "SP-KL-05"}</strong> (VietGAP)
+                            </span>
+                          </div>
 
-                        <div className="pt-1.5 border-t border-blue-100/70 pl-4 text-[11px] text-gray-600 flex items-center gap-1.5">
-                          <CreditCard size={12} className="text-gray-400 shrink-0" />
-                          <span>
-                            {isQr ? (
-                              order.status === "PENDING_PAYMENT" ? (
-                                <span className="text-amber-800 font-semibold">
-                                  Chờ quét mã VietQR để kho lạnh xuất hàng
+                          {/* Role: Xe Lạnh IoT */}
+                          <div className="flex items-start gap-2">
+                            <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-900 font-extrabold border border-blue-300/70 shrink-0 mt-0.5">
+                              ĐỘI XE LẠNH
+                            </span>
+                            <span className="text-gray-600">
+                              {order.status === "DELIVERED" || order.status === "COMPLETED" ? (
+                                <strong className="text-emerald-800">Đã giao tận nơi an toàn · Thùng xe 4.2°C chuẩn VietGAP</strong>
+                              ) : order.status === "SHIPPING" ? (
+                                <span className="text-blue-800 font-semibold">
+                                  Đang vận chuyển 4.2°C · Tài xế <strong>{order.driverName}</strong> (<a href={`tel:${order.driverPhone}`} className="underline font-bold">{order.driverPhone}</a>)
                                 </span>
                               ) : (
-                                <span className="text-emerald-800 font-semibold">
-                                  Đã thanh toán VietQR 24/7{" "}
-                                  {order.paymentRef ? `· Mã GD: ${order.paymentRef}` : ""}
-                                  {order.paidAt ? ` (${new Date(order.paidAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })})` : ""}
-                                </span>
-                              )
-                            ) : order.status === "DELIVERED" || order.status === "COMPLETED" ? (
-                              <span className="text-emerald-800 font-semibold">
-                                Đã thanh toán (Tài xế đã thu {(order.total || 0).toLocaleString("vi-VN")} đ tiền mặt COD)
-                              </span>
-                            ) : (
-                              <span className="text-orange-950 font-medium">
-                                Thu hộ COD khi nhận hàng: <strong className="font-bold">{(order.total || 0).toLocaleString("vi-VN")} đ</strong>
-                              </span>
-                            )}
-                          </span>
+                                <span className="text-amber-800 font-medium">Bảo quản kho mát 2-5°C (FEFO) · Đang chờ bàn giao đội xe</span>
+                              )}
+                            </span>
+                          </div>
+
+                          {/* Payment status */}
+                          <div className="flex items-center gap-2 pt-1 border-t border-gray-200/60 text-gray-600">
+                            <CreditCard size={12} className="text-gray-400 shrink-0" />
+                            <span>
+                              {isQr ? (
+                                order.status === "PENDING_PAYMENT" ? (
+                                  order.paymentRef === "PENDING_ADMIN_APPROVAL" ? (
+                                    <span className="text-amber-800 font-bold">⏳ Đang chờ Kế toán đối soát sao kê</span>
+                                  ) : (
+                                    <span className="text-amber-800 font-semibold">Chờ quét VietQR để kho xuất hàng</span>
+                                  )
+                                ) : (
+                                  <span className="text-emerald-800 font-semibold">
+                                    Đã thanh toán VietQR 24/7 {order.paymentRef ? `· Mã GD: ${order.paymentRef}` : ""}
+                                  </span>
+                                )
+                              ) : (
+                                <span>Thu tiền mặt COD khi nhận: <strong>{(order.total || 0).toLocaleString("vi-VN")} đ</strong></span>
+                              )}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Real-time Status Alert Banner if SHIPPING */}
+                  {/* Clean Live Status Alert if SHIPPING (NO duplicate button) */}
                   {order.status === "SHIPPING" && (
-                    <div className="mx-4 sm:mx-5 mb-3 p-3 rounded-xl bg-blue-50/90 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-950">
-                      <div className="flex items-start sm:items-center gap-2">
-                        <Truck size={15} className="text-blue-600 shrink-0 mt-0.5 sm:mt-0" />
+                    <div className="mx-4 sm:mx-5 mb-3 p-3 rounded-xl bg-blue-50/90 border border-blue-200 flex items-center justify-between text-xs text-blue-950">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping shrink-0" />
                         <span>
-                          <strong>Đơn hàng đang trên xe lạnh 4.2°C:</strong> Tài xế <strong>{order.driverName}</strong> ({order.driverPhone}) đang di chuyển tới bạn. Quý khách vui lòng để ý điện thoại và bấm <strong>[Đã nhận được hàng]</strong> khi nhận nông sản.
+                          <strong>Đơn hàng đang trên xe lạnh 4.2°C:</strong> Tài xế <strong>{order.driverName}</strong> ({order.driverPhone}) đang di chuyển tới bạn. Quý khách vui lòng để ý điện thoại và bấm nút <strong>[Đã nhận được hàng]</strong> bên dưới khi nhận nông sản.
                         </span>
                       </div>
-                      <button
-                        onClick={() => handleAdvanceOrderStep(order.id, "DELIVERED")}
-                        disabled={isUpdatingOrderStatus}
-                        className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shrink-0 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-                      >
-                        <CheckCircle2 size={13} />
-                        <span>Xác nhận đã nhận hàng</span>
-                      </button>
                     </div>
                   )}
 
