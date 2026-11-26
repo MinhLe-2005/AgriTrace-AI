@@ -46,6 +46,23 @@ export function OrderChatDrawer({
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [previewPhotoModal, setPreviewPhotoModal] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleChatFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 8 * 1024 * 1024) {
+        toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 8MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSelectedPhoto(event.target?.result as string);
+        toast.success("Đã đính kèm ảnh!");
+      };
+      reader.readAsDataURL(file);
+    }
+  }
 
   const orderCode = order?.orderCode || "";
   const firstItem = order?.items?.[0];
@@ -377,18 +394,18 @@ export function OrderChatDrawer({
             className="flex items-center gap-2"
           >
             {/* Quick Photo Upload Preset Button */}
+            <input
+              type="file"
+              ref={chatFileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleChatFile}
+            />
             <button
               type="button"
-              onClick={() => {
-                const samplePhotos = [
-                  "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=600&auto=format&fit=crop",
-                  "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=600&auto=format&fit=crop",
-                ];
-                setSelectedPhoto(samplePhotos[Math.floor(Math.random() * samplePhotos.length)]);
-                toast.info("Đã đính kèm ảnh mở thùng nông sản.");
-              }}
+              onClick={() => chatFileInputRef.current?.click()}
               className="p-2.5 rounded-xl text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 border border-gray-200 transition-colors cursor-pointer"
-              title="Đính kèm ảnh thực tế"
+              title="Đính kèm ảnh thực tế từ máy / điện thoại"
             >
               <ImageIcon size={18} />
             </button>

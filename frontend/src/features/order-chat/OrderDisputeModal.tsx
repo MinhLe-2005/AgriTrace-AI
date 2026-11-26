@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   X,
   AlertTriangle,
@@ -11,6 +11,9 @@ import {
   Gift,
   ShieldAlert,
   Info,
+  Camera,
+  Trash2,
+  Image as ImageIcon,
 } from "lucide-react";
 import type { ApiOrder } from "@/services/catalog.service";
 import { orderChatService } from "@/services/order-chat.service";
@@ -33,9 +36,27 @@ export function OrderDisputeModal({
   const [solution, setSolution] = useState<"REFUND_MONEY" | "REPLACE_GOODS" | "VOUCHER">("REFUND_MONEY");
   const [note, setNote] = useState("");
   const [photoUrl, setPhotoUrl] = useState(
-    "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=600&auto=format&fit=crop"
+    "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop"
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 8 * 1024 * 1024) {
+        toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 8MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setPhotoUrl(result);
+        toast.success("Đã tải ảnh chụp mở thùng thành công!");
+      };
+      reader.readAsDataURL(file);
+    }
+  }
 
   if (!isOpen || !order) return null;
 
@@ -203,41 +224,97 @@ export function OrderDisputeModal({
 
           {/* Section 3: Evidence Photo */}
           <div className="space-y-2">
-            <label className="font-bold text-gray-900 text-xs block">
-              3. Ảnh chụp thực tế lúc mở thùng đồng kiểm: <span className="text-red-500">*</span>
-            </label>
-            <div className="flex items-center gap-3">
-              <div className="w-20 h-20 rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden relative shrink-0">
-                <img src={photoUrl} alt="Evidence" className="w-full h-full object-cover" />
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <input
-                  type="text"
-                  value={photoUrl}
-                  onChange={(e) => setPhotoUrl(e.target.value)}
-                  placeholder="URL ảnh bằng chứng nông sản hư hỏng..."
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-[11px] focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50/50"
-                />
-                <div className="flex gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-gray-900 text-xs block">
+                3. Ảnh chụp thực tế lúc mở thùng đồng kiểm: <span className="text-red-500">*</span>
+              </label>
+              <span className="text-[10px] text-gray-500">Chụp rõ phần rau củ dập nát</span>
+            </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            {photoUrl ? (
+              <div className="p-3 rounded-2xl border border-gray-200 bg-gray-50/80 flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden border border-gray-300 relative shrink-0 shadow-2xs bg-gray-100">
+                    <img src={photoUrl} alt="Evidence" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">
+                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                      <span>Đã có ảnh bằng chứng</span>
+                    </span>
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                      Ảnh sẽ được gửi trực tiếp cho Chủ Vườn & Admin đối soát
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
-                    onClick={() =>
-                      setPhotoUrl("https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=600&auto=format&fit=crop")
-                    }
-                    className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-[10px] font-semibold text-gray-700 cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 text-xs font-semibold transition-colors cursor-pointer"
                   >
-                    Mẫu 1: Dập lá
+                    Đổi ảnh khác
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setPhotoUrl("https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=600&auto=format&fit=crop")
-                    }
-                    className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-[10px] font-semibold text-gray-700 cursor-pointer"
+                    onClick={() => setPhotoUrl("")}
+                    className="p-1.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                    title="Xóa ảnh"
                   >
-                    Mẫu 2: Nát quả
+                    <Trash2 size={15} />
                   </button>
                 </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 hover:border-amber-500 rounded-2xl p-5 text-center cursor-pointer transition-all bg-gray-50/60 hover:bg-amber-50/30 group space-y-1.5"
+              >
+                <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto group-hover:scale-105 transition-transform shadow-2xs">
+                  <Camera size={20} />
+                </div>
+                <div>
+                  <span className="font-bold text-xs text-gray-900 group-hover:text-amber-900 block">
+                    Bấm để tải ảnh chụp từ máy tính / điện thoại
+                  </span>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Hỗ trợ định dạng JPG, PNG, WEBP (Tối đa 8MB)
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Sample Selector for testing convenience */}
+            <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
+              <span>Hoặc thử nghiệm nhanh với ảnh mẫu:</span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoUrl("https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop")
+                  }
+                  className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[10px] font-semibold text-gray-700 cursor-pointer"
+                >
+                  🥬 Rau dập lá
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoUrl("https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=600&auto=format&fit=crop")
+                  }
+                  className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[10px] font-semibold text-gray-700 cursor-pointer"
+                >
+                  🍓 Dâu tây dập
+                </button>
               </div>
             </div>
           </div>
