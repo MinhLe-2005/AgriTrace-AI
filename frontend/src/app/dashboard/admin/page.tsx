@@ -1116,7 +1116,7 @@ function AdminPortalContent() {
     { key: "batches" as const, label: "Duyệt Lô Xuất Kho", icon: Package, badge: pendingBatchesCount },
     { key: "certs" as const, label: "Duyệt Chứng Nhận", icon: Award, badge: pendingCertsCount },
     { key: "orders" as const, label: "Đơn Hàng", icon: ShoppingBag, badge: orders.length },
-    { key: "messages" as const, label: "Hộp Thư & Khiếu Nại", icon: MessageSquare, badge: "Live" },
+    { key: "messages" as const, label: "Hộp Thư & Khiếu Nại", icon: MessageSquare },
     { key: "vouchers" as const, label: "Voucher", icon: Ticket, badge: vouchers.length },
     { key: "loyalty" as const, label: "Hội Viên AgriClub", icon: Crown, badge: members.length },
     { key: "events" as const, label: "Sự Kiện & Mùa Vụ", icon: CalendarDays, badge: campaigns.length },
