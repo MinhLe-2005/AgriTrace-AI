@@ -2611,6 +2611,21 @@ function FarmerPortalContent() {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => {
+              setActiveTab("messages");
+              window.history.replaceState(null, "", "/dashboard/farmer?tab=messages");
+            }}
+            className={`px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all transform active:scale-95 cursor-pointer ${
+              activeTab === "messages"
+                ? "bg-amber-400 text-stone-950 ring-2 ring-amber-300 font-extrabold"
+                : "bg-amber-500 hover:bg-amber-400 text-stone-950"
+            }`}
+          >
+            <MessageSquare size={15} />
+            <span>Hộp Thư & Khiếu Nại</span>
+            <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
+          </button>
+          <button
             onClick={openAddFarmModal}
             className="px-3.5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-emerald-700/60 transition-all cursor-pointer"
           >
@@ -2628,7 +2643,10 @@ function FarmerPortalContent() {
       {/* 2. Navigation Tabs (5 Khối nghiệp vụ chuẩn bài nói, QUẢN LÝ NÔNG TRẠI đứng đầu tiên) */}
       <div className="flex border-b border-gray-200 overflow-x-auto gap-2 text-xs font-bold">
         <button
-          onClick={() => setActiveTab("farms")}
+          onClick={() => {
+            setActiveTab("farms");
+            window.history.replaceState(null, "", "/dashboard/farmer");
+          }}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "farms"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
@@ -2638,6 +2656,25 @@ function FarmerPortalContent() {
           <Home size={16} /> Quản Lý Nông Trại
           <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full">
             {visibleFarms.length} Trang trại
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("messages");
+            window.history.replaceState(null, "", "/dashboard/farmer?tab=messages");
+          }}
+          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "messages"
+              ? "border-amber-600 text-amber-950 font-extrabold bg-amber-50/60"
+              : "border-transparent text-amber-800 hover:text-amber-950 hover:bg-amber-50/40"
+          }`}
+        >
+          <MessageSquare size={16} className="text-amber-600" />
+          <span>Hộp Thư & Khiếu Nại</span>
+          <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+            Live Chat
           </span>
         </button>
 
@@ -2743,20 +2780,6 @@ function FarmerPortalContent() {
           <TrendingUp size={16} /> AI Dự Báo Nhu Cầu
           <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
             7-30 Ngày
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("messages")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "messages"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
-          }`}
-        >
-          <MessageSquare size={16} /> Hộp Thư & Khiếu Nại
-          <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
-            Live Chat
           </span>
         </button>
       </div>

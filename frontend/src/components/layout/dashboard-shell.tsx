@@ -13,6 +13,7 @@ import {
   Leaf,
   LogOut,
   Menu,
+  MessageSquare,
   PackageCheck,
   PackageSearch,
   QrCode,
@@ -59,6 +60,7 @@ const customerNavigation: NavItem[] = [
 
 const farmerNavigation: NavItem[] = [
   { href: "/dashboard/farmer", label: "Quản Lý Nông Trại", icon: Leaf },
+  { href: "/dashboard/farmer?tab=messages", label: "Hộp Thư & Khiếu Nại", icon: MessageSquare },
   { href: "/dashboard/farmer?tab=seasons", label: "Mùa Vụ Canh Tác", icon: CalendarRange },
   { href: "/dashboard/farmer?tab=forecast", label: "AI Dự Báo Nhu Cầu", icon: TrendingUp },
   { href: "/traceability", label: "Cấp Mã QR Lô Hàng", icon: QrCode },
@@ -86,6 +88,7 @@ const adminNavigation: NavItem[] = [
   { href: "/dashboard/admin?tab=batches", label: "Duyệt Lô Xuất Kho", icon: PackageCheck, group: "Tổng quan" },
   { href: "/dashboard/admin?tab=certs", label: "Duyệt Chứng Nhận Nông Trại", icon: Award, group: "Tổng quan" },
   { href: "/dashboard/admin?tab=orders", label: "Quản Lý Đơn Hàng Hệ Thống", icon: ClipboardList, group: "Vận hành" },
+  { href: "/dashboard/admin?tab=messages", label: "Hộp Thư & Khiếu Nại", icon: MessageSquare, group: "Vận hành" },
   { href: "/dashboard/farmer", label: "Giám Sát Nông Trại", icon: Leaf, group: "Vận hành" },
   { href: "/dashboard/warehouse", label: "Giám Sát Kho Hàng", icon: Warehouse, group: "Vận hành" },
   { href: "/dashboard/distributor", label: "Giám Sát Vận Chuyển", icon: Truck, group: "Vận hành" },
