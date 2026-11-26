@@ -33,6 +33,11 @@ public class ReviewController {
         return ApiResponse.ok("Lấy danh sách đánh giá thành công", reviewRepository.findByProductNameOrderByCreatedAtDesc(productName));
     }
 
+    @GetMapping("/all")
+    public ApiResponse<List<Review>> getAllReviews() {
+        return ApiResponse.ok("Lấy toàn bộ đánh giá thành công", reviewRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt")));
+    }
+
     @GetMapping("/order/{orderCode}")
     public ApiResponse<List<Review>> getOrderReviews(@PathVariable String orderCode) {
         return ApiResponse.ok("Lấy đánh giá đơn hàng thành công", reviewRepository.findByOrderCodeOrderByCreatedAtDesc(orderCode));
@@ -106,6 +111,17 @@ public class ReviewController {
         review.setLikesCount(current + 1);
         Review saved = reviewRepository.save(review);
         return ApiResponse.ok("Đã thích đánh giá!", saved);
+    }
+
+    @PostMapping("/{id}/unlike")
+    @Transactional
+    public ApiResponse<Review> unlikeReview(@PathVariable Long id) {
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đánh giá #" + id));
+        int current = review.getLikesCount() != null ? review.getLikesCount() : 0;
+        review.setLikesCount(Math.max(0, current - 1));
+        Review saved = reviewRepository.save(review);
+        return ApiResponse.ok("Đã hủy thích đánh giá!", saved);
     }
 
     @lombok.Data

@@ -28,6 +28,11 @@ export const reviewService = {
     return payload(data);
   },
 
+  async getAllReviews(): Promise<ApiReview[]> {
+    const { data } = await api.get<ApiPayload<ApiReview[]>>("/reviews/all");
+    return payload(data);
+  },
+
   async getOrderReviews(orderCode: string): Promise<ApiReview[]> {
     const { data } = await api.get<ApiPayload<ApiReview[]>>(`/reviews/order/${encodeURIComponent(orderCode)}`);
     return payload(data);
@@ -45,6 +50,11 @@ export const reviewService = {
 
   async likeReview(id: number): Promise<ApiReview> {
     const { data } = await api.post<ApiPayload<ApiReview>>(`/reviews/${id}/like`);
+    return payload(data);
+  },
+
+  async unlikeReview(id: number): Promise<ApiReview> {
+    const { data } = await api.post<ApiPayload<ApiReview>>(`/reviews/${id}/unlike`);
     return payload(data);
   },
 

@@ -41,6 +41,8 @@ import {
   HelpCircle,
   Clock,
   ThumbsUp,
+  UserCheck,
+  Store,
   MessageCircle,
   Trash2,
   Maximize2,
@@ -232,23 +234,64 @@ function ProductsContent() {
   const [replyText, setReplyText] = useState<string>("");
   const [replyAuthor, setReplyAuthor] = useState<string>("");
 
-  async function handleLikeReview(reviewId: number) {
-    if (likedReviewIds.includes(reviewId)) {
-      toast.info("Bạn đã thích đánh giá này rồi!");
-      return;
+  // Role detection: Only FARMER or ADMIN can reply as the owner
+  const [activeUserRole, setActiveUserRole] = useState<"CUSTOMER" | "FARMER" | "ADMIN">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("agritrace_test_role");
+      if (saved === "FARMER" || saved === "ADMIN") return saved;
     }
-    setLikedReviewIds((prev) => [...prev, reviewId]);
+    return "CUSTOMER";
+  });
+
+  const isOwnerOrAdmin = activeUserRole === "FARMER" || activeUserRole === "ADMIN" || !!user?.roles?.some((r) => r.toUpperCase().includes("FARMER") || r.toUpperCase().includes("ADMIN"));
+
+  // Load liked reviews from localStorage
+  useEffect(() => {
     try {
-      const updated = await reviewService.likeReview(reviewId);
-      setProductReviews((prev) =>
-        prev.map((r) => (r.id === reviewId ? { ...r, likesCount: updated.likesCount } : r))
-      );
-      toast.success("Đã ghi nhận phản hồi hữu ích của bạn!");
-    } catch {
-      // Fallback local update
-      setProductReviews((prev) =>
-        prev.map((r) => (r.id === reviewId ? { ...r, likesCount: (r.likesCount || 0) + 1 } : r))
-      );
+      const saved = localStorage.getItem("agritrace_liked_review_ids");
+      if (saved) setLikedReviewIds(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  // Save liked reviews to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("agritrace_liked_review_ids", JSON.stringify(likedReviewIds));
+    } catch {}
+  }, [likedReviewIds]);
+
+  async function handleLikeReview(reviewId: number) {
+    const isLiked = likedReviewIds.includes(reviewId);
+    if (isLiked) {
+      // HỦY THÍCH (Unlike) - Giảm số lượt thích, cho phép hủy tự do
+      setLikedReviewIds((prev) => prev.filter((id) => id !== reviewId));
+      try {
+        const updated = await reviewService.unlikeReview(reviewId);
+        setProductReviews((prev) =>
+          prev.map((r) => (r.id === reviewId ? { ...r, likesCount: updated.likesCount } : r))
+        );
+        toast.info("Đã bỏ thích đánh giá.");
+      } catch {
+        setProductReviews((prev) =>
+          prev.map((r) => (r.id === reviewId ? { ...r, likesCount: Math.max(0, (r.likesCount || 1) - 1) } : r))
+        );
+        toast.info("Đã bỏ thích đánh giá.");
+      }
+    } else {
+      // THÍCH (Like) - Tăng số lượt thích
+      setLikedReviewIds((prev) => [...prev, reviewId]);
+      try {
+        const updated = await reviewService.likeReview(reviewId);
+        setProductReviews((prev) =>
+          prev.map((r) => (r.id === reviewId ? { ...r, likesCount: updated.likesCount } : r))
+        );
+        toast.success("Đã ghi nhận đánh giá hữu ích!");
+      } catch {
+        setProductReviews((prev) =>
+          prev.map((r) => (r.id === reviewId ? { ...r, likesCount: (r.likesCount || 0) + 1 } : r))
+        );
+        toast.success("Đã ghi nhận đánh giá hữu ích!");
+      }
     }
   }
 
@@ -1561,6 +1604,38 @@ function ProductsContent() {
                   </div>
                 </div>
 
+                {/* Role Status & Simulator Bar (Chủ vào rep cmt thông qua các vai trò) */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-stone-100/90 border border-stone-200 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("w-2 h-2 rounded-full", isOwnerOrAdmin ? "bg-emerald-500 animate-pulse" : "bg-blue-500")} />
+                    <span className="text-stone-700">
+                      Vai trò hiện tại: <strong className={isOwnerOrAdmin ? "text-emerald-800 font-bold" : "text-stone-900 font-bold"}>
+                        {isOwnerOrAdmin ? `Chủ Nhà Vườn (${user?.name || "Nguyễn Văn Hùng"} · ${selectedProduct.farm || "Hợp Tác Xã Mộc Châu"})` : "Khách Hàng (Người Mua)"}
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="text-[10px] text-stone-500">Chuyển vai trò thử nghiệm:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextRole = isOwnerOrAdmin ? "CUSTOMER" : "FARMER";
+                        setActiveUserRole(nextRole);
+                        try { localStorage.setItem("agritrace_test_role", nextRole); } catch {}
+                        toast.info(nextRole === "FARMER" ? "Đã chuyển sang vai trò: Chủ Nhà Vườn (Được quyền phản hồi đánh giá)" : "Đã chuyển sang vai trò: Khách Hàng (Chỉ xem và bấm Hữu ích)");
+                      }}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-2xs",
+                        isOwnerOrAdmin
+                          ? "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                          : "bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800"
+                      )}
+                    >
+                      {isOwnerOrAdmin ? "👤 Trở lại vai trò Khách Hàng" : "🌿 Vào vai trò Chủ Vườn để Trả lời"}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   {displayedReviews.map((rev, idx) => {
                     const photoMatch = rev.comment?.match(/\[Ảnh thực tế: ([^\]]+)\]/);
@@ -1658,30 +1733,47 @@ function ProductsContent() {
                           </div>
                         )}
 
-                        {/* Interactive Toolbar (Like & Farmer Reply button) */}
-                        <div className="flex items-center gap-2 pt-1 border-t border-stone-200/60">
-                          <button
-                            type="button"
-                            onClick={() => handleLikeReview(rev.id)}
-                            className={cn(
-                              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 cursor-pointer",
-                              hasLiked
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                : "bg-white text-stone-700 border-stone-200 hover:border-emerald-300 hover:text-emerald-800"
-                            )}
-                          >
-                            <ThumbsUp size={13} className={hasLiked ? "fill-emerald-700 text-emerald-700" : ""} />
-                            <span>Hữu ích {likesCount > 0 ? `(${likesCount})` : ""}</span>
-                          </button>
+                        {/* Interactive Toolbar (Like / Unlike Toggle & Role-based Farmer Reply) */}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-stone-200/60">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleLikeReview(rev.id)}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 cursor-pointer",
+                                hasLiked
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300 shadow-2xs"
+                                  : "bg-white text-stone-700 border-stone-200 hover:border-emerald-300 hover:text-emerald-800"
+                              )}
+                              title={hasLiked ? "Bấm để hủy thích đánh giá này" : "Bấm để thích đánh giá này"}
+                            >
+                              <ThumbsUp size={13} className={hasLiked ? "fill-emerald-700 text-emerald-700" : ""} />
+                              <span>{hasLiked ? "Đã thích" : "Hữu ích"} {likesCount > 0 ? `(${likesCount})` : ""}</span>
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => setReplyingReviewId(replyingReviewId === rev.id ? null : rev.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 bg-white border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-all cursor-pointer"
-                          >
-                            <MessageCircle size={13} className="text-emerald-700" />
-                            <span>{rev.reply ? "Thêm lời cảm ơn" : "Phản hồi từ Nhà Vườn"}</span>
-                          </button>
+                            {/* Chỉ Chủ Vườn hoặc Admin mới có quyền Rep cmt */}
+                            {isOwnerOrAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReplyingReviewId(replyingReviewId === rev.id ? null : rev.id);
+                                  if (!replyAuthor) {
+                                    setReplyAuthor(`${user?.name || "Nguyễn Văn Hùng"} (${selectedProduct.farm || "Chủ Trang Trại"})`);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-emerald-800 hover:bg-emerald-900 border border-emerald-900 shadow-2xs transition-all cursor-pointer"
+                              >
+                                <MessageCircle size={13} />
+                                <span>{rev.reply ? "Cập nhật phản hồi Chủ Vườn" : "Trả lời với vai trò Chủ Vườn"}</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {!isOwnerOrAdmin && (
+                            <span className="text-[10px] text-stone-400 italic">
+                              Chỉ Chủ Nhà Vườn mới có quyền trả lời đánh giá
+                            </span>
+                          )}
                         </div>
 
                         {/* Farmer Reply Box (Hiển thị nếu đã có phản hồi) */}
@@ -1713,13 +1805,18 @@ function ProductsContent() {
                                 ✕
                               </button>
                             </div>
-                            <input
-                              type="text"
-                              value={replyAuthor}
-                              onChange={(e) => setReplyAuthor(e.target.value)}
-                              placeholder={`Tên đại diện (Mặc định: ${selectedProduct.farm || "Chủ Trang Trại"})`}
-                              className="w-full text-xs px-3 py-1.5 rounded-lg border border-stone-200 focus:outline-none focus:border-emerald-600"
-                            />
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 shrink-0">
+                                🌿 Người đại diện trả lời:
+                              </span>
+                              <input
+                                type="text"
+                                value={replyAuthor}
+                                onChange={(e) => setReplyAuthor(e.target.value)}
+                                placeholder={`${user?.name || "Nguyễn Văn Hùng"} - Đại diện ${selectedProduct.farm || "Chủ Trang Trại"}`}
+                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-stone-200 focus:outline-none focus:border-emerald-600 font-semibold text-stone-900"
+                              />
+                            </div>
                             <textarea
                               value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}

@@ -27,6 +27,9 @@ import {
   Sparkles,
   Sprout,
   Trash2,
+  Star,
+  MessageCircle,
+  ThumbsUp,
   Truck,
   Upload,
   User,
@@ -40,6 +43,7 @@ import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
 import { VerificationSubmission } from "@/features/verification/verification-submission";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { reviewService, type ApiReview } from "@/services/review.service";
 
 // =========================================================================
 // TYPES & DEFINITIONS
@@ -739,8 +743,49 @@ function getApiErrorMessage(err: unknown, fallback: string): string {
 }
 
 export default function FarmerPortalPage() {
+  const { user } = useAuthStore();
   // 5 Tab nghiệp vụ rõ ràng, tách riêng "Quản Lý Nông Trại" lên vị trí nổi bật
-  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs">("farms");
+  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews">("farms");
+  const [farmerReviews, setFarmerReviews] = useState<ApiReview[]>([]);
+  const [farmerReplyText, setFarmerReplyText] = useState<{ [id: number]: string }>({});
+  const [isSubmittingReply, setIsSubmittingReply] = useState<{ [id: number]: boolean }>({});
+
+  useEffect(() => {
+    reviewService.getAllReviews()
+      .then((data) => setFarmerReviews(data || []))
+      .catch(() => {});
+  }, []);
+
+  async function handleFarmerSubmitReply(reviewId: number, farmName: string) {
+    const text = farmerReplyText[reviewId]?.trim();
+    if (!text) {
+      toast.error("Vui lòng nhập nội dung phản hồi!");
+      return;
+    }
+    setIsSubmittingReply((prev) => ({ ...prev, [reviewId]: true }));
+    const authorName = `${user?.name || "Nguyễn Văn Hùng"} (${farmName || "Chủ Nhà Vườn"})`;
+    try {
+      const updated = await reviewService.replyReview(reviewId, text, authorName);
+      setFarmerReviews((prev) =>
+        prev.map((r) =>
+          r.id === reviewId
+            ? {
+                ...r,
+                reply: updated.reply || text,
+                replyAuthor: updated.replyAuthor || authorName,
+                repliedAt: updated.repliedAt || new Date().toISOString(),
+              }
+            : r
+        )
+      );
+      setFarmerReplyText((prev) => ({ ...prev, [reviewId]: "" }));
+      toast.success("Đã đăng phản hồi từ Chủ Vườn thành công!");
+    } catch {
+      toast.error("Không thể đăng phản hồi, vui lòng thử lại!");
+    } finally {
+      setIsSubmittingReply((prev) => ({ ...prev, [reviewId]: false }));
+    }
+  }
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [clientNowMs, setClientNowMs] = useState<number | null>(null);
 
@@ -2391,6 +2436,18 @@ export default function FarmerPortalPage() {
             </span>
           ) : null}
         </button>
+
+        <button
+          onClick={() => setActiveTab("reviews")}
+          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "reviews"
+              ? "border-emerald-600 text-emerald-800 font-extrabold"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <Star size={16} className={activeTab === "reviews" ? "fill-amber-400 text-amber-500" : "text-gray-400"} />
+          <span>Đánh Giá Khách Hàng ({farmerReviews.length})</span>
+        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -3383,6 +3440,156 @@ export default function FarmerPortalPage() {
                           title="Xóa chứng nhận"
                         >
                           <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 6: ĐÁNH GIÁ NÔNG SẢN & PHẢN HỒI TỪ CHỦ VƯỜN */}
+      {/* ========================================================================= */}
+      {activeTab === "reviews" && (
+        <div className="space-y-4">
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-base text-gray-900 flex items-center gap-2 font-serif">
+                <Star size={18} className="fill-amber-400 text-amber-500" />
+                Quản Lý Đánh Giá & Phản Hồi Khách Hàng (Tư Cách Chủ Nông Trại)
+              </h3>
+              <p className="text-xs text-gray-600 mt-1">
+                Theo dõi phản hồi đồng kiểm độ tươi của người mua, gửi lời cảm ơn và giải đáp trực tiếp với tư cách Chủ Vườn / Hợp Tác Xã.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                🌿 Người đại diện: {user?.name || "Nguyễn Văn Hùng"} (Chủ Vườn)
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {farmerReviews.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center text-xs text-gray-500">
+                Chưa có đánh giá nào cho các sản phẩm của nông trại.
+              </div>
+            ) : (
+              farmerReviews.map((rev) => {
+                const photoMatch = rev.comment?.match(/\[Ảnh thực tế: ([^\]]+)\]/);
+                const photoUrl = photoMatch ? photoMatch[1] : null;
+                const cleanComment = rev.comment ? rev.comment.replace(/\[Ảnh thực tế: [^\]]+\]/g, "").trim() : "";
+                const criteriaMatch = cleanComment.match(/^\[Đồng kiểm: ([^\]]+)\]/);
+                const criteriaStr = criteriaMatch ? criteriaMatch[1] : null;
+                const finalComment = criteriaMatch ? cleanComment.replace(/^\[Đồng kiểm: [^\]]+\]\s*/, "") : cleanComment;
+
+                return (
+                  <div key={rev.id} className="bg-white p-5 rounded-2xl border-2 border-stone-200 space-y-3.5 shadow-2xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full bg-emerald-800 text-white font-bold flex items-center justify-center text-xs">
+                          {rev.userName?.charAt(0) || "K"}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900 text-sm">{rev.userName}</span>
+                            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              ✓ Đã đồng kiểm nhận hàng
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-500">
+                            <span>Sản phẩm: <strong className="text-gray-800">{rev.productName}</strong></span>
+                            <span>· Mã đơn: <strong className="font-mono text-gray-800">#{rev.orderCode}</strong></span>
+                            <span>· {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString("vi-VN") : "Hôm nay"}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} size={14} className={s <= (rev.rating || 5) ? "fill-amber-400 text-amber-500" : "text-gray-300"} />
+                        ))}
+                      </div>
+                    </div>
+
+                    {criteriaStr && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {criteriaStr.split("·").map((c, ci) => (
+                          <span key={ci} className="text-xs bg-stone-50 text-emerald-900 px-2.5 py-1 rounded-md border border-emerald-200 font-semibold flex items-center gap-1">
+                            <span className="text-emerald-600">✓</span> {c.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-sm text-stone-800 leading-relaxed font-normal">{finalComment}</p>
+
+                    {photoUrl && (
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-gray-700">Ảnh thực tế khách hàng mở thùng:</span>
+                        <div className="w-24 h-24 rounded-xl overflow-hidden border border-gray-300 shadow-2xs">
+                          <img src={photoUrl} alt="Ảnh thực tế" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Phản hồi hiện tại của Chủ Vườn */}
+                    {rev.reply && (
+                      <div className="p-3.5 rounded-xl bg-emerald-50/90 border border-emerald-300 space-y-1 text-xs">
+                        <div className="flex items-center justify-between font-bold text-emerald-950">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 size={14} className="text-emerald-700" />
+                            Phản hồi đã gửi của Chủ Vườn ({rev.replyAuthor || "Chủ Nông Trại"}):
+                          </span>
+                          <span className="text-[10px] text-emerald-700 font-medium">
+                            {rev.repliedAt ? new Date(rev.repliedAt).toLocaleDateString("vi-VN") : "Mới đây"}
+                          </span>
+                        </div>
+                        <p className="text-stone-800 leading-relaxed font-normal">{rev.reply}</p>
+                      </div>
+                    )}
+
+                    {/* Form gửi hoặc cập nhật phản hồi */}
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2 text-xs">
+                      <span className="font-bold text-stone-900 flex items-center gap-1.5">
+                        <MessageCircle size={14} className="text-emerald-700" />
+                        {rev.reply ? "Cập nhật câu trả lời tới khách hàng:" : "Viết câu trả lời với tư cách Chủ Vườn:"}
+                      </span>
+                      <textarea
+                        value={farmerReplyText[rev.id] ?? (rev.reply || "")}
+                        onChange={(e) => setFarmerReplyText((prev) => ({ ...prev, [rev.id]: e.target.value }))}
+                        placeholder="Nhập lời cảm ơn hoặc thông tin cam kết độ tươi từ nông trại..."
+                        rows={2}
+                        className="w-full text-xs p-2.5 rounded-lg border border-stone-300 focus:outline-none focus:border-emerald-600 bg-white"
+                      />
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-stone-500">Mẫu nhanh:</span>
+                          <button
+                            type="button"
+                            onClick={() => setFarmerReplyText((prev) => ({ ...prev, [rev.id]: "Dạ Nông Trại xin chân thành cảm ơn quý khách đã tin dùng nông sản VietGAP! Chúc gia đình bạn có những bữa ăn thật ngon miệng ạ." }))}
+                            className="text-[10px] bg-white hover:bg-emerald-50 hover:text-emerald-800 px-2 py-0.5 rounded border border-stone-300 cursor-pointer"
+                          >
+                            Cảm ơn & Chúc ngon miệng
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFarmerReplyText((prev) => ({ ...prev, [rev.id]: "Vườn luôn hái rau củ sáng sớm và bảo quản lạnh 4.2°C nguyên vẹn để giữ trọn độ tươi giòn gửi tới bạn." }))}
+                            className="text-[10px] bg-white hover:bg-emerald-50 hover:text-emerald-800 px-2 py-0.5 rounded border border-stone-300 cursor-pointer"
+                          >
+                            Cam kết tươi giòn
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isSubmittingReply[rev.id]}
+                          onClick={() => handleFarmerSubmitReply(rev.id, "Nông Trại Xanh")}
+                          className="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {isSubmittingReply[rev.id] ? "Đang gửi..." : rev.reply ? "Cập nhật phản hồi" : "Gửi phản hồi cho khách"}
                         </button>
                       </div>
                     </div>
