@@ -79,6 +79,22 @@ export function OrderChatDrawer({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Notify floating widgets (like Gemini Assistant) so they don't overlap the drawer
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("order-chat-drawer-toggle", { detail: { isOpen } })
+      );
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("order-chat-drawer-toggle", { detail: { isOpen: false } })
+        );
+      }
+    };
+  }, [isOpen]);
+
   async function loadMessages() {
     if (!orderCode) return;
     try {
