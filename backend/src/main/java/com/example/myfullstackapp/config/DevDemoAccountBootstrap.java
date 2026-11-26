@@ -28,11 +28,11 @@ import java.util.Set;
 public class DevDemoAccountBootstrap implements ApplicationRunner {
     private static final String DEMO_PASSWORD = "123456";
     private static final List<DemoAccount> DEMO_ACCOUNTS = List.of(
-            new DemoAccount("customer", "customer@sportvenue.com", "Khách hàng demo", RoleName.CUSTOMER),
-            new DemoAccount("farmer", "farmer@sportvenue.com", "Nông dân demo", RoleName.FARMER),
-            new DemoAccount("warehouse", "warehouse@sportvenue.com", "Thủ kho demo", RoleName.WAREHOUSE),
-            new DemoAccount("distributor", "distributor@sportvenue.com", "Nhà phân phối demo", RoleName.DISTRIBUTOR),
-            new DemoAccount("admin", "admin@sportvenue.com", "Quản trị viên demo", RoleName.ADMIN)
+            new DemoAccount("customer", "customer@sportvenue.com", "Lê Quang Minh", RoleName.CUSTOMER),
+            new DemoAccount("farmer", "farmer@sportvenue.com", "Lê Quang Minh (Chủ Vườn)", RoleName.FARMER),
+            new DemoAccount("warehouse", "warehouse@sportvenue.com", "Lê Quang Minh (Thủ Kho)", RoleName.WAREHOUSE),
+            new DemoAccount("distributor", "distributor@sportvenue.com", "Lê Quang Minh (Vận Chuyển)", RoleName.DISTRIBUTOR),
+            new DemoAccount("admin", "admin@sportvenue.com", "Lê Quang Minh (Quản Trị Viên)", RoleName.ADMIN)
     );
 
     private final UserRepository userRepository;

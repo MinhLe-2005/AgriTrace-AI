@@ -1106,7 +1106,7 @@ function AdminPortalContent() {
     loyalty: { title: "Hội viên AgriClub", description: "Theo dõi hạng thành viên, điểm thưởng và lịch sử chi tiêu của khách hàng.", icon: Crown, tone: "amber" as const, meta: `${members.length} hội viên` },
     events: { title: "Sự kiện & mùa vụ", description: "Quản lý thời gian, ưu đãi và phạm vi nông sản áp dụng cho từng chiến dịch.", icon: CalendarDays, tone: "teal" as const, meta: `${campaigns.length} chiến dịch` },
     blog: { title: "Quản trị blog & cẩm nang", description: "Quản lý nội dung, chuyên mục, trạng thái xuất bản và thông tin tác giả.", icon: BookOpen, tone: "indigo" as const, meta: `${blogPosts.length} bài viết` },
-    messages: { title: "Hộp thư & khiếu nại khách hàng", description: "Tiếp nhận khiếu nại hoàn tiền, chat trực tiếp với người mua và phê duyệt bồi hoàn theo chuẩn chuỗi lạnh.", icon: MessageSquare, tone: "amber" as const, meta: "Live Chat & Khiếu Nại" },
+    messages: { title: "Hộp thư & khiếu nại khách hàng", description: "Tiếp nhận khiếu nại hoàn tiền, chat trực tiếp với người mua và phê duyệt bồi hoàn theo chuẩn chuỗi lạnh.", icon: MessageSquare, tone: "amber" as const, meta: "Hộp Thư Đơn Hàng" },
   } satisfies Record<AdminTab, { title: string; description: string; icon: typeof Shield; tone: "forest" | "ocean" | "violet" | "amber" | "teal" | "indigo"; meta: string }>;
   const pageHeader = headerByTab[activeTab];
 

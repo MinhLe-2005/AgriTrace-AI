@@ -30,6 +30,7 @@ export type ConversationSummary = {
   lastMessageTime: string;
   messageCount: number;
   hasPendingDispute: boolean;
+  unreadCount?: number;
 };
 
 export type SendMessagePayload = {
@@ -86,6 +87,14 @@ export const orderChatService = {
       return res.data?.data || res.data || [];
     } catch {
       return [];
+    }
+  },
+
+  async markAsRead(orderCode: string): Promise<void> {
+    try {
+      await api.patch(`/orders/${encodeURIComponent(orderCode)}/messages/read`);
+    } catch {
+      // ignore
     }
   },
 };

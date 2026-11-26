@@ -50,7 +50,32 @@ export function AdminMessagesPanel() {
   // Load inbox
   useEffect(() => {
     loadInbox();
-  }, [filterDispute]);
+
+    // Smart polling
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        orderChatService
+          .getInbox({
+            status: filterDispute === "PENDING_DISPUTE" ? "DISPUTE" : undefined,
+          })
+          .then((list) => {
+            setConversations(list);
+          })
+          .catch(() => {});
+
+        if (selectedOrderCode) {
+          orderChatService
+            .getMessages(selectedOrderCode)
+            .then((msgs) => {
+              setMessages(msgs);
+            })
+            .catch(() => {});
+        }
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [filterDispute, selectedOrderCode]);
 
   async function loadInbox() {
     setIsLoading(true);
@@ -67,6 +92,15 @@ export function AdminMessagesPanel() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function handleSelectConversation(code: string) {
+    setSelectedOrderCode(code);
+    setConversations((prev) =>
+      prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
+    );
+    orderChatService.markAsRead(code);
+    loadMessages(code);
   }
 
   // Load messages
@@ -293,17 +327,26 @@ export function AdminMessagesPanel() {
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
             {filteredConvs.map((conv) => {
               const isSelected = conv.orderCode === selectedOrderCode;
+              const hasUnread = Boolean(conv.unreadCount && conv.unreadCount > 0);
               return (
                 <div
                   key={conv.orderCode}
-                  onClick={() => setSelectedOrderCode(conv.orderCode)}
+                  onClick={() => handleSelectConversation(conv.orderCode)}
                   className={`p-3.5 transition-colors cursor-pointer text-xs ${
                     isSelected ? "bg-emerald-50/80 border-l-4 border-emerald-700" : "hover:bg-gray-100/70"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-1 mb-1">
-                    <span className="font-mono font-bold text-emerald-800">#{conv.orderCode}</span>
-                    <span className="text-[10px] text-gray-400">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-mono font-bold text-emerald-800">#{conv.orderCode}</span>
+                      {hasUnread && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white font-extrabold text-[9px] animate-pulse shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                          {conv.unreadCount} tin mới
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-400 shrink-0">
                       {conv.lastMessageTime
                         ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                         : ""}

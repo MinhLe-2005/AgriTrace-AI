@@ -84,6 +84,7 @@ public class OrderMessageController {
         private LocalDateTime lastMessageTime;
         private int messageCount;
         private boolean hasPendingDispute;
+        private int unreadCount;
     }
 
     /**
@@ -122,9 +123,42 @@ public class OrderMessageController {
                 orderMessageRepository.save(welcomeMsg);
                 messages = List.of(welcomeMsg);
             }
+        } else {
+            // Tự động đánh dấu đã đọc khi mở xem tin nhắn
+            boolean hasUnread = false;
+            for (OrderMessage m : messages) {
+                if (!m.isRead()) {
+                    m.setRead(true);
+                    hasUnread = true;
+                }
+            }
+            if (hasUnread) {
+                orderMessageRepository.saveAll(messages);
+            }
         }
 
         return ApiResponse.ok("Lấy lịch sử tin nhắn thành công", messages);
+    }
+
+    /**
+     * Đánh dấu tất cả tin nhắn trong đơn hàng là đã đọc.
+     */
+    @PatchMapping("/{orderCode}/messages/read")
+    @Transactional
+    public ApiResponse<Void> markAsRead(@PathVariable String orderCode) {
+        String cleanCode = orderCode.trim().toUpperCase();
+        List<OrderMessage> messages = orderMessageRepository.findByOrderCodeOrderByCreatedAtAsc(cleanCode);
+        boolean hasUnread = false;
+        for (OrderMessage m : messages) {
+            if (!m.isRead()) {
+                m.setRead(true);
+                hasUnread = true;
+            }
+        }
+        if (hasUnread) {
+            orderMessageRepository.saveAll(messages);
+        }
+        return ApiResponse.ok("Đã đánh dấu đã đọc thành công", null);
     }
 
     /**
@@ -330,6 +364,8 @@ public class OrderMessageController {
                 continue;
             }
 
+            long unread = msgs.stream().filter(m -> !m.isRead()).count();
+
             summaries.add(ConversationSummary.builder()
                     .orderCode(order.getOrderCode())
                     .customerName(order.getReceiverName() != null ? order.getReceiverName() : "Khách hàng")
@@ -345,6 +381,7 @@ public class OrderMessageController {
                     .lastMessageTime(lastMsgTime)
                     .messageCount(msgs.size())
                     .hasPendingDispute(hasPending)
+                    .unreadCount((int) unread)
                     .build());
         }
 

@@ -45,7 +45,33 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
   // Load inbox
   useEffect(() => {
     loadInbox();
-  }, [farmerFarmName, filterDispute]);
+
+    // Smart polling: định kỳ 3.5s lấy tin nhắn mới khi tab đang xem (tiết kiệm database)
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        orderChatService
+          .getInbox({
+            farmName: farmerFarmName,
+            status: filterDispute === "DISPUTE" ? "DISPUTE" : undefined,
+          })
+          .then((list) => {
+            setConversations(list);
+          })
+          .catch(() => {});
+
+        if (selectedOrderCode) {
+          orderChatService
+            .getMessages(selectedOrderCode)
+            .then((msgs) => {
+              setMessages(msgs);
+            })
+            .catch(() => {});
+        }
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [farmerFarmName, filterDispute, selectedOrderCode]);
 
   async function loadInbox() {
     setIsLoading(true);
@@ -63,6 +89,16 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function handleSelectConversation(code: string) {
+    setSelectedOrderCode(code);
+    // Xóa ngay chấm đỏ trong giao diện khi xem
+    setConversations((prev) =>
+      prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
+    );
+    orderChatService.markAsRead(code);
+    loadMessages(code);
   }
 
   // Load messages when conversation selected
@@ -140,6 +176,12 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
             <h3 className="font-extrabold text-sm text-gray-900 flex items-center gap-2">
               <MessageSquare size={17} className="text-emerald-700" />
               <span>Hộp Thư Khách Hàng</span>
+              {conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0) > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-red-600 text-white font-extrabold text-[10px] animate-pulse flex items-center gap-1 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                  {conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0)} mới
+                </span>
+              )}
             </h3>
             <button
               onClick={loadInbox}
@@ -192,20 +234,29 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
         </div>
 
         {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+        <div className="flex-1 overflow-y-auto divide-y divide-gray-100 min-w-0">
           {filteredConvs.map((conv) => {
             const isSelected = conv.orderCode === selectedOrderCode;
+            const hasUnread = Boolean(conv.unreadCount && conv.unreadCount > 0);
             return (
               <div
                 key={conv.orderCode}
-                onClick={() => setSelectedOrderCode(conv.orderCode)}
+                onClick={() => handleSelectConversation(conv.orderCode)}
                 className={`p-3.5 transition-colors cursor-pointer text-xs ${
                   isSelected ? "bg-emerald-50/80 border-l-4 border-emerald-700" : "hover:bg-gray-100/70"
                 }`}
               >
                 <div className="flex items-start justify-between gap-1 mb-1">
-                  <span className="font-mono font-bold text-emerald-800">#{conv.orderCode}</span>
-                  <span className="text-[10px] text-gray-400">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-mono font-bold text-emerald-800">#{conv.orderCode}</span>
+                    {hasUnread && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white font-extrabold text-[9px] animate-pulse shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                        {conv.unreadCount} tin mới
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-gray-400 shrink-0">
                     {conv.lastMessageTime
                       ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       : ""}

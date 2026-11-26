@@ -37,7 +37,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { farmerService, parseFarmDocUrls, serializeFarmDocUrls, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot, ApiForecastProductItem } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
@@ -772,6 +772,7 @@ function resolveFarmerOwnerId(user: { id?: string; name?: string; email?: string
 
 function FarmerPortalContent() {
   // 9 Tab nghiệp vụ: Nông trại, Lô hàng, Nhật ký, Sản phẩm, Chứng nhận, Đánh giá, Mùa vụ, AI Dự báo & Hộp thư
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast" | "messages">("farms");
   const [farmerReviews, setFarmerReviews] = useState<ApiReview[]>([]);
@@ -2613,7 +2614,7 @@ function FarmerPortalContent() {
           <button
             onClick={() => {
               setActiveTab("messages");
-              window.history.replaceState(null, "", "/dashboard/farmer?tab=messages");
+              router.push("/dashboard/farmer?tab=messages");
             }}
             className={`px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all transform active:scale-95 cursor-pointer ${
               activeTab === "messages"
@@ -2623,7 +2624,6 @@ function FarmerPortalContent() {
           >
             <MessageSquare size={15} />
             <span>Hộp Thư & Khiếu Nại</span>
-            <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
           </button>
           <button
             onClick={openAddFarmModal}
@@ -2645,7 +2645,7 @@ function FarmerPortalContent() {
         <button
           onClick={() => {
             setActiveTab("farms");
-            window.history.replaceState(null, "", "/dashboard/farmer");
+            router.push("/dashboard/farmer");
           }}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "farms"
@@ -2662,7 +2662,7 @@ function FarmerPortalContent() {
         <button
           onClick={() => {
             setActiveTab("messages");
-            window.history.replaceState(null, "", "/dashboard/farmer?tab=messages");
+            router.push("/dashboard/farmer?tab=messages");
           }}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "messages"
@@ -2672,10 +2672,6 @@ function FarmerPortalContent() {
         >
           <MessageSquare size={16} className="text-amber-600" />
           <span>Hộp Thư & Khiếu Nại</span>
-          <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-            Live Chat
-          </span>
         </button>
 
         <button
@@ -4051,10 +4047,12 @@ function FarmerPortalContent() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 9: HỘP THƯ & KHIẾU NẠI KHÁCH HÀNG (LIVE CHAT & DISPUTES) */}
+      {/* TAB 2: HỘP THƯ & KHIẾU NẠI KHÁCH HÀNG */}
       {/* ========================================================================= */}
       {activeTab === "messages" && (
-        <FarmerMessagesPanel />
+        <div className="w-full min-w-0 overflow-hidden">
+          <FarmerMessagesPanel />
+        </div>
       )}
 
       {/* ========================================================================= */}
