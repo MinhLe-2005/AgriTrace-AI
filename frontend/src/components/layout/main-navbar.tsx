@@ -963,15 +963,6 @@ export function MainNavbar() {
                     </Link>
                   )}
                   <Link
-                    href="/vouchers"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors whitespace-nowrap shrink-0"
-                    title="Kho mã giảm giá & voucher toàn sàn"
-                  >
-                    <Gift size={14} className="text-amber-600" />
-                    <span>Kho Voucher</span>
-                  </Link>
-
-                  <Link
                     href="/dashboard/customer?tab=orders"
                     className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors whitespace-nowrap shrink-0"
                     title="Xem đơn mua của bạn"
@@ -1223,14 +1214,6 @@ export function MainNavbar() {
             </>
           ) : (
             <div className="flex items-center gap-2 shrink-0">
-              <Link
-                href="/vouchers"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors whitespace-nowrap shrink-0"
-                title="Kho mã giảm giá & voucher toàn sàn"
-              >
-                <Gift size={14} className="text-amber-600" />
-                <span>Kho Voucher</span>
-              </Link>
               <Link
                 href="/login"
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 transition-all shadow-xs whitespace-nowrap shrink-0"

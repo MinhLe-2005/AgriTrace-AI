@@ -301,23 +301,23 @@ export default function LoyaltyPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
             <Link
               href="/vouchers"
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer whitespace-nowrap"
               title="Xem tất cả mã giảm giá nông sản trên toàn sàn"
             >
-              <Gift size={16} />
-              <span>🎁 Kho Mã Giảm Giá (Toàn Sàn)</span>
+              <Gift size={14} />
+              <span>Kho Mã Giảm Giá</span>
             </Link>
 
             <Link
               href="/dashboard/customer?tab=vouchers"
-              className="px-4 py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold transition-colors flex items-center gap-2 shadow-2xs"
+              className="px-3.5 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs whitespace-nowrap"
               title="Xem các voucher đã lưu vào ví của tài khoản"
             >
-              <Ticket size={15} />
-              <span>🎫 Ví Voucher Của Tôi</span>
+              <Ticket size={14} />
+              <span>Ví Voucher Của Tôi</span>
             </Link>
           </div>
         </div>
