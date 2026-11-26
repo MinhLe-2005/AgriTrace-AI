@@ -28,6 +28,7 @@ import {
   Trash2,
   Star,
   MessageCircle,
+  MessageSquare,
   TrendingUp,
   Truck,
   Upload,
@@ -42,6 +43,7 @@ import { farmerService, parseFarmDocUrls, serializeFarmDocUrls, LotTimelineEvent
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
 import { DemandForecastPanel } from "@/components/farmer/demand-forecast-panel";
 import { CropSeasonsPanel } from "@/components/farmer/crop-seasons-panel";
+import { FarmerMessagesPanel } from "@/features/order-chat/FarmerMessagesPanel";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { reviewService, type ApiReview } from "@/services/review.service";
@@ -769,9 +771,9 @@ function resolveFarmerOwnerId(user: { id?: string; name?: string; email?: string
 }
 
 function FarmerPortalContent() {
-  // 8 Tab nghiệp vụ: Nông trại, Lô hàng, Nhật ký, Sản phẩm, Chứng nhận, Đánh giá, Mùa vụ & AI Dự báo
+  // 9 Tab nghiệp vụ: Nông trại, Lô hàng, Nhật ký, Sản phẩm, Chứng nhận, Đánh giá, Mùa vụ, AI Dự báo & Hộp thư
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast">("farms");
+  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast" | "messages">("farms");
   const [farmerReviews, setFarmerReviews] = useState<ApiReview[]>([]);
   const [farmerReplyText, setFarmerReplyText] = useState<{ [id: number]: string }>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [id: number]: boolean }>({});
@@ -824,8 +826,8 @@ function FarmerPortalContent() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "seasons", "forecast"].includes(tab)) {
-      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast");
+    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "seasons", "forecast", "messages"].includes(tab)) {
+      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast" | "messages");
     } else if (!tab) {
       setActiveTab((prev) => (prev === "forecast" || prev === "seasons" ? "farms" : prev));
     }
@@ -2743,6 +2745,20 @@ function FarmerPortalContent() {
             7-30 Ngày
           </span>
         </button>
+
+        <button
+          onClick={() => setActiveTab("messages")}
+          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "messages"
+              ? "border-emerald-600 text-emerald-800 font-extrabold"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <MessageSquare size={16} /> Hộp Thư & Khiếu Nại
+          <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+            Live Chat
+          </span>
+        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -4009,6 +4025,13 @@ function FarmerPortalContent() {
           farms={visibleFarms.map((f) => ({ code: f.code, name: f.name }))}
           onPlanHarvestBatch={handlePlanHarvestBatchFromForecast}
         />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 9: HỘP THƯ & KHIẾU NẠI KHÁCH HÀNG (LIVE CHAT & DISPUTES) */}
+      {/* ========================================================================= */}
+      {activeTab === "messages" && (
+        <FarmerMessagesPanel />
       )}
 
       {/* ========================================================================= */}

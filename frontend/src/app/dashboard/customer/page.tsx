@@ -44,6 +44,8 @@ import {
   X,
   PhoneCall,
   Zap,
+  MessageSquare,
+  AlertTriangle,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -51,7 +53,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { getApiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
-import { catalogService } from "@/services/catalog.service";
+import { catalogService, type ApiOrder } from "@/services/catalog.service";
+import { OrderChatDrawer } from "@/features/order-chat/OrderChatDrawer";
+import { OrderDisputeModal } from "@/features/order-chat/OrderDisputeModal";
 import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { reviewService } from "@/services/review.service";
@@ -100,6 +104,10 @@ type Order = {
   paymentMethod?: string;
   paymentRef?: string;
   paidAt?: string;
+  refundStatus?: string;
+  refundReason?: string;
+  refundSolution?: string;
+  refundAmount?: number;
   timeline: { title: string; time: string; completed: boolean }[];
 };
 
@@ -559,6 +567,10 @@ function CustomerDashboardContent() {
               paymentMethod: o.paymentMethod || "COD",
               paymentRef: o.paymentRef,
               paidAt: o.paidAt,
+              refundStatus: o.refundStatus || undefined,
+              refundReason: o.refundReason || undefined,
+              refundSolution: o.refundSolution || undefined,
+              refundAmount: o.refundAmount || undefined,
               items: rawItems,
               timeline: [
                 {
@@ -740,6 +752,10 @@ function CustomerDashboardContent() {
   const [reviewDriverCheck, setReviewDriverCheck] = useState(true);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewedOrders, setReviewedOrders] = useState<Record<string, boolean>>({});
+
+  // SHOPEE-STYLE: Chat với Shop & Yêu cầu Trả hàng / Hoàn tiền
+  const [chatOrder, setChatOrder] = useState<ApiOrder | null>(null);
+  const [disputeOrder, setDisputeOrder] = useState<ApiOrder | null>(null);
 
   useEffect(() => {
     try {
@@ -2167,6 +2183,42 @@ function CustomerDashboardContent() {
                           </button>
                         )
                       )}
+
+                      {/* FEATURE: Chat với Shop (Shopee-style) */}
+                      <button
+                        onClick={() => setChatOrder({ ...(order as any), orderCode: order.id, total: order.total } as ApiOrder)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer hover:border-emerald-400 active:scale-95"
+                        title="Chat trực tiếp với chủ nông trại và shop về đơn hàng này"
+                      >
+                        <MessageSquare size={13} className="text-emerald-700" />
+                        <span>Chat với Shop</span>
+                      </button>
+
+                      {/* FEATURE: Khiếu nại / Trả hàng (Shopee-style) */}
+                      {order.refundStatus === "PENDING" ? (
+                        <button
+                          onClick={() => setChatOrder({ ...(order as any), orderCode: order.id, total: order.total } as ApiOrder)}
+                          className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-950 border border-amber-400 text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer animate-pulse"
+                          title="Đang có yêu cầu hoàn tiền, bấm để xem chi tiết trao đổi"
+                        >
+                          <AlertTriangle size={13} className="text-amber-700" />
+                          <span>Đang chờ hoàn tiền</span>
+                        </button>
+                      ) : order.refundStatus === "APPROVED" || order.status === "REFUNDED" ? (
+                        <span className="px-3.5 py-1.5 rounded-xl bg-red-100 text-red-950 border border-red-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-default">
+                          <CheckCircle2 size={13} className="text-red-700" />
+                          <span>Đã hoàn tiền</span>
+                        </span>
+                      ) : (order.status === "DELIVERED" || order.status === "COMPLETED" || order.status === "SHIPPING") ? (
+                        <button
+                          onClick={() => setDisputeOrder({ ...(order as any), orderCode: order.id, total: order.total } as ApiOrder)}
+                          className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-red-50 text-red-800 border border-red-200 hover:border-red-300 text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          title="Gửi yêu cầu đổi trả hoặc hoàn tiền nếu nông sản bị hư hại"
+                        >
+                          <AlertTriangle size={13} className="text-red-600" />
+                          <span>Trả hàng / Hoàn tiền</span>
+                        </button>
+                      ) : null}
 
                       <Link
                         href={order.lotCode ? `/traceability?lot=${order.lotCode}` : "/traceability"}
@@ -3882,6 +3934,41 @@ function CustomerDashboardContent() {
           </div>
         </div>
       )}
+
+      {/* SHOPEE-STYLE: Drawer Chat với Shop */}
+      <OrderChatDrawer
+        order={chatOrder}
+        isOpen={Boolean(chatOrder)}
+        onClose={() => setChatOrder(null)}
+        onOpenDispute={(ord) => {
+          setDisputeOrder(ord);
+        }}
+        currentUserRole="CUSTOMER"
+        currentUserName={user?.name || "Lê Quang Minh"}
+      />
+
+      {/* SHOPEE-STYLE: Modal Yêu Cầu Trả Hàng / Hoàn Tiền */}
+      <OrderDisputeModal
+        order={disputeOrder}
+        isOpen={Boolean(disputeOrder)}
+        onClose={() => setDisputeOrder(null)}
+        onSuccess={(updatedOrder) => {
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === updatedOrder.orderCode
+                ? {
+                    ...o,
+                    refundStatus: "PENDING",
+                    refundReason: updatedOrder.refundReason || undefined,
+                  }
+                : o
+            )
+          );
+          if (chatOrder && chatOrder.orderCode === updatedOrder.orderCode) {
+            setChatOrder((prev) => (prev ? { ...prev, ...updatedOrder } : null));
+          }
+        }}
+      />
     </div>
   );
 }
