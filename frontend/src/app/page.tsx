@@ -73,6 +73,70 @@ export default function HomePage() {
   const [autoSlideDirection, setAutoSlideDirection] = useState<"right" | "left">("right");
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
 
+  // Mouse Drag-to-Scroll State & Handlers
+  const isMouseDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const dragDistanceRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const onGlobalMouseUp = () => {
+      if (isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        setIsDragging(false);
+        if (productCarouselRef.current) {
+          productCarouselRef.current.style.scrollBehavior = "smooth";
+          productCarouselRef.current.style.scrollSnapType = "x mandatory";
+        }
+      }
+    };
+    window.addEventListener("mouseup", onGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", onGlobalMouseUp);
+  }, []);
+
+  const handleCarouselMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const el = productCarouselRef.current;
+    if (!el) return;
+
+    isMouseDownRef.current = true;
+    dragDistanceRef.current = 0;
+    startXRef.current = e.pageX - el.offsetLeft;
+    scrollLeftRef.current = el.scrollLeft;
+
+    el.style.scrollBehavior = "auto";
+    el.style.scrollSnapType = "none";
+  };
+
+  const handleCarouselMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDownRef.current) return;
+    const el = productCarouselRef.current;
+    if (!el) return;
+
+    const x = e.pageX - el.offsetLeft;
+    const walk = x - startXRef.current;
+    dragDistanceRef.current = Math.abs(walk);
+
+    if (Math.abs(walk) > 3) {
+      if (!isDragging) setIsDragging(true);
+      e.preventDefault();
+      el.scrollLeft = scrollLeftRef.current - walk;
+    }
+  };
+
+  const handleCarouselMouseUp = () => {
+    if (!isMouseDownRef.current) return;
+    isMouseDownRef.current = false;
+    setIsDragging(false);
+
+    const el = productCarouselRef.current;
+    if (!el) return;
+
+    el.style.scrollBehavior = "smooth";
+    el.style.scrollSnapType = "x mandatory";
+  };
+
   function scrollProducts(direction: "left" | "right") {
     if (!productCarouselRef.current) return;
     const el = productCarouselRef.current;
@@ -665,10 +729,6 @@ export default function HomePage() {
 
               {/* Prev / Next Carousel Controls */}
               <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-[#166534] border border-emerald-200 text-[10px] font-mono font-bold mr-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isCarouselPaused ? 'bg-amber-500' : 'bg-emerald-600 animate-pulse'}`} />
-                  <span>{isCarouselPaused ? "Tạm dừng khi rê chuột" : "Tự động trượt qua về"}</span>
-                </span>
                 <button
                   type="button"
                   onClick={() => {
@@ -736,6 +796,15 @@ export default function HomePage() {
             {/* Horizontal Scroll Track - 4 cards visible per frame on LG */}
             <div
               ref={productCarouselRef}
+              onMouseDown={handleCarouselMouseDown}
+              onMouseMove={handleCarouselMouseMove}
+              onMouseUp={handleCarouselMouseUp}
+              onClickCapture={(e) => {
+                if (dragDistanceRef.current > 6) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }
+              }}
               onScroll={() => {
                 const el = productCarouselRef.current;
                 if (!el) return;
@@ -744,7 +813,9 @@ export default function HomePage() {
                 const idx = Math.round(el.scrollLeft / step);
                 setActiveSlideIdx(Math.max(0, idx));
               }}
-              className="flex gap-4 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory"
+              className={`flex gap-4 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory select-none ${
+                isDragging ? "cursor-grabbing" : "cursor-grab"
+              }`}
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
               {shown.map((p) => {
@@ -774,13 +845,14 @@ export default function HomePage() {
                       </div>
 
                       {/* Product Image */}
-                      <div className="relative h-48 bg-[#F6F3EC] overflow-hidden">
+                      <div className="relative h-48 bg-[#F6F3EC] overflow-hidden select-none">
                         <Image
                           src={p.image || "/images/products/xa-lach.jpg"}
                           alt={p.name}
                           fill
+                          draggable={false}
                           sizes="(max-width: 640px) 84vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500 pointer-events-none select-none"
                         />
 
                         {discountPercent > 0 && (
