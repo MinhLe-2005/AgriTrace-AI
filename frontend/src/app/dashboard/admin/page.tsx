@@ -534,6 +534,33 @@ function AdminPortalContent() {
     }
   }
 
+  async function handleApproveTransfer(orderCode: string) {
+    try {
+      const updated = await catalogService.updateOrderStatus(orderCode, "PAID");
+      toast.success(`Đã duyệt thanh toán VietQR thành công cho đơn #${orderCode}!`);
+      setOrders((prev) => prev.map((o) => (o.orderCode === orderCode ? updated : o)));
+      if (selectedOrder?.orderCode === orderCode) {
+        setSelectedOrder(updated);
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  }
+
+  async function handleRejectTransfer(orderCode: string) {
+    if (!window.confirm(`Xác nhận chưa nhận được tiền cho đơn #${orderCode}? Đơn hàng sẽ giữ trạng thái Chưa thanh toán và thông báo cho khách kiểm tra lại.`)) return;
+    try {
+      const updated = await catalogService.rejectTransfer(orderCode, "Chưa nhận được giao dịch sao kê VietQR");
+      toast.info(`Đã từ chối xác nhận thanh toán đơn #${orderCode}.`);
+      setOrders((prev) => prev.map((o) => (o.orderCode === orderCode ? updated : o)));
+      if (selectedOrder?.orderCode === orderCode) {
+        setSelectedOrder(updated);
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  }
+
   // --- Handlers: Vouchers ---
   async function handleCreateVoucher(e: React.FormEvent) {
     e.preventDefault();
@@ -941,6 +968,7 @@ function AdminPortalContent() {
       const st = o.status?.toUpperCase() || "";
       const matchStatus =
         orderFilter === "ALL" ||
+        (orderFilter === "PENDING_APPROVAL" && o.status === "PENDING_PAYMENT" && o.paymentRef === "PENDING_ADMIN_APPROVAL") ||
         (orderFilter === "CONFIRMED" && ["CONFIRMED", "PAID", "PREPARING", "PENDING_PAYMENT"].includes(st)) ||
         (orderFilter === "DELIVERED" && ["DELIVERED", "COMPLETED"].includes(st)) ||
         (orderFilter === "CANCELLED" && ["CANCELLED", "REFUNDED"].includes(st)) ||
@@ -2254,6 +2282,10 @@ function AdminPortalContent() {
               {(
                 [
                   { key: "ALL", label: "Tất cả" },
+                  {
+                    key: "PENDING_APPROVAL",
+                    label: `⚡ Chờ duyệt VietQR (${orders.filter((o) => o.status === "PENDING_PAYMENT" && o.paymentRef === "PENDING_ADMIN_APPROVAL").length})`,
+                  },
                   { key: "CONFIRMED", label: "Chờ lấy hàng" },
                   { key: "SHIPPING", label: "Đang giao" },
                   { key: "DELIVERED", label: "Đã giao" },
@@ -2267,6 +2299,8 @@ function AdminPortalContent() {
                     "px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
                     orderFilter === f.key
                       ? "bg-primary text-primary-foreground"
+                      : f.key === "PENDING_APPROVAL" && orders.some((o) => o.status === "PENDING_PAYMENT" && o.paymentRef === "PENDING_ADMIN_APPROVAL")
+                      ? "bg-amber-100 text-amber-900 border border-amber-300 font-bold hover:bg-amber-200"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   )}
                 >
@@ -2357,9 +2391,19 @@ function AdminPortalContent() {
                               <span className="text-[10px] font-bold text-gray-400">Đã hủy thanh toán</span>
                             ) : (order.paymentMethod || "COD").toUpperCase() === "PAYOS" ? (
                               order.status === "PENDING_PAYMENT" ? (
-                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block">
-                                  ⏳ Chưa TT (Giữ hàng 30p)
-                                </span>
+                                order.paymentRef === "PENDING_ADMIN_APPROVAL" ? (
+                                  <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 inline-flex items-center gap-1 animate-pulse">
+                                    🟡 Khách báo đã CK (Chờ duyệt)
+                                  </span>
+                                ) : order.paymentRef === "REJECTED_TRANSFER" ? (
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 inline-block">
+                                    ❌ Đã từ chối (Chưa nhận tiền)
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block">
+                                    ⏳ Chưa TT (Giữ hàng 30p)
+                                  </span>
+                                )
                               ) : (
                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block">
                                   ✅ Đã thanh toán QR
@@ -2401,9 +2445,27 @@ function AdminPortalContent() {
                           </span>
                         </td>
                         <td className="p-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             <button type="button" onClick={() => setSelectedOrder(order)} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Chi tiết</button>
-                            {(order.allowedNextStatuses ?? []).filter((status) => status !== "CANCELLED").slice(0, 1).map((status) => (
+                            {order.status === "PENDING_PAYMENT" && order.paymentRef === "PENDING_ADMIN_APPROVAL" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleApproveTransfer(order.orderCode)}
+                                  className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-800 transition-colors shadow-2xs"
+                                >
+                                  ✓ Duyệt đã nhận tiền
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleRejectTransfer(order.orderCode)}
+                                  className="rounded-lg bg-rose-50 border border-rose-200 px-2 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100 transition-colors"
+                                >
+                                  ✕ Chưa nhận
+                                </button>
+                              </>
+                            )}
+                            {!(order.status === "PENDING_PAYMENT" && order.paymentRef === "PENDING_ADMIN_APPROVAL") && (order.allowedNextStatuses ?? []).filter((status) => status !== "CANCELLED").slice(0, 1).map((status) => (
                               <button key={status} type="button" onClick={() => void handleUpdateOrderStatus(order.orderCode, status)} className="rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                 Chuyển: {orderStatusLabel(status)}
                               </button>

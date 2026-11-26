@@ -301,6 +301,9 @@ public class OrderController {
                 || ("PENDING_PAYMENT".equals(currentStatus) && "CONFIRMED".equals(newStatus)))
                 && order.getPaidAt() == null) {
             order.setPaidAt(LocalDateTime.now());
+            if ("PENDING_ADMIN_APPROVAL".equals(order.getPaymentRef()) || order.getPaymentRef() == null) {
+                order.setPaymentRef("ADMIN_VERIFIED_VIETQR");
+            }
         }
         Order saved = orderRepository.save(order);
         if ("PAID".equals(newStatus) || "DELIVERED".equals(newStatus)
@@ -313,6 +316,46 @@ public class OrderController {
             );
         }
         return ApiResponse.ok("Cập nhật trạng thái đơn hàng thành công", saved);
+    }
+
+    @PostMapping("/{orderCode}/report-transfer")
+    @Transactional
+    public ApiResponse<Order> reportTransfer(
+            @PathVariable String orderCode,
+            @RequestParam(required = false) String note
+    ) {
+        Order order = orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
+
+        if (!"PENDING_PAYMENT".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("Đơn hàng #" + orderCode + " không ở trạng thái chờ thanh toán");
+        }
+
+        order.setPaymentRef("PENDING_ADMIN_APPROVAL");
+        if (note != null && !note.isBlank()) {
+            order.setDeliveryNote((order.getDeliveryNote() != null ? order.getDeliveryNote() + " | " : "") + "Khách báo CK: " + note.trim());
+        }
+        Order saved = orderRepository.save(order);
+        log.info("Khách hàng đã báo chuyển khoản cho đơn #{}, đang chờ Quản trị viên đối soát", orderCode);
+        return ApiResponse.ok("Đã ghi nhận thông báo chuyển khoản. Quản trị viên/Kế toán đang đối soát sao kê để duyệt đơn.", saved);
+    }
+
+    @PostMapping("/{orderCode}/reject-transfer")
+    @Transactional
+    public ApiResponse<Order> rejectTransfer(
+            @PathVariable String orderCode,
+            @RequestParam(required = false) String reason
+    ) {
+        Order order = orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
+
+        order.setPaymentRef("REJECTED_TRANSFER");
+        if (reason != null && !reason.isBlank()) {
+            order.setDeliveryNote((order.getDeliveryNote() != null ? order.getDeliveryNote() + " | " : "") + "Từ chối CK: " + reason.trim());
+        }
+        Order saved = orderRepository.save(order);
+        log.info("Quản trị viên từ chối xác nhận chuyển khoản đơn #{}. Lý do: {}", orderCode, reason);
+        return ApiResponse.ok("Đã từ chối xác nhận chuyển khoản cho đơn hàng #" + orderCode, saved);
     }
 
     private void deductProductStock(String productName, String qtyStr) {

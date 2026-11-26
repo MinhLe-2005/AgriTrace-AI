@@ -140,8 +140,16 @@ function getOrderStatusDetails(
     paymentStatusColor = "bg-purple-50 text-purple-800 border-purple-200/80";
   } else if (isQr) {
     if (normStatus === "PENDING_PAYMENT") {
-      paymentStatusText = `Chưa thanh toán (Giữ hàng 30p · Còn ${holdMinutesLeft}p)`;
-      paymentStatusColor = "bg-amber-100 text-amber-900 border-amber-300";
+      if ((paymentRef || "").toUpperCase().includes("PENDING_ADMIN") || (paymentRef || "").toUpperCase().includes("APPROVAL")) {
+        paymentStatusText = "Chờ Admin/Kế toán duyệt chuyển khoản";
+        paymentStatusColor = "bg-amber-100 text-amber-900 border-amber-300 font-semibold";
+      } else if ((paymentRef || "").toUpperCase().includes("REJECTED")) {
+        paymentStatusText = "Chưa nhận được chuyển khoản (Quét lại QR)";
+        paymentStatusColor = "bg-rose-100 text-rose-900 border-rose-300 font-semibold";
+      } else {
+        paymentStatusText = `Chưa thanh toán (Giữ hàng 30p · Còn ${holdMinutesLeft}p)`;
+        paymentStatusColor = "bg-amber-100 text-amber-900 border-amber-300";
+      }
     } else {
       paymentStatusText = "Đã thanh toán (Chuyển khoản VietQR)";
       paymentStatusColor = "bg-emerald-100 text-emerald-900 border-emerald-300";
@@ -818,42 +826,26 @@ function CustomerDashboardContent() {
   async function handleQuickConfirmPaid(orderCode: string) {
     setIsProcessingPayos(true);
     try {
-      await paymentService.simulatePaymentSuccess(orderCode);
+      await catalogService.reportTransfer(orderCode);
       const targetOrd = orders.find((o) => o.id === orderCode);
-      const pts = targetOrd?.pointsAwarded || 20;
       const nowIso = new Date().toISOString();
       addNotification({
-        id: `notif-paid-${orderCode}`,
-        title: `✅ Đã thanh toán VietQR đơn #${orderCode}`,
-        message: `Hệ thống đã xác nhận chuyển khoản ${(targetOrd?.total || 0).toLocaleString("vi-VN")}đ cho đơn #${orderCode}. Đơn hàng đã chuyển sang Chờ đóng gói kho lạnh!`,
+        id: `notif-claimed-paid-${orderCode}`,
+        title: `⏳ Đã gửi thông báo chuyển khoản đơn #${orderCode}`,
+        message: `Hệ thống đã tiếp nhận thông tin chuyển khoản cho đơn #${orderCode}. Quản trị viên/Kế toán đang đối soát sao kê ngân hàng 24/7 để phê duyệt!`,
         type: "order",
         link: `/dashboard/customer?tab=orders&order=${orderCode}`,
       });
-      addNotification({
-        id: `notif-points-${orderCode}`,
-        title: `🎁 Tích điểm thành công: +${pts} điểm AgriClub!`,
-        message: `Chúc mừng! Bạn vừa được cộng +${pts} điểm thưởng từ đơn #${orderCode} vào Ví Hội Viên AgriClub!`,
-        type: "voucher",
-        link: `/dashboard/customer?tab=points`,
-      });
-      toast.success(`Đã xác nhận chuyển khoản & cộng +${pts} điểm AgriClub cho đơn #${orderCode}!`);
-      loyaltyService.getLoyaltyMe(user?.email || "customer@gmail.com").then((lp) => {
-        if (lp) setLoyaltyProfile(lp);
-      }).catch(() => {});
+      toast.info(`Đã báo chuyển khoản đơn #${orderCode}! Admin/Kế toán đang kiểm tra sao kê để phê duyệt.`);
       setOrders((prev) =>
         prev.map((o) => {
           if (o.id !== orderCode) return o;
-          const d = getOrderStatusDetails("PAID", o.paymentMethod, o.createdAtRaw, nowIso, o.paymentRef);
+          const d = getOrderStatusDetails("PENDING_PAYMENT", o.paymentMethod, o.createdAtRaw, o.paidAt, "PENDING_ADMIN_APPROVAL");
           const updated: Order = {
             ...o,
-            status: "PAID",
-            paidAt: nowIso,
-            statusText: d.text,
-            statusColor: d.color,
+            paymentRef: "PENDING_ADMIN_APPROVAL",
             paymentStatusText: d.paymentStatusText,
             paymentStatusColor: d.paymentStatusColor,
-            holdMinutesLeft: 0,
-            timeline: o.timeline.map((step, i) => (i <= 1 ? { ...step, completed: true } : step)),
           };
           if (selectedOrder?.id === orderCode) {
             setSelectedOrder(updated);
@@ -861,8 +853,9 @@ function CustomerDashboardContent() {
           return updated;
         })
       );
-    } catch {
-      toast.error("Không thể xác nhận thanh toán đơn hàng.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể gửi thông báo chuyển khoản.";
+      toast.error(msg);
     } finally {
       setIsProcessingPayos(false);
     }
@@ -1674,19 +1667,38 @@ function CustomerDashboardContent() {
                       <div className="flex items-start sm:items-center gap-2.5 text-amber-950">
                         <Clock size={16} className="text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
                         <div>
-                          <strong>Kho lạnh đang tạm giữ nông sản 30 phút</strong> (Còn{" "}
-                          <strong className="text-amber-900 font-extrabold">{order.holdMinutesLeft || 30} phút</strong>).
-                          Vui lòng quét mã VietQR bên dưới hoặc ấn xác nhận nếu bạn vừa chuyển khoản!
+                          {order.paymentRef === "PENDING_ADMIN_APPROVAL" ? (
+                            <>
+                              <strong className="text-amber-900 font-extrabold">⏳ Đã tiếp nhận báo chuyển khoản:</strong> Kế toán AgriTrace đang đối soát sao kê ngân hàng 24/7 để xác nhận đơn cho bạn (thường mất 1–3 phút). Vui lòng giữ biên lai đối chiếu nếu cần!
+                            </>
+                          ) : order.paymentRef === "REJECTED_TRANSFER" ? (
+                            <>
+                              <strong className="text-rose-900 font-extrabold">⚠️ Kế toán chưa nhận được tiền:</strong> Chưa tìm thấy giao dịch sao kê cho đơn #{order.id}. Vui lòng kiểm tra lại tài khoản hoặc quét lại VietQR đúng nội dung!
+                            </>
+                          ) : (
+                            <>
+                              <strong>Kho lạnh đang tạm giữ nông sản 30 phút</strong> (Còn{" "}
+                              <strong className="text-amber-900 font-extrabold">{order.holdMinutesLeft || 30} phút</strong>).
+                              Vui lòng quét mã VietQR bên dưới hoặc ấn xác nhận nếu bạn vừa chuyển khoản!
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => handleQuickConfirmPaid(order.id)}
-                          disabled={isProcessingPayos}
-                          className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-                        >
-                          ✓ Tôi đã chuyển khoản
-                        </button>
+                        {order.paymentRef === "PENDING_ADMIN_APPROVAL" ? (
+                          <span className="px-3.5 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs border border-amber-300 flex items-center gap-1.5 shadow-2xs cursor-default">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                            Đang chờ Admin duyệt
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleQuickConfirmPaid(order.id)}
+                            disabled={isProcessingPayos}
+                            className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                          >
+                            ✓ Tôi đã chuyển khoản
+                          </button>
+                        )}
                         <button
                           onClick={() => handleOpenPayOS(order.id)}
                           className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"

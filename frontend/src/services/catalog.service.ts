@@ -280,4 +280,20 @@ export const catalogService = {
     const payload = res.data as { data?: ApiOrder };
     return payload?.data || (res.data as ApiOrder);
   },
+
+  async reportTransfer(orderCode: string, note?: string): Promise<ApiOrder> {
+    const res = await api.post<{ data?: ApiOrder } | ApiOrder>(`/orders/${encodeURIComponent(orderCode)}/report-transfer`, null, {
+      params: note ? { note } : undefined,
+    });
+    const payload = res.data as { data?: ApiOrder };
+    return payload?.data || (res.data as ApiOrder);
+  },
+
+  async rejectTransfer(orderCode: string, reason?: string): Promise<ApiOrder> {
+    const res = await api.post<{ data?: ApiOrder } | ApiOrder>(`/orders/${encodeURIComponent(orderCode)}/reject-transfer`, null, {
+      params: reason ? { reason } : undefined,
+    });
+    const payload = res.data as { data?: ApiOrder };
+    return payload?.data || (res.data as ApiOrder);
+  },
 };

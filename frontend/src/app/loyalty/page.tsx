@@ -139,6 +139,61 @@ const redeemOptions = [
   },
 ];
 
+// Shopee-style Member Perk & Voucher Definitions
+type VoucherPerk = {
+  id: string;
+  type: "points" | "tier" | "promo";
+  title: string;
+  code?: string;
+  discountBadge: string;
+  desc: string;
+  minOrder: string;
+  costPoints?: number;
+  minTier: string;
+  tag: string;
+  tagColor: string;
+  isSaved?: boolean;
+};
+
+const memberPerkVouchers: VoucherPerk[] = [
+  {
+    id: "perk-fs-monthly",
+    type: "tier",
+    code: "VIP-FREESHIP",
+    title: "Voucher Freeship Xe Lạnh 25.000 đ",
+    discountBadge: "FREESHIP 25K",
+    desc: "Đặc quyền miễn phí ship xe lạnh 2°C - 5°C hàng tháng",
+    minOrder: "100.000 đ",
+    minTier: "Đồng",
+    tag: "Đặc Quyền Hội Viên",
+    tagColor: "bg-emerald-100 text-emerald-800",
+  },
+  {
+    id: "perk-quarter-sale",
+    type: "tier",
+    code: "VIP-GOLD5",
+    title: "Voucher Giảm 5% Toàn Giỏ Hàng",
+    discountBadge: "GIẢM 5%",
+    desc: "Chiết khấu độc quyền cho thành viên đạt hạng Vàng & Kim Cương",
+    minOrder: "300.000 đ",
+    minTier: "Vàng",
+    tag: "Đặc Quyền VIP",
+    tagColor: "bg-amber-100 text-amber-800",
+  },
+  {
+    id: "perk-agri30",
+    type: "promo",
+    code: "AGRI30",
+    title: "Mã Trợ Giá Nông Sản Vụ Mùa -30%",
+    discountBadge: "GIẢM 30%",
+    desc: "Ưu đãi trực tiếp từ quỹ hỗ trợ tiêu thụ nông sản sạch",
+    minOrder: "150.000 đ",
+    minTier: "Tất cả",
+    tag: "Hot Vụ Mùa",
+    tagColor: "bg-rose-100 text-rose-800",
+  },
+];
+
 export default function LoyaltyPage() {
   const { user } = useAuthStore();
   const [profile, setProfile] = useState<LoyaltyProfile | null>(null);
@@ -146,6 +201,8 @@ export default function LoyaltyPage() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemedVoucher, setRedeemedVoucher] = useState<ApiVoucher | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [activeVoucherTab, setActiveVoucherTab] = useState<"all" | "points" | "tier" | "promo">("all");
+  const [savedCodes, setSavedCodes] = useState<string[]>(["VIP-FREESHIP"]);
 
   useEffect(() => {
     async function loadData() {
@@ -165,11 +222,11 @@ export default function LoyaltyPage() {
     loadData();
   }, [user?.email]);
 
-  const currentPoints = profile?.currentPoints ?? 100;
-  const totalSpent = profile?.totalSpent ?? 0;
+  const currentPoints = profile?.currentPoints ?? 47;
+  const totalSpent = profile?.totalSpent ?? 487250;
   const tierKey = profile?.tier?.toUpperCase() ?? "BRONZE";
   const pointsMultiplier = profile?.pointsMultiplier ?? 1.0;
-  const progressPercent = profile?.progressPercent ?? 0;
+  const progressPercent = profile?.progressPercent ?? 48.7;
   const nextTier = profile?.nextTier ?? "SILVER";
   const nextTierThreshold = profile?.nextTierThreshold ?? 1000000;
   const transactions = profile?.recentTransactions ?? [];
@@ -200,6 +257,15 @@ export default function LoyaltyPage() {
     } finally {
       setIsRedeeming(false);
     }
+  }
+
+  function handleClaimPerk(code: string, title: string) {
+    if (savedCodes.includes(code)) {
+      toast.info(`Mã ${code} đã có trong ví voucher của bạn!`);
+      return;
+    }
+    setSavedCodes((prev) => [...prev, code]);
+    toast.success(`Đã lưu "${title}" (Mã: ${code}) vào ví voucher của bạn!`);
   }
 
   function handleCopy(code: string) {
@@ -404,6 +470,196 @@ export default function LoyaltyPage() {
           </div>
         )}
 
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {/* ── SHOPEE-STYLE REWARDS: KHO VOUCHER & ĐỔI MÃ GIẢM GIÁ ──   */}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        <div id="redeem-section" className="scroll-mt-24 bg-white p-6 sm:p-7 rounded-3xl border border-gray-200/90 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                  <Ticket size={17} />
+                </span>
+                <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight">
+                  Kho Voucher & Đổi Mã Giảm Giá Shopee Rewards
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Lưu mã đặc quyền theo hạng thành viên hoặc đổi điểm tích lũy lấy voucher giảm giá, freeship xe lạnh trên giỏ hàng.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+                Điểm của bạn: <strong className="font-mono text-sm">{currentPoints} điểm</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Shopee Voucher Filter Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
+            {[
+              { key: "all", label: "Tất Cả Ưu Đãi" },
+              { key: "points", label: `Đổi Điểm Lấy Quà (${redeemOptions.length})` },
+              { key: "tier", label: `Đặc Quyền Hạng ${tierKey} (VIP)` },
+              { key: "promo", label: "Mã Trợ Giá Vụ Mùa" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveVoucherTab(tab.key as any)}
+                className={cn(
+                  "px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all duration-150 cursor-pointer",
+                  activeVoucherTab === tab.key
+                    ? "bg-emerald-800 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200/80 hover:text-gray-900"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Shopee-style Specimen Voucher Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 1. Member Perk & Promo Vouchers */}
+            {(activeVoucherTab === "all" || activeVoucherTab === "tier" || activeVoucherTab === "promo") &&
+              memberPerkVouchers
+                .filter((v) => (activeVoucherTab === "all" ? true : v.type === activeVoucherTab))
+                .map((v) => {
+                  const isSaved = savedCodes.includes(v.code || "");
+                  return (
+                    <div
+                      key={v.id}
+                      className="relative rounded-2xl border border-gray-200/90 bg-white hover:border-amber-400 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col sm:flex-row group"
+                    >
+                      {/* Left Coupon Notch Stub */}
+                      <div className="sm:w-36 bg-gradient-to-br from-amber-500 to-amber-700 p-4 text-white flex sm:flex-col justify-between items-center sm:items-center text-center relative border-r border-dashed border-amber-300/40">
+                        <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold">
+                          {v.type === "promo" ? <Sparkles size={18} /> : <Crown size={18} />}
+                        </div>
+                        <div className="my-1 text-center">
+                          <span className="font-mono text-base sm:text-lg font-black tracking-tight block">
+                            {v.discountBadge}
+                          </span>
+                          <span className="text-[10px] text-amber-100 font-medium tracking-wide uppercase">
+                            {v.type === "promo" ? "Toàn sàn" : "Đặc quyền"}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-mono text-amber-200/90">
+                          {v.code}
+                        </span>
+                      </div>
+
+                      {/* Right Voucher Details */}
+                      <div className="p-4 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", v.tagColor)}>
+                              {v.tag}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-mono">HSD: 31/12/2026</span>
+                          </div>
+                          <h3 className="font-bold text-sm text-gray-900 mt-1.5">{v.title}</h3>
+                          <p className="text-[11px] text-gray-500 leading-snug mt-0.5">{v.desc}</p>
+                          <div className="text-[11px] text-stone-500 mt-1">
+                            <span>Đơn tối thiểu: </span>
+                            <strong className="text-gray-800 font-semibold">{v.minOrder}</strong>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                            <CheckCircle2 size={13} />
+                            <span>Hạng: {v.minTier}</span>
+                          </span>
+                          {isSaved ? (
+                            <Link
+                              href="/products"
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                            >
+                              <span>Đã lưu · Dùng ngay →</span>
+                            </Link>
+                          ) : (
+                            <button
+                              onClick={() => handleClaimPerk(v.code || "", v.title)}
+                              className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
+                            >
+                              Lưu Mã Ngay
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+            {/* 2. Points Redemption Vouchers */}
+            {(activeVoucherTab === "all" || activeVoucherTab === "points") &&
+              redeemOptions.map((opt) => {
+                const canRedeem = currentPoints >= opt.cost;
+                return (
+                  <div
+                    key={opt.id}
+                    className="relative rounded-2xl border border-gray-200/90 bg-white hover:border-emerald-500 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col sm:flex-row group"
+                  >
+                    {/* Left Coupon Notch Stub (Points Style) */}
+                    <div className="sm:w-36 bg-gradient-to-br from-[#123e21] to-[#1c5d33] p-4 text-white flex sm:flex-col justify-between items-center sm:items-center text-center relative border-r border-dashed border-emerald-400/40">
+                      <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold">
+                        <Gift size={18} />
+                      </div>
+                      <div className="my-1 text-center">
+                        <span className="font-mono text-base sm:text-lg font-black tracking-tight block">
+                          {opt.type === "FREESHIP" ? "FREESHIP" : opt.title.split("Voucher ")[1] || "GIẢM TIỀN"}
+                        </span>
+                        <span className="text-[10px] text-emerald-200 font-medium tracking-wide uppercase">
+                          Đổi bằng điểm
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-amber-300 bg-black/20 px-1.5 py-0.5 rounded">
+                        {opt.cost} điểm
+                      </span>
+                    </div>
+
+                    {/* Right Voucher Details */}
+                    <div className="p-4 flex-1 flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                            {opt.tag}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-mono">HSD: 30 ngày từ khi đổi</span>
+                        </div>
+                        <h3 className="font-bold text-sm text-gray-900 mt-1.5">{opt.title}</h3>
+                        <p className="text-[11px] text-gray-500 leading-snug mt-0.5">{opt.desc}</p>
+                        <div className="text-[11px] text-stone-500 mt-1">
+                          <span>Đơn tối thiểu: </span>
+                          <strong className="text-gray-800 font-semibold">{opt.minOrder}</strong>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-stone-500">
+                          Yêu cầu: <strong>Hạng {opt.minTier}</strong>
+                        </span>
+                        <button
+                          onClick={() => handleRedeem(opt)}
+                          disabled={!canRedeem || isRedeeming}
+                          className={cn(
+                            "px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer",
+                            canRedeem
+                              ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          )}
+                        >
+                          {isRedeeming ? "Đang xử lý…" : canRedeem ? `Đổi ngay (${opt.cost}đ)` : `Cần ${opt.cost} điểm`}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+
         {/* ── 4 Membership Tiers Display ── */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -463,66 +719,6 @@ export default function LoyaltyPage() {
                       {isCurrent ? "Đang áp dụng cho tài khoản" : "Cần đạt mức chi tiêu tương ứng"}
                     </span>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Redeem Points Section ── */}
-        <div id="redeem-section" className="scroll-mt-24 bg-white p-6 sm:p-7 rounded-3xl border border-gray-200/90 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Gift size={19} className="text-emerald-700" />
-                Quầy Đổi Điểm Lấy Mã Giảm Giá Thật
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Đổi điểm tích lũy lấy voucher freeship hoặc giảm tiền mặt trực tiếp trên giỏ hàng (Mã sinh tự động vào cơ sở dữ liệu).
-              </p>
-            </div>
-            <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold self-start sm:self-auto">
-              Số dư: <strong>{currentPoints} điểm</strong>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {redeemOptions.map((opt) => {
-              const canRedeem = currentPoints >= opt.cost;
-              return (
-                <div
-                  key={opt.id}
-                  className="p-4 rounded-2xl border border-gray-200/80 bg-gray-50/50 flex flex-col justify-between space-y-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                        {opt.tag}
-                      </span>
-                      <span className="text-xs font-extrabold text-purple-800">
-                        {opt.cost} điểm
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-sm text-gray-900">{opt.title}</h3>
-                    <p className="text-[11px] text-gray-500 leading-snug">{opt.desc}</p>
-                    <div className="text-[11px] text-gray-400 pt-1">
-                      <span>Đơn tối thiểu: </span>
-                      <strong className="text-gray-600">{opt.minOrder}</strong>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleRedeem(opt)}
-                    disabled={!canRedeem || isRedeeming}
-                    className={cn(
-                      "w-full py-2 rounded-xl text-xs font-semibold transition-all shadow-xs",
-                      canRedeem
-                        ? "bg-emerald-700 hover:bg-emerald-800 text-white"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    )}
-                  >
-                    {isRedeeming ? "Đang xử lý…" : canRedeem ? `Đổi ngay (${opt.cost}đ)` : "Chưa đủ điểm"}
-                  </button>
                 </div>
               );
             })}

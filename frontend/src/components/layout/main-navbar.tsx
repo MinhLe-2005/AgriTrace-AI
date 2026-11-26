@@ -483,7 +483,7 @@ export function MainNavbar() {
             onMouseLeave={handleMouseLeave}
           >
             <Link
-              href="/vouchers"
+              href="/loyalty"
               className={cn(
                 "px-3 py-2 rounded-xl flex items-center gap-1 transition-all duration-150 cursor-pointer",
                 pathname.startsWith("/vouchers") || pathname.startsWith("/loyalty")
@@ -504,24 +504,25 @@ export function MainNavbar() {
             {hoveredNav === "loyalty" && (
               <div className="absolute top-full left-0 pt-2 w-80 z-50 animate-in fade-in zoom-in-95 duration-150 before:content-[''] before:absolute before:inset-x-0 before:-top-2 before:h-3">
                 <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-3 space-y-1 text-xs">
-                  <div className="px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-900 border-b border-gray-100">
-                    Quyền Lợi & Ưu Đãi
+                  <div className="px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-900 border-b border-gray-100 flex items-center justify-between">
+                    <span>Quyền Lợi & Ưu Đãi</span>
+                    <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-bold">Shopee Rewards</span>
                   </div>
 
                   <Link
-                    href="/events"
-                    className="p-2.5 rounded-xl hover:bg-rose-50/70 transition-all flex items-start gap-2.5 group"
+                    href="/loyalty"
+                    className="p-2.5 rounded-xl hover:bg-emerald-50/80 transition-all flex items-start gap-2.5 group"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-rose-600 group-hover:text-white transition-colors">
-                      <Sparkles size={15} />
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-700 group-hover:text-white transition-colors">
+                      <Award size={15} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-gray-900 group-hover:text-rose-800 block">
-                          Sự Kiện & Mùa Vụ Khuyến Mãi
+                        <span className="font-bold text-gray-900 group-hover:text-emerald-800 block">
+                          Thành Viên AgriClub & Đổi Mã
                         </span>
                       </div>
-                      <span className="text-[10px] text-gray-500">Trợ giá vụ mùa tại vườn, đếm ngược thời gian sale</span>
+                      <span className="text-[10px] text-gray-500">Xem thẻ hội viên, tích điểm và đổi mã giảm giá</span>
                     </div>
                   </Link>
 
@@ -541,23 +542,23 @@ export function MainNavbar() {
                   </Link>
 
                   <Link
-                    href="/loyalty"
-                    className="p-2.5 rounded-xl hover:bg-amber-50/70 transition-all flex items-start gap-2.5 group"
+                    href="/events"
+                    className="p-2.5 rounded-xl hover:bg-rose-50/70 transition-all flex items-start gap-2.5 group"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-700 group-hover:text-white transition-colors">
-                      <Award size={15} />
+                    <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                      <Sparkles size={15} />
                     </div>
                     <div>
-                      <span className="font-bold text-gray-900 group-hover:text-emerald-800 block">
-                        Thành Viên AgriClub
+                      <span className="font-bold text-gray-900 group-hover:text-rose-800 block">
+                        Sự Kiện & Mùa Vụ Khuyến Mãi
                       </span>
-                      <span className="text-[10px] text-gray-500">Tích lũy 1x - 1.5x điểm thưởng mỗi đơn mua</span>
+                      <span className="text-[10px] text-gray-500">Trợ giá vụ mùa tại vườn, đếm ngược thời gian sale</span>
                     </div>
                   </Link>
 
                   <Link
                     href="/loyalty#redeem-section"
-                    className="p-2.5 rounded-xl hover:bg-amber-50/70 transition-all flex items-start gap-2.5 group"
+                    className="p-2.5 rounded-xl hover:bg-teal-50/70 transition-all flex items-start gap-2.5 group"
                   >
                     <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-teal-700 group-hover:text-white transition-colors">
                       <Sparkles size={15} />
