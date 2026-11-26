@@ -158,7 +158,6 @@ export function MainNavbar() {
   // Sync live notifications from user orders, vouchers, and verification
   useEffect(() => {
     if (!user) {
-      useNotificationStore.setState({ notifications: [] });
       return;
     }
     let mounted = true;
@@ -737,8 +736,12 @@ export function MainNavbar() {
             <div className="relative">
               <button
                 onClick={() => {
-                  setNotifOpen(!notifOpen);
+                  const nextOpen = !notifOpen;
+                  setNotifOpen(nextOpen);
                   setUserOpen(false);
+                  if (nextOpen && unreadNotifs.length > 0) {
+                    markAllAsRead();
+                  }
                 }}
                 className="relative p-2 rounded-xl text-gray-600 hover:text-emerald-700 hover:bg-gray-100 transition-colors cursor-pointer"
                 title="Thông báo"

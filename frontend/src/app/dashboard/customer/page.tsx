@@ -409,6 +409,7 @@ function CustomerDashboardContent() {
   const { user, updateUser } = useAuthStore();
   const { addItem } = useCartStore();
   const { notifications, addNotification, markAsRead, markAllAsRead, deleteNotification } = useNotificationStore();
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const tabParam = searchParams.get("tab");
   const orderParam = searchParams.get("order");
@@ -652,6 +653,16 @@ function CustomerDashboardContent() {
       }
     }
   }, [tabParam, orderParam, orders]);
+
+  // Auto mark notifications as read when viewing the notifications tab
+  useEffect(() => {
+    if (activeTab === "notifications" && unreadCount > 0) {
+      const timer = setTimeout(() => {
+        markAllAsRead();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, unreadCount, markAllAsRead]);
 
   // Order filter & search
   const [orderFilter, setOrderFilter] = useState<string>("ALL");
@@ -1351,8 +1362,6 @@ function CustomerDashboardContent() {
     if (notifFilter === "SEASON") return n.type === "season" || n.type === "promo";
     return true;
   });
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="space-y-6">
@@ -2482,9 +2491,12 @@ function CustomerDashboardContent() {
               filteredNotifs.map((n) => (
                 <div
                   key={n.id}
+                  onClick={() => {
+                    if (!n.read) markAsRead(n.id);
+                  }}
                   className={cn(
-                    "py-4 px-3 sm:px-4 rounded-xl transition-colors flex items-start justify-between gap-4 group",
-                    !n.read ? "bg-emerald-50/40" : "hover:bg-gray-50"
+                    "py-4 px-3 sm:px-4 rounded-xl transition-colors flex items-start justify-between gap-4 group cursor-pointer",
+                    !n.read ? "bg-emerald-50/40 hover:bg-emerald-50/70" : "hover:bg-gray-50"
                   )}
                 >
                   <div className="flex items-start gap-3.5 flex-1 min-w-0">
@@ -2528,7 +2540,10 @@ function CustomerDashboardContent() {
                         {n.link && (
                           <Link
                             href={n.link}
-                            onClick={() => markAsRead(n.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(n.id);
+                            }}
                             className="text-emerald-700 font-semibold hover:underline flex items-center gap-1"
                           >
                             <span>Xem chi tiết</span>
@@ -2542,7 +2557,10 @@ function CustomerDashboardContent() {
                   <div className="flex items-center gap-1">
                     {!n.read && (
                       <button
-                        onClick={() => markAsRead(n.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAsRead(n.id);
+                        }}
                         title="Đánh dấu đã đọc"
                         className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-700 hover:bg-white transition-colors"
                       >
@@ -2550,7 +2568,10 @@ function CustomerDashboardContent() {
                       </button>
                     )}
                     <button
-                      onClick={() => deleteNotification(n.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(n.id);
+                      }}
                       title="Xóa thông báo"
                       className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-white transition-colors"
                     >
