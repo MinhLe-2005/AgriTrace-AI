@@ -1,98 +1,150 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SYSTEM_INSTRUCTION = `Bạn là Trợ lý AI Thông Minh của Hệ Thống Quản Lý Chuỗi Cung Ứng Nông Sản Sạch AgriTrace AI.
-Nhiệm vụ của bạn là tư vấn tận tình, chuyên sâu về nông sản theo mùa vụ, giá cả, tiêu chuẩn VietGAP/GlobalGAP, quy trình chuỗi lạnh, và HƯỚNG DẪN ĐẶT HÀNG TRỰC TIẾP QUA CÁC NÚT HÀNH ĐỘNG ĐIỀU HƯỚNG TRANG.
+// Fallback catalog reflecting the exact live database & active seasonal campaigns
+const LIVE_CATALOG = [
+  {
+    name: "Dâu Tây New Zealand Mộc Châu",
+    basePrice: 210000,
+    currentPrice: 170100, // 210.000 - 19% (trợ giá 39.900đ)
+    discountPercent: 19,
+    discountAmount: 39900,
+    unit: "Hộp 500g",
+    batchCode: "LOT-DT-2026-11",
+    altBatch: "DT-MC-2026-11",
+    campaign: "Mùa Thu Hoạch Dâu Tây New Zealand Mộc Châu",
+    origin: "HTX Nông Sản Sạch Mộc Châu (Sơn La)",
+    cert: "GlobalGAP / VietGAP",
+    pesticide: "Kiểm định NIFC tồn dư BVTV = 0",
+    coldChain: "Bảo quản xe lạnh 2°C – 5°C",
+    keywords: ["dau", "dau tay", "strawberry", "moc chau", "dt-mc", "lot-dt"],
+  },
+  {
+    name: "Cam Sành Hàm Yên Tép Vàng Mọng Nước",
+    basePrice: 55000,
+    currentPrice: 45000, // 55.000 - 18% (trợ giá 10.000đ)
+    discountPercent: 18,
+    discountAmount: 10000,
+    unit: "KG",
+    batchCode: "SP-CS-03",
+    altBatch: "CS-HY-2026-03",
+    campaign: "Đại Tiệc Cam Sành Hàm Yên & Bố Hạ Chính Vụ",
+    origin: "HTX Cam Sành Hàm Yên (Tuyên Quang)",
+    cert: "VietGAP",
+    pesticide: "BVTV = 0, đạt chuẩn an toàn sinh học",
+    coldChain: "Kho mát 2°C – 5°C",
+    keywords: ["cam", "cam sanh", "ham yen", "cs-hy", "sp-cs"],
+  },
+  {
+    name: "Xà Lách Lô Lô Xanh Thủy Canh",
+    basePrice: 42000,
+    currentPrice: 33600, // 42.000 - 20% (trợ giá 8.400đ)
+    discountPercent: 20,
+    discountAmount: 8400,
+    unit: "KG",
+    batchCode: "LOT-XL-2026-08",
+    altBatch: "XL-2026-08",
+    campaign: "Chiến Dịch Trợ Giá Rau Ăn Lá Thủy Canh Đà Lạt",
+    origin: "Nông Trại Xanh Thủy Canh Đà Lạt (Lâm Đồng)",
+    cert: "GlobalGAP / VietGAP",
+    pesticide: "Quatest 1 BVTV = 0",
+    coldChain: "Thu hoạch 05:30 sáng, xe lạnh 2°C – 5°C",
+    keywords: ["xa lach", "lo lo", "rau", "thuy canh", "xl-2026", "lot-xl"],
+  },
+  {
+    name: "Cải Xoăn Kale Hữu Cơ Dinh Dưỡng",
+    basePrice: 75000,
+    currentPrice: 60000, // 75.000 - 20% (trợ giá 15.000đ)
+    discountPercent: 20,
+    discountAmount: 15000,
+    unit: "KG",
+    batchCode: "SP-KL-05",
+    altBatch: "KL-2026-05",
+    campaign: "Chiến Dịch Trợ Giá Rau Ăn Lá Thủy Canh Đà Lạt",
+    origin: "Nông Trại Xanh Thủy Canh Đà Lạt (Lâm Đồng)",
+    cert: "Organic BioCert",
+    pesticide: "100% hữu cơ, không hóa chất",
+    coldChain: "Bảo quản mát 2°C – 5°C",
+    keywords: ["kale", "cai xoan", "cai kale", "sp-kl"],
+  },
+  {
+    name: "Bơ Sáp 034 Đặc Sản Cao Nguyên",
+    basePrice: 90000,
+    currentPrice: 74700, // 90.000 - 17% (trợ giá 15.300đ)
+    discountPercent: 17,
+    discountAmount: 15300,
+    unit: "KG",
+    batchCode: "SP-BO-06",
+    altBatch: "BO-034",
+    campaign: "Tuần Lễ Xả Kho Tươi Cuối Vụ Bơ Sáp 034",
+    origin: "Bảo Lộc (Lâm Đồng)",
+    cert: "VietGAP",
+    pesticide: "BVTV = 0",
+    coldChain: "Bảo quản kho mát 5°C",
+    keywords: ["bo", "bo sap", "034", "sp-bo"],
+  },
+  {
+    name: "Cà Chua Bi Cherry Đỏ Ngọt",
+    basePrice: 60000,
+    currentPrice: 50000, // Giảm 17%
+    discountPercent: 17,
+    discountAmount: 10000,
+    unit: "KG",
+    batchCode: "SP-CC-04",
+    altBatch: "CC-04",
+    campaign: "Vụ Mùa Cà Chua Bi Cherry",
+    origin: "Nông Trại Xanh Thủy Canh Đà Lạt",
+    cert: "VietGAP",
+    pesticide: "BVTV = 0",
+    coldChain: "Xe lạnh 2°C – 5°C",
+    keywords: ["ca chua", "cherry", "sp-cc"],
+  },
+];
 
-DƯỚI ĐÂY LÀ TOÀN BỘ CƠ SỞ TRI THỨC VÀ DANH MỤC NÔNG SẢN THỰC TẾ TRÊN HỆ THỐNG:
+function buildSystemInstruction(): string {
+  const productListText = LIVE_CATALOG.map(
+    (p) => `- ${p.name}:
+  + Giá bán thực tế trên web: ${p.currentPrice.toLocaleString("vi-VN")} đ / ${p.unit} (Giá gốc: ${p.basePrice.toLocaleString("vi-VN")} đ — Đang áp dụng ${p.campaign} giảm ${p.discountPercent}% tiết kiệm ${p.discountAmount.toLocaleString("vi-VN")} đ).
+  + Mã lô GS1: ${p.batchCode}
+  + Nguồn gốc: ${p.origin}
+  + Chứng nhận: ${p.cert}, ${p.pesticide}
+  + Chuỗi lạnh: ${p.coldChain}`
+  ).join("\n");
 
-1. DANH MỤC 6 NÔNG SẢN SẠCH ĐANG BÁN & MÙA VỤ HIỆN TẠI (MÙA ĐÔNG - XUÂN 2026):
-- Dâu Tây New Zealand Mộc Châu:
-  + Giá bán ưu đãi: 180.000 đ / Hộp 500g (Giá gốc: 210.000 đ - Giảm 14%).
-  + Mã lô định danh GS1: DT-MC-2026-11.
-  + Nguồn gốc: Hợp Tác Xã Nông Sản Sạch Mộc Châu (Thị trấn Nông Trường, Mộc Châu, Sơn La).
-  + Canh tác & Mùa vụ: Đang vào chính vụ đông - xuân rộ trái ngon nhất năm, trồng giá thể xơ dừa hữu cơ Israel, tưới giun quế vi sinh.
-  + Tiêu chuẩn: Chứng nhận VietGAP số #VG-SL-2025-442, kiểm nghiệm NIFC không tồn dư BVTV, bảo quản lạnh 2°C - 5°C.
-- Cam Sành Hàm Yên Tép Vàng Mọng Nước:
-  + Giá bán ưu đãi: 45.000 đ / KG (Giá gốc: 55.000 đ - Giảm 18%).
-  + Mã lô: CS-HY-2026-03 (hoặc SP-CS-05).
-  + Nguồn gốc: HTX Cam Sành Hàm Yên, Tuyên Quang.
-  + Canh tác & Mùa vụ: Mùa thu hoạch rộ tép cam vàng óng, mọng nước, vỏ mỏng, vị ngọt thanh giải nhiệt cực tốt, giàu vitamin C.
-  + Tiêu chuẩn: VietGAP an toàn sinh học.
-- Cải Xoăn Kale Hữu Cơ Dinh Dưỡng:
-  + Giá bán ưu đãi: 65.000 đ / KG (Giá gốc: 75.000 đ - Giảm 13%).
-  + Mã lô: SP-KL-05.
-  + Nguồn gốc: Nông Trại Xanh Thủy Canh Đà Lạt (Lâm Đồng).
-  + Đặc điểm: Nữ hoàng rau xanh, giàu vitamin A-C-K và khoáng chất chống oxy hóa, làm nước ép detox hoặc salad.
-  + Tiêu chuẩn: Canh tác chuẩn Organic BioCert.
-- Bơ Sáp 034 Đặc Sản Cao Nguyên:
-  + Giá bán ưu đãi: 75.000 đ / KG (Giá gốc: 90.000 đ - Giảm 17%).
-  + Mã lô: SP-BO-06.
-  + Nguồn gốc: Bảo Lộc, Tỉnh Lâm Đồng.
-  + Đặc điểm: Cơm vàng dày hạt lép, dẻo quánh, ngậy béo thơm lừng tự nhiên.
-  + Tiêu chuẩn: VietGAP.
-- Xà Lách Lô Lô Xanh Thủy Canh:
-  + Giá bán ưu đãi: 35.000 đ / KG (Giá gốc: 42.000 đ - Giảm 17%).
-  + Mã lô: LOT-XL-2026-08.
-  + Nguồn gốc: Nông Trại Xanh Thủy Canh Đà Lạt (Lâm Đồng).
-  + Đặc điểm: Trồng giàn thủy canh hồi lưu khép kín trong nhà kính, giòn ngọt thanh mát, không đắng, hái mới mỗi sáng 05:30.
-  + Tiêu chuẩn: GlobalGAP số #GG-VN-2024-910, Quatest 1 BVTV = 0.
-- Cà Chua Bi Cherry Đỏ Ngọt:
-  + Giá bán ưu đãi: 50.000 đ / KG (Giá gốc: 60.000 đ - Giảm 17%).
-  + Mã lô: SP-CC-04.
-  + Nguồn gốc: Nông Trại Xanh Thủy Canh Đà Lạt.
-  + Đặc điểm: Quả chùm tròn đều, vỏ mỏng mọng đỏ, ngọt đậm ròn tan.
+  return `Bạn là Trợ lý AI Thông Minh của Hệ Thống Nông Sản Sạch AgriTrace AI.
+Nhiệm vụ của bạn là tư vấn CHÍNH XÁC 100% về giá bán thực tế trên website, mùa vụ, tiêu chuẩn VietGAP/GlobalGAP, quy trình chuỗi lạnh, gợi ý thực đơn món ngon dinh dưỡng, và HƯỚNG DẪN ĐẶT HÀNG TRỰC TIẾP QUA CÁC NÚT HÀNH ĐỘNG ĐIỀU HƯỚNG TRANG.
 
-2. QUY TRÌNH CHUỖI LẠNH & QUẢN LÝ FEFO:
-- Tất cả nông sản sau khi thu hoạch lúc 05:30 sáng được sơ chế và đưa vào chuỗi lạnh khép kín 2°C - 5°C.
-- Vận chuyển bằng đội xe lạnh chuyên dụng kiểm soát nhiệt độ tự động qua cảm biến IoT.
-- Quản lý hạn dùng FEFO (First-Expired, First-Out): Hạn dùng gần nhất xuất trước để nông sản đến tay khách luôn tươi ngon.
+DƯỚI ĐÂY LÀ DANH MỤC VÀ GIÁ BÁN THỰC TẾ ĐANG NIÊM YẾT TRÊN WEBSITE:
+${productListText}
 
-3. TRUY XUẤT NGUỒN GỐC TEM QR CODE GS1:
-- Khách quét mã QR trên bao bì hoặc tra cứu mã lô để xem nhật ký: ngày gieo trồng, kiểm định chất lượng phòng lab Quatest/NIFC, nhật ký nhiệt độ xe lạnh và giấy chứng nhận an toàn thực phẩm.
-
-4. HỘI VIÊN AGRICLUB & VÍ VOUCHER:
-- Tích lũy 1 điểm cho mỗi 10.000 đ chi tiêu.
-- 4 Hạng: Đồng (x1.0), Bạc (x1.2), Vàng (x1.5), Kim Cương (x2.0).
-- Đổi điểm nhận voucher giảm 10k, 30k, hoặc mã freeship xe lạnh 25k (FREESHIP25).
-
-5. THANH TOÁN & GIAO HÀNG:
-- Thanh toán COD hoặc quét mã PayOS VietQR tự động xác nhận trong 2 giây.
-- Cam kết bảo hành 1 đổi 1 trong vòng 24h nếu dập nát.
+ĐẶC BIỆT LƯU Ý VỀ GIÁ BÁN:
+- Dâu Tây New Zealand Mộc Châu: GIÁ BÁN ĐANG HIỂN THỊ TRÊN WEB LÀ 170.100 đ / Hộp 500g (Giá gốc 210.000 đ, trợ giá trực tiếp 19% tiết kiệm 39.900 đ). Tuyệt đối không báo sai giá khác!
+- Cam Sành Hàm Yên: 45.000 đ / KG (Gốc 55.000 đ).
+- Xà Lách Lô Lô Xanh: 33.600 đ / KG (Gốc 42.000 đ).
+- Cải Xoăn Kale: 60.000 đ / KG (Gốc 75.000 đ).
+- Bơ Sáp 034: 74.700 đ / KG (Gốc 90.000 đ).
+- Cà Chua Bi Cherry: 50.000 đ / KG.
 
 QUY TẮC BẮT BUỘC VỀ NÚT HÀNH ĐỘNG (INTERACTIVE ACTION BUTTONS):
 Mỗi khi tư vấn cho người dùng về mua nông sản, giới thiệu loại rau củ quả, mùa vụ, tra cứu nguồn gốc, đổi voucher, hoặc giỏ hàng thanh toán:
-BẠN BẮT BUỘC PHẢI TẠO CÁC NÚT ĐIỀU HƯỚNG TRANG Ở CUỐI CÂU TRẢ LỜI BẰNG CÚ PHÁP ĐẶC BIỆT:
+BẠN BẮT BUỘC PHẢI TẠO CÁC NÚT ĐIỀU HƯỚNG TRANG Ở CUỐI CÂU TRẢ LỜI BẰNG CÚ PHÁP:
 [[ACTION: <Nhãn nút có biểu tượng emoji> | <Đường dẫn URL>]]
 
-Các đường dẫn URL chuẩn xác trên AgriTrace (Tự động lọc sản phẩm và mở cửa sổ Mua Ngay Áp Voucher hoặc Chi Tiết):
-- Mua ngay Dâu Tây (Mở thẳng form Mua Ngay có Áp Voucher): [[ACTION: ⚡ Mua Ngay Dâu Tây Mộc Châu (Áp Voucher) | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]
-- Xem chi tiết Dâu Tây: [[ACTION: 🔍 Xem Chi Tiết Dâu Tây Mộc Châu | /products?search=Dâu+Tây&detail=DT-MC-2026-11]]
-- Mua ngay Cam Sành (Mở thẳng form Mua Ngay có Áp Voucher): [[ACTION: ⚡ Mua Ngay Cam Sành Hàm Yên (Áp Voucher) | /products?search=Cam+Sành&buy=CS-HY-2026-03]]
-- Xem chi tiết Cam Sành: [[ACTION: 🔍 Xem Chi Tiết Cam Sành Hàm Yên | /products?search=Cam+Sành&detail=CS-HY-2026-03]]
-- Mua ngay Xà Lách Thủy Canh: [[ACTION: ⚡ Mua Ngay Xà Lách Lô Lô Xanh (Áp Voucher) | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]
-- Xem chi tiết Xà Lách: [[ACTION: 🔍 Xem Chi Tiết Xà Lách Lô Lô | /products?search=Xà+Lách&detail=LOT-XL-2026-08]]
-- Mua ngay Cải Kale: [[ACTION: ⚡ Mua Ngay Cải Xoăn Kale (Áp Voucher) | /products?search=Cải+Xoăn&buy=SP-KL-05]]
-- Mua ngay Bơ Sáp: [[ACTION: ⚡ Mua Ngay Bơ Sáp 034 Cao Nguyên | /products?search=Bơ+Sáp&buy=SP-BO-06]]
-- Mua ngay Cà Chua Bi: [[ACTION: ⚡ Mua Ngay Cà Chua Bi Cherry | /products?search=Cà+Chua&buy=SP-CC-04]]
-- Mua theo danh mục:
-  + Trái cây: [[ACTION: 🍎 Xem Danh Mục Trái Cây Đặc Sản | /products?cat=trai_cay]]
-  + Rau ăn lá: [[ACTION: 🥬 Xem Danh Mục Rau Thủy Canh | /products?cat=rau_la]]
-  + Tất cả sản phẩm: [[ACTION: 🛒 Khám Phá Cửa Hàng Nông Sản | /products]]
-- Tra cứu nguồn gốc mã QR GS1:
-  + Dâu Tây: [[ACTION: 🔍 Tra Cứu Lô Dâu Tây DT-MC-2026-11 | /traceability?batch=DT-MC-2026-11]]
-  + Xà Lách: [[ACTION: 🔍 Tra Cứu Lô Xà Lách LOT-XL-2026-08 | /traceability?batch=LOT-XL-2026-08]]
-  + Cam Sành: [[ACTION: 🔍 Tra Cứu Lô Cam Sành CS-HY-2026-03 | /traceability?batch=CS-HY-2026-03]]
-  + Tra cứu chung: [[ACTION: 🔍 Quét & Tra Cứu Mã QR GS1 | /traceability]]
-- Giỏ hàng & thanh toán: [[ACTION: 🛍️ Đến Giỏ Hàng Chung | /cart]]
-- Tích điểm & đổi voucher: [[ACTION: 🎁 Đổi Điểm Thưởng & Lấy Voucher | /dashboard/customer?tab=vouchers]]
-- Đơn hàng đã mua: [[ACTION: 📦 Xem Lịch Sử Đơn Hàng | /dashboard/customer?tab=orders]]
+Các đường dẫn URL chuẩn xác trên AgriTrace:
+- Mua ngay Dâu Tây: [[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]
+- Xem chi tiết Dâu Tây: [[ACTION: 🔍 Xem Chi Tiết Dâu Tây Mộc Châu | /products?search=Dâu+Tây&detail=LOT-DT-2026-11]]
+- Mua ngay Cam Sành: [[ACTION: ⚡ Mua Ngay Cam Sành (45.000đ) | /products?search=Cam+Sành&buy=SP-CS-03]]
+- Xem chi tiết Cam Sành: [[ACTION: 🔍 Xem Chi Tiết Cam Sành Hàm Yên | /products?search=Cam+Sành&detail=SP-CS-03]]
+- Mua ngay Xà Lách: [[ACTION: ⚡ Mua Ngay Xà Lách Lô Lô (33.600đ) | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]
+- Mua ngay Cải Kale: [[ACTION: ⚡ Mua Ngay Cải Xoăn Kale (60.000đ) | /products?search=Cải+Xoăn&buy=SP-KL-05]]
+- Mua ngay Bơ Sáp: [[ACTION: ⚡ Mua Ngay Bơ Sáp 034 (74.700đ) | /products?search=Bơ+Sáp&buy=SP-BO-06]]
+- Mua ngay Cà Chua: [[ACTION: ⚡ Mua Ngay Cà Chua Bi (50.000đ) | /products?search=Cà+Chua&buy=SP-CC-04]]
+- Mua theo danh mục: [[ACTION: 🥬 Danh Mục Rau Ăn Lá | /products?cat=rau_la]] | [[ACTION: 🍎 Danh Mục Trái Cây | /products?cat=trai_cay]] | [[ACTION: 🛒 Cửa Hàng Nông Sản | /products]]
+- Tra cứu mã QR GS1: [[ACTION: 🔍 Quét & Tra Cứu Tem QR | /traceability]]
+- Giỏ hàng & Voucher: [[ACTION: 🛍️ Đến Giỏ Hàng | /cart]] | [[ACTION: 🎁 Ví Voucher & Đổi Điểm | /dashboard/customer?tab=vouchers]] | [[ACTION: 📦 Đơn Hàng Của Tôi | /dashboard/customer?tab=orders]]
 
-Mỗi phản hồi tư vấn nông sản nên kèm từ 1 đến 3 nút action phù hợp nhất để khách hàng bấm là hệ thống lọc đúng sản phẩm đó và mở ngay popup Mua Ngay hoặc Chi Tiết!
-
-QUY TẮC BẮT BUỘC VỀ PHẠM VI (SCOPE GUARDRAIL):
-- Bạn chỉ hỗ trợ nông sản sạch, nguồn gốc xuất xứ, chứng nhận VietGAP, chuỗi lạnh, dinh dưỡng ẩm thực gia đình và dịch vụ trên AgriTrace AI.
-- Nếu người dùng hỏi các chủ đề ngoài lề (lập trình, chính trị, showbiz, tài chính...), hãy lịch sự từ chối và hướng họ quay lại nông sản sạch AgriTrace.
-- Luôn giữ thái độ thân thiện, xưng hô "Dạ chào bạn!", "AgriTrace AI xin chia sẻ...", câu từ tự nhiên, mạch lạc, dùng gạch đầu dòng và in đậm rõ ràng.`;
+HỖ TRỢ THỰC ĐƠN & BẢO QUẢN:
+Nếu khách hỏi về nấu gì, công thức món ăn, bảo quản rau củ trong tủ lạnh, hãy tư vấn nhiệt tình, nêu rõ cách giữ tươi và các bước chế biến đơn giản giữ trọn vitamin!`;
+}
 
 function normalizeVi(str: string): string {
   return (str || "")
@@ -104,138 +156,180 @@ function normalizeVi(str: string): string {
     .trim();
 }
 
-const PRODUCT_ACTION_CATALOG = [
-  {
-    keywords: ["dau", "dau tay", "strawberry", "moc chau", "dt-mc"],
-    buyAction: "[[ACTION: ⚡ Mua Ngay Dâu Tây Mộc Châu (Mở Cửa Sổ Đặt Mua) | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]",
-    detailAction: "[[ACTION: 🔍 Xem Chi Tiết & Tem QR Lô Dâu Tây | /products?search=Dâu+Tây&detail=DT-MC-2026-11]]",
-    fallbackReply:
-      "Dạ chào bạn! 🍓 **Dâu Tây New Zealand Mộc Châu** hiện đang vào chính vụ Đông - Xuân ngon nhất năm tại **Hợp Tác Xã Nông Sản Sạch Mộc Châu**:\n\n- **Giá ưu đãi:** **180.000 đ / Hộp 500g** (Giảm 14% so với giá gốc 210.000 đ)\n- **Mã lô truy xuất GS1:** **DT-MC-2026-11** (Đạt chuẩn **GlobalGAP / VietGAP**, kiểm định NIFC không tồn dư BVTV)\n- **Chuỗi lạnh:** Thu hái lúc 05:30 sáng và vận chuyển xe lạnh chuyên dụng **2°C - 5°C**\n\nBạn bấm ngay vào nút bên dưới để **mở thẳng cửa sổ Đặt Mua Dâu Tây (có áp Voucher giảm giá)** nhé!",
-  },
-  {
-    keywords: ["cam", "cam sanh", "ham yen", "cs-hy", "sp-cs"],
-    buyAction: "[[ACTION: ⚡ Mua Ngay Cam Sành Hàm Yên (Mở Cửa Sổ Đặt Mua) | /products?search=Cam+Sành&buy=CS-HY-2026-03]]",
-    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cam Sành Hàm Yên | /products?search=Cam+Sành&detail=CS-HY-2026-03]]",
-    fallbackReply:
-      "Dạ chào bạn! 🍊 **Cam Sành Hàm Yên Tép Vàng Mọng Nước** đang vào vụ thu hoạch rộ ngọt thanh, giàu Vitamin C:\n\n- **Giá ưu đãi:** **45.000 đ / KG** (Giá gốc 55.000 đ)\n- **Mã lô GS1:** **CS-HY-2026-03** — Đạt chuẩn **VietGAP**\n- **Nguồn gốc:** HTX Cam Sành Hàm Yên, Tuyên Quang\n\nBạn bấm nút bên dưới để **mở ngay cửa sổ Mua Cam Sành** nhé!",
-  },
-  {
-    keywords: ["xa lach", "lo lo", "rau", "thuy canh", "xl-2026"],
-    buyAction: "[[ACTION: ⚡ Mua Ngay Xà Lách Thủy Canh (Mở Cửa Sổ Đặt Mua) | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]",
-    detailAction: "[[ACTION: 🔍 Tra Cứu Tem QR Lô Xà Lách XL-2026-08 | /traceability?batch=LOT-XL-2026-08]]",
-    fallbackReply:
-      "Dạ chào bạn! 🥬 **Xà Lách Lô Lô Xanh Thủy Canh** được thu hoạch mới lúc 05:30 sáng nay tại Nông Trại Xanh Thủy Canh Đà Lạt:\n\n- **Giá ưu đãi:** **35.000 đ / KG** (Giòn ngọt, không đắng, chuẩn GlobalGAP #GG-VN-2024-910)\n- **Kiểm định:** Quatest 1 tồn dư BVTV = 0, bảo quản chuỗi lạnh 2°C - 5°C\n\nBạn bấm nút bên dưới để **mở thẳng cửa sổ Đặt Mua Xà Lách** nhé!",
-  },
-  {
-    keywords: ["kale", "cai xoan", "cai kale", "sp-kl"],
-    buyAction: "[[ACTION: ⚡ Mua Ngay Cải Xoăn Kale Hữu Cơ (Mở Cửa Sổ Đặt Mua) | /products?search=Cải+Xoăn&buy=SP-KL-05]]",
-    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cải Xoăn Kale | /products?search=Cải+Xoăn&detail=SP-KL-05]]",
-    fallbackReply:
-      "Dạ chào bạn! 🥬 **Cải Xoăn Kale Hữu Cơ Dinh Dưỡng** (Đà Lạt) rất giàu Vitamin A-C-K, cực tốt cho salad và nước ép detox:\n\n- **Giá ưu đãi:** **65.000 đ / KG** (Chuẩn canh tác Organic BioCert)\n- **Mã lô:** **SP-KL-05**\n\nBạn bấm nút bên dưới để **vào mua ngay Cải Xoăn Kale** nhé!",
-  },
-  {
-    keywords: ["bo", "bo sap", "034", "sp-bo"],
-    buyAction: "[[ACTION: ⚡ Mua Ngay Bơ Sáp 034 Cao Nguyên | /products?search=Bơ+Sáp&buy=SP-BO-06]]",
-    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Bơ Sáp 034 | /products?search=Bơ+Sáp&detail=SP-BO-06]]",
-    fallbackReply:
-      "Dạ chào bạn! 🥑 **Bơ Sáp 034 Đặc Sản Cao Nguyên** (Bảo Lộc, Lâm Đồng) cơm vàng dày, hạt lép, dẻo béo tự nhiên:\n\n- **Giá ưu đãi:** **75.000 đ / KG** (Chuẩn VietGAP)\n- **Mã lô:** **SP-BO-06**\n\nBạn bấm nút bên dưới để **mở ngay cửa sổ Đặt Mua Bơ Sáp 034** nhé!",
-  },
-  {
-    keywords: ["ca chua", "cherry", "sp-cc"],
-    buyAction: "[[ACTION: ⚡ Mua Ngay Cà Chua Bi Cherry | /products?search=Cà+Chua&buy=SP-CC-04]]",
-    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cà Chua Bi Cherry | /products?search=Cà+Chua&detail=SP-CC-04]]",
-    fallbackReply:
-      "Dạ chào bạn! 🍅 **Cà Chua Bi Cherry Đỏ Ngọt** (Nông Trại Thủy Canh Đà Lạt) quả chùm tròn mọng, ngọt thanh:\n\n- **Giá ưu đãi:** **50.000 đ / KG** (Chuẩn VietGAP)\n- **Mã lô:** **SP-CC-04**\n\nBạn bấm nút bên dưới để **đặt mua ngay Cà Chua Bi Cherry** nhé!",
-  },
-  {
-    keywords: ["ca rot", "baby", "cr-dl"],
-    buyAction: "[[ACTION: ⚡ Mua Ngay Cà Rốt Baby Đà Lạt | /products?search=Cà+Rốt&buy=CR-DL-2026-07]]",
-    detailAction: "[[ACTION: 🔍 Xem Chi Tiết Cà Rốt Baby | /products?search=Cà+Rốt&detail=CR-DL-2026-07]]",
-    fallbackReply:
-      "Dạ chào bạn! 🥕 **Cà Rốt Baby Giòn Ngọt Đà Lạt** củ nhỏ non mềm, giàu Beta-Carotene:\n\n- **Mã lô:** **CR-DL-2026-07** (Chuẩn VietGAP Đà Lạt)\n\nBạn bấm nút bên dưới để **mở ngay cửa sổ Đặt Mua Cà Rốt Baby** nhé!",
-  },
-];
-
-function ensureGuaranteedActionButtons(userMessage: string, replyText: string): string {
-  const normUser = normalizeVi(userMessage);
-  const normReply = normalizeVi(replyText);
-  let updatedReply = replyText.trim();
-
-  let matchedAnyProduct = false;
-  for (const item of PRODUCT_ACTION_CATALOG) {
-    const userMentions = item.keywords.some((kw) => normUser.includes(kw));
-    const replyMentions = item.keywords.some((kw) => normReply.includes(kw));
-    if (userMentions || (replyMentions && normUser.includes("mua"))) {
-      matchedAnyProduct = true;
-      // Extract the URL path from buyAction to see if AI already included a buy link for this product
-      const buyUrlMatch = item.buyAction.match(/\|\s*(.*?)\]\]/);
-      const buyUrl = buyUrlMatch ? buyUrlMatch[1].trim() : "";
-      if (buyUrl && !updatedReply.includes(buyUrl)) {
-        updatedReply += `\n\n${item.buyAction}`;
-      }
-      const detailUrlMatch = item.detailAction.match(/\|\s*(.*?)\]\]/);
-      const detailUrl = detailUrlMatch ? detailUrlMatch[1].trim() : "";
-      if (detailUrl && !updatedReply.includes(detailUrl)) {
-        updatedReply += `\n${item.detailAction}`;
-      }
-    }
-  }
-
-  // If no [[ACTION:...]] at all exists in the reply, append helpful default actions
-  if (!/\[\[ACTION:/i.test(updatedReply)) {
-    if (normUser.includes("voucher") || normUser.includes("diem") || normUser.includes("ma giam")) {
-      updatedReply += `\n\n[[ACTION: 🎁 Mở Kho Voucher & Đổi Điểm AgriClub | /dashboard/customer?tab=vouchers]]`;
-    } else if (normUser.includes("don hang") || normUser.includes("don mua") || normUser.includes("thanh toan")) {
-      updatedReply += `\n\n[[ACTION: 📦 Xem Đơn Mua Của Tôi | /dashboard/customer?tab=orders]]`;
-    } else if (!matchedAnyProduct) {
-      updatedReply += `\n\n[[ACTION: ⚡ Mua Ngay Dâu Tây Mộc Châu | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]\n[[ACTION: ⚡ Mua Ngay Cam Sành Hàm Yên | /products?search=Cam+Sành&buy=CS-HY-2026-03]]\n[[ACTION: 🛒 Xem Toàn Bộ Cửa Hàng Nông Sản | /products]]`;
-    }
-  }
-
-  return updatedReply;
-}
-
 function buildSmartFallbackReply(userMessage: string): string {
   const normUser = normalizeVi(userMessage);
-  for (const item of PRODUCT_ACTION_CATALOG) {
-    if (item.keywords.some((kw) => normUser.includes(kw))) {
-      return `${item.fallbackReply}\n\n${item.buyAction}\n${item.detailAction}\n[[ACTION: 🎁 Kho Voucher Giảm Giá | /dashboard/customer?tab=vouchers]]`;
-    }
-  }
 
-  if (normUser.includes("voucher") || normUser.includes("ma giam") || normUser.includes("diem")) {
+  // 1. Dâu tây
+  if (normUser.includes("dau") || normUser.includes("strawberry") || normUser.includes("moc chau") || normUser.includes("dt-mc")) {
     return (
-      "Dạ chào bạn! 🎁 Trên **AgriTrace AI**, mỗi mã Voucher ưu đãi được áp dụng **1 lần cho mỗi tài khoản** để đảm bảo quyền lợi công bằng cho mọi hội viên AgriClub:\n\n" +
-      "- **AGRI30K**: Giảm ngay 30.000đ cho đơn từ 150.000đ\n" +
-      "- **FREESHIP25**: Miễn phí vận chuyển xe lạnh chuyên dụng 25.000đ\n\n" +
-      "Bạn bấm vào nút bên dưới để kiểm tra Ví Voucher hoặc đặt mua nông sản ngay nhé!\n\n" +
-      "[[ACTION: 🎁 Mở Kho Voucher Đã Lưu | /dashboard/customer?tab=vouchers]]\n" +
-      "[[ACTION: ⚡ Mua Ngay Dâu Tây (Áp Voucher) | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]"
+      "Dạ chào bạn! 🍓 **Dâu Tây New Zealand Mộc Châu** hiện đang vào chính vụ Đông - Xuân ngon nhất năm tại **Hợp Tác Xã Nông Sản Sạch Mộc Châu**:\n\n" +
+      "- **Giá bán thực tế trên web:** **170.100 đ / Hộp 500g** (Đang được **trợ giá trực tiếp 19%** từ giá gốc 210.000 đ — tiết kiệm 39.900 đ)\n" +
+      "- **Mã lô truy xuất GS1:** **LOT-DT-2026-11** (Đạt chuẩn **GlobalGAP & VietGAP**, kiểm nghiệm NIFC tồn dư BVTV = 0)\n" +
+      "- **Chuỗi lạnh:** Thu hái lúc 05:30 sáng, đóng hộp vi lỗ sinh học và vận chuyển xe lạnh chuyên dụng **2°C - 5°C**\n\n" +
+      "Bạn bấm ngay vào nút bên dưới để mở cửa sổ đặt mua hoặc xem chi tiết hồ sơ lô hàng nhé!\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]\n" +
+      "[[ACTION: 🔍 Xem Chi Tiết Dâu Tây Mộc Châu | /products?search=Dâu+Tây&detail=LOT-DT-2026-11]]\n" +
+      "[[ACTION: 🎁 Kho Voucher & Đổi Điểm | /dashboard/customer?tab=vouchers]]"
     );
   }
 
-  if (normUser.includes("don") || normUser.includes("giao hang") || normUser.includes("thanh toan")) {
+  // 2. Cam sành
+  if (normUser.includes("cam") || normUser.includes("ham yen") || normUser.includes("cs-hy") || normUser.includes("sp-cs")) {
     return (
-      "Dạ chào bạn! 📦 Hệ thống **AgriTrace** quản lý minh bạch tách biệt **Trạng thái Thanh toán** và **Trạng thái Vận chuyển xe lạnh**:\n\n" +
-      "- **Thanh toán VietQR 24/7**: Giữ hàng tồn kho tối đa **30 phút** khi đang chờ quét mã QR, tự động chuyển sang **Đã thanh toán** ngay khi hoàn tất.\n" +
-      "- **Thanh toán Tiền mặt (COD)**: Hiển thị *Chưa thanh toán (Thu hộ COD)* trong lúc đóng gói/vận chuyển và tự động xác nhận *Đã thanh toán* ngay khi giao hàng thành công.\n\n" +
+      "Dạ chào bạn! 🍊 **Cam Sành Hàm Yên Tép Vàng Mọng Nước** đang vào mùa thu hoạch rộ ngọt thanh, vỏ mỏng, giàu Vitamin C:\n\n" +
+      "- **Giá bán thực tế trên web:** **45.000 đ / KG** (Giá gốc 55.000 đ — giảm 18%)\n" +
+      "- **Mã lô GS1:** **SP-CS-03** — Đạt chuẩn an toàn **VietGAP**\n" +
+      "- **Nguồn gốc:** HTX Cam Sành Hàm Yên, Tuyên Quang\n\n" +
+      "Bạn bấm nút bên dưới để đặt mua hoặc xem chi tiết sản phẩm nhé!\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Cam Sành (45.000đ) | /products?search=Cam+Sành&buy=SP-CS-03]]\n" +
+      "[[ACTION: 🔍 Xem Chi Tiết Cam Sành Hàm Yên | /products?search=Cam+Sành&detail=SP-CS-03]]\n" +
+      "[[ACTION: 🎁 Ví Voucher & Điểm Thưởng | /dashboard/customer?tab=vouchers]]"
+    );
+  }
+
+  // 3. Xà lách
+  if (normUser.includes("xa lach") || normUser.includes("lo lo") || normUser.includes("rau") || normUser.includes("thuy canh") || normUser.includes("xl-2026")) {
+    return (
+      "Dạ chào bạn! 🥬 **Xà Lách Lô Lô Xanh Thủy Canh** hái mới lúc 05:30 sáng nay tại Nông Trại Xanh Thủy Canh Đà Lạt:\n\n" +
+      "- **Giá bán thực tế trên web:** **33.600 đ / KG** (Đang được trợ giá vụ mùa **giảm 20%** từ giá gốc 42.000 đ)\n" +
+      "- **Tiêu chuẩn:** Chuẩn **GlobalGAP & VietGAP**, kiểm định Quatest 1 BVTV = 0\n" +
+      "- **Mã lô GS1:** **LOT-XL-2026-08**\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Xà Lách Lô Lô (33.600đ) | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]\n" +
+      "[[ACTION: 🔍 Tra Cứu Tem QR Lô Xà Lách | /traceability?batch=LOT-XL-2026-08]]\n" +
+      "[[ACTION: 🥬 Xem Danh Mục Rau Ăn Lá | /products?cat=rau_la]]"
+    );
+  }
+
+  // 4. Cải Kale
+  if (normUser.includes("kale") || normUser.includes("cai xoan") || normUser.includes("cai kale") || normUser.includes("sp-kl")) {
+    return (
+      "Dạ chào bạn! 🥬 **Cải Xoăn Kale Hữu Cơ Dinh Dưỡng** canh tác tại Đà Lạt, giàu Vitamin A-C-K và chất chống oxy hóa:\n\n" +
+      "- **Giá bán thực tế trên web:** **60.000 đ / KG** (Đang được trợ giá **giảm 20%** từ giá gốc 75.000 đ)\n" +
+      "- **Tiêu chuẩn:** Chuẩn canh tác **Organic BioCert**\n" +
+      "- **Mã lô GS1:** **SP-KL-05**\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Cải Xoăn Kale (60.000đ) | /products?search=Cải+Xoăn&buy=SP-KL-05]]\n" +
+      "[[ACTION: 🔍 Xem Chi Tiết Cải Xoăn Kale | /products?search=Cải+Xoăn&detail=SP-KL-05]]\n" +
+      "[[ACTION: 🥬 Xem Danh Mục Rau Ăn Lá | /products?cat=rau_la]]"
+    );
+  }
+
+  // 5. Bơ Sáp 034
+  if (normUser.includes("bo") || normUser.includes("bo sap") || normUser.includes("034") || normUser.includes("sp-bo")) {
+    return (
+      "Dạ chào bạn! 🥑 **Bơ Sáp 034 Đặc Sản Cao Nguyên** (Bảo Lộc, Lâm Đồng) cơm vàng dày hạt lép, dẻo béo ngậy thơm ngon:\n\n" +
+      "- **Giá bán thực tế trên web:** **74.700 đ / KG** (Đang xả kho cuối vụ **giảm 17%** từ giá gốc 90.000 đ)\n" +
+      "- **Tiêu chuẩn:** **VietGAP**, kiểm định BVTV = 0\n" +
+      "- **Mã lô GS1:** **SP-BO-06**\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Bơ Sáp 034 (74.700đ) | /products?search=Bơ+Sáp&buy=SP-BO-06]]\n" +
+      "[[ACTION: 🔍 Xem Chi Tiết Bơ Sáp 034 | /products?search=Bơ+Sáp&detail=SP-BO-06]]\n" +
+      "[[ACTION: 🍎 Xem Danh Mục Trái Cây | /products?cat=trai_cay]]"
+    );
+  }
+
+  // 6. Cà chua bi
+  if (normUser.includes("ca chua") || normUser.includes("cherry") || normUser.includes("sp-cc")) {
+    return (
+      "Dạ chào bạn! 🍅 **Cà Chua Bi Cherry Đỏ Ngọt** thu hoạch tại Đà Lạt, chùm mọng đỏ giòn ngọt:\n\n" +
+      "- **Giá bán thực tế trên web:** **50.000 đ / KG** (Giá gốc 60.000 đ — giảm 17%)\n" +
+      "- **Tiêu chuẩn:** Chuẩn **VietGAP**\n" +
+      "- **Mã lô GS1:** **SP-CC-04**\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Cà Chua Bi Cherry (50.000đ) | /products?search=Cà+Chua&buy=SP-CC-04]]\n" +
+      "[[ACTION: 🔍 Xem Chi Tiết Cà Chua Bi | /products?search=Cà+Chua&detail=SP-CC-04]]"
+    );
+  }
+
+  // 7. Gợi ý thực đơn / Công thức món ngon (AI Chef)
+  if (normUser.includes("mon") || normUser.includes("nau") || normUser.includes("cong thuc") || normUser.includes("salad") || normUser.includes("detox") || normUser.includes("an gi")) {
+    return (
+      "Dạ chào bạn! 🍳 **AgriTrace AI Chef** gợi ý cho bạn 2 công thức món ngon tươi mát từ nông sản VietGAP đang có sẵn hôm nay:\n\n" +
+      "1. 🥗 **Salad Cải Kale & Dâu Tây Mộc Châu Sốt Chanh Leo**:\n" +
+      "   - Nguyên liệu: 200g Cải Kale, 150g Dâu Tây (170.100đ), 1 quả Bơ Sáp 034 (74.700đ), 100g Cà Chua Bi.\n" +
+      "   - Cách làm: Kale bóp nhẹ với chút muối và dầu olive; dâu tây và bơ cắt lát; rưới sốt chanh leo hoặc mè rang.\n" +
+      "   - Dinh dưỡng: Giàu chất xơ, Vitamin C, Vitamin K và chất béo lành mạnh, chỉ ~220 kcal.\n\n" +
+      "2. 🥤 **Nước Ép Xanh Detox Thanh Lọc (Kale + Táo + Xà Lách Thủy Canh)**:\n" +
+      "   - Giúp da sáng mịn, thanh nhiệt và hỗ trợ giảm cân hiệu quả.\n\n" +
+      "Bạn bấm vào nút bên dưới để chọn mua nguyên liệu giao lạnh tận nhà nhé!\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]\n" +
+      "[[ACTION: ⚡ Mua Ngay Cải Xoăn Kale (60.000đ) | /products?search=Cải+Xoăn&buy=SP-KL-05]]\n" +
+      "[[ACTION: 🛒 Đến Cửa Hàng Nông Sản | /products]]"
+    );
+  }
+
+  // 8. Hướng dẫn bảo quản rau củ trong tủ lạnh
+  if (normUser.includes("bao quan") || normUser.includes("tu lanh") || normUser.includes("de duoc bao lau") || normUser.includes("hong")) {
+    return (
+      "Dạ chào bạn! ❄️ Mẹo bảo quản nông sản sạch VietGAP giữ trọn độ giòn ngọt và dinh dưỡng từ chuyên gia AgriTrace:\n\n" +
+      "- 🍓 **Dâu Tây Mộc Châu**: **Tuyệt đối không rửa trước khi cất tủ lạnh**. Lót khăn giấy hút ẩm dưới đáy hộp, đậy kín và bảo quản ngăn mát 2°C – 4°C, ăn ngon nhất trong 3–5 ngày.\n" +
+      "- 🥬 **Xà lách & Cải Kale**: Bọc giấy báo hoặc màng bọc thực phẩm, giữ trong ngăn rau củ 3°C – 5°C tươi xanh từ 7–10 ngày.\n" +
+      "- 🥑 **Bơ Sáp 034**: Khi bơ còn xanh, để nơi thoáng mát ở nhiệt độ phòng để bơ chín tự nhiên. Khi bơ mềm tay thì mới cất tủ lạnh dùng dần.\n" +
+      "- 🍊 **Cam Sành**: Để ngăn mát 5°C – 8°C có thể giữ nước và vitamin tới 2 tuần.\n\n" +
+      "[[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]\n" +
+      "[[ACTION: 📦 Xem Đơn Mua Của Tôi | /dashboard/customer?tab=orders]]"
+    );
+  }
+
+  // 9. Voucher & Tích điểm
+  if (normUser.includes("voucher") || normUser.includes("ma giam") || normUser.includes("diem") || normUser.includes("khuyen mai")) {
+    return (
+      "Dạ chào bạn! 🎁 Trên **AgriTrace AI**, các mã ưu đãi được áp dụng minh bạch **1 lần cho mỗi tài khoản**:\n\n" +
+      "- **AGRI30**: Giảm ngay **30.000 đ** cho đơn nông sản từ 150.000 đ\n" +
+      "- **FREESHIP25**: Miễn phí vận chuyển xe lạnh chuyên dụng **25.000 đ**\n" +
+      "- **Tích điểm AgriClub**: Nhận **1 điểm** cho mỗi 5.000 đ chi tiêu để nâng hạng Vàng / Kim Cương\n\n" +
+      "[[ACTION: 🎁 Mở Kho Voucher Đã Lưu | /dashboard/customer?tab=vouchers]]\n" +
+      "[[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]"
+    );
+  }
+
+  // 10. Đơn hàng & Thanh toán
+  if (normUser.includes("don") || normUser.includes("giao hang") || normUser.includes("thanh toan") || normUser.includes("vietqr")) {
+    return (
+      "Dạ chào bạn! 📦 Hệ thống **AgriTrace** quản lý đơn hàng minh bạch theo chuỗi cung ứng lạnh:\n\n" +
+      "- **Thanh toán VietQR 24/7**: Tạm giữ nông sản trong kho lạnh tối đa **30 phút** khi chờ chuyển khoản, tự động kích hoạt xuất kho ngay khi nhận giao dịch.\n" +
+      "- **Vận chuyển xe lạnh IoT 4.2°C**: Thùng xe chuyên dụng kiểm soát nhiệt độ từ nông trại đến bàn ăn gia đình bạn.\n" +
+      "- **Chính sách 1 đổi 1 trong 24H**: Đổi mới miễn phí nếu nông sản bị dập nát hoặc không đạt chuẩn.\n\n" +
       "[[ACTION: 📦 Kiểm Tra Đơn Mua Của Tôi | /dashboard/customer?tab=orders]]\n" +
       "[[ACTION: 🛒 Tiếp Tục Mua Nông Sản | /products]]"
     );
   }
 
+  // Default general
   return (
-    "Dạ chào bạn! 🌱 **AgriTrace AI** sẵn sàng hỗ trợ bạn chọn mua nông sản sạch chuẩn VietGAP/GlobalGAP đang vào chính vụ ngon nhất hôm nay:\n\n" +
-    "- 🍓 **Dâu Tây New Zealand Mộc Châu**: **180.000 đ / Hộp 500g** (Lô `DT-MC-2026-11`)\n" +
-    "- 🍊 **Cam Sành Hàm Yên Tép Vàng**: **45.000 đ / KG** (Lô `CS-HY-2026-03`)\n" +
-    "- 🥬 **Xà Lách Thủy Canh Lô Lô Xanh**: **35.000 đ / KG** (Lô `LOT-XL-2026-08`)\n" +
-    "- 🥬 **Cải Xoăn Kale Hữu Cơ Đà Lạt**: **65.000 đ / KG** (Lô `SP-KL-05`)\n\n" +
-    "Bạn muốn đặt mua món nào chỉ cần bấm thẳng vào nút tương ứng bên dưới để mở ngay cửa sổ đặt hàng nhé!\n\n" +
-    "[[ACTION: ⚡ Mua Ngay Dâu Tây Mộc Châu | /products?search=Dâu+Tây&buy=DT-MC-2026-11]]\n" +
-    "[[ACTION: ⚡ Mua Ngay Cam Sành Hàm Yên | /products?search=Cam+Sành&buy=CS-HY-2026-03]]\n" +
-    "[[ACTION: ⚡ Mua Ngay Xà Lách Thủy Canh | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]\n" +
+    "Dạ chào bạn! 🌱 **AgriTrace AI** sẵn sàng hỗ trợ bạn chọn mua nông sản sạch đạt chuẩn VietGAP/GlobalGAP đang vào chính vụ hôm nay:\n\n" +
+    "- 🍓 **Dâu Tây New Zealand Mộc Châu**: **170.100 đ / Hộp 500g** (Trợ giá vụ mùa -19%, gốc 210.000 đ)\n" +
+    "- 🍊 **Cam Sành Hàm Yên Tép Vàng**: **45.000 đ / KG** (Giảm 18%, gốc 55.000 đ)\n" +
+    "- 🥬 **Xà Lách Lô Lô Xanh Thủy Canh**: **33.600 đ / KG** (Trợ giá -20%, gốc 42.000 đ)\n" +
+    "- 🥬 **Cải Xoăn Kale Hữu Cơ Đà Lạt**: **60.000 đ / KG** (Trợ giá -20%, gốc 75.000 đ)\n" +
+    "- 🥑 **Bơ Sáp 034 Cao Nguyên**: **74.700 đ / KG** (Xả kho cuối vụ -17%, gốc 90.000 đ)\n\n" +
+    "Bạn muốn tìm hiểu hoặc đặt mua món nào có thể bấm ngay nút hành động bên dưới nhé!\n\n" +
+    "[[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]\n" +
+    "[[ACTION: ⚡ Mua Ngay Cam Sành (45.000đ) | /products?search=Cam+Sành&buy=SP-CS-03]]\n" +
+    "[[ACTION: ⚡ Mua Ngay Xà Lách Thủy Canh (33.600đ) | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]\n" +
     "[[ACTION: 🛒 Xem Tất Cả Nông Sản | /products]]"
   );
+}
+
+function ensureGuaranteedActionButtons(userMessage: string, replyText: string): string {
+  const normUser = normalizeVi(userMessage);
+  let updatedReply = replyText.trim();
+
+  // If no action buttons exist, append relevant ones
+  if (!/\[\[ACTION:/i.test(updatedReply)) {
+    if (normUser.includes("dau") || normUser.includes("strawberry")) {
+      updatedReply += `\n\n[[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]\n[[ACTION: 🔍 Xem Chi Tiết Dâu Tây Mộc Châu | /products?search=Dâu+Tây&detail=LOT-DT-2026-11]]`;
+    } else if (normUser.includes("cam") || normUser.includes("ham yen")) {
+      updatedReply += `\n\n[[ACTION: ⚡ Mua Ngay Cam Sành (45.000đ) | /products?search=Cam+Sành&buy=SP-CS-03]]\n[[ACTION: 🔍 Xem Chi Tiết Cam Sành Hàm Yên | /products?search=Cam+Sành&detail=SP-CS-03]]`;
+    } else if (normUser.includes("xa lach") || normUser.includes("rau")) {
+      updatedReply += `\n\n[[ACTION: ⚡ Mua Ngay Xà Lách Thủy Canh (33.600đ) | /products?search=Xà+Lách&buy=LOT-XL-2026-08]]\n[[ACTION: 🥬 Xem Danh Mục Rau Ăn Lá | /products?cat=rau_la]]`;
+    } else if (normUser.includes("voucher") || normUser.includes("diem") || normUser.includes("ma giam")) {
+      updatedReply += `\n\n[[ACTION: 🎁 Mở Kho Voucher & Đổi Điểm AgriClub | /dashboard/customer?tab=vouchers]]`;
+    } else if (normUser.includes("don hang") || normUser.includes("don mua") || normUser.includes("thanh toan")) {
+      updatedReply += `\n\n[[ACTION: 📦 Xem Đơn Mua Của Tôi | /dashboard/customer?tab=orders]]`;
+    } else {
+      updatedReply += `\n\n[[ACTION: ⚡ Mua Ngay Dâu Tây (170.100đ) | /products?search=Dâu+Tây&buy=LOT-DT-2026-11]]\n[[ACTION: ⚡ Mua Ngay Cam Sành (45.000đ) | /products?search=Cam+Sành&buy=SP-CS-03]]\n[[ACTION: 🛒 Xem Toàn Bộ Nông Sản | /products]]`;
+    }
+  }
+
+  return updatedReply;
 }
 
 export async function POST(req: NextRequest) {
@@ -250,12 +344,10 @@ export async function POST(req: NextRequest) {
     const lastUserMessage =
       [...messages].reverse().find((m: { role: string; content: string }) => m.role === "user")?.content || "";
 
-    // Check API Key: Priority 1 = User provided key, Priority 2 = Server ENV
+    // Check API Key
     const rawKey = userApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || process.env.NEXT_PUBLIC_GEMINI_API_KEY?.trim();
     const isAiStudioKey = typeof rawKey === "string" && rawKey.startsWith("AIza");
 
-    // If key is missing or not a valid Google AI Studio key (e.g. Antigravity internal token),
-    // immediately return instant smart advisor reply in < 50ms without hanging the chat!
     if (!rawKey || !isAiStudioKey) {
       return NextResponse.json({
         reply: buildSmartFallbackReply(lastUserMessage),
@@ -265,19 +357,16 @@ export async function POST(req: NextRequest) {
 
     const apiKey = rawKey;
 
-    // Convert messages to Gemini contents format
     const contents = messages.map((m: { role: string; content: string }) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     }));
 
-    // List of valid Gemini models to try in order of speed
-    const candidateModels = [
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-    ];
+    const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
     let replyText = "";
     let usedModel = "";
+
+    const systemPrompt = buildSystemInstruction();
 
     for (const model of candidateModels) {
       try {
@@ -285,7 +374,7 @@ export async function POST(req: NextRequest) {
 
         const payload = {
           system_instruction: {
-            parts: [{ text: SYSTEM_INSTRUCTION }],
+            parts: [{ text: systemPrompt }],
           },
           contents,
           generationConfig: {
@@ -298,20 +387,17 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(4000), // Max 4 seconds timeout to ensure instant response
+          signal: AbortSignal.timeout(4000),
         });
 
         if (res.ok) {
           const data = await res.json();
-          replyText =
-            data.candidates?.[0]?.content?.parts?.[0]?.text ||
-            "";
+          replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
           if (replyText) {
             usedModel = model;
             break;
           }
         } else {
-          // If 400/403/429, don't keep hammering subsequent models
           break;
         }
       } catch {

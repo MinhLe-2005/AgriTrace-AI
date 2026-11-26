@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowRight,
   Calendar,
   Check,
   CheckCircle2,
@@ -921,123 +922,105 @@ function ProductsContent() {
                     ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100)
                     : 0;
 
+                const displayBatch = p.batchCode || (p.id ? `LÔ-${p.id.slice(0, 5).toUpperCase()}` : "AGRI-01");
+
                 return (
                   <div
                     key={p.id}
                     onClick={() => setSelectedProduct(p)}
-                    className="group bg-white rounded-3xl border border-gray-200/90 hover:border-emerald-500 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer"
+                    className="bento-card group overflow-hidden flex flex-col justify-between cursor-pointer transition-all duration-300 hover:shadow-md hover:border-[#166534]"
                   >
                     <div>
-                      {/* Image container with fixed height */}
-                      <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-gray-100">
+                      {/* Top Specimen Header Bar (Chuẩn phong cách Home) */}
+                      <div className="px-3.5 py-2.5 bg-[#FBF9F5] border-b border-[#EFECE4] flex items-center justify-between gap-1 text-[10px] font-mono">
+                        <span className="font-bold text-[#166534] flex items-center gap-1 whitespace-nowrap truncate">
+                          <QrCode size={11} className="shrink-0" />
+                          <span className="truncate">LÔ #{displayBatch}</span>
+                        </span>
+                        <span className="font-bold text-stone-500 whitespace-nowrap shrink-0">
+                          CHỨNG NHẬN: <strong className="text-[#16261E] uppercase">{p.cert}</strong>
+                        </span>
+                      </div>
+
+                      {/* Product Image */}
+                      <div className="relative h-48 sm:h-52 w-full bg-[#F6F3EC] overflow-hidden">
                         <Image
                           src={p.image || "/images/products/xa-lach.jpg"}
                           alt={p.name}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                          className="object-cover group-hover:scale-108 transition-transform duration-500"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />
 
-                        {/* Top Badges */}
-                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1 pointer-events-none">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-extrabold text-white shadow-md flex items-center gap-1 whitespace-nowrap shrink-0",
-                                p.cert?.toLowerCase().includes("organic")
-                                  ? "bg-teal-700"
-                                  : p.cert?.toLowerCase().includes("globalgap")
-                                  ? "bg-blue-700"
-                                  : "bg-emerald-700"
-                              )}
-                            >
-                              <ShieldCheck size={11} />
-                              {p.cert}
-                            </span>
-                            {p.batchCode && (
-                              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-black/65 text-white backdrop-blur-xs shadow-xs truncate whitespace-nowrap">
-                                #{p.batchCode}
-                              </span>
-                            )}
-                          </div>
+                        {discountPercent > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowPromoInfoModal(true);
+                            }}
+                            className="absolute top-2.5 right-2.5 font-mono px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#A3630A] text-white shadow-xs hover:scale-105 transition-transform flex items-center gap-1 cursor-pointer pointer-events-auto"
+                            title="Bấm để xem căn cứ trợ giá mùa vụ"
+                          >
+                            <Flame size={10} className="fill-yellow-200 text-yellow-200" />
+                            <span>-{discountPercent}%</span>
+                          </button>
+                        )}
 
-                          {discountPercent > 0 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowPromoInfoModal(true);
-                              }}
-                              className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md flex items-center gap-1 whitespace-nowrap shrink-0 pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
-                              title="Bấm để xem căn cứ & quyết định trợ giá vụ mùa"
-                            >
-                              <Flame size={11} className="text-yellow-200 fill-yellow-200 shrink-0" />
-                              <span>Vụ mùa -{discountPercent}%</span>
-                            </button>
-                          )}
+                        {/* Harvest time tag */}
+                        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#16261E]/85 backdrop-blur-md text-stone-100 text-[10px] font-mono pointer-events-none">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          <span>{p.harvest || "Hôm nay, 05:30 Sáng"}</span>
                         </div>
 
-                        {/* Harvest & Cold storage tags on image bottom */}
-                        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white pointer-events-none">
-                          <div className="px-2.5 py-1 rounded-lg bg-black/65 backdrop-blur-md text-[10px] font-medium flex items-center gap-1.5 shadow-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>{p.harvest || "Hái sáng nay 05:30"}</span>
-                          </div>
-                          <div className="px-2 py-1 rounded-lg bg-emerald-950/70 backdrop-blur-md text-[10px] font-semibold flex items-center gap-1 text-emerald-200">
-                            <Thermometer size={11} className="text-cyan-300" />
-                            <span>{p.temperature ? p.temperature.split(" ")[0] : "2-5°C"}</span>
-                          </div>
+                        {/* Cold-Chain Temp tag */}
+                        <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1 px-2 py-1 rounded-lg bg-[#16261E]/85 backdrop-blur-md text-emerald-300 text-[10px] font-mono pointer-events-none">
+                          <Thermometer size={11} className="text-cyan-300" />
+                          <span>{p.temperature ? p.temperature.split(" ")[0] : "2-5°C"}</span>
                         </div>
                       </div>
 
                       {/* Content */}
                       <div className="p-4 space-y-2.5">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <MapPin size={12} className="text-emerald-600 shrink-0" />
-                          <span className="truncate">{p.farm || p.origin}</span>
+                        <div>
+                          <div className="flex items-center gap-1 text-[11px] text-stone-500 mb-1">
+                            <MapPin size={12} className="text-[#166534] shrink-0" />
+                            <span className="truncate font-medium">{p.farm || p.origin}</span>
+                          </div>
+                          <h3 className="font-serif font-bold text-base text-[#16261E] group-hover:text-[#166534] transition-colors line-clamp-1">
+                            {p.name}
+                          </h3>
                         </div>
-
-                        <h3 className="font-bold text-gray-900 text-sm sm:text-base group-hover:text-emerald-700 transition-colors line-clamp-1">
-                          {p.name}
-                        </h3>
 
                         {/* Rating & Stock */}
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1 text-amber-400">
-                            <Star size={12} className="fill-amber-400" />
-                            <span className="font-bold text-gray-800">{p.rating}</span>
-                            <span className="text-gray-400">({p.reviews} đánh giá)</span>
+                          <div className="flex items-center gap-1">
+                            <Star size={13} className="fill-amber-400 text-amber-400" />
+                            <span className="font-bold text-[#16261E]">{p.rating}</span>
+                            <span className="text-stone-400">({p.reviews} đánh giá)</span>
                           </div>
-                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                            Còn {p.stockLeft} {p.unit}
+
+                          <span className="font-mono text-[10px] text-[#166534] font-bold bg-emerald-50/80 px-2 py-0.5 rounded border border-emerald-200">
+                            CÒN {p.stockLeft} {p.unit || "KG"}
                           </span>
                         </div>
 
-                        {/* Loyalty Points Pill (Connected to AgriClub Engine) */}
-                        <div className="pt-0.5">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 text-[11px] font-bold text-amber-900 shadow-2xs">
-                            <Sparkles size={12} className="text-amber-600 shrink-0" />
-                            <span>
-                              Tích +{Math.round((p.price / 10000) * (loyaltyProfile?.pointsMultiplier || 1.5))} điểm AgriClub
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Price */}
-                        <div className="pt-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-black text-emerald-800">
-                              {p.price.toLocaleString("vi-VN")} đ
-                            </span>
-                            <span className="text-xs text-gray-400 font-normal">
-                              / {p.unit}
-                            </span>
-                            {p.oldPrice > p.price && (
-                              <span className="text-xs text-gray-400 line-through">
-                                {p.oldPrice.toLocaleString("vi-VN")} đ
+                        {/* Price Section */}
+                        <div className="pt-2.5 border-t border-[#F0ECE1] space-y-1">
+                          <div className="flex items-baseline justify-between">
+                            <div>
+                              <span className="font-mono text-lg font-extrabold text-[#16261E]">
+                                {p.price.toLocaleString("vi-VN")} đ
                               </span>
-                            )}
+                              <span className="text-xs text-stone-500 font-medium"> / {p.unit}</span>
+                              {p.oldPrice > p.price && (
+                                <span className="ml-2 font-mono text-[11px] text-stone-400 line-through">
+                                  {p.oldPrice.toLocaleString("vi-VN")} đ
+                                </span>
+                              )}
+                            </div>
                           </div>
+
                           {p.oldPrice > p.price && (
                             <button
                               type="button"
@@ -1045,26 +1028,34 @@ function ProductsContent() {
                                 e.stopPropagation();
                                 setShowPromoInfoModal(true);
                               }}
-                              className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline mt-0.5 text-left cursor-pointer group/promo"
-                              title="Bấm để xem căn cứ & lịch biểu trợ giá mùa vụ"
+                              className="flex items-center gap-1 text-[11px] font-semibold text-[#A3630A] hover:underline cursor-pointer text-left"
+                              title="Bấm để xem lịch biểu trợ giá mùa vụ"
                             >
-                              <span>🌾 {(p as { campaignTitle?: string }).campaignTitle || "Vụ mùa chính vụ"} · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ</span>
-                              <Info size={11} className="text-amber-600 group-hover/promo:scale-110 transition-transform shrink-0" />
+                              <Flame size={11} className="fill-amber-500 text-amber-500 shrink-0" />
+                              <span className="truncate">
+                                🌾 {(p as { campaignTitle?: string }).campaignTitle || "Vụ mùa chính vụ"} · Giảm {(p.oldPrice - p.price).toLocaleString("vi-VN")} đ
+                              </span>
                             </button>
                           )}
+
+                          {/* Loyalty Points Pill */}
+                          <div className="text-[10px] text-stone-400 flex items-center gap-1 pt-0.5">
+                            <Sparkles size={11} className="text-amber-500 shrink-0" />
+                            <span>Tích +{Math.round((p.price / 10000) * (loyaltyProfile?.pointsMultiplier || 1.5))} điểm AgriClub</span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="p-4 pt-0 grid grid-cols-2 gap-2">
+                    <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedProduct(p);
                         }}
-                        className="w-full py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                        className="py-2.5 px-3 rounded-xl text-xs font-bold text-[#16261E] bg-[#F6F3EC] hover:bg-[#EAE5D9] border border-[#E4DFD5] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <Eye size={13} />
                         <span>Chi tiết</span>
@@ -1076,10 +1067,10 @@ function ProductsContent() {
                           e.stopPropagation();
                           handleBuyNow(p, 1);
                         }}
-                        className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-colors shadow-xs flex items-center justify-center gap-1 active:scale-95"
+                        className="py-2.5 px-3 rounded-xl text-xs font-bold text-white bg-[#166534] hover:bg-[#14532D] shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                       >
-                        <ShoppingBag size={13} />
                         <span>Mua ngay</span>
+                        <ArrowRight size={13} />
                       </button>
                     </div>
                   </div>
