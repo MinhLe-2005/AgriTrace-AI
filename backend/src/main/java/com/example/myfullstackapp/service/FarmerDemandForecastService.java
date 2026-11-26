@@ -4,12 +4,14 @@ import com.example.myfullstackapp.dto.farmer.FarmerDemandForecastResponse;
 import com.example.myfullstackapp.dto.farmer.FarmerDemandForecastResponse.ForecastProductItem;
 import com.example.myfullstackapp.dto.farmer.FarmerDemandForecastResponse.ForecastTimelinePoint;
 import com.example.myfullstackapp.entity.Campaign;
+import com.example.myfullstackapp.entity.CropSeason;
 import com.example.myfullstackapp.entity.Farm;
 import com.example.myfullstackapp.entity.HarvestLot;
 import com.example.myfullstackapp.entity.Order;
 import com.example.myfullstackapp.entity.OrderItem;
 import com.example.myfullstackapp.entity.Product;
 import com.example.myfullstackapp.repository.CampaignRepository;
+import com.example.myfullstackapp.repository.CropSeasonRepository;
 import com.example.myfullstackapp.repository.FarmRepository;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
 import com.example.myfullstackapp.repository.OrderRepository;
@@ -52,6 +54,9 @@ public class FarmerDemandForecastService {
     private final CampaignRepository campaignRepository;
     private final FarmerOwnershipResolver ownershipResolver;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CropSeasonRepository cropSeasonRepository;
+
     public FarmerDemandForecastResponse buildForecast(String requestedOwnerId, String farmCode, int horizonDays) {
         return buildForecastAtDate(requestedOwnerId, farmCode, horizonDays, LocalDate.now());
     }
@@ -82,11 +87,14 @@ public class FarmerDemandForecastService {
                 .filter(o -> !EXCLUDED_ORDER_STATUSES.contains(normalizeUpper(o.getStatus())))
                 .toList();
         List<Campaign> activeCampaigns = loadRelevantCampaigns(today, clampedHorizon);
+        List<CropSeason> ownerSeasons = cropSeasonRepository != null
+                ? cropSeasonRepository.findByOwnerIdIgnoreCaseOrderByIdAsc(effectiveOwner)
+                : List.of();
 
         List<CatalogCandidate> candidates = buildCandidates(products, lots, farmsByCode, effectiveOwner, cleanFarmFilter);
         List<ForecastProductItem> items = new ArrayList<>();
         for (CatalogCandidate candidate : candidates) {
-            items.add(analyzeCandidate(candidate, lots, validOrders, activeCampaigns, clampedHorizon, today));
+            items.add(analyzeCandidate(candidate, lots, validOrders, activeCampaigns, ownerSeasons, clampedHorizon, today));
         }
         items.sort(Comparator.comparingInt(FarmerDemandForecastService::riskSortOrder)
                 .thenComparing(Comparator.comparingDouble(ForecastProductItem::predictedDemand).reversed()));
@@ -118,6 +126,26 @@ public class FarmerDemandForecastService {
                 items,
                 timeline
         );
+    }
+
+    private SeasonEvaluation resolveSeasonForCandidate(
+            CatalogCandidate candidate,
+            List<CropSeason> ownerSeasons,
+            int currentMonth
+    ) {
+        for (CropSeason cs : ownerSeasons) {
+            if (!Boolean.TRUE.equals(cs.getActive())) continue;
+            if (cs.getStartMonth() == null || cs.getEndMonth() == null) continue;
+            boolean farmMatches = cs.getFarmCode() == null || cs.getFarmCode().isBlank()
+                    || candidate.farmCode == null || candidate.farmCode.isBlank()
+                    || cs.getFarmCode().equalsIgnoreCase(candidate.farmCode);
+            if (farmMatches && matchesProduct(cs.getProductName(), candidate.name)) {
+                var eval = CropSeasonCalculator.evaluate(cs.getStartMonth(), cs.getEndMonth(), currentMonth);
+                double mult = CropSeasonCalculator.computeDemandMultiplier(eval.code(), cs.getPeakMultiplier());
+                return new SeasonEvaluation(mult, eval.label() + " (T" + cs.getStartMonth() + " → T" + cs.getEndMonth() + ")");
+            }
+        }
+        return evaluateSeason(candidate.name, candidate.categoryCode, currentMonth);
     }
 
     SeasonEvaluation evaluateSeason(String productName, String categoryCode, int month) {
@@ -175,6 +203,7 @@ public class FarmerDemandForecastService {
             List<HarvestLot> ownerLots,
             List<Order> validOrders,
             List<Campaign> activeCampaigns,
+            List<CropSeason> ownerSeasons,
             int horizonDays,
             LocalDate today
     ) {
@@ -189,7 +218,7 @@ public class FarmerDemandForecastService {
 
         double currentSupply = roundOneDecimal(Math.max(0.0, candidate.stockLeft + lotSupply));
 
-        SeasonEvaluation season = evaluateSeason(candidate.name, candidate.categoryCode, today.getMonthValue());
+        SeasonEvaluation season = resolveSeasonForCandidate(candidate, ownerSeasons, today.getMonthValue());
         CampaignMatch campaignMatch = matchCampaign(candidate, activeCampaigns);
 
         boolean hasOrderData = sales.sold90d > 0.0 || sales.soldAllTime > 0.0;

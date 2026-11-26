@@ -74,6 +74,9 @@ public class FarmerController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.myfullstackapp.service.FarmerDemandForecastService demandForecastService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.myfullstackapp.repository.CropSeasonRepository cropSeasonRepository;
+
     @PostMapping(value = "/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<FarmerMediaStorageService.StoredMediaResult>> uploadProofImage(
             @RequestParam("file") MultipartFile file,
@@ -1697,6 +1700,189 @@ public class FarmerController {
                 "Phân tích dự báo nhu cầu AI thành công",
                 demandForecastService.buildForecast(ownerId, farmCode, horizonDays)
         ));
+    }
+
+    @GetMapping("/seasons")
+    public ResponseEntity<List<com.example.myfullstackapp.entity.CropSeason>> getCropSeasons(
+            @RequestParam(required = false) String ownerId,
+            @RequestParam(required = false) String farmCode,
+            @RequestParam(required = false) Integer month
+    ) {
+        if (cropSeasonRepository == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<com.example.myfullstackapp.entity.CropSeason> seasons = cropSeasonRepository.findAllByOrderByIdAsc();
+        if (seasons.isEmpty()) {
+            initSampleCropSeasons();
+            seasons = cropSeasonRepository.findAllByOrderByIdAsc();
+        }
+        Authentication auth = ownershipResolver.currentAuthentication();
+        if (ownershipResolver.isStrictFarmerSession(auth) || (ownerId != null && !ownerId.isBlank())) {
+            String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(ownerId, farmCode);
+            seasons = seasons.stream()
+                    .filter(s -> s.getOwnerId() != null && s.getOwnerId().equalsIgnoreCase(effectiveOwner))
+                    .toList();
+        }
+        if (farmCode != null && !farmCode.isBlank() && !"ALL".equalsIgnoreCase(farmCode.trim())) {
+            String cleanFarm = farmCode.trim();
+            seasons = seasons.stream()
+                    .filter(s -> s.getFarmCode() != null && s.getFarmCode().equalsIgnoreCase(cleanFarm))
+                    .toList();
+        }
+        if (month != null && month >= 1 && month <= 12) {
+            seasons.forEach(s -> s.setPreviewMonth(month));
+        }
+        return ResponseEntity.ok(seasons);
+    }
+
+    @PostMapping("/seasons")
+    @Transactional
+    public ResponseEntity<ApiResponse<com.example.myfullstackapp.entity.CropSeason>> createCropSeason(
+            @RequestBody com.example.myfullstackapp.entity.CropSeason req
+    ) {
+        if (cropSeasonRepository == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ApiResponse.error("Kho cấu hình mùa vụ chưa sẵn sàng."));
+        }
+        if (req.getProductName() == null || req.getProductName().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Tên nông sản mùa vụ không được để trống"));
+        }
+        if (req.getStartMonth() == null || req.getStartMonth() < 1 || req.getStartMonth() > 12
+                || req.getEndMonth() == null || req.getEndMonth() < 1 || req.getEndMonth() > 12) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Tháng bắt đầu và kết thúc phải từ 1 đến 12"));
+        }
+        String effectiveOwner = ownershipResolver.resolveEffectiveOwnerId(req.getOwnerId(), req.getFarmCode());
+        req.setId(null);
+        req.setOwnerId(effectiveOwner);
+        req.setProductName(req.getProductName().trim());
+        if (req.getFarmCode() != null && !req.getFarmCode().isBlank()) {
+            req.setFarmCode(req.getFarmCode().trim().toUpperCase(Locale.ROOT));
+        }
+        if (req.getCategoryCode() == null || req.getCategoryCode().isBlank()) {
+            req.setCategoryCode("trai_cay");
+        }
+        if (req.getPeakMultiplier() == null || req.getPeakMultiplier() <= 0) {
+            req.setPeakMultiplier(1.30);
+        }
+        if (req.getActive() == null) {
+            req.setActive(true);
+        }
+        var saved = cropSeasonRepository.save(req);
+        return ResponseEntity.ok(ApiResponse.ok("Đã lưu cấu hình mùa vụ mới!", saved));
+    }
+
+    @PutMapping("/seasons/{id}")
+    @Transactional
+    public ResponseEntity<ApiResponse<com.example.myfullstackapp.entity.CropSeason>> updateCropSeason(
+            @PathVariable Long id,
+            @RequestBody com.example.myfullstackapp.entity.CropSeason req
+    ) {
+        if (cropSeasonRepository == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ApiResponse.error("Kho cấu hình mùa vụ chưa sẵn sàng."));
+        }
+        var existing = cropSeasonRepository.findById(id).orElse(null);
+        if (existing == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Không tìm thấy mùa vụ #" + id));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(existing.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền chỉnh sửa mùa vụ của chủ vườn khác!"));
+        }
+        if (req.getProductName() != null && !req.getProductName().isBlank()) existing.setProductName(req.getProductName().trim());
+        if (req.getFarmCode() != null) existing.setFarmCode(req.getFarmCode().trim().toUpperCase(Locale.ROOT));
+        if (req.getCategoryCode() != null && !req.getCategoryCode().isBlank()) existing.setCategoryCode(req.getCategoryCode().trim());
+        if (req.getStartMonth() != null && req.getStartMonth() >= 1 && req.getStartMonth() <= 12) existing.setStartMonth(req.getStartMonth());
+        if (req.getEndMonth() != null && req.getEndMonth() >= 1 && req.getEndMonth() <= 12) existing.setEndMonth(req.getEndMonth());
+        if (req.getPeakMultiplier() != null && req.getPeakMultiplier() > 0) existing.setPeakMultiplier(req.getPeakMultiplier());
+        if (req.getNotes() != null) existing.setNotes(req.getNotes().trim());
+        if (req.getActive() != null) existing.setActive(req.getActive());
+
+        var saved = cropSeasonRepository.save(existing);
+        return ResponseEntity.ok(ApiResponse.ok("Đã cập nhật cấu hình mùa vụ!", saved));
+    }
+
+    @DeleteMapping("/seasons/{id}")
+    @Transactional
+    public ResponseEntity<ApiResponse<Void>> deleteCropSeason(@PathVariable Long id) {
+        if (cropSeasonRepository == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ApiResponse.error("Kho cấu hình mùa vụ chưa sẵn sàng."));
+        }
+        var existing = cropSeasonRepository.findById(id).orElse(null);
+        if (existing == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Không tìm thấy mùa vụ #" + id));
+        }
+        if (!ownershipResolver.canModifyOwnedResource(existing.getOwnerId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Bạn không có quyền xóa mùa vụ của chủ vườn khác!"));
+        }
+        cropSeasonRepository.delete(existing);
+        return ResponseEntity.ok(ApiResponse.ok("Đã xóa cấu hình mùa vụ!", null));
+    }
+
+    private void initSampleCropSeasons() {
+        var s1 = com.example.myfullstackapp.entity.CropSeason.builder()
+                .ownerId("farmer_hung")
+                .farmCode("NT-DL-01")
+                .productName("Xà Lách Lô Lô Xanh Thủy Canh")
+                .categoryCode("rau_la")
+                .startMonth(10)
+                .endMonth(2)
+                .peakMultiplier(1.25)
+                .notes("Vụ Đông - Xuân vắt qua năm mới, hái sáng 05:30 mỗi ngày.")
+                .build();
+        var s2 = com.example.myfullstackapp.entity.CropSeason.builder()
+                .ownerId("farmer_hung")
+                .farmCode("NT-DL-01")
+                .productName("Cà Chua Bi Cherry Đỏ Ngọt")
+                .categoryCode("cu_qua")
+                .startMonth(12)
+                .endMonth(4)
+                .peakMultiplier(1.30)
+                .notes("Mùa nắng ấm Đà Lạt vắt qua Tết, chuẩn bị giàn tưới nhỏ giọt.")
+                .build();
+        var s3 = com.example.myfullstackapp.entity.CropSeason.builder()
+                .ownerId("farmer_hung")
+                .farmCode("NT-DL-01")
+                .productName("Cải Xoăn Kale Hữu Cơ Dinh Dưỡng")
+                .categoryCode("rau_la")
+                .startMonth(9)
+                .endMonth(11)
+                .peakMultiplier(1.22)
+                .notes("Giai đoạn cuối vụ Thu, theo dõi sâu tơ và chuẩn bị luống gối vụ mới.")
+                .build();
+        var s4 = com.example.myfullstackapp.entity.CropSeason.builder()
+                .ownerId("farmer_hung")
+                .farmCode("NT-DL-01")
+                .productName("Bơ Sáp 034 Đặc Sản Cao Nguyên")
+                .categoryCode("trai_cay")
+                .startMonth(4)
+                .endMonth(8)
+                .peakMultiplier(1.35)
+                .notes("Chính vụ Hè - Thu cao nguyên Lâm Đồng, hiện giai đoạn dưỡng cây.")
+                .build();
+        var s5 = com.example.myfullstackapp.entity.CropSeason.builder()
+                .ownerId("farmer_thieu")
+                .farmCode("NT-MC-03")
+                .productName("Dâu Tây New Zealand Mộc Châu")
+                .categoryCode("trai_cay")
+                .startMonth(11)
+                .endMonth(3)
+                .peakMultiplier(1.38)
+                .notes("Chính vụ Đông - Xuân vắt qua năm mới trên cao nguyên Mộc Châu.")
+                .build();
+        var s6 = com.example.myfullstackapp.entity.CropSeason.builder()
+                .ownerId("farmer_thieu")
+                .farmCode("NT-MC-03")
+                .productName("Mận Hậu Mộc Châu")
+                .categoryCode("trai_cay")
+                .startMonth(5)
+                .endMonth(7)
+                .peakMultiplier(1.32)
+                .notes("Thu hoạch tập trung đầu Hè từ tháng 5 đến tháng 7.")
+                .build();
+        cropSeasonRepository.saveAll(List.of(s1, s2, s3, s4, s5, s6));
     }
 
     private String resolveFarmCode(String farmName) {
