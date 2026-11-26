@@ -36,5 +36,16 @@ public class Review {
     private String comment;
 
     @Builder.Default
+    private Integer likesCount = 0;
+
+    @Column(length = 1000)
+    private String reply;
+
+    @Column(length = 128)
+    private String replyAuthor;
+
+    private LocalDateTime repliedAt;
+
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }

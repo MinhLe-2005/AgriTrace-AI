@@ -69,6 +69,17 @@ public class FarmerSchemaCompatibilityInitializer implements ApplicationRunner {
                     st.execute("UPDATE agri_products SET farm = 'Hợp Tác Xã Nông Sản Sạch Mộc Châu' WHERE farm ILIKE '%Nong San Sach Moc Chau%'");
                     st.execute("UPDATE agri_order_items SET name = 'Dâu Tây New Zealand Mộc Châu' WHERE name ILIKE 'Dau Tay New Zealand%'");
                     st.execute("UPDATE agri_order_items SET origin = 'Hợp Tác Xã Nông Sản Sạch Mộc Châu' WHERE origin ILIKE '%Nong San Sach Moc Chau%'");
+                    st.execute("ALTER TABLE IF EXISTS agri_reviews ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0");
+                    st.execute("ALTER TABLE IF EXISTS agri_reviews ADD COLUMN IF NOT EXISTS reply VARCHAR(1000)");
+                    st.execute("ALTER TABLE IF EXISTS agri_reviews ADD COLUMN IF NOT EXISTS reply_author VARCHAR(128)");
+                    st.execute("ALTER TABLE IF EXISTS agri_reviews ADD COLUMN IF NOT EXISTS replied_at TIMESTAMPTZ");
+                    st.execute("UPDATE agri_products SET harvest = 'Thu hoạch sáng sớm theo đơn' WHERE name ILIKE '%Dâu Tây%'");
+                    st.execute("UPDATE agri_products SET harvest = 'Thu hoạch đúng độ già 8.5 tuổi' WHERE name ILIKE '%Bơ Sáp%'");
+                    st.execute("UPDATE agri_products SET harvest = 'Thu hoạch thủy canh hằng ngày' WHERE name ILIKE '%Xà Lách%'");
+                    st.execute("UPDATE agri_products SET harvest = 'Thu hoạch tươi sáng sớm' WHERE name ILIKE '%Cải Xoăn%' OR name ILIKE '%Kale%'");
+                    st.execute("UPDATE agri_products SET harvest = 'Thu hoạch lứa chín mọng' WHERE name ILIKE '%Cà Chua%'");
+                    st.execute("UPDATE agri_products SET harvest = 'Chính vụ thu hoạch tươi' WHERE name ILIKE '%Cam Sành%'");
+                    st.execute("UPDATE agri_products SET harvest = 'Thu hoạch tươi theo đơn' WHERE harvest = 'Hôm nay, 05:30 Sáng' OR harvest IS NULL");
                     log.info("Database schema compatibility check & Sprint 3 column auto-migration completed.");
                 }
             }

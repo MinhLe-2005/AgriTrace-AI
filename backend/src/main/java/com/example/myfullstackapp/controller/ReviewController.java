@@ -96,4 +96,72 @@ public class ReviewController {
 
         return ApiResponse.ok("Cảm ơn bạn đã đánh giá sản phẩm!", saved);
     }
+
+    @PostMapping("/{id}/like")
+    @Transactional
+    public ApiResponse<Review> likeReview(@PathVariable Long id) {
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đánh giá #" + id));
+        int current = review.getLikesCount() != null ? review.getLikesCount() : 0;
+        review.setLikesCount(current + 1);
+        Review saved = reviewRepository.save(review);
+        return ApiResponse.ok("Đã thích đánh giá!", saved);
+    }
+
+    @lombok.Data
+    public static class ReplyReviewRequest {
+        private String reply;
+        private String replyAuthor;
+    }
+
+    @PostMapping("/{id}/reply")
+    @Transactional
+    public ApiResponse<Review> replyReview(
+            @PathVariable Long id,
+            @RequestBody ReplyReviewRequest request,
+            Authentication authentication
+    ) {
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đánh giá #" + id));
+        String author = request.getReplyAuthor();
+        if (author == null || author.isBlank()) {
+            if (authentication != null && authentication.isAuthenticated()) {
+                author = authentication.getName();
+            } else {
+                author = "Đại diện Nhà Vườn";
+            }
+        }
+        review.setReply(request.getReply());
+        review.setReplyAuthor(author);
+        review.setRepliedAt(LocalDateTime.now());
+        Review saved = reviewRepository.save(review);
+        return ApiResponse.ok("Đã đăng phản hồi từ nhà vườn!", saved);
+    }
+
+    @DeleteMapping("/{id}")
+    @Transactional
+    public ApiResponse<Void> deleteReview(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đánh giá #" + id));
+        String prodName = review.getProductName();
+        reviewRepository.delete(review);
+
+        // Recalculate product rating & reviews
+        List<Product> products = productRepository.findAll();
+        for (Product product : products) {
+            if (product.getName() != null && product.getName().equalsIgnoreCase(prodName)) {
+                List<Review> remaining = reviewRepository.findByProductNameOrderByCreatedAtDesc(prodName);
+                double avg = remaining.stream().mapToInt(Review::getRating).average().orElse(5.0);
+                product.setRating(Math.round(avg * 10.0) / 10.0);
+                product.setReviews(remaining.size());
+                productRepository.save(product);
+                break;
+            }
+        }
+
+        return ApiResponse.ok("Đã xóa đánh giá thành công", null);
+    }
 }

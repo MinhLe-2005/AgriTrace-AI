@@ -645,70 +645,40 @@ function CustomerDashboardContent() {
   const [orderFilter, setOrderFilter] = useState<string>("ALL");
   const [orderSearchText, setOrderSearchText] = useState<string>("");
 
-  // FEATURE 2: ⏱️ Helper tính toán Đồng Hồ Độ Tươi Xuất Vườn (Freshness Counter: 24H Farm-to-Table)
+  // FEATURE 2: ❄️ Cam Kết Chuỗi Lạnh & Hạn Dùng Tươi (Cold-Chain & Best Before Guarantee)
   function getFreshnessDetails(order: Order) {
     const origin = order.items?.[0]?.origin || "Nông Trại Xanh Thủy Canh Đà Lạt";
     const farmShort = origin.replace(/nông trại/i, "").trim();
 
-    let orderTime = new Date();
-    if (order.createdAtRaw) {
-      const parsed = new Date(order.createdAtRaw);
-      if (!isNaN(parsed.getTime())) orderTime = parsed;
-    }
-
-    // Mặc định nông trại thu hoạch lúc 05:30 sáng ngày đặt hàng (chuẩn rau tươi xuất vườn)
-    const harvestDate = new Date(orderTime);
-    harvestDate.setHours(5, 30, 0, 0);
-    if (harvestDate.getTime() > orderTime.getTime()) {
-      harvestDate.setDate(harvestDate.getDate() - 1);
-    }
-
     const isDelivered = order.status === "DELIVERED" || order.status === "COMPLETED";
     const isShipping = order.status === "SHIPPING";
-
-    let endTime = new Date();
-    if (isDelivered && order.paidAt) {
-      const p = new Date(order.paidAt);
-      if (!isNaN(p.getTime())) endTime = p;
-    }
-
-    const diffMs = Math.max(1000 * 60 * 45, endTime.getTime() - harvestDate.getTime());
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const timeStr = `${diffHours > 0 ? `${diffHours} giờ ` : ""}${diffMinutes} phút`;
 
     if (isDelivered) {
       return {
         status: "DELIVERED",
-        badgeText: `Kỷ lục tươi: ${timeStr}`,
-        headline: `Thu hoạch lúc 05:30 sáng nay tại ${farmShort} · Đã giao tận tay sau ${timeStr}!`,
-        subline: `Độ tươi tuyệt đối, giữ trọn 100% độ giòn mát & vitamin tự nhiên từ vườn (vượt trội so với rau siêu thị lưu kho 3-5 ngày).`,
-        bgClass: "bg-[#F3EFE8] text-[#16261E] border-b border-[#E4DFD5]",
-        pillClass: "bg-emerald-100 text-emerald-900 border-emerald-300",
-        hoursBadge: `${timeStr} từ vườn`,
+        tag: "Chuỗi Lạnh & Hạn Dùng Tươi",
+        headline: `Đã giao tận tay · Dùng ngon nhất trong 3–5 ngày tới (Bảo quản mát 2°C – 5°C)`,
+        subline: `Nông sản tươi từ ${farmShort} được bảo quản xe lạnh khép kín · Bao đổi trả 100% trong 24H nếu dập úa.`,
+        hoursBadge: `🌿 Dùng ngon trong 3-5 ngày`,
       };
     }
 
     if (isShipping) {
       return {
         status: "SHIPPING",
-        badgeText: `Đang giao: ${timeStr}`,
-        headline: `Thu hoạch lúc 05:30 sáng nay tại ${farmShort} · Đang giao tới bạn: Độ tươi mới ${timeStr}!`,
-        subline: `Đang trên xe lạnh 4.2°C chuẩn VietGAP từ nông trại tới bàn ăn, cuống lá nguyên vẹn không úa dập.`,
-        bgClass: "bg-emerald-50/70 text-emerald-950 border-b border-emerald-200/80",
-        pillClass: "bg-emerald-100 text-emerald-900 border-emerald-300",
-        hoursBadge: `${timeStr} từ lúc hái`,
+        tag: "Xe Lạnh Đang Vận Chuyển",
+        headline: `Xe lạnh chuyên dụng 4.2°C đang di chuyển · Giữ trọn độ tươi giòn từ ${farmShort}`,
+        subline: `Tài xế giao chuẩn giờ và hỗ trợ quý khách mở thùng đồng kiểm độ tươi trước khi nhận hàng.`,
+        hoursBadge: `❄️ Xe lạnh 4.2°C VietGAP`,
       };
     }
 
     return {
       status: "PROCESSING",
-      badgeText: `Thu hoạch sáng sớm nay`,
-      headline: `Thu hoạch lúc 05:30 sáng nay tại ${farmShort} · Bảo quản kho mát FEFO: Độ tươi mới ${timeStr}!`,
-      subline: `Cam kết chuỗi cung ứng khép kín 24H Farm-to-Table, chuẩn bị bàn giao đội xe lạnh thông minh.`,
-      bgClass: "bg-stone-50 text-stone-900 border-b border-stone-200",
-      pillClass: "bg-amber-100 text-amber-900 border-amber-300",
-      hoursBadge: `${timeStr} sau thu hoạch`,
+      tag: "Chuẩn Bị Lô Thu Hoạch Mới",
+      headline: `Đang chuẩn bị từ lô thu hoạch mới tại ${farmShort} · Đóng thùng giữ nhiệt kèm tem niêm phong`,
+      subline: `Cam kết chuỗi cung ứng khép kín Farm-to-Table, chuẩn bị bàn giao đội xe lạnh thông minh.`,
+      hoursBadge: `📦 Giao hỏa tốc trong ngày`,
     };
   }
 
@@ -1772,31 +1742,31 @@ function CustomerDashboardContent() {
                     </div>
                   </div>
 
-                  {/* FEATURE 2: ⏱️ ĐỒNG HỒ ĐỘ TƯƠI XUẤT VƯỜN (Freshness Counter: 24H Farm-to-Table) */}
+                  {/* FEATURE 2: ❄️ CAM KẾT CHUỖI LẠNH & HẠN DÙNG TƯƠI (Đậm nét, Rõ ràng, Tương phản cao) */}
                   {!isCancelled && (() => {
                     const fresh = getFreshnessDetails(order);
                     return (
-                      <div className={cn("px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-xs shadow-inner transition-all", fresh.bgClass)}>
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                      <div className="px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 text-xs bg-[#0A261D] text-white border-b border-[#051711] shadow-inner transition-all">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-[9px] uppercase tracking-wider font-extrabold bg-white/10 px-2 py-0.5 rounded text-emerald-200 border border-white/10 flex items-center gap-1 shadow-2xs">
-                                <Clock size={10} className="text-emerald-300" /> Đồng Hồ Độ Tươi 24H
+                              <span className="font-mono text-[9px] uppercase tracking-wider font-extrabold bg-emerald-900/90 text-emerald-300 px-2 py-0.5 rounded border border-emerald-600/50 flex items-center gap-1 shadow-2xs">
+                                <ShieldCheck size={11} className="text-emerald-400" /> {fresh.tag}
                               </span>
-                              <span className="font-semibold text-emerald-50 text-[11px] sm:text-xs">
+                              <span className="font-bold text-white text-xs sm:text-sm">
                                 {fresh.headline}
                               </span>
                             </div>
-                            <p className="text-[10px] text-emerald-200/80 mt-0.5 hidden sm:block">
+                            <p className="text-[11px] text-emerald-200 mt-0.5 hidden sm:block font-normal">
                               {fresh.subline}
                             </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 ml-auto shrink-0">
-                          <span className={cn("px-2.5 py-1 rounded-full text-[11px] font-extrabold border flex items-center gap-1 shadow-2xs", fresh.pillClass)}>
-                            <Sparkles size={11} />
+                          <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center gap-1.5 shadow-2xs">
+                            <Sparkles size={12} className="text-amber-300" />
                             <span>{fresh.hoursBadge}</span>
                           </span>
                         </div>

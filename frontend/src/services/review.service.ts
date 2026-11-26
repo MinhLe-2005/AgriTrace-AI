@@ -9,6 +9,10 @@ export type ApiReview = {
   userName: string;
   rating: number;
   comment?: string;
+  likesCount?: number;
+  reply?: string;
+  replyAuthor?: string;
+  repliedAt?: string;
   createdAt: string;
 };
 
@@ -37,5 +41,19 @@ export const reviewService = {
   }): Promise<ApiReview> {
     const { data } = await api.post<ApiPayload<ApiReview>>("/reviews", input);
     return payload(data);
+  },
+
+  async likeReview(id: number): Promise<ApiReview> {
+    const { data } = await api.post<ApiPayload<ApiReview>>(`/reviews/${id}/like`);
+    return payload(data);
+  },
+
+  async replyReview(id: number, reply: string, replyAuthor?: string): Promise<ApiReview> {
+    const { data } = await api.post<ApiPayload<ApiReview>>(`/reviews/${id}/reply`, { reply, replyAuthor });
+    return payload(data);
+  },
+
+  async deleteReview(id: number): Promise<void> {
+    await api.delete(`/reviews/${id}`);
   },
 };

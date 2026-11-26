@@ -40,6 +40,12 @@ import {
   Gift,
   HelpCircle,
   Clock,
+  ThumbsUp,
+  MessageCircle,
+  Trash2,
+  Maximize2,
+  BadgeCheck,
+  Camera,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -185,6 +191,10 @@ function ProductsContent() {
         userName: "Quang Minh Lê",
         rating: 5,
         comment: `[Đồng kiểm: Rau giòn tươi nguyên vẹn · Thùng lạnh 4.2°C đạt chuẩn · Tài xế thân thiện & đúng hẹn] Nông sản giao tới đóng thùng giữ nhiệt rất tốt, rau củ tươi giòn chuẩn VietGAP, cuống mới hái! [Ảnh thực tế: ${selectedProduct.image}]`,
+        likesCount: 3,
+        reply: "Dạ Nông Trại xin chân thành cảm ơn anh Quang Minh đã tin tưởng và đồng hành cùng nông sản tươi của vườn! Chúc anh và gia đình có những bữa ăn thơm ngon, trọn vẹn dinh dưỡng.",
+        replyAuthor: selectedProduct.farm || "Đại diện Nhà Vườn",
+        repliedAt: "2026-11-26T11:00:00Z",
         createdAt: "2026-11-26T10:15:00Z",
       },
       {
@@ -195,6 +205,7 @@ function ProductsContent() {
         userName: "Hoàng Nam",
         rating: 5,
         comment: `[Đồng kiểm: Rau giòn tươi nguyên vẹn · Thùng lạnh 4.2°C đạt chuẩn] Nhận hàng mở thùng kiểm tra ngay với tài xế, tươi hơn hẳn rau mua ở siêu thị. Sẽ ủng hộ dài lâu.`,
+        likesCount: 1,
         createdAt: "2026-11-25T16:40:00Z",
       },
       {
@@ -204,11 +215,97 @@ function ProductsContent() {
         userEmail: "thuhuong@gmail.com",
         userName: "Thu Hường",
         rating: 5,
-        comment: `[Đồng kiểm: Rau giòn tươi nguyên vẹn · Tài xế thân thiện & đúng hẹn] Đóng gói sạch sẽ, quét mã QR ra ngay nhật ký nông trại Đà Lạt rất an tâm cho các bé nhỏ ăn.`,
+        comment: `[Đồng kiểm: Rau giòn tươi nguyên vẹn · Tài xế thân thiện & đúng hẹn] Đóng gói sạch sẽ, quét mã QR ra ngay nhật ký nông trại rất an tâm cho các bé nhỏ ăn.`,
+        likesCount: 2,
+        reply: "Cảm ơn chị Hường nhiều ạ! Vườn luôn tuân thủ quy trình canh tác an toàn sinh học để mang đến chất lượng tốt nhất.",
+        replyAuthor: selectedProduct.farm || "Hợp Tác Xã Nông Sản",
+        repliedAt: "2026-11-24T14:30:00Z",
         createdAt: "2026-11-24T09:20:00Z",
       },
     ];
   }, [productReviews, selectedProduct]);
+
+  // Review Interactions: Lightbox, Likes, Farmer Replies & Delete
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
+  const [likedReviewIds, setLikedReviewIds] = useState<number[]>([]);
+  const [replyingReviewId, setReplyingReviewId] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState<string>("");
+  const [replyAuthor, setReplyAuthor] = useState<string>("");
+
+  async function handleLikeReview(reviewId: number) {
+    if (likedReviewIds.includes(reviewId)) {
+      toast.info("Bạn đã thích đánh giá này rồi!");
+      return;
+    }
+    setLikedReviewIds((prev) => [...prev, reviewId]);
+    try {
+      const updated = await reviewService.likeReview(reviewId);
+      setProductReviews((prev) =>
+        prev.map((r) => (r.id === reviewId ? { ...r, likesCount: updated.likesCount } : r))
+      );
+      toast.success("Đã ghi nhận phản hồi hữu ích của bạn!");
+    } catch {
+      // Fallback local update
+      setProductReviews((prev) =>
+        prev.map((r) => (r.id === reviewId ? { ...r, likesCount: (r.likesCount || 0) + 1 } : r))
+      );
+    }
+  }
+
+  async function handleSendReply(reviewId: number) {
+    if (!replyText.trim()) {
+      toast.error("Vui lòng nhập nội dung phản hồi!");
+      return;
+    }
+    const authorName = replyAuthor.trim() || selectedProduct?.farm || "Đại diện Nhà Vườn";
+    try {
+      const updated = await reviewService.replyReview(reviewId, replyText.trim(), authorName);
+      setProductReviews((prev) =>
+        prev.map((r) =>
+          r.id === reviewId
+            ? {
+                ...r,
+                reply: updated.reply || replyText.trim(),
+                replyAuthor: updated.replyAuthor || authorName,
+                repliedAt: updated.repliedAt || new Date().toISOString(),
+              }
+            : r
+        )
+      );
+      setReplyingReviewId(null);
+      setReplyText("");
+      toast.success("Đã đăng phản hồi từ Nhà Vườn thành công!");
+    } catch {
+      // Local fallback
+      setProductReviews((prev) =>
+        prev.map((r) =>
+          r.id === reviewId
+            ? {
+                ...r,
+                reply: replyText.trim(),
+                replyAuthor: authorName,
+                repliedAt: new Date().toISOString(),
+              }
+            : r
+        )
+      );
+      setReplyingReviewId(null);
+      setReplyText("");
+      toast.success("Đã lưu phản hồi của Nhà Vườn!");
+    }
+  }
+
+  async function handleDeleteReview(reviewId: number) {
+    if (!confirm("Bạn có chắc chắn muốn xóa đánh giá này không?")) return;
+    try {
+      await reviewService.deleteReview(reviewId);
+      setProductReviews((prev) => prev.filter((r) => r.id !== reviewId));
+      toast.success("Đã xóa đánh giá thành công.");
+    } catch {
+      setProductReviews((prev) => prev.filter((r) => r.id !== reviewId));
+      toast.success("Đã xóa đánh giá.");
+    }
+  }
   const [quickBuyProduct, setQuickBuyProduct] = useState<ApiProduct | null>(null);
   const [quickBuyQty, setQuickBuyQty] = useState(1);
   const [modalQty, setModalQty] = useState(1);
@@ -1022,8 +1119,8 @@ function ProductsContent() {
 
                         {/* Harvest time tag */}
                         <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#16261E]/85 backdrop-blur-md text-stone-100 text-[10px] font-mono pointer-events-none">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                          <span>{p.harvest || "Hôm nay, 05:30 Sáng"}</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <span>{p.harvest || "Thu hoạch tươi theo đơn"}</span>
                         </div>
 
                         {/* Cold-Chain Temp tag */}
@@ -1236,7 +1333,7 @@ function ProductsContent() {
                     {/* Top Fresh Badge */}
                     <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-emerald-900/85 backdrop-blur-md text-white text-[11px] font-semibold flex items-center gap-1 shadow-sm">
                       <Leaf size={11} className="text-emerald-300" />
-                      <span>{selectedProduct.harvest || "Thu hoạch 05:30 sáng nay"}</span>
+                      <span>{selectedProduct.harvest || "Thu hoạch tươi theo đơn"}</span>
                     </div>
 
                     {/* Bottom Cold Chain Badge */}
@@ -1442,21 +1539,29 @@ function ProductsContent() {
                 </div>
               </div>
 
-              {/* Customer Reviews & Co-inspection Section (Đánh giá người mua) */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-gray-200/90 space-y-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                  <div className="flex items-center gap-2">
-                    <Star size={16} className="fill-amber-400 text-amber-500" />
-                    <h4 className="text-sm font-bold text-gray-900">
-                      Đánh Giá & Đồng Kiểm Từ Người Mua ({displayedReviews.length})
-                    </h4>
+              {/* Customer Reviews & Co-inspection Section (Đánh giá người mua - Đậm nét, Rõ ràng) */}
+              <div className="p-4 sm:p-6 rounded-2xl bg-white border-2 border-stone-200/90 shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-stone-200">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Star size={18} className="fill-amber-400 text-amber-500" />
+                      <h4 className="text-base font-bold text-stone-900 font-serif">
+                        Đánh Giá & Đồng Kiểm Thực Tế ({displayedReviews.length})
+                      </h4>
+                    </div>
+                    <p className="text-xs text-stone-600">
+                      100% đánh giá có hình ảnh từ khách hàng mở thùng cùng tài xế xe lạnh
+                    </p>
                   </div>
-                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                    100% Đồng kiểm chuẩn VietGAP
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-900 bg-emerald-100/90 px-3 py-1 rounded-full border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
+                      <BadgeCheck size={14} className="text-emerald-700" />
+                      Chuẩn VietGAP 5.0 ★
+                    </span>
+                  </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {displayedReviews.map((rev, idx) => {
                     const photoMatch = rev.comment?.match(/\[Ảnh thực tế: ([^\]]+)\]/);
                     const photoUrl = photoMatch ? photoMatch[1] : null;
@@ -1464,50 +1569,197 @@ function ProductsContent() {
                     const criteriaMatch = cleanComment.match(/^\[Đồng kiểm: ([^\]]+)\]/);
                     const criteriaStr = criteriaMatch ? criteriaMatch[1] : null;
                     const finalComment = criteriaMatch ? cleanComment.replace(/^\[Đồng kiểm: [^\]]+\]\s*/, "") : cleanComment;
+                    const hasLiked = likedReviewIds.includes(rev.id);
+                    const likesCount = (rev.likesCount || 0) + (hasLiked && !(rev.likesCount && rev.likesCount > 0) ? 1 : 0);
+                    const isAuthorOrAdmin = !!user?.email && (user.email === rev.userEmail || !!user.roles?.some((r) => r.toUpperCase().includes("ADMIN")));
 
                     return (
-                      <div key={rev.id || idx} className="p-3.5 rounded-xl bg-gray-50/70 border border-gray-100 text-xs space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-[11px]">
+                      <div key={rev.id || idx} className="p-4 sm:p-5 rounded-2xl bg-stone-50/80 border border-stone-200/90 text-xs space-y-3 shadow-2xs hover:border-emerald-200 transition-colors">
+                        {/* Header: User Info & Verification */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
                               {rev.userName?.charAt(0) || "K"}
                             </div>
                             <div>
-                              <div className="flex items-center gap-1.5 font-bold text-gray-900">
-                                <span>{rev.userName}</span>
-                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                                  ✓ Đã đồng kiểm nhận hàng
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-stone-900 text-sm">{rev.userName}</span>
+                                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                                  <BadgeCheck size={12} className="text-emerald-700" />
+                                  Đã đồng kiểm mở thùng
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                {[1, 2, 3, 4, 5].map((s) => (
-                                  <Star key={s} size={11} className={cn(s <= (rev.rating || 5) ? "fill-amber-400 text-amber-400" : "text-gray-300")} />
-                                ))}
-                                <span className="text-[10px] text-gray-400 ml-1">
-                                  {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString("vi-VN") : "Hôm nay"}
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className="flex items-center">
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <Star key={s} size={13} className={cn(s <= (rev.rating || 5) ? "fill-amber-400 text-amber-500" : "text-stone-300")} />
+                                  ))}
+                                </div>
+                                <span className="text-xs text-stone-500 font-medium">
+                                  · {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString("vi-VN") : "Hôm nay"}
                                 </span>
                               </div>
                             </div>
                           </div>
+
+                          {/* Delete button (nếu là chủ đánh giá hoặc admin) */}
+                          {isAuthorOrAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReview(rev.id)}
+                              className="text-stone-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
+                              title="Xóa đánh giá này"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
 
+                        {/* Co-inspection Badges */}
                         {criteriaStr && (
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                             {criteriaStr.split("·").map((c: string, ci: number) => (
-                              <span key={ci} className="text-[10px] bg-white text-emerald-800 px-2 py-0.5 rounded border border-emerald-100 font-medium">
-                                {c.trim()}
+                              <span key={ci} className="text-xs bg-white text-emerald-950 px-2.5 py-1 rounded-lg border border-emerald-200/90 font-semibold shadow-2xs flex items-center gap-1">
+                                <span className="text-emerald-600 font-bold">✓</span> {c.trim()}
                               </span>
                             ))}
                           </div>
                         )}
 
-                        <p className="text-gray-700 leading-relaxed text-[11px]">{finalComment}</p>
+                        {/* Comment text */}
+                        <p className="text-stone-800 text-sm leading-relaxed font-normal">{finalComment}</p>
 
+                        {/* Photo Thumbnail with Lightbox trigger */}
                         {photoUrl && (
-                          <div className="pt-1">
-                            <span className="text-[10px] text-gray-400 block mb-1">Ảnh thực tế mở thùng:</span>
-                            <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 bg-white shadow-2xs">
-                              <Image src={photoUrl} alt="Ảnh đánh giá" width={80} height={80} className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                          <div className="pt-1 space-y-1.5">
+                            <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                              <Camera size={13} className="text-emerald-700" />
+                              Ảnh chụp thực tế lúc mở thùng đồng kiểm:
+                            </span>
+                            <div
+                              onClick={() => setLightboxImage({
+                                url: photoUrl,
+                                title: `Ảnh đồng kiểm từ ${rev.userName} · ${selectedProduct.name}`,
+                              })}
+                              className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden border-2 border-stone-300 bg-white shadow-sm cursor-pointer group hover:border-emerald-600 transition-all"
+                              title="Bấm để xem ảnh phóng to toàn màn hình"
+                            >
+                              <Image
+                                src={photoUrl}
+                                alt="Ảnh đánh giá"
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[11px] font-bold gap-1">
+                                <Maximize2 size={16} />
+                                <span>Phóng to</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Interactive Toolbar (Like & Farmer Reply button) */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-stone-200/60">
+                          <button
+                            type="button"
+                            onClick={() => handleLikeReview(rev.id)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 cursor-pointer",
+                              hasLiked
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                : "bg-white text-stone-700 border-stone-200 hover:border-emerald-300 hover:text-emerald-800"
+                            )}
+                          >
+                            <ThumbsUp size={13} className={hasLiked ? "fill-emerald-700 text-emerald-700" : ""} />
+                            <span>Hữu ích {likesCount > 0 ? `(${likesCount})` : ""}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setReplyingReviewId(replyingReviewId === rev.id ? null : rev.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 bg-white border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-all cursor-pointer"
+                          >
+                            <MessageCircle size={13} className="text-emerald-700" />
+                            <span>{rev.reply ? "Thêm lời cảm ơn" : "Phản hồi từ Nhà Vườn"}</span>
+                          </button>
+                        </div>
+
+                        {/* Farmer Reply Box (Hiển thị nếu đã có phản hồi) */}
+                        {rev.reply && (
+                          <div className="p-3.5 rounded-xl bg-emerald-50/90 border border-emerald-300/80 text-xs space-y-1.5 shadow-2xs">
+                            <div className="flex items-center justify-between text-emerald-950 font-bold">
+                              <span className="flex items-center gap-1.5 text-xs">
+                                <BadgeCheck size={14} className="text-emerald-700" />
+                                🌿 Phản hồi từ Nhà Vườn ({rev.replyAuthor || selectedProduct.farm || "Đại diện nông trại"}):
+                              </span>
+                              <span className="text-[10px] text-emerald-700 font-medium">
+                                {rev.repliedAt ? new Date(rev.repliedAt).toLocaleDateString("vi-VN") : "Mới đây"}
+                              </span>
+                            </div>
+                            <p className="text-stone-800 leading-relaxed font-normal">{rev.reply}</p>
+                          </div>
+                        )}
+
+                        {/* Farmer Reply Form (Form mở khi bấm nút Phản hồi) */}
+                        {replyingReviewId === rev.id && (
+                          <div className="p-3.5 rounded-xl bg-white border-2 border-emerald-600/50 space-y-2.5 shadow-sm">
+                            <div className="flex items-center justify-between text-xs font-bold text-emerald-950">
+                              <span>💬 Trả lời đánh giá này (Với tư cách Nhà Vườn / Hợp Tác Xã)</span>
+                              <button
+                                type="button"
+                                onClick={() => setReplyingReviewId(null)}
+                                className="text-stone-400 hover:text-stone-600 cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={replyAuthor}
+                              onChange={(e) => setReplyAuthor(e.target.value)}
+                              placeholder={`Tên đại diện (Mặc định: ${selectedProduct.farm || "Chủ Trang Trại"})`}
+                              className="w-full text-xs px-3 py-1.5 rounded-lg border border-stone-200 focus:outline-none focus:border-emerald-600"
+                            />
+                            <textarea
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder="Nhập nội dung phản hồi tới khách hàng..."
+                              rows={2}
+                              className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-emerald-600"
+                            />
+                            {/* Fast template chips */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] text-stone-500 font-medium">Mẫu nhanh:</span>
+                              <button
+                                type="button"
+                                onClick={() => setReplyText("Dạ vườn xin chân thành cảm ơn quý khách đã tin dùng nông sản VietGAP! Chúc bạn và gia đình thật ngon miệng ạ.")}
+                                className="text-[10px] bg-stone-100 hover:bg-emerald-50 hover:text-emerald-800 px-2 py-0.5 rounded border border-stone-200 cursor-pointer"
+                              >
+                                Cảm ơn & Chúc ngon miệng
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setReplyText("Nông trại luôn thu hoạch đúng lứa sáng sớm và chuyển xe lạnh liền tay để giữ trọn độ tươi giòn tốt nhất.")}
+                                className="text-[10px] bg-stone-100 hover:bg-emerald-50 hover:text-emerald-800 px-2 py-0.5 rounded border border-stone-200 cursor-pointer"
+                              >
+                                Cam kết tươi giòn
+                              </button>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setReplyingReviewId(null)}
+                                className="px-3 py-1 text-xs text-stone-600 hover:text-stone-800 cursor-pointer"
+                              >
+                                Hủy
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSendReply(rev.id)}
+                                className="px-3.5 py-1 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-2xs cursor-pointer"
+                              >
+                                Gửi phản hồi
+                              </button>
                             </div>
                           </div>
                         )}
@@ -1778,6 +2030,54 @@ function ProductsContent() {
       )}
 
       {/* Mua Ngay Siêu Tốc Modal */}
+      {/* Lightbox Modal Xem Ảnh Đánh Giá Phóng To */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-200"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            className="relative max-w-3xl w-full max-h-[90vh] bg-stone-900 rounded-2xl overflow-hidden border border-white/20 shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 bg-stone-950/90 border-b border-white/10 flex items-center justify-between text-white text-xs">
+              <div className="flex items-center gap-2">
+                <Camera size={15} className="text-emerald-400" />
+                <span className="font-bold">{lightboxImage.title || "Ảnh đồng kiểm thực tế"}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="relative flex-1 min-h-[350px] sm:min-h-[500px] bg-black/70 flex items-center justify-center p-2">
+              <Image
+                src={lightboxImage.url}
+                alt={lightboxImage.title || "Ảnh đồng kiểm"}
+                fill
+                className="object-contain"
+              />
+            </div>
+            <div className="p-3 bg-stone-950/95 text-stone-300 text-xs flex items-center justify-between border-t border-white/10">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <BadgeCheck size={14} />
+                Ảnh chụp thực tế của khách hàng mở thùng cùng tài xế xe lạnh
+              </span>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="px-3 py-1 bg-white/15 hover:bg-white/25 text-white rounded-lg text-xs font-medium cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <QuickBuyModal
         isOpen={!!quickBuyProduct}
         onClose={() => setQuickBuyProduct(null)}
