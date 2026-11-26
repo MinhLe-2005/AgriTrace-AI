@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Award,
   BookOpen,
+  CalendarRange,
   Check,
   CheckCircle2,
   Clock,
@@ -40,6 +41,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { farmerService, parseFarmDocUrls, serializeFarmDocUrls, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot, ApiForecastProductItem } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
 import { DemandForecastPanel } from "@/components/farmer/demand-forecast-panel";
+import { CropSeasonsPanel } from "@/components/farmer/crop-seasons-panel";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { reviewService, type ApiReview } from "@/services/review.service";
@@ -767,8 +769,9 @@ function resolveFarmerOwnerId(user: { id?: string; name?: string; email?: string
 }
 
 function FarmerPortalContent() {
+  // 8 Tab nghiệp vụ: Nông trại, Lô hàng, Nhật ký, Sản phẩm, Chứng nhận, Đánh giá, Mùa vụ & AI Dự báo
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "forecast">("farms");
+  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast">("farms");
   const [farmerReviews, setFarmerReviews] = useState<ApiReview[]>([]);
   const [farmerReplyText, setFarmerReplyText] = useState<{ [id: number]: string }>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [id: number]: boolean }>({});
@@ -821,10 +824,10 @@ function FarmerPortalContent() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "forecast"].includes(tab)) {
-      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "forecast");
+    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "seasons", "forecast"].includes(tab)) {
+      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast");
     } else if (!tab) {
-      setActiveTab((prev) => (prev === "forecast" ? "farms" : prev));
+      setActiveTab((prev) => (prev === "forecast" || prev === "seasons" ? "farms" : prev));
     }
   }, [searchParams]);
 
@@ -2714,6 +2717,20 @@ function FarmerPortalContent() {
         </button>
 
         <button
+          onClick={() => setActiveTab("seasons")}
+          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "seasons"
+              ? "border-emerald-600 text-emerald-800 font-extrabold"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          <CalendarRange size={16} /> Mùa Vụ Canh Tác
+          <span className="bg-sky-100 text-sky-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+            4 Trạng thái
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("forecast")}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "forecast"
@@ -3973,7 +3990,18 @@ function FarmerPortalContent() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 7: AI DỰ BÁO NHU CẦU TIÊU THỤ (7 - 30 NGÀY TỚI) */}
+      {/* TAB 7: QUẢN LÝ MÙA VỤ CANH TÁC (CROP SEASONS) */}
+      {/* ========================================================================= */}
+      {activeTab === "seasons" && (
+        <CropSeasonsPanel
+          ownerId={activeOwnerId}
+          farms={visibleFarms.map((f) => ({ code: f.code, name: f.name }))}
+          productNames={Array.from(new Set(visibleProducts.map((p) => p.name)))}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 8: AI DỰ BÁO NHU CẦU TIÊU THỤ (7 - 30 NGÀY TỚI) */}
       {/* ========================================================================= */}
       {activeTab === "forecast" && (
         <DemandForecastPanel

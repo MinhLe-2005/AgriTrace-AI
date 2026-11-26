@@ -154,6 +154,24 @@ export type ApiDemandForecastResponse = {
   timeline: ApiForecastTimelinePoint[];
 };
 
+export type ApiCropSeason = {
+  id: number;
+  ownerId: string;
+  farmCode?: string;
+  productName: string;
+  categoryCode?: string;
+  startMonth: number;
+  endMonth: number;
+  peakMultiplier?: number;
+  notes?: string;
+  active?: boolean;
+  seasonCode?: "UPCOMING" | "IN_SEASON" | "LATE_SEASON" | "OFF_SEASON" | string;
+  seasonLabel?: "Sắp vào mùa" | "Đang vào mùa" | "Cuối mùa" | "Hết mùa" | string;
+  crossYear?: boolean;
+  durationMonths?: number;
+  effectiveDemandMultiplier?: number;
+};
+
 export type ApiProductItem = {
   id: string;
   name: string;
@@ -554,5 +572,40 @@ export const farmerService = {
       throw new Error("Không thể kết nối trợ lý chiến lược AI");
     }
     return (await res.json()) as { advice: string; model: string };
+  },
+
+  async getCropSeasons(params?: {
+    ownerId?: string;
+    farmCode?: string;
+    month?: number;
+  }): Promise<ApiCropSeason[]> {
+    const res = await api.get<ApiCropSeason[]>("/farmer/seasons", { params });
+    return res.data || [];
+  },
+
+  async createCropSeason(payload: Partial<ApiCropSeason>): Promise<ApiCropSeason> {
+    const res = await api.post<{ success: boolean; message?: string; data?: ApiCropSeason }>(
+      "/farmer/seasons",
+      payload
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể tạo cấu hình mùa vụ");
+    }
+    return res.data.data;
+  },
+
+  async updateCropSeason(id: number, payload: Partial<ApiCropSeason>): Promise<ApiCropSeason> {
+    const res = await api.put<{ success: boolean; message?: string; data?: ApiCropSeason }>(
+      `/farmer/seasons/${id}`,
+      payload
+    );
+    if (!res.data?.success || !res.data?.data) {
+      throw new Error(res.data?.message || "Không thể cập nhật cấu hình mùa vụ");
+    }
+    return res.data.data;
+  },
+
+  async deleteCropSeason(id: number): Promise<void> {
+    await api.delete(`/farmer/seasons/${id}`);
   },
 };

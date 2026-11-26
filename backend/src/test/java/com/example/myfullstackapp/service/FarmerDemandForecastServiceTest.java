@@ -2,12 +2,14 @@ package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.farmer.FarmerDemandForecastResponse;
 import com.example.myfullstackapp.entity.Campaign;
+import com.example.myfullstackapp.entity.CropSeason;
 import com.example.myfullstackapp.entity.Farm;
 import com.example.myfullstackapp.entity.HarvestLot;
 import com.example.myfullstackapp.entity.Order;
 import com.example.myfullstackapp.entity.OrderItem;
 import com.example.myfullstackapp.entity.Product;
 import com.example.myfullstackapp.repository.CampaignRepository;
+import com.example.myfullstackapp.repository.CropSeasonRepository;
 import com.example.myfullstackapp.repository.FarmRepository;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
 import com.example.myfullstackapp.repository.OrderRepository;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,8 +49,11 @@ class FarmerDemandForecastServiceTest {
     @Mock
     private FarmerOwnershipResolver ownershipResolver;
 
+    @Mock
+    private CropSeasonRepository cropSeasonRepository;
+
     private FarmerDemandForecastService buildService() {
-        return new FarmerDemandForecastService(
+        FarmerDemandForecastService service = new FarmerDemandForecastService(
                 productRepository,
                 harvestLotRepository,
                 orderRepository,
@@ -55,6 +61,8 @@ class FarmerDemandForecastServiceTest {
                 campaignRepository,
                 ownershipResolver
         );
+        ReflectionTestUtils.setField(service, "cropSeasonRepository", cropSeasonRepository);
+        return service;
     }
 
     @Test
@@ -175,5 +183,49 @@ class FarmerDemandForecastServiceTest {
         assertEquals("SURPLUS", item.riskStatus());
         assertEquals(0.0, item.recommendedPrepQty());
         assertEquals(7, res.timeline().size());
+    }
+
+    @Test
+    void usesConfiguredCropSeasonMultiplierWhenDefinedForFarmerProduct() {
+        LocalDate nov26 = LocalDate.of(2026, 11, 26);
+
+        Farm farm = Farm.builder().code("NT-DL-01").name("Nông Trại Xanh Đà Lạt").ownerId("farmer_hung").build();
+        Product tomato = Product.builder()
+                .id("p-tomato")
+                .name("Cà Chua Bi Cherry")
+                .categoryCode("cu_qua")
+                .unit("kg")
+                .price(50000L)
+                .oldPrice(60000L)
+                .stockLeft(80)
+                .farmCode("NT-DL-01")
+                .ownerId("farmer_hung")
+                .active(true)
+                .build();
+
+        CropSeason crossYearPeak = CropSeason.builder()
+                .id(1L)
+                .ownerId("farmer_hung")
+                .farmCode("NT-DL-01")
+                .productName("Cà Chua Bi Cherry")
+                .startMonth(11)
+                .endMonth(2)
+                .peakMultiplier(1.45)
+                .active(true)
+                .build();
+
+        when(ownershipResolver.resolveEffectiveOwnerId("farmer_hung", "NT-DL-01")).thenReturn("farmer_hung");
+        when(farmRepository.findByOwnerIdIgnoreCaseOrderByIdAsc("farmer_hung")).thenReturn(List.of(farm));
+        when(productRepository.findByOwnerIdIgnoreCaseAndActiveTrue("farmer_hung")).thenReturn(List.of(tomato));
+        when(harvestLotRepository.findByOwnerIdIgnoreCaseOrderByCreatedAtDesc("farmer_hung")).thenReturn(List.of());
+        when(orderRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(campaignRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(cropSeasonRepository.findByOwnerIdIgnoreCaseOrderByIdAsc("farmer_hung")).thenReturn(List.of(crossYearPeak));
+
+        FarmerDemandForecastResponse res = buildService().buildForecastAtDate("farmer_hung", "NT-DL-01", 7, nov26);
+
+        var item = res.items().get(0);
+        assertEquals(1.45, item.seasonalMultiplier());
+        assertTrue(item.seasonPhase().contains("Đang vào mùa (T11 → T2)"));
     }
 }

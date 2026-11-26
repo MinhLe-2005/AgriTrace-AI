@@ -59,6 +59,7 @@ const customerNavigation: NavItem[] = [
 
 const farmerNavigation: NavItem[] = [
   { href: "/dashboard/farmer", label: "Quản Lý Nông Trại", icon: Leaf },
+  { href: "/dashboard/farmer?tab=seasons", label: "Mùa Vụ Canh Tác", icon: CalendarRange },
   { href: "/dashboard/farmer?tab=forecast", label: "AI Dự Báo Nhu Cầu", icon: TrendingUp },
   { href: "/traceability", label: "Cấp Mã QR Lô Hàng", icon: QrCode },
   { href: "/products", label: "Xem Gian Hàng", icon: Store },
