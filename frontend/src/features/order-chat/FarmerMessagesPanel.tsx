@@ -167,9 +167,9 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
   ];
 
   return (
-    <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden flex flex-col md:flex-row h-[760px] animate-in fade-in duration-200">
+    <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden flex flex-col md:flex-row h-[760px] animate-in fade-in duration-200 w-full min-w-0">
       {/* ── Left Sidebar: Conversation List ── */}
-      <div className="w-full md:w-80 lg:w-96 border-r border-gray-200 flex flex-col shrink-0 bg-gray-50/50">
+      <div className="w-full md:w-80 lg:w-[320px] xl:w-[360px] border-r border-gray-200 flex flex-col shrink-0 bg-gray-50/50 min-w-0">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 bg-white space-y-3">
           <div className="flex items-center justify-between">
@@ -300,9 +300,9 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
         </div>
       </div>
 
-      {/* ── Right Content: Live Chat Room with Customer ── */}
+      {/* ── Right Content: Trao Đổi Với Khách Hàng ── */}
       {activeConv ? (
-        <div className="flex-1 flex flex-col bg-white">
+        <div className="flex-1 flex flex-col bg-white min-w-0 overflow-hidden">
           {/* Header */}
           <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 shadow-2xs">
             <div className="flex items-center gap-3">

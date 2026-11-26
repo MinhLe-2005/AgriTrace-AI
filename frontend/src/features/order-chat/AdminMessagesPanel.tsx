@@ -257,9 +257,9 @@ export function AdminMessagesPanel() {
       </div>
 
       {/* ── Main Chat Room Container ── */}
-      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden flex flex-col md:flex-row h-[760px]">
+      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden flex flex-col md:flex-row h-[760px] w-full min-w-0">
         {/* Left Sidebar */}
-        <div className="w-full md:w-80 lg:w-96 border-r border-gray-200 flex flex-col shrink-0 bg-gray-50/50">
+        <div className="w-full md:w-80 lg:w-[320px] xl:w-[360px] border-r border-gray-200 flex flex-col shrink-0 bg-gray-50/50 min-w-0">
           <div className="p-4 border-b border-gray-200 bg-white space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-sm text-gray-900 flex items-center gap-2">
@@ -394,7 +394,7 @@ export function AdminMessagesPanel() {
 
         {/* Right Content */}
         {activeConv ? (
-          <div className="flex-1 flex flex-col bg-white">
+          <div className="flex-1 flex flex-col bg-white min-w-0 overflow-hidden">
             {/* Header */}
             <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 shadow-2xs">
               <div className="flex items-center gap-3">
