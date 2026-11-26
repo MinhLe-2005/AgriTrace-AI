@@ -22,6 +22,7 @@ import {
   ShoppingCart,
   Store,
   Ticket,
+  TrendingUp,
   Truck,
   Users,
   Warehouse,
@@ -58,6 +59,7 @@ const customerNavigation: NavItem[] = [
 
 const farmerNavigation: NavItem[] = [
   { href: "/dashboard/farmer", label: "Quản Lý Nông Trại", icon: Leaf },
+  { href: "/dashboard/farmer?tab=forecast", label: "AI Dự Báo Nhu Cầu", icon: TrendingUp },
   { href: "/traceability", label: "Cấp Mã QR Lô Hàng", icon: QrCode },
   { href: "/products", label: "Xem Gian Hàng", icon: Store },
 ];
@@ -130,7 +132,7 @@ function SidebarNavItems({
         const itemTab = itemQuery ? new URLSearchParams(itemQuery).get("tab") : null;
         const active = itemTab
           ? pathname === itemPath && currentTab === itemTab
-          : pathname === item.href && (!currentTab || pathname !== "/dashboard/admin");
+          : pathname === item.href && (!currentTab || (pathname !== "/dashboard/admin" && pathname !== "/dashboard/farmer"));
         const Icon = item.icon;
         const showGroup = item.group && item.group !== navItems[index - 1]?.group;
         return (

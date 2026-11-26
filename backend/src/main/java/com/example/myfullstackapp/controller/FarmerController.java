@@ -71,6 +71,9 @@ public class FarmerController {
     private final FarmerMediaStorageService mediaStorageService;
     private final FarmerOwnershipResolver ownershipResolver;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.myfullstackapp.service.FarmerDemandForecastService demandForecastService;
+
     @PostMapping(value = "/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<FarmerMediaStorageService.StoredMediaResult>> uploadProofImage(
             @RequestParam("file") MultipartFile file,
@@ -1678,6 +1681,22 @@ public class FarmerController {
                 .build();
 
         farmingLogRepository.saveAll(List.of(l1, l2, l3, l4, l5));
+    }
+
+    @GetMapping("/ai/demand-forecast")
+    public ResponseEntity<ApiResponse<com.example.myfullstackapp.dto.farmer.FarmerDemandForecastResponse>> getDemandForecast(
+            @RequestParam(required = false) String ownerId,
+            @RequestParam(required = false) String farmCode,
+            @RequestParam(defaultValue = "7") int horizonDays
+    ) {
+        if (demandForecastService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ApiResponse.error("Dịch vụ dự báo nhu cầu AI chưa sẵn sàng."));
+        }
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Phân tích dự báo nhu cầu AI thành công",
+                demandForecastService.buildForecast(ownerId, farmCode, horizonDays)
+        ));
     }
 
     private String resolveFarmCode(String farmName) {
