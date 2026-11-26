@@ -158,6 +158,90 @@ public class EmailService {
         }
     }
 
+    public void sendContactEmail(
+            String targetEmail,
+            String senderName,
+            String senderEmail,
+            String senderPhone,
+            String senderRole,
+            String subject,
+            String messageBody
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(
+                    message,
+                    MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+                    StandardCharsets.UTF_8.name()
+            );
+
+            helper.setFrom(fromEmail, "AgriTrace AI - Hộp Thư Liên Hệ");
+            helper.setTo(targetEmail);
+            if (senderEmail != null && !senderEmail.isBlank()) {
+                helper.setReplyTo(senderEmail, senderName != null ? senderName : "Khách hàng");
+            }
+            String emailSubject = "[AgriTrace Liên Hệ] " + (subject != null && !subject.isBlank() ? subject : ("Tin nhắn từ " + senderName));
+            helper.setSubject(emailSubject);
+
+            String htmlTemplate = """
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f6fbf7; margin: 0; padding: 24px; color: #2d3748; }
+                        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.06); border: 1px solid #d1fae5; }
+                        .header { background: linear-gradient(135deg, #064e3b 0%, #047857 100%); padding: 28px 24px; text-align: center; color: #ffffff; }
+                        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+                        .header p { margin: 6px 0 0; font-size: 13px; color: #a7f3d0; }
+                        .content { padding: 28px 24px; }
+                        .info-grid { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 20px; font-size: 13px; line-height: 1.6; }
+                        .msg-box { background: #fafafa; border: 1px solid #e5e7eb; border-left: 4px solid #10b981; border-radius: 8px; padding: 18px; margin-bottom: 20px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #1f2937; }
+                        .footer { background: #f9fafb; padding: 16px 24px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>🌿 AgriTrace AI - Tin Nhắn Liên Hệ Mới</h1>
+                            <p>Yêu cầu hỗ trợ & liên hệ đối tác từ cổng website</p>
+                        </div>
+                        <div class="content">
+                            <div class="info-grid">
+                                <div><strong>Họ và tên:</strong> {{SENDER_NAME}}</div>
+                                <div><strong>Email người gửi:</strong> <a href="mailto:{{SENDER_EMAIL}}">{{SENDER_EMAIL}}</a></div>
+                                <div><strong>Số điện thoại:</strong> {{SENDER_PHONE}}</div>
+                                <div><strong>Vai trò hệ thống:</strong> {{SENDER_ROLE}}</div>
+                                <div><strong>Tiêu đề:</strong> {{SUBJECT}}</div>
+                            </div>
+                            <div style="font-size: 13px; font-weight: bold; color: #374151; margin-bottom: 6px;">Nội dung tin nhắn:</div>
+                            <div class="msg-box">{{MESSAGE_BODY}}</div>
+                        </div>
+                        <div class="footer">
+                            Email này được gửi tự động từ biểu mẫu liên hệ trên hệ thống AgriTrace AI.
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """;
+
+            String htmlContent = htmlTemplate
+                    .replace("{{SENDER_NAME}}", senderName != null ? senderName : "Ẩn danh")
+                    .replace("{{SENDER_EMAIL}}", senderEmail != null ? senderEmail : "N/A")
+                    .replace("{{SENDER_PHONE}}", senderPhone != null && !senderPhone.isBlank() ? senderPhone : "Chưa cung cấp")
+                    .replace("{{SENDER_ROLE}}", senderRole != null ? senderRole : "Khách hàng")
+                    .replace("{{SUBJECT}}", subject != null && !subject.isBlank() ? subject : "Yêu cầu chung")
+                    .replace("{{MESSAGE_BODY}}", messageBody != null ? messageBody : "");
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Successfully sent contact message from [{}] to: {}", senderEmail, targetEmail);
+        } catch (Exception e) {
+            log.error("Failed to send contact email to {}: {}", targetEmail, e.getMessage(), e);
+            throw new RuntimeException("Không thể gửi email liên hệ: " + e.getMessage(), e);
+        }
+    }
+
     private void sendHtmlEmail(String toEmail, String subject, String title, String description, String otpCode) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

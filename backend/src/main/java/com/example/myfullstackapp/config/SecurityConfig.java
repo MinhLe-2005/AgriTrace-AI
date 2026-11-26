@@ -47,7 +47,7 @@ public class SecurityConfig {
                         // verifies the current password and clears self-locks only.
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/lock").permitAll()
                         .requestMatchers("/api/v1/users/**", "/api/v1/verifications/**").authenticated()
-                        .requestMatchers("/api/v1/payment/payos/**", "/api/v1/loyalty/**", "/api/v1/campaigns/**", "/api/v1/blog-posts/**", "/api/v1/vouchers/**").permitAll()
+                        .requestMatchers("/api/v1/payment/payos/**", "/api/v1/loyalty/**", "/api/v1/campaigns/**", "/api/v1/blog-posts/**", "/api/v1/vouchers/**", "/api/v1/contact/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/products/**", "/api/v1/vouchers/**", "/api/v1/traceability/**", "/api/v1/orders/**", "/api/v1/reviews/**", "/api/v1/loyalty/**", "/api/v1/campaigns/**", "/api/v1/blog-posts/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders/**", "/api/v1/farmer/**", "/api/v1/products/**", "/api/v1/reviews/**", "/api/v1/loyalty/**").permitAll()
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/**", "/api/v1/farmer/**").permitAll()

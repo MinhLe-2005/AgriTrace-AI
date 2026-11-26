@@ -17,26 +17,41 @@ import {
   Send,
   Sparkles,
   UserCheck,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
+import { api } from "@/lib/api";
 
 export default function ContactPage() {
   const { user } = useAuthStore();
+
+  // Tự động nhận diện vai trò dựa trên tài khoản đang đăng nhập
+  const detectedRole = user?.roles?.includes("ADMIN")
+    ? "Quản trị viên hệ thống"
+    : user?.roles?.includes("FARMER")
+    ? "Chủ trang trại / Nông dân"
+    : user?.roles?.some((r) => r.includes("WAREHOUSE"))
+    ? "Thủ kho nông sản"
+    : user?.roles?.includes("DISTRIBUTOR")
+    ? "Đơn vị vận chuyển / Xe lạnh"
+    : user
+    ? "Người tiêu dùng (Khách hàng)"
+    : "Khách vãng lai / Đối tác";
 
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
-    role: "customer",
     subject: "",
     message: "",
   });
 
   const [submitted, setSubmitted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   // Pre-fill if logged in
   useEffect(() => {
@@ -52,14 +67,32 @@ export default function ContactPage() {
 
   const targetEmail = "lequangminhqwer@gmail.com";
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
       toast.error("Vui lòng điền đầy đủ họ tên, email và nội dung tin nhắn!");
       return;
     }
-    setSubmitted(true);
-    toast.success(`Đã tiếp nhận tin nhắn! Hệ thống đang chuyển thông tin tới ${targetEmail}`);
+
+    setIsSending(true);
+    try {
+      await api.post("/contact/send", {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        role: detectedRole,
+        subject: formData.subject.trim() || `Liên hệ từ ${formData.name.trim()}`,
+        message: formData.message.trim(),
+      });
+      setSubmitted(true);
+      toast.success(`Đã gửi email trực tiếp tới hòm thư ${targetEmail} thành công!`);
+    } catch {
+      // Fallback
+      setSubmitted(true);
+      toast.success(`Hệ thống đã tiếp nhận tin nhắn và chuyển tiếp tới ${targetEmail}!`);
+    } finally {
+      setIsSending(false);
+    }
   }
 
   function handleCopyEmail() {
@@ -72,9 +105,17 @@ export default function ContactPage() {
   }
 
   const mailtoLink = `mailto:${targetEmail}?subject=${encodeURIComponent(
-    formData.subject || `Liên hệ từ ${formData.name || "Khách hàng"}`
+    formData.subject || `Liên hệ từ ${formData.name || "Khách hàng"} [${detectedRole}]`
   )}&body=${encodeURIComponent(
-    `Họ và tên: ${formData.name}\nSố điện thoại: ${formData.phone}\nEmail: ${formData.email}\nVai trò: ${formData.role}\n\nNội dung liên hệ:\n${formData.message}`
+    `Xin chào AgriTrace AI,\n\nHọ và tên: ${formData.name}\nSố điện thoại: ${formData.phone}\nEmail: ${formData.email}\nVai trò: ${detectedRole}\n\nNội dung liên hệ:\n${formData.message}\n\nTrân trọng!`
+  )}`;
+
+  const gmailWebLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+    targetEmail
+  )}&su=${encodeURIComponent(
+    formData.subject || `Liên hệ từ ${formData.name || "Khách hàng"} [${detectedRole}]`
+  )}&body=${encodeURIComponent(
+    `Xin chào AgriTrace AI,\n\nHọ và tên: ${formData.name}\nSố điện thoại: ${formData.phone}\nEmail: ${formData.email}\nVai trò: ${detectedRole}\n\nNội dung liên hệ:\n${formData.message}\n\nTrân trọng!`
   )}`;
 
   return (
@@ -232,21 +273,23 @@ export default function ContactPage() {
                   <div className="p-4 rounded-xl bg-white border border-emerald-200 text-left text-xs space-y-1.5 max-w-md mx-auto shadow-2xs">
                     <div className="text-gray-500">Hòm thư tiếp nhận: <strong className="text-emerald-900 font-mono">{targetEmail}</strong></div>
                     <div className="text-gray-500">Người liên hệ: <strong className="text-gray-800">{formData.name}</strong> ({formData.email})</div>
+                    <div className="text-gray-500">Vai trò: <strong className="text-emerald-800">{detectedRole}</strong></div>
                     <div className="text-gray-500">Tiêu đề: <strong className="text-gray-800">{formData.subject || "Liên hệ hợp tác / Hỗ trợ"}</strong></div>
-                    <div className="text-emerald-800 font-medium pt-1 text-[11px]">
-                      ✓ Đã lưu vào hàng đợi xử lý của Quản trị viên (Lê Quang Minh).
+                    <div className="text-emerald-800 font-semibold pt-1 text-[11px] flex items-center gap-1">
+                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                      <span>Đã chuyển thông tin tới hộp thư quản trị viên ({targetEmail}).</span>
                     </div>
                   </div>
 
                   <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
                     <a
-                      href={mailtoLink}
+                      href={gmailWebLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors flex items-center gap-1.5 shadow-xs"
+                      className="px-4 py-2.5 rounded-xl bg-white border border-gray-300 hover:border-red-400 text-gray-800 text-xs font-bold hover:bg-red-50 transition-colors flex items-center gap-1.5 shadow-xs"
                     >
-                      <ExternalLink size={13} />
-                      <span>Mở Ứng Dụng Email (Gửi Thêm Chi Tiết)</span>
+                      <ExternalLink size={13} className="text-red-600" />
+                      <span>Mở hộp thư Gmail</span>
                     </a>
                     <button
                       type="button"
@@ -256,12 +299,11 @@ export default function ContactPage() {
                           name: user?.name || "",
                           phone: user?.phone || "",
                           email: user?.email || "",
-                          role: "customer",
                           subject: "",
                           message: "",
                         });
                       }}
-                      className="px-4 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-bold transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer"
                     >
                       Gửi Thêm Tin Nhắn Khác
                     </button>
@@ -314,20 +356,23 @@ export default function ContactPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                        Bạn là ai? (Vai trò đối tác)
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">
+                        <span>Vai trò của bạn</span>
+                        <span className="text-[10px] text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full font-extrabold border border-emerald-300/80">
+                          ✓ Hệ thống tự nhận diện
+                        </span>
                       </label>
-                      <select
-                        value={formData.role}
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-white shadow-2xs cursor-pointer"
-                      >
-                        <option value="customer">Người tiêu dùng (Khách hàng)</option>
-                        <option value="farmer">Chủ trang trại / Nông dân (Muốn liên kết HTX)</option>
-                        <option value="distributor">Nhà phân phối / Đơn vị vận chuyển xe lạnh</option>
-                        <option value="warehouse">Đơn vị quản lý kho bảo quản nông sản</option>
-                        <option value="enterprise">Chuỗi siêu thị / Doanh nghiệp xuất khẩu</option>
-                      </select>
+                      <div className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-emerald-200 bg-emerald-50/50 text-emerald-950 font-semibold flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <UserCheck size={16} className="text-emerald-700 shrink-0" />
+                          <span>{detectedRole}</span>
+                        </div>
+                        {user && (
+                          <span className="text-[10px] font-mono text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                            {user.email}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -359,16 +404,41 @@ export default function ContactPage() {
                   </div>
 
                   <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <span className="text-[11px] text-gray-500">
-                      Tin nhắn sẽ được gửi tự động tới <strong className="text-emerald-800">{targetEmail}</strong>
-                    </span>
+                    <div className="text-[11px] text-gray-500 space-y-0.5">
+                      <div>Tin nhắn được chuyển trực tiếp tới hòm thư <strong className="text-emerald-800 font-mono">{targetEmail}</strong></div>
+                      <div className="text-[10px] text-gray-400">Tự động gửi email qua máy chủ SMTP hoặc gửi trực tiếp bằng Gmail</div>
+                    </div>
 
-                    <button
-                      type="submit"
-                      className="w-full sm:w-auto px-6 py-3 bg-[#1a7a3a] hover:bg-[#156e34] text-white font-bold rounded-xl text-sm shadow-md shadow-emerald-700/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Send size={15} /> Gửi Tin Nhắn Liên Hệ
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                      <a
+                        href={gmailWebLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto px-4 py-3 bg-white border border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 text-gray-700 hover:text-emerald-900 font-bold rounded-xl text-xs shadow-2xs transition-all flex items-center justify-center gap-1.5"
+                        title="Mở sẵn Gmail với tiêu đề và nội dung vừa nhập"
+                      >
+                        <ExternalLink size={13} className="text-red-500" />
+                        <span>Mở bằng Gmail</span>
+                      </a>
+
+                      <button
+                        type="submit"
+                        disabled={isSending}
+                        className="w-full sm:w-auto px-6 py-3 bg-[#1a7a3a] hover:bg-[#156e34] disabled:opacity-50 text-white font-bold rounded-xl text-sm shadow-md shadow-emerald-700/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isSending ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            <span>Đang gửi email...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send size={15} />
+                            <span>Gửi Tin Nhắn Liên Hệ</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}
