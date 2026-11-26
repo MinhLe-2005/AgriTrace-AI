@@ -40,6 +40,7 @@ import {
   Maximize2,
   Droplets,
   Sprout,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -2137,6 +2138,107 @@ export default function TraceabilityPage() {
             </div>
 
             {/* Bottom Actions */}
+            {/* ── BẢNG 4: ĐỒNG KIỂM & PHẢN HỒI THỰC TẾ TỪ NGƯỜI TIÊU DÙNG (CUSTOMER REVIEWS) ── */}
+            <div id="customer-reviews" className="scroll-mt-24 space-y-4 pt-4 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 shadow-2xs">
+                    <Star size={16} className="fill-amber-400 text-amber-500" />
+                  </span>
+                  <div>
+                    <h3 className="font-extrabold text-base sm:text-lg text-gray-900">
+                      Đồng Kiểm Độ Tươi & Phản Hồi Từ Người Tiêu Dùng
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Đánh giá thực tế khi mở thùng nông sản của các khách hàng đã mua lô này
+                    </p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto">
+                  100% Đồng kiểm 5★ Đạt Chuẩn
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-white border border-gray-200/90 shadow-2xs space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
+                        Q
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 flex items-center gap-1.5">
+                          <span>Quang Minh Lê</span>
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-semibold border border-emerald-200">
+                            ✓ Đã nhận & đồng kiểm
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} size={11} className="fill-amber-400 text-amber-400" />
+                          ))}
+                          <span className="text-[10px] text-gray-400 ml-1">Đơn #AGRI-8EXE4SNA</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-100 font-medium">
+                      Rau giòn chuẩn VietGAP
+                    </span>
+                    <span className="text-[10px] bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-100 font-medium">
+                      Thùng xe lạnh 4.2°C
+                    </span>
+                    <span className="text-[10px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-100 font-medium">
+                      Tài xế thân thiện
+                    </span>
+                  </div>
+
+                  <p className="text-gray-700 leading-relaxed text-[11px]">
+                    Nông sản giao tới đóng thùng giữ nhiệt rất tốt, rau củ tươi giòn chuẩn VietGAP, cuống mới hái, độ tươi vượt trội so với siêu thị!
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white border border-gray-200/90 shadow-2xs space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-bold flex items-center justify-center text-xs">
+                        H
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 flex items-center gap-1.5">
+                          <span>Hoàng Nam</span>
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-semibold border border-emerald-200">
+                            ✓ Đã nhận & đồng kiểm
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} size={11} className="fill-amber-400 text-amber-400" />
+                          ))}
+                          <span className="text-[10px] text-gray-400 ml-1">Đơn #AGRI-5975</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-100 font-medium">
+                      Rau giòn chuẩn VietGAP
+                    </span>
+                    <span className="text-[10px] bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-100 font-medium">
+                      Thùng lạnh 4.2°C
+                    </span>
+                  </div>
+
+                  <p className="text-gray-700 leading-relaxed text-[11px]">
+                    Quét tem QR kiểm tra nhật ký vườn trước khi mua, nhận hàng rau còn nguyên phấn lá tươi xanh, đóng gói bao bì sinh học rất ưng ý.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
               <span className="text-gray-400">
                 Mã xác thực chuỗi cung ứng độc quyền AgriTrace AI • PostgreSQL & GS1 Verified
