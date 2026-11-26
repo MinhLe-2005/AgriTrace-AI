@@ -273,7 +273,6 @@ export default function ContactPage() {
                   <div className="p-4 rounded-xl bg-white border border-emerald-200 text-left text-xs space-y-1.5 max-w-md mx-auto shadow-2xs">
                     <div className="text-gray-500">Hòm thư tiếp nhận: <strong className="text-emerald-900 font-mono">{targetEmail}</strong></div>
                     <div className="text-gray-500">Người liên hệ: <strong className="text-gray-800">{formData.name}</strong> ({formData.email})</div>
-                    <div className="text-gray-500">Vai trò: <strong className="text-emerald-800">{detectedRole}</strong></div>
                     <div className="text-gray-500">Tiêu đề: <strong className="text-gray-800">{formData.subject || "Liên hệ hợp tác / Hỗ trợ"}</strong></div>
                     <div className="text-emerald-800 font-semibold pt-1 text-[11px] flex items-center gap-1">
                       <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
@@ -356,37 +355,17 @@ export default function ContactPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">
-                        <span>Vai trò của bạn</span>
-                        <span className="text-[10px] text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full font-extrabold border border-emerald-300/80">
-                          ✓ Hệ thống tự nhận diện
-                        </span>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                        Tiêu đề liên hệ
                       </label>
-                      <div className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-emerald-200 bg-emerald-50/50 text-emerald-950 font-semibold flex items-center justify-between shadow-2xs">
-                        <div className="flex items-center gap-2">
-                          <UserCheck size={16} className="text-emerald-700 shrink-0" />
-                          <span>{detectedRole}</span>
-                        </div>
-                        {user && (
-                          <span className="text-[10px] font-mono text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
-                            {user.email}
-                          </span>
-                        )}
-                      </div>
+                      <input
+                        type="text"
+                        value={formData.subject}
+                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                        placeholder="Ví dụ: Đăng ký đưa nông trại vào hệ thống / Hợp tác"
+                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 shadow-2xs"
+                      />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                      Tiêu đề liên hệ
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.subject}
-                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                      placeholder="Ví dụ: Đăng ký liên kết đưa nông trại vào hệ thống truy xuất QR"
-                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 shadow-2xs"
-                    />
                   </div>
 
                   <div>
