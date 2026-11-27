@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /** Persistent inbox plus transaction-safe SSE fan-out for distributor operations. */
 @Service
@@ -67,16 +68,13 @@ public class DistributorNotificationService {
     }
 
     /**
-     * System events such as an overdue reminder should be visible after an
-     * offline period, but must not produce a duplicate inbox item each time a
-     * scheduled check runs.
+     * Inserts an overdue alert atomically. `dedupKey` contains the ETA, so a
+     * later ETA correction can legitimately produce a fresh alert.
      */
     @Transactional
-    public void notifyDistributorOnce(String recipientEmail, DistributorNotificationType type, String title, String content, String referenceCode) {
-        if (!notificationRepository.existsByRecipientEmailIgnoreCaseAndTypeAndReferenceCode(
-                normalizedEmail(recipientEmail), type, referenceCode)) {
-            create(recipientEmail, false, type, title, content, referenceCode);
-        }
+    public void notifyDistributorOverdueOnce(String recipientEmail, String title, String content,
+                                               String referenceCode, String dedupKey) {
+        createOverdueOnce(recipientEmail, false, title, content, referenceCode, dedupKey);
     }
 
     @Transactional
@@ -86,13 +84,9 @@ public class DistributorNotificationService {
     }
 
     @Transactional
-    public void notifyAdminsOnce(DistributorNotificationType type, String title, String content, String referenceCode) {
-        userRepository.findActiveUsersWithRoleForUpdate(RoleName.ADMIN).forEach(admin -> {
-            if (!notificationRepository.existsByRecipientEmailIgnoreCaseAndTypeAndReferenceCode(
-                    normalizedEmail(admin.getEmail()), type, referenceCode)) {
-                create(admin.getEmail(), true, type, title, content, referenceCode);
-            }
-        });
+    public void notifyAdminsOverdueOnce(String title, String content, String referenceCode, String dedupKey) {
+        userRepository.findActiveUsersWithRoleForUpdate(RoleName.ADMIN).forEach(admin ->
+                createOverdueOnce(admin.getEmail(), true, title, content, referenceCode, dedupKey));
     }
 
     private void create(String recipientEmail, boolean adminRecipient, DistributorNotificationType type,
@@ -107,6 +101,17 @@ public class DistributorNotificationService {
                 .build());
         events.publishEvent(new DistributorNotificationCreated(
                 saved.getId(), saved.getRecipientEmail(), adminRecipient, saved.getType(), saved.getReferenceCode(), Instant.now()));
+    }
+
+    private void createOverdueOnce(String recipientEmail, boolean adminRecipient, String title, String content,
+                                   String referenceCode, String dedupKey) {
+        if (recipientEmail == null || recipientEmail.isBlank() || dedupKey == null || dedupKey.isBlank()) return;
+        UUID id = UUID.randomUUID();
+        if (notificationRepository.insertOverdueOnce(id, normalizedEmail(recipientEmail), title, content, referenceCode, dedupKey) == 1) {
+            events.publishEvent(new DistributorNotificationCreated(
+                    id, normalizedEmail(recipientEmail), adminRecipient, DistributorNotificationType.SHIPMENT_OVERDUE,
+                    referenceCode, Instant.now()));
+        }
     }
 
     private DistributorNotificationResponse toResponse(DistributorNotification notification) {

@@ -20,15 +20,14 @@ public class DistributorShipmentOverdueMonitor {
     @Transactional
     public void alertOverdueShipments() {
         Instant now = Instant.now();
-        shipmentRepository.findByStatusOrderByCreatedAtDesc("IN_TRANSIT").stream()
-                .filter(shipment -> shipment.getEstimatedArrival() != null)
-                .filter(shipment -> shipment.getEstimatedArrival().isBefore(now))
+        shipmentRepository.findByStatusAndEstimatedArrivalBeforeOrderByEstimatedArrivalAsc("IN_TRANSIT", now).stream()
                 .forEach(shipment -> {
                     String content = "Chuyến " + shipment.getShipmentCode() + " đã quá thời gian dự kiến giao hàng.";
-                    notificationService.notifyDistributorOnce(shipment.getDistributorEmail(), DistributorNotificationType.SHIPMENT_OVERDUE,
-                            "Chuyến hàng quá hạn", content, shipment.getShipmentCode());
-                    notificationService.notifyAdminsOnce(DistributorNotificationType.SHIPMENT_OVERDUE,
-                            "Chuyến hàng quá hạn", content, shipment.getShipmentCode());
+                    String dedupKey = shipment.getShipmentCode() + ":eta:" + shipment.getEstimatedArrival().toEpochMilli();
+                    notificationService.notifyDistributorOverdueOnce(shipment.getDistributorEmail(),
+                            "Chuyến hàng quá hạn", content, shipment.getShipmentCode(), dedupKey);
+                    notificationService.notifyAdminsOverdueOnce(
+                            "Chuyến hàng quá hạn", content, shipment.getShipmentCode(), dedupKey);
                 });
     }
 }

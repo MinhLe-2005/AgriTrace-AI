@@ -35,6 +35,10 @@ public class DistributorNotification {
     @Column(name = "reference_code", length = 64)
     private String referenceCode;
 
+    /** Internal idempotency key; intentionally not exposed through the inbox API. */
+    @Column(name = "dedup_key", length = 128)
+    private String dedupKey;
+
     @Builder.Default
     @Column(name = "is_read", nullable = false)
     private boolean read = false;

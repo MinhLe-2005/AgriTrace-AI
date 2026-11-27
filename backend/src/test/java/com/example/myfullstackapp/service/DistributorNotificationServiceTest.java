@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,17 +29,16 @@ class DistributorNotificationServiceTest {
     }
 
     @Test
-    void skipsDuplicateScheduledNotification() {
+    void onlyEmitsRealtimeEventWhenAtomicOverdueInsertSucceeds() {
         DistributorNotificationRepository notifications = mock(DistributorNotificationRepository.class);
-        DistributorNotificationService service = new DistributorNotificationService(notifications, mock(UserRepository.class), mock(ApplicationEventPublisher.class));
-        when(notifications.existsByRecipientEmailIgnoreCaseAndTypeAndReferenceCode(
-                "driver@example.com", DistributorNotificationType.SHIPMENT_OVERDUE, "SHIP-123")).thenReturn(true);
+        ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+        DistributorNotificationService service = new DistributorNotificationService(notifications, mock(UserRepository.class), events);
+        when(notifications.insertOverdueOnce(any(), any(), any(), any(), any(), any())).thenReturn(0, 1);
 
-        service.notifyDistributorOnce("driver@example.com", DistributorNotificationType.SHIPMENT_OVERDUE,
-                "Chuyến hàng quá hạn", "Đã quá thời gian giao.", "SHIP-123");
+        service.notifyDistributorOverdueOnce("driver@example.com", "Chuyến hàng quá hạn", "Đã quá thời gian giao.", "SHIP-123", "SHIP-123:eta:100");
+        service.notifyDistributorOverdueOnce("driver@example.com", "Chuyến hàng quá hạn", "Đã quá thời gian giao.", "SHIP-123", "SHIP-123:eta:200");
 
-        verify(notifications).existsByRecipientEmailIgnoreCaseAndTypeAndReferenceCode(
-                "driver@example.com", DistributorNotificationType.SHIPMENT_OVERDUE, "SHIP-123");
-        verify(notifications, never()).save(any());
+        verify(notifications, org.mockito.Mockito.times(2)).insertOverdueOnce(any(), any(), any(), any(), any(), any());
+        verify(events).publishEvent(any(DistributorNotificationCreated.class));
     }
 }
