@@ -60,6 +60,39 @@ export type CreateShipmentInput = Pick<
   | "estimatedArrival"
 >;
 
+export type DistributorNotificationType =
+  | "SHIPMENT_ASSIGNED"
+  | "SHIPMENT_CANCELLED"
+  | "SHIPMENT_OVERDUE"
+  | "SHIPMENT_UPDATED"
+  | "STATUS_UPDATED"
+  | "INCIDENT_REPORTED"
+  | "SUPPORT_REQUEST"
+  | "NEW_MESSAGE"
+  | "QR_RECEIVED";
+
+export type DistributorNotification = {
+  id: string;
+  type: DistributorNotificationType | string;
+  title: string;
+  content: string;
+  referenceCode?: string;
+  read: boolean;
+  createdAt: string;
+  readAt?: string;
+};
+
+export type ShipmentChatMessage = {
+  id: string;
+  shipmentCode: string;
+  senderEmail: string;
+  senderName: string;
+  senderRole: "ADMIN" | "DISTRIBUTOR";
+  content: string;
+  sentAt: string;
+  read: boolean;
+};
+
 export type DistributorDashboardStats = {
   activeShipments: number;
   preparingShipments: number;
