@@ -6,6 +6,8 @@ import com.example.myfullstackapp.service.*;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +27,17 @@ import java.util.*;
 public class StockReservationController {
     private final StockReservationService reservations;
     private final WarehouseWeightService weights;
+
+    @GetMapping("/eligible-orders/lookup")
+    public ApiResponse<EligibleOrder> lookupOrder(
+            @PathVariable UUID warehouseId, @RequestParam @NotBlank @Size(max = 64) String reference) {
+        return ApiResponse.ok("Warehouse order retrieved", reservations.lookupOrder(warehouseId, reference));
+    }
+
+    @GetMapping("/reservations/{id}")
+    public ApiResponse<ReservationView> get(@PathVariable UUID warehouseId, @PathVariable UUID id) {
+        return ApiResponse.ok("Reservation retrieved", reservations.getView(warehouseId, id));
+    }
 
     @PostMapping("/fefo")
     public ApiResponse<List<AllocationView>> preview(

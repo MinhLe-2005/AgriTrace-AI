@@ -74,7 +74,8 @@ public final class WarehouseOperations {
             boolean inTransit,
             String receivedBy,
             Instant receivedAt,
-            String receivingNote) {}
+            String receivingNote,
+            String shipmentCode) {}
 
     public record TransferReceiveLine(
             @NotNull UUID lineId,
@@ -98,6 +99,15 @@ public final class WarehouseOperations {
             boolean held,
             Instant receivedAt) {}
 
+    public record InventoryPage(List<BalanceView> rows, boolean hasNext) {}
+
+    public record InventoryLabel(UUID balanceId, String lotId, String lotCode, String productId) {}
+    public record LotLabel(String lotId, String lotCode, String productId) {}
+
+    public record InventoryLabelRequest(
+            @NotNull @Size(max = 100) List<@NotNull UUID> balanceIds,
+            @NotNull @Size(max = 100) List<@NotBlank @Size(max = 100) String> lotIds) {}
+
     public record MovementView(
             UUID id,
             String lotId,
@@ -114,6 +124,12 @@ public final class WarehouseOperations {
             @NotNull @NotBlank String productId,
             @NotNull @DecimalMin("0.001") @Digits(integer = 11, fraction = 3) BigDecimal quantityKg,
             @Min(1) @Max(1440) int ttlMinutes) {}
+
+    public record OrderDemandLine(
+            String productId, BigDecimal demandKg, BigDecimal remainingKg, String issue) {}
+
+    public record EligibleOrder(
+            long id, String orderCode, String status, List<OrderDemandLine> lines) {}
 
     public record AllocationView(
             UUID balanceId,
@@ -135,7 +151,8 @@ public final class WarehouseOperations {
     }
 
     public record ReservationView(
-            UUID id, Long orderId, String status, Instant expiresAt, List<AllocationView> lines) {}
+            UUID id, Long orderId, String status, Instant expiresAt, List<AllocationView> lines,
+            String orderCode) {}
 
     public record FefoInput(
             @NotNull String productId,
@@ -150,7 +167,10 @@ public final class WarehouseOperations {
     public record InspectionView(
             UUID id, UUID balanceId, boolean held, String note, String actor, Instant createdAt) {}
 
-    public record HandoverInput(@NotBlank @Size(max = 150) String reference) {}
+    public record HandoverInput(@NotBlank @Size(max = 150) String reference,
+                                @Size(max = 64) String shipmentCode) {
+        public HandoverInput(String reference) { this(reference, null); }
+    }
 
     public record RuleInput(
             @Min(0) @Max(365) int expiryWarningDays,

@@ -386,7 +386,7 @@ export function QuickBuyModal({
         discount: discountAmount,
         total,
         pointsAwarded: pointsEarned,
-        lotCode: product.batchCode || "XL-2026-08",
+        lotCode: product.batchCode || undefined,
         items: [
           {
             name: product.name,

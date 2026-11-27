@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class FarmerWarehouseInboundListenerTest {
 
     @Test
-    void updatesLotStatusRecordsTraceabilityAndBroadcastsSseOnWarehouseConfirm() {
+    void updatesLotStatusRecordsTraceabilityAndBroadcastsSseOnWarehouseConfirm() throws Exception {
         HarvestLotRepository lots = mock(HarvestLotRepository.class);
         TraceabilityRecordRepository traces = mock(TraceabilityRecordRepository.class);
         FarmerBatchEventStream stream = mock(FarmerBatchEventStream.class);
@@ -53,5 +53,8 @@ class FarmerWarehouseInboundListenerTest {
         assertEquals("Kho Lạnh Tân Bình", lot.getTransportDestination());
         assertTrue(trace.getTimelineJson().contains("Đã nhập kho đích"));
         verify(stream).broadcastBatchChanged(eq(lot), eq("WAREHOUSE_INBOUND"), anyString(), eq("WAREHOUSE"));
+
+        listener.onWarehouseInboundConfirmed(new WarehouseLotInboundEvent("Kho Lạnh Tân Bình", "Thủ kho Bình", List.of("XL-2026-08")));
+        assertEquals(1, mapper.readTree(trace.getTimelineJson()).size());
     }
 }

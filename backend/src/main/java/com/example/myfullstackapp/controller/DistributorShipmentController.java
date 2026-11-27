@@ -41,11 +41,13 @@ public class DistributorShipmentController {
     }
 
     @GetMapping("/shipments")
+    @PreAuthorize("hasAnyRole('DISTRIBUTOR', 'ADMIN', 'WAREHOUSE')")
     public ApiResponse<List<ShipmentResponse>> listShipments(
             @RequestParam(required = false) String status,
             Authentication authentication
     ) {
-        return ApiResponse.ok("Shipments retrieved", distributorShipmentService.list(actor(authentication), isAdmin(authentication), status));
+        boolean canViewAll = isAdmin(authentication) || hasRole(authentication, "ROLE_WAREHOUSE");
+        return ApiResponse.ok("Shipments retrieved", distributorShipmentService.list(actor(authentication), canViewAll, status));
     }
 
     @GetMapping("/shipments/history")
@@ -138,7 +140,11 @@ public class DistributorShipmentController {
     }
 
     private boolean isAdmin(Authentication authentication) {
+        return hasRole(authentication, "ROLE_ADMIN");
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
         return authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
     }
 }

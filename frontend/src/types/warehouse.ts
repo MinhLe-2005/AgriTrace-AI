@@ -77,6 +77,7 @@ export interface WarehouseDocument {
   inTransit?: boolean;
   note?: string;
   handoverReference?: string;
+  shipmentCode?: string;
   createdBy: string;
   confirmedBy?: string;
   createdAt: string;
@@ -105,11 +106,23 @@ export interface Allocation {
   dispatchedKg?: number;
 }
 export interface Reservation {
+  orderCode?: string;
   id: string;
   orderId: number;
   status: string;
   expiresAt: string;
   lines: Allocation[];
+}
+export interface EligibleWarehouseOrder {
+  id: number;
+  orderCode: string;
+  status: string;
+  lines: {
+    productId: string;
+    demandKg: number | null;
+    remainingKg: number | null;
+    issue: string | null;
+  }[];
 }
 export interface Inspection {
   id: string;

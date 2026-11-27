@@ -67,7 +67,7 @@ const farmerNavigation: NavItem[] = [
 
 const warehouseNavigation: NavItem[] = [
   { href: "/dashboard/warehouse", label: "Quản Lý Kho Lạnh & FEFO", icon: Warehouse },
-  { href: "/traceability", label: "Quét Mã Nhập Kho", icon: QrCode },
+  { href: "/dashboard/warehouse?action=inbound", label: "Quét Mã Nhập Kho", icon: QrCode },
 ];
 
 const distributorNavigation: NavItem[] = [

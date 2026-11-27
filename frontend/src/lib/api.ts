@@ -1,4 +1,4 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
@@ -11,6 +11,10 @@ export const api = axios.create({ baseURL, headers: { "Content-Type": "applicati
 const refreshApi = axios.create({ baseURL, headers: { "Content-Type": "application/json" } });
 let refreshRequest: Promise<AuthTokens> | null = null;
 
+export interface ApiRequestConfig extends AxiosRequestConfig {
+  skipErrorToast?: boolean;
+}
+
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().accessToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -18,10 +22,17 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 function messageFromError(error: AxiosError<ApiErrorResponse>) {
-  if (error.response?.data?.details && error.response.data.details.length > 0) {
-    return error.response.data.details[0];
+  const message = error.response?.data?.details?.[0] ?? error.response?.data?.message;
+  if (message === "Reservation is expired or no longer active") {
+    return "Lượt giữ hàng của phiếu đã hết hạn hoặc đã được giải phóng. Hãy hủy phiếu nháp cũ, giữ hàng lại cho đơn và lập phiếu xuất mới.";
   }
-  return error.response?.data?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.";
+  if (message === "Insufficient eligible stock") {
+    return "Không đủ hàng khả dụng còn hạn và đạt điều kiện để phân bổ. Hãy kiểm tra tồn kho và số lượng cần xuất.";
+  }
+  if (message === "Insufficient unreserved stock") {
+    return "Tồn khả dụng đã thay đổi hoặc đang được giữ cho đơn khác. Hãy tải lại tồn kho và kiểm tra số lượng trước khi xuất.";
+  }
+  return message ?? "Có lỗi xảy ra. Vui lòng thử lại.";
 }
 
 function signOut() {
@@ -37,7 +48,7 @@ function signOut() {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse>) => {
-    const request = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const request = error.config as (InternalAxiosRequestConfig & { _retry?: boolean; skipErrorToast?: boolean }) | undefined;
     const status = error.response?.status;
     const isRefresh = request?.url?.includes("/auth/refresh-token");
 
@@ -65,7 +76,7 @@ api.interceptors.response.use(
       }
     }
 
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !request?.skipErrorToast) {
       const reqUrl = request?.url ?? "";
       const isBackgroundGet =
         request?.method?.toLowerCase() === "get" &&

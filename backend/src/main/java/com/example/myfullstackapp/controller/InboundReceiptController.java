@@ -65,8 +65,17 @@ public class InboundReceiptController {
     }
 
     @GetMapping("/eligible-lots")
-    public ApiResponse<List<LotSummary>> lots(@PathVariable UUID warehouseId) {
+    public ApiResponse<List<LotSummary>> lots(
+            @PathVariable UUID warehouseId,
+            @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 128) String q) {
         inventory.requireWarehouse(warehouseId);
-        return ApiResponse.ok("Eligible lots retrieved", lots.approved());
+        return ApiResponse.ok("Eligible lots retrieved", lots.approved(q));
+    }
+
+    @GetMapping("/eligible-lots/by-code")
+    public ApiResponse<LotSummary> lookup(@PathVariable UUID warehouseId,
+            @RequestParam @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 128) String code) {
+        inventory.requireWarehouse(warehouseId);
+        return ApiResponse.ok("Eligible lot retrieved", lots.eligibleByCode(code));
     }
 }

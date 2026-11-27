@@ -51,4 +51,7 @@ public interface StockReservationRepository extends JpaRepository<StockReservati
     List<StockReservation> findByWarehouseIdOrderByCreatedAtDesc(UUID warehouseId, Pageable page);
 
     Optional<StockReservation> findByIdAndWarehouseId(UUID id, UUID warehouseId);
+
+    long countByWarehouseIdAndStatusAndCreatedAtBefore(
+            UUID warehouseId, StockReservation.Status status, Instant cutoff);
 }

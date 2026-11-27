@@ -76,9 +76,24 @@ public class WarehouseMonitoringService {
     @Transactional(readOnly = true)
     public List<DeviceView> devices(UUID warehouseId) {
         inventory.requireWarehouse(warehouseId);
-        return devices.findByWarehouseIdOrderByCreatedAtAsc(warehouseId).stream()
-                .map(this::deviceView)
-                .toList();
+        var list = devices.findByWarehouseIdOrderByCreatedAtAsc(warehouseId);
+        var latestMap = latestReadingsByDevice(list);
+        return list.stream().map(d -> deviceView(d, latestMap.get(d.getId()))).toList();
+    }
+
+    private Map<UUID, WarehouseSensorReading> latestReadingsByDevice(
+            List<WarehouseSensorDevice> deviceList) {
+        Map<UUID, WarehouseSensorReading> latestMap = new HashMap<>();
+        if (deviceList.isEmpty()) return latestMap;
+        var ids = deviceList.stream().map(WarehouseSensorDevice::getId).toList();
+        var rows = readings.findLatestForDevices(ids);
+        rows.stream()
+                .sorted(
+                        Comparator.comparing(WarehouseSensorReading::getRecordedAt)
+                                .thenComparing(WarehouseSensorReading::getReceivedAt)
+                                .reversed())
+                .forEach(r -> latestMap.putIfAbsent(r.getDeviceId(), r));
+        return latestMap;
     }
 
     @Transactional
@@ -279,32 +294,56 @@ public class WarehouseMonitoringService {
                         .map(WarehouseMonitoringSettings::getMaxGapSeconds)
                         .orElse(120);
         var now = clock.instant();
-        return devices.findByWarehouseIdOrderByCreatedAtAsc(warehouseId).stream()
-                .filter(WarehouseSensorDevice::isActive)
-                .flatMap(
-                        d ->
-                                readings
-                                        .findFirstByDeviceIdOrderByRecordedAtDescReceivedAtDesc(
-                                                d.getId())
-                                        .stream()
-                                        .map(r -> readingView(r, d, gap, now)))
+        var active =
+                devices.findByWarehouseIdOrderByCreatedAtAsc(warehouseId).stream()
+                        .filter(WarehouseSensorDevice::isActive)
+                        .toList();
+        var latestMap = latestReadingsByDevice(active);
+        return active.stream()
+                .map(d -> latestMap.get(d.getId()))
+                .filter(Objects::nonNull)
+                .map(r -> {
+                    var device =
+                            active.stream()
+                                    .filter(d -> d.getId().equals(r.getDeviceId()))
+                                    .findFirst()
+                                    .orElseThrow();
+                    return readingView(r, device, gap, now);
+                })
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public StatusView status(UUID warehouseId) {
-        var deviceList = devices(warehouseId);
-        return new StatusView(
-                clock.instant(),
-                (int) deviceList.stream().filter(DeviceView::active).count(),
-                (int) latest(warehouseId).stream().filter(ReadingView::fresh).count(),
-                settings(warehouseId).maxGapSeconds());
+        inventory.requireWarehouse(warehouseId);
+        int gap =
+                settings.findById(warehouseId)
+                        .map(WarehouseMonitoringSettings::getMaxGapSeconds)
+                        .orElse(120);
+        var now = clock.instant();
+        var active =
+                devices.findByWarehouseIdOrderByCreatedAtAsc(warehouseId).stream()
+                        .filter(WarehouseSensorDevice::isActive)
+                        .toList();
+        var latestMap = latestReadingsByDevice(active);
+        int freshCount = 0;
+        for (var d : active) {
+            var r = latestMap.get(d.getId());
+            if (r != null && !r.getRecordedAt().isBefore(now.minusSeconds(gap)) && !r.getRecordedAt().isAfter(now)) {
+                freshCount++;
+            }
+        }
+        return new StatusView(now, active.size(), freshCount, gap);
     }
 
     private DeviceView deviceView(WarehouseSensorDevice d) {
         var latest =
                 readings.findFirstByDeviceIdOrderByRecordedAtDescReceivedAtDesc(d.getId())
                         .orElse(null);
+        return deviceView(d, latest);
+    }
+
+    private DeviceView deviceView(WarehouseSensorDevice d, WarehouseSensorReading latest) {
         return new DeviceView(
                 d.getId(),
                 d.getWarehouseId(),

@@ -65,10 +65,10 @@ export function WarehouseLiveBadge({
     <span
       role="status"
       className={
-        "rounded-full px-3 py-1 text-xs " +
+        "rounded-[2px] border px-2 py-0.5 text-[11px] font-medium " +
         (status === "connected"
-          ? "bg-emerald-50 text-emerald-800"
-          : "bg-slate-100 text-slate-600")
+          ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+          : "border-slate-300 bg-slate-100 text-slate-700")
       }
     >
       {text}
@@ -174,7 +174,7 @@ function ReadingChart({
   const end = Date.parse(points[points.length - 1].recordedAt);
 
   return (
-    <div className="rounded-xl border bg-white p-3 space-y-3">
+    <div className="rounded-none border border-slate-300 bg-white p-3 space-y-3">
       <div className="flex items-center justify-between border-b pb-2">
         <h4 className="text-sm font-semibold text-slate-800">
           Biểu đồ cảm biến theo thời gian
@@ -571,7 +571,7 @@ export function WarehouseMonitoringPanel({
       <ErrorNotice error={alerts.error} />
       {devices.isPending && <p role="status">Đang tải cảm biến…</p>}
       {!devices.isPending && !devices.error && !devices.data?.length && (
-        <p className="rounded-xl border bg-white p-5 text-slate-500">
+        <p className="rounded-none border border-slate-300 bg-white p-4 text-slate-500">
           Chưa có cảm biến. Đăng ký thiết bị hoặc cảm biến giả lập để bắt đầu
           nhận dữ liệu.
         </p>
@@ -605,7 +605,7 @@ export function WarehouseMonitoringPanel({
               <article
                 key={device.id}
                 className={
-                  "space-y-2 rounded-xl border p-4 " +
+                  "space-y-2 rounded-none border border-slate-300 p-3 " +
                   (incident
                     ? "border-red-300 bg-red-50"
                     : !reading?.fresh
@@ -675,7 +675,7 @@ export function WarehouseMonitoringPanel({
         {rules.data?.map((rule) => (
           <article
             key={rule.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-none border border-slate-300 bg-white p-3"
           >
             <div>
               <h4 className="font-medium">
@@ -920,7 +920,7 @@ export function WarehouseMonitoringPanel({
             <ErrorNotice error={revisions.error} />
             {revisions.isPending && <p>Đang tải lịch sử…</p>}
             {revisions.data?.map((r) => (
-              <article key={r.id} className="rounded-xl border p-3 text-sm">
+              <article key={r.id} className="rounded-none border border-slate-300 bg-white p-3 text-sm">
                 <p className="font-medium">
                   {r.definition.name} · {r.definition.enabled ? "Bật" : "Tắt"}
                 </p>

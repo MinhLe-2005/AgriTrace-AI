@@ -11,6 +11,7 @@ import type {
   WarehouseDocument,
   DocumentInput,
   Reservation,
+  EligibleWarehouseOrder,
   Allocation,
   Inspection,
   RiskAlert,
@@ -21,6 +22,7 @@ import type {
   WarehouseDashboard,
   UnitConversion,
 } from "@/types/warehouse";
+
 async function get<T>(url: string, params?: object) {
   return unpack((await api.get<ApiResponse<T>>(url, { params })).data);
 }
@@ -30,7 +32,9 @@ async function post<T>(url: string, body?: object) {
 async function put<T>(url: string, body?: object) {
   return unpack((await api.put<ApiResponse<T>>(url, body)).data);
 }
+
 const path = (id: string) => "/warehouses/" + id;
+
 export const warehouseService = {
   all: () => get<Warehouse[]>("/warehouses"),
   save: (input: WarehouseInput, id?: string) =>
@@ -48,19 +52,39 @@ export const warehouseService = {
     put<StorageLocation>(path(id) + "/locations/" + locationId + "/status", {
       active,
     }),
-  lots: (id: string) =>
-    get<LotSummary[]>(path(id) + "/inbound-receipts/eligible-lots"),
-  stock: async (id: string) => {
+  lots: (id: string, q?: string) =>
+    get<LotSummary[]>(
+      path(id) + "/inbound-receipts/eligible-lots",
+      q ? { q } : undefined
+    ),
+  lotByCode: (id: string, code: string) =>
+    get<LotSummary>(path(id) + "/inbound-receipts/eligible-lots/by-code", {
+      code,
+    }),
+  stock: async (id: string, onlyAvailable = false) => {
     const balances = new Map<string, Balance>();
     for (let page = 0; ; page++) {
       const rows = await get<Balance[]>(path(id) + "/inventory", {
         page,
         size: 500,
+        ...(onlyAvailable ? { onlyAvailable: true } : {}),
       });
       rows.forEach((row) => balances.set(row.id, row));
       if (rows.length < 500) return [...balances.values()];
     }
   },
+  stockPage: (id: string, page = 0, q = "", size = 50) =>
+    get<{ rows: Balance[]; hasNext: boolean }>(path(id) + "/inventory/search", {
+      page,
+      q,
+      size,
+    }),
+  stockProducts: (id: string) => get<string[]>(path(id) + "/inventory/products"),
+  stockLabels: (id: string, balanceIds: string[], lotIds: string[]) =>
+    post<{ balanceId: string; lotId: string; lotCode: string; productId: string }[]>(
+      path(id) + "/inventory/labels",
+      { balanceIds, lotIds }
+    ),
   conversions: (id: string) =>
     get<UnitConversion[]>(path(id) + "/unit-conversions"),
   saveConversion: (
@@ -85,10 +109,15 @@ export const warehouseService = {
       lines,
       note,
     }),
-  handover: (id: string, documentId: string, reference: string) =>
+  handover: (
+    id: string,
+    documentId: string,
+    reference: string,
+    shipmentCode?: string
+  ) =>
     put<WarehouseDocument>(
       path(id) + "/documents/" + documentId + "/handover",
-      { reference }
+      { reference, shipmentCode }
     ),
   fefo: (id: string, productId: string, quantityKg: number) =>
     post<Allocation[]>(path(id) + "/fefo", { productId, quantityKg }),
@@ -107,12 +136,28 @@ export const warehouseService = {
     }),
   reservations: (id: string, page = 0) =>
     get<Reservation[]>(path(id) + "/reservations", { page }),
+  lookupOrder: (id: string, reference: string) =>
+    get<EligibleWarehouseOrder>(path(id) + "/eligible-orders/lookup", {
+      reference,
+    }),
+  findReservation: (id: string, reservationId: string) =>
+    get<Reservation>(path(id) + "/reservations/" + reservationId),
   release: (id: string, reservationId: string) =>
     put<Reservation>(path(id) + "/reservations/" + reservationId + "/release"),
   reconcile: (id: string, reservationId: string) =>
     put<Reservation>(
       path(id) + "/reservations/" + reservationId + "/reconcile"
     ),
+  reconcileEndOfDay: (id: string) =>
+    post<{
+      warehouseId: string;
+      ledgerKg: number;
+      balanceKg: number;
+      diffKg: number;
+      staleDrafts: number;
+      staleReservations: number;
+      expiredReservations: number;
+    }>(path(id) + "/reconcile"),
   inspect: (id: string, balanceId: string, held: boolean, note: string) =>
     post<Inspection>(path(id) + "/inspections", { balanceId, held, note }),
   inspections: (id: string, page = 0) =>

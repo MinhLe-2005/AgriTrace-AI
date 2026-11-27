@@ -8,7 +8,7 @@ import com.example.myfullstackapp.entity.ShipmentReceipt;
 import com.example.myfullstackapp.entity.ShipmentTrackingEvent;
 import com.example.myfullstackapp.exception.ResourceNotFoundException;
 import com.example.myfullstackapp.repository.HarvestLotRepository;
-import com.example.myfullstackapp.repository.OrderRepository;
+import com.example.myfullstackapp.repository.BatchWarehouseTraceQuery;
 import com.example.myfullstackapp.repository.ShipmentReceiptRepository;
 import com.example.myfullstackapp.repository.ShipmentRepository;
 import com.example.myfullstackapp.repository.ShipmentTrackingEventRepository;
@@ -30,14 +30,12 @@ import static org.mockito.Mockito.when;
 class TraceabilityChainServiceTest {
     private final HarvestLotRepository lots = mock(HarvestLotRepository.class);
     private final TraceabilityRecordRepository legacy = mock(TraceabilityRecordRepository.class);
-    private final StockBalanceRepository balances = mock(StockBalanceRepository.class);
-    private final WarehouseRepository warehouses = mock(WarehouseRepository.class);
     private final ShipmentRepository shipments = mock(ShipmentRepository.class);
     private final ShipmentTrackingEventRepository tracking = mock(ShipmentTrackingEventRepository.class);
     private final ShipmentReceiptRepository receipts = mock(ShipmentReceiptRepository.class);
-    private final OrderRepository orders = mock(OrderRepository.class);
+    private final BatchWarehouseTraceQuery ledger = mock(BatchWarehouseTraceQuery.class);
     private final TraceabilityChainService service = new TraceabilityChainService(
-            lots, legacy, balances, warehouses, shipments, tracking, receipts, orders);
+            lots, legacy, ledger, shipments, tracking, receipts);
 
     @Test
     void buildsARealFarmToDeliveryChainForAPersistedLot() {
@@ -77,18 +75,12 @@ class TraceabilityChainServiceTest {
                 .qrValue("QR-1")
                 .receivedAt(Instant.parse("2026-11-02T04:00:00Z"))
                 .build();
-        Order order = Order.builder()
-                .orderCode("ORD-1")
-                .lotCode("LOT-1")
-                .receiverAddress("Địa chỉ B")
-                .createdAt(LocalDateTime.of(2026, 11, 1, 9, 0))
-                .build();
+
 
         when(lots.findByCodeIgnoreCase("LOT-1")).thenReturn(Optional.of(lot));
         when(legacy.findByBatchCodeIgnoreCase("LOT-1")).thenReturn(Optional.empty());
-        when(orders.findByLotCodeIgnoreCaseOrderByCreatedAtAsc("LOT-1")).thenReturn(List.of(order));
-        when(balances.findByLotCodeIgnoreCaseOrderByReceivedAtAsc("LOT-1")).thenReturn(List.of());
-        when(shipments.findByLotCodeIgnoreCaseOrderByCreatedAtAsc("LOT-1")).thenReturn(List.of(shipment));
+        when(ledger.dispatches("LOT-1")).thenReturn(List.of(new BatchWarehouseTraceQuery.Dispatch(10L, java.math.BigDecimal.TEN, shipment.getDispatchTime())));
+        when(shipments.findAllById(List.of(10L))).thenReturn(List.of(shipment));
         when(tracking.findByShipmentIdInOrderByEventTimeAsc(List.of(10L))).thenReturn(List.of(event));
         when(receipts.findByShipmentIdIn(List.of(10L))).thenReturn(List.of(receipt));
 
@@ -98,8 +90,8 @@ class TraceabilityChainServiceTest {
         assertEquals("Rau cải", response.productName());
         assertEquals("Nông trại A", response.farm().name());
         assertEquals("SHIP-1", response.shipments().getFirst().shipmentCode());
-        assertEquals("Trạm kiểm tra", response.shipments().getFirst().trackingEvents().getFirst().location());
-        assertEquals("Người nhận B", response.delivery().receiverName());
+        assertEquals("ON_SCHEDULE", response.shipments().getFirst().trackingEvents().getFirst().status());
+        assertEquals(receipt.getReceivedAt(), response.delivery().receivedAt());
         assertEquals("DELIVERED", response.timeline().getLast().stage());
     }
 
@@ -107,9 +99,6 @@ class TraceabilityChainServiceTest {
     void rejectsAnUnknownBatch() {
         when(lots.findByCodeIgnoreCase("UNKNOWN")).thenReturn(Optional.empty());
         when(legacy.findByBatchCodeIgnoreCase("UNKNOWN")).thenReturn(Optional.empty());
-        when(orders.findByLotCodeIgnoreCaseOrderByCreatedAtAsc("UNKNOWN")).thenReturn(List.of());
-        when(balances.findByLotCodeIgnoreCaseOrderByReceivedAtAsc("UNKNOWN")).thenReturn(List.of());
-        when(shipments.findByLotCodeIgnoreCaseOrderByCreatedAtAsc("UNKNOWN")).thenReturn(List.of());
 
         assertThrows(ResourceNotFoundException.class, () -> service.traceByBatchCode("UNKNOWN"));
     }

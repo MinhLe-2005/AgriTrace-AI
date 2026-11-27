@@ -337,7 +337,7 @@ function CartContent() {
         discount: voucherDiscount,
         total,
         pointsAwarded: pointsEarned,
-        lotCode: items[0]?.batchCode || "XL-2026-08",
+        lotCode: items.length && items.every(item => item.batchCode === items[0].batchCode) ? items[0].batchCode || undefined : undefined,
         items: items.map((it) => ({
           name: it.name,
           origin: it.farm,

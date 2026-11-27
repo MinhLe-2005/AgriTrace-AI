@@ -164,11 +164,52 @@ class InboundReceiptControllerTest {
 
     @Test
     void farmerContractFailureReturns503() throws Exception {
-        when(lots.approved())
+        when(lots.approved(isNull()))
                 .thenThrow(new WarehouseIntegrationException("Farmer integration unavailable"));
         mvc.perform(get(base + "/eligible-lots").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_INTEGRATION_UNAVAILABLE"));
+    }
+
+    @Test
+    void eligibleLotsByCodeAndSearchQuery() throws Exception {
+        var lot =
+                new LotSummary(
+                        "12",
+                        "Xoài Cát",
+                        "LOT-XC-01",
+                        java.time.LocalDate.of(2026, 12, 31),
+                        new java.math.BigDecimal("120.000"),
+                        "KG",
+                        "APPROVED");
+        when(lots.eligibleByCode("LOT-XC-01")).thenReturn(lot);
+        when(lots.approved("XC")).thenReturn(java.util.List.of(lot));
+
+        mvc.perform(
+                        get(base + "/eligible-lots/by-code")
+                                .param("code", "LOT-XC-01")
+                                .with(user("staff").roles("WAREHOUSE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lotCode").value("LOT-XC-01"));
+
+        mvc.perform(
+                        get(base + "/eligible-lots")
+                                .param("q", "XC")
+                                .with(user("staff").roles("WAREHOUSE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].lotCode").value("LOT-XC-01"));
+
+        mvc.perform(
+                        get(base + "/eligible-lots/by-code")
+                                .param("code", " ")
+                                .with(user("staff").roles("WAREHOUSE")))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(
+                        get(base + "/eligible-lots/by-code")
+                                .param("code", "LOT-XC-01")
+                                .with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
     }
 
     @Test

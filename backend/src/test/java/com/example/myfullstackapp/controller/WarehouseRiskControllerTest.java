@@ -37,6 +37,8 @@ class WarehouseRiskControllerTest {
     @MockitoBean
     private WarehouseRiskService risk;
     @MockitoBean
+    private WarehouseReconciliationService reconciliation;
+    @MockitoBean
     private WarehouseQualityService quality;
     @MockitoBean
     private WarehouseDashboardService dashboard;

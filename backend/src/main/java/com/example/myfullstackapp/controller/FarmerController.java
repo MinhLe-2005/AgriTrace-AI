@@ -71,6 +71,9 @@ public class FarmerController {
     private final FarmerMediaStorageService mediaStorageService;
     private final FarmerOwnershipResolver ownershipResolver;
 
+    @org.springframework.beans.factory.annotation.Value("${app.demo.trace-samples:false}")
+    private boolean traceSamples;
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.myfullstackapp.service.FarmerDemandForecastService demandForecastService;
 
@@ -418,7 +421,7 @@ public class FarmerController {
             @RequestParam(required = false) String farmCode
     ) {
         List<HarvestLot> lots = harvestLotRepository.findAllByOrderByCreatedAtDesc();
-        if (lots.isEmpty()) {
+        if (traceSamples && lots.isEmpty()) {
             initSampleLots();
             lots = harvestLotRepository.findAllByOrderByCreatedAtDesc();
         }
@@ -1516,7 +1519,7 @@ public class FarmerController {
             @RequestParam(required = false) String batchCode
     ) {
         List<FarmingLog> logs = farmingLogRepository.findAllByOrderByCreatedAtDesc();
-        if (logs.isEmpty()) {
+        if (traceSamples && logs.isEmpty()) {
             initSampleLogs();
             logs = farmingLogRepository.findAllByOrderByCreatedAtDesc();
         }

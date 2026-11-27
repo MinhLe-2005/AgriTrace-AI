@@ -59,6 +59,10 @@ public class WarehouseDocument {
     @Column(length = 150)
     private String handoverReference;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "handover_shipment_id")
+    private Shipment handoverShipment;
+
     @Column(length = 254)
     private String handoverBy;
 
@@ -84,6 +88,7 @@ public class WarehouseDocument {
 
     private Instant confirmedAt;
 
+    @org.hibernate.annotations.BatchSize(size = 100)
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
     private List<WarehouseDocumentLine> lines = new ArrayList<>();

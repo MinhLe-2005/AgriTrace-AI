@@ -161,7 +161,7 @@ class WarehouseSchemaTest {
                 statement.execute(
                         Files.readString(
                                 Path.of(
-                                        "src/main/resources/db/migration/V5__restore_core_lookup_indexes.sql")));
+                                        "src/main/resources/db/migration/V6__restore_core_lookup_indexes.sql")));
             }
             try (var rows =
                     statement.executeQuery(
@@ -441,13 +441,13 @@ DROP INDEX idx_refresh_tokens_user_id;
                         "P10_partial_reservations.sql",
                         "P11_transfer_receiving.sql",
                         "P12_inventory_indexes.sql",
-                        "P13_legacy_schema_alignment.sql")) {
+                        "P13_legacy_schema_alignment.sql", "P14_outbound_shipment.sql")) {
             statement.execute(Files.readString(Path.of("../docs/warehouse/" + file)));
         }
         statement.execute(
                 Files.readString(
                         Path.of(
-                                "src/main/resources/db/migration/V5__restore_core_lookup_indexes.sql")));
+                                "src/main/resources/db/migration/V6__restore_core_lookup_indexes.sql")));
     }
 
     private void assertSqlState(Statement statement, String expected, String sql) {

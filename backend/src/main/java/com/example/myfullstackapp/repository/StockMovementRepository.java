@@ -36,4 +36,7 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
             "select coalesce(sum(m.deltaKg),0) from StockMovement m where m.lotId=:id and"
                     + " m.type='INBOUND'")
     BigDecimal totalReceived(@Param("id") String lotId);
+
+    @Query("select coalesce(sum(m.deltaKg),0) from StockMovement m where m.warehouseId=:warehouseId")
+    BigDecimal sumAllDeltaByWarehouse(@Param("warehouseId") UUID warehouseId);
 }

@@ -13,11 +13,15 @@ import {
   X,
 } from "lucide-react";
 import { warehouseHeatmapService as service } from "@/services/warehouse-heatmap.service";
+import { warehouseService } from "@/services/warehouse.service";
+import { cn } from "@/utils/cn";
 import { getApiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { toast } from "@/stores/toast-store";
+import type { WarehouseLiveStatus } from "./use-warehouse-live";
 import type {
   HeatmapCell,
   HeatmapSignal,
@@ -56,7 +60,7 @@ function Signal({ signal }: { signal: HeatmapSignal }) {
   return (
     <span
       className={
-        "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs " +
+        "inline-flex items-center gap-1 rounded-[2px] border px-2 py-0.5 text-xs " +
         colors[signal.state]
       }
     >
@@ -93,7 +97,7 @@ function Dialog({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl outline-none"
+        className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-none border border-slate-300 bg-white p-5 shadow-lg outline-none"
         onKeyDown={(e) => {
           if (e.key === "Escape") close();
           if (e.key === "Tab") {
@@ -155,7 +159,7 @@ function Shelf({
       onClick={open}
       aria-label={`${cell.code}, ${signal.label}, ${quantity(cell.quantityKg)} kg`}
       title={`${cell.name} · ${signal.label}`}
-      className={`relative min-h-32 rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${colors[signal.state]} ${dimmed ? "opacity-30" : ""}`}
+      className={`relative min-h-28 rounded-[2px] border p-2.5 text-left transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${colors[signal.state]} ${dimmed ? "opacity-30" : ""}`}
     >
       <div className="flex items-center justify-between gap-1">
         <span className="font-bold">{cell.code}</span>
@@ -195,24 +199,49 @@ function Shelf({
 }
 export function WarehouseHeatmapPanel({
   warehouseId,
+  liveStatus,
+  onQuickDocument,
+  onViewAlerts,
 }: {
   warehouseId: string;
+  liveStatus?: WarehouseLiveStatus;
+  onQuickDocument?: (
+    type: "OUTBOUND" | "TRANSFER",
+    lotId: string,
+    locationId: string
+  ) => void;
+  onViewAlerts?: () => void;
 }) {
   const client = useQueryClient();
   const [layer, setLayer] = useState<Layer>("overall"),
     [level, setLevel] = useState(1),
     [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [edit, setEdit] = useState<
     (LocationCoordinates & { locationId: string }) | null
   >(null);
+  const [editMode, setEditMode] = useState<"select" | "create">("select");
+  const [newLocation, setNewLocation] = useState({
+    code: "",
+    name: "",
+    capacityTons: 0.5,
+    tempTargetC: 1.2,
+    humidityTarget: 85,
+  });
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [inspectLot, setInspectLot] = useState<{
+    id: string;
+    lotCode: string;
+    held: boolean;
+  } | null>(null);
+  const [inspectNote, setInspectNote] = useState("");
   const map = useQuery({
     queryKey: ["warehouse", warehouseId, "heatmap"],
     queryFn: () => service.map(warehouseId),
     retry: false,
-    refetchInterval: 30000,
+    refetchInterval: liveStatus === "connected" ? false : 30000,
   });
   const cells = map.data?.cells ?? [],
     selected = cells.find((c) => c.locationId === selectedId);
@@ -227,7 +256,7 @@ export function WarehouseHeatmapPanel({
     [c.code, c.name, ...c.lots.flatMap((l) => [l.lotCode, l.productId])]
       .join(" ")
       .toLocaleLowerCase("vi")
-      .includes(search.trim().toLocaleLowerCase("vi"));
+      .includes(debouncedSearch.trim().toLocaleLowerCase("vi"));
   async function mutate(operation: () => Promise<unknown>, message: string) {
     setBusy(true);
     setError("");
@@ -248,6 +277,7 @@ export function WarehouseHeatmapPanel({
   function startEdit(c: HeatmapCell) {
     setSelectedId(null);
     setError("");
+    setEditMode("select");
     setEdit({
       locationId: c.locationId,
       row: c.layout?.row ?? 1,
@@ -316,7 +346,7 @@ export function WarehouseHeatmapPanel({
       {map.isPending && <p role="status">Đang tải sơ đồ kho…</p>}
       {map.data && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 divide-y divide-slate-300 border border-slate-300 bg-white lg:grid-cols-4 lg:divide-x lg:divide-y-0">
             {[
               [
                 "Đã xếp trên sơ đồ",
@@ -335,9 +365,9 @@ export function WarehouseHeatmapPanel({
                 `${cells.filter((c) => c.temperature.state === "UNKNOWN").length} kệ`,
               ],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border bg-white p-4">
+              <div key={label} className="p-3">
                 <p className="text-xs text-slate-500">{label}</p>
-                <p className="mt-1 text-xl font-semibold">{value}</p>
+                <p className="mt-1 font-mono text-lg font-bold tabular-nums">{value}</p>
               </div>
             ))}
           </div>
@@ -385,7 +415,7 @@ export function WarehouseHeatmapPanel({
               <Signal key={state} signal={{ state, label }} />
             ))}
           </div>
-          <div className="rounded-2xl border bg-slate-50 p-3 sm:p-5">
+          <div className="rounded-none border border-slate-300 bg-slate-50 p-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-500">
               <span>Tầng {level} · Hàng × Cột · Bấm ô trống để xếp kệ</span>
               <span>{placed.length} kệ</span>
@@ -429,11 +459,21 @@ export function WarehouseHeatmapPanel({
                       <button
                         key={`${r}:${c}`}
                         aria-label={`Xếp kệ vào hàng ${r + 1}, cột ${c + 1}, tầng ${level}`}
-                        className="min-h-32 rounded-xl border border-dashed border-slate-300 text-sm text-slate-400 hover:border-emerald-500 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
+                        className="min-h-28 rounded-[2px] border border-dashed border-slate-300 text-xs text-slate-500 hover:border-emerald-600 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
                         onClick={() => {
                           setError("");
+                          const nextNum = cells.length + 1;
+                          const suggestedCode = `K${nextNum < 10 ? "0" + nextNum : nextNum}`;
+                          setNewLocation({
+                            code: suggestedCode,
+                            name: `Khu kệ ${suggestedCode}`,
+                            capacityTons: 0.5,
+                            tempTargetC: 1.2,
+                            humidityTarget: 85,
+                          });
+                          setEditMode(unplaced.length > 0 ? "select" : "create");
                           setEdit({
-                            locationId: "",
+                            locationId: unplaced.length > 0 ? unplaced[0].locationId : "",
                             row: r + 1,
                             column: c + 1,
                             level,
@@ -458,10 +498,16 @@ export function WarehouseHeatmapPanel({
             </span>
           </div>
           {map.data.warehouseAlerts > 0 && (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Có {map.data.warehouseAlerts} cảnh báo chung của kho. Xem đầy đủ
-              tại tab Cảnh báo.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <span>
+                Có {map.data.warehouseAlerts} cảnh báo chung của kho.
+              </span>
+              {onViewAlerts && (
+                <Button size="sm" variant="secondary" onClick={onViewAlerts}>
+                  Xem tab Cảnh báo
+                </Button>
+              )}
+            </div>
           )}
           <section className="space-y-3">
             <h3 className="font-semibold">
@@ -577,10 +623,10 @@ export function WarehouseHeatmapPanel({
               <h3 className="mb-2 font-medium">
                 Lô hàng trên kệ ({selected.lots.length})
               </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b text-xs text-slate-500">
+              <div className="overflow-x-auto border border-slate-300">
+                <table className="w-full border-collapse text-left text-[13px]">
+                  <thead className="border-b border-slate-300 bg-slate-100 text-xs text-slate-700">
+                    <tr>
                       {[
                         "Lô / sản phẩm",
                         "Hạn dùng",
@@ -588,16 +634,17 @@ export function WarehouseHeatmapPanel({
                         "Giữ đơn",
                         "Khả dụng",
                         "Chất lượng",
+                        "Thao tác nhanh",
                       ].map((h) => (
-                        <th key={h} className="whitespace-nowrap p-2">
+                        <th key={h} className="whitespace-nowrap border-r border-slate-300 px-2.5 py-1.5 font-semibold last:border-r-0">
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_td]:px-2.5 [&_td]:py-1.5 [&_td:last-child]:border-r-0">
                     {selected.lots.map((l) => (
-                      <tr key={l.id} className="border-b">
+                      <tr key={l.id} className="hover:bg-emerald-50/40">
                         <td className="p-2">
                           <b>{l.lotCode}</b>
                           <p className="text-xs text-slate-500">
@@ -611,7 +658,61 @@ export function WarehouseHeatmapPanel({
                         <td className="p-2">{quantity(l.reservedKg)}</td>
                         <td className="p-2">{quantity(l.availableKg)}</td>
                         <td className="p-2">
-                          {l.held ? "Đang giữ" : "Không giữ"}
+                          <span
+                            className={
+                              "inline-flex rounded-full px-2 py-0.5 text-xs font-medium " +
+                              (l.held
+                                ? "bg-rose-50 text-rose-800"
+                                : "bg-emerald-50 text-emerald-800")
+                            }
+                          >
+                            {l.held ? "Cách ly" : "Bình thường"}
+                          </span>
+                        </td>
+                        <td className="p-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setError("");
+                                setInspectNote("");
+                                setInspectLot({
+                                  id: l.id,
+                                  lotCode: l.lotCode,
+                                  held: l.held,
+                                });
+                              }}
+                            >
+                              {l.held ? "Giải phóng" : "Cách ly"}
+                            </Button>
+                            {onQuickDocument && l.availableKg > 0 && !l.held && selected.active && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    const locId = selected.locationId;
+                                    setSelectedId(null);
+                                    onQuickDocument("OUTBOUND", l.lotId, locId);
+                                  }}
+                                >
+                                  Xuất
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    const locId = selected.locationId;
+                                    setSelectedId(null);
+                                    onQuickDocument("TRANSFER", l.lotId, locId);
+                                  }}
+                                >
+                                  Chuyển
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -626,7 +727,21 @@ export function WarehouseHeatmapPanel({
             </section>
             {selected.alerts.length > 0 && (
               <section>
-                <h3 className="mb-2 font-medium">Cảnh báo liên quan</h3>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="font-medium">Cảnh báo liên quan</h3>
+                  {onViewAlerts && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedId(null);
+                        onViewAlerts();
+                      }}
+                    >
+                      Xử lý tại Cảnh báo →
+                    </Button>
+                  )}
+                </div>
                 {selected.alerts.map((a) => (
                   <p
                     key={a.id}
@@ -652,10 +767,13 @@ export function WarehouseHeatmapPanel({
           </div>
         </Dialog>
       )}
-      {edit && (
+      {inspectLot && (
         <Dialog
-          title="Xếp vị trí trên sơ đồ"
-          close={() => !busy && setEdit(null)}
+          title={
+            (inspectLot.held ? "Giải phóng cách ly · " : "Kiểm tra & cách ly · ") +
+            inspectLot.lotCode
+          }
+          close={() => !busy && setInspectLot(null)}
         >
           <form
             className="space-y-4"
@@ -663,35 +781,244 @@ export function WarehouseHeatmapPanel({
               e.preventDefault();
               if (
                 await mutate(
-                  () => service.place(warehouseId, edit.locationId, edit),
-                  "Đã lưu tọa độ kệ."
+                  () =>
+                    warehouseService.inspect(
+                      warehouseId,
+                      inspectLot.id,
+                      !inspectLot.held,
+                      inspectNote.trim()
+                    ),
+                  inspectLot.held
+                    ? "Đã giải phóng cách ly lô."
+                    : "Đã đưa lô vào cách ly."
                 )
               ) {
-                setLevel(edit.level);
-                setEdit(null);
+                await client.invalidateQueries({
+                  queryKey: ["warehouse", warehouseId],
+                });
+                setInspectLot(null);
               }
             }}
           >
-            <label className="block text-sm">
-              Vị trí lưu trữ
-              <Select
-                aria-label="Vị trí lưu trữ"
+            <label className="block space-y-1 text-sm">
+              <span>Kết quả kiểm tra và lý do</span>
+              <Input
+                autoFocus
                 required
-                value={edit.locationId}
-                onChange={(e) =>
-                  setEdit({ ...edit, locationId: e.target.value })
-                }
-              >
-                <option value="">Chọn kệ chưa xếp</option>
-                {cells
-                  .filter((c) => !c.layout || c.locationId === edit.locationId)
-                  .map((c) => (
-                    <option key={c.locationId} value={c.locationId}>
-                      {c.code} · {c.name}
-                    </option>
-                  ))}
-              </Select>
+                maxLength={500}
+                value={inspectNote}
+                onChange={(e) => setInspectNote(e.target.value)}
+                placeholder="Ghi rõ lý do kiểm tra chất lượng"
+              />
             </label>
+            {error && (
+              <p role="alert" className="text-sm text-red-700">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setInspectLot(null)}
+              >
+                Đóng
+              </Button>
+              <Button type="submit" loading={busy}>
+                Xác nhận
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+      {edit && (
+        <Dialog
+          title="Xếp vị trí trên sơ đồ"
+          close={() => !busy && setEdit(null)}
+        >
+          {/* Segmented control for choosing existing shelf or creating a new one */}
+          {!cells.find((c) => c.locationId === edit.locationId)?.layout && (
+            <div className="mb-4 flex rounded-xl border bg-slate-100 p-1">
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 rounded-lg py-1.5 text-xs font-medium transition-all",
+                  editMode === "create" || unplaced.length === 0
+                    ? "bg-white text-emerald-800 shadow font-semibold"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+                onClick={() => setEditMode("create")}
+              >
+                + Tạo kệ mới trực tiếp
+              </button>
+              <button
+                type="button"
+                disabled={unplaced.length === 0}
+                className={cn(
+                  "flex-1 rounded-lg py-1.5 text-xs font-medium transition-all",
+                  editMode === "select" && unplaced.length > 0
+                    ? "bg-white text-slate-900 shadow font-semibold"
+                    : "text-slate-500 hover:text-slate-900",
+                  unplaced.length === 0 && "opacity-40 cursor-not-allowed"
+                )}
+                onClick={() => setEditMode("select")}
+              >
+                Chọn kệ chưa xếp ({unplaced.length})
+              </button>
+            </div>
+          )}
+
+          <form
+            className="space-y-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (editMode === "create") {
+                if (!newLocation.code.trim() || !newLocation.name.trim()) {
+                  setError("Vui lòng nhập đầy đủ mã và tên vị trí lưu trữ.");
+                  return;
+                }
+                setBusy(true);
+                setError("");
+                try {
+                  const created = await warehouseService.saveLocation(warehouseId, {
+                    code: newLocation.code.trim(),
+                    name: newLocation.name.trim(),
+                    capacityTons: Number(newLocation.capacityTons),
+                    tempTargetC: Number(newLocation.tempTargetC),
+                    humidityTarget: Number(newLocation.humidityTarget),
+                  });
+                  await service.place(warehouseId, created.id, edit);
+                  await client.invalidateQueries({
+                    queryKey: ["warehouse", warehouseId],
+                  });
+                  toast.success(`Đã tạo và xếp vị trí ${newLocation.code} lên sơ đồ thành công!`);
+                  setLevel(edit.level);
+                  setEdit(null);
+                } catch (err) {
+                  setError(getApiErrorMessage(err));
+                } finally {
+                  setBusy(false);
+                }
+              } else {
+                if (
+                  await mutate(
+                    () => service.place(warehouseId, edit.locationId, edit),
+                    "Đã lưu tọa độ kệ."
+                  )
+                ) {
+                  setLevel(edit.level);
+                  setEdit(null);
+                }
+              }
+            }}
+          >
+            {editMode === "create" && !cells.find((c) => c.locationId === edit.locationId)?.layout ? (
+              <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                <p className="text-xs font-semibold text-emerald-800">
+                  Thông tin vị trí lưu trữ mới
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-medium text-slate-700">
+                    Mã vị trí / Kệ
+                    <Input
+                      aria-label="Mã vị trí"
+                      required
+                      placeholder="VD: K04"
+                      value={newLocation.code}
+                      onChange={(e) =>
+                        setNewLocation({ ...newLocation, code: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-slate-700">
+                    Sức chứa (tấn)
+                    <Input
+                      aria-label="Sức chứa tấn"
+                      type="number"
+                      step={0.05}
+                      min={0.01}
+                      required
+                      value={newLocation.capacityTons}
+                      onChange={(e) =>
+                        setNewLocation({
+                          ...newLocation,
+                          capacityTons: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Tên vị trí mô tả
+                  <Input
+                    aria-label="Tên vị trí"
+                    required
+                    placeholder="VD: Khu trữ dưa lưới & quả mọng"
+                    value={newLocation.name}
+                    onChange={(e) =>
+                      setNewLocation({ ...newLocation, name: e.target.value })
+                    }
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-medium text-slate-700">
+                    Nhiệt độ mục tiêu (°C)
+                    <Input
+                      aria-label="Nhiệt độ mục tiêu"
+                      type="number"
+                      step={0.1}
+                      value={newLocation.tempTargetC}
+                      onChange={(e) =>
+                        setNewLocation({
+                          ...newLocation,
+                          tempTargetC: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-slate-700">
+                    Độ ẩm mục tiêu (%)
+                    <Input
+                      aria-label="Độ ẩm mục tiêu"
+                      type="number"
+                      step={1}
+                      min={0}
+                      max={100}
+                      value={newLocation.humidityTarget}
+                      onChange={(e) =>
+                        setNewLocation({
+                          ...newLocation,
+                          humidityTarget: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <label className="block text-sm">
+                Vị trí lưu trữ
+                <Select
+                  aria-label="Vị trí lưu trữ"
+                  required
+                  value={edit.locationId}
+                  onChange={(e) =>
+                    setEdit({ ...edit, locationId: e.target.value })
+                  }
+                >
+                  <option value="">Chọn kệ chưa xếp</option>
+                  {cells
+                    .filter((c) => !c.layout || c.locationId === edit.locationId)
+                    .map((c) => (
+                      <option key={c.locationId} value={c.locationId}>
+                        {c.code} · {c.name}
+                      </option>
+                    ))}
+                </Select>
+              </label>
+            )}
+
             <div className="grid grid-cols-3 gap-3">
               {(
                 [
@@ -719,7 +1046,6 @@ export function WarehouseHeatmapPanel({
             </div>
             <p className="text-xs text-slate-500">
               Tối đa 30 hàng × 30 cột, 10 tầng. Mỗi ô chứa một vị trí lưu trữ.
-              Sửa tọa độ không thay đổi tồn kho.
             </p>
             {error && (
               <p role="alert" className="text-sm text-red-700">
@@ -748,11 +1074,11 @@ export function WarehouseHeatmapPanel({
                 <span />
               )}
               <Button
-                disabled={busy || !edit.locationId}
+                disabled={busy || (editMode === "select" && !edit.locationId)}
                 loading={busy}
                 type="submit"
               >
-                Lưu tọa độ
+                {editMode === "create" ? "Tạo & xếp lên sơ đồ" : "Lưu tọa độ"}
               </Button>
             </div>
           </form>

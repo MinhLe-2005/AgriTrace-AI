@@ -34,6 +34,12 @@ public class OrderController {
     private final ProductRepository productRepository;
     private final com.example.myfullstackapp.service.LoyaltyService loyaltyService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.myfullstackapp.repository.StockReservationRepository stockReservationRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     private static final Set<String> NON_CANCELLABLE_STATUSES = Set.of("SHIPPING", "DELIVERED", "CANCELLED", "REFUNDED");
 
 
@@ -180,7 +186,7 @@ public class OrderController {
                 .discount(discount)
                 .total(total)
                 .pointsAwarded(points > 0 ? points : 20)
-                .lotCode(req.getLotCode() != null ? req.getLotCode() : "XL-2026-08")
+                .lotCode(req.getLotCode())
                 .createdAt(LocalDateTime.now())
                 .items(new ArrayList<>())
                 .build();
@@ -250,6 +256,7 @@ public class OrderController {
         order.setStatus("CANCELLED");
         order.setCancelledAt(LocalDateTime.now());
         order.setCancelReason(reason);
+        releaseActiveWarehouseReservations(order.getId());
         if (wasPaid && (order.getPaymentRef() == null || !order.getPaymentRef().startsWith("REFUND-"))) {
             order.setPaymentRef("REFUND-VIETQR-" + order.getOrderCode());
         }
@@ -293,6 +300,7 @@ public class OrderController {
             order.setStatus(newStatus);
         }
         if ("REFUNDED".equals(newStatus)) {
+            releaseActiveWarehouseReservations(order.getId());
             // Hoàn tiền: thu hồi điểm đã tích. Không hoàn kho vì hàng có thể đã giao tới khách.
             loyaltyService.revokeOrderPoints(order.getUserEmail(), order.getOrderCode(),
                     order.getTotal() != null ? order.getTotal() : 0L);
@@ -399,6 +407,31 @@ public class OrderController {
             return Math.max(1, Integer.parseInt(firstToken.replaceAll("[^0-9]", "")));
         } catch (Exception e) {
             return 1;
+        }
+    }
+
+    /** Giải phóng các lượt giữ hàng còn ACTIVE trong kho khi đơn hàng bị hủy hoặc hoàn tiền. */
+    private void releaseActiveWarehouseReservations(Long orderId) {
+        if (stockReservationRepository == null || orderId == null) return;
+        try {
+            var activeReservations = stockReservationRepository.findByOrderId(orderId).stream()
+                    .filter(r -> r.getStatus() == com.example.myfullstackapp.entity.StockReservation.Status.ACTIVE)
+                    .toList();
+            if (!activeReservations.isEmpty()) {
+                activeReservations.forEach(r -> r.setStatus(com.example.myfullstackapp.entity.StockReservation.Status.RELEASED));
+                stockReservationRepository.saveAll(activeReservations);
+                // Thông báo SSE cho mỗi kho bị ảnh hưởng để thủ kho thấy số giữ hàng giảm ngay.
+                if (eventPublisher != null) {
+                    activeReservations.stream()
+                            .map(com.example.myfullstackapp.entity.StockReservation::getWarehouseId)
+                            .distinct()
+                            .forEach(wId -> eventPublisher.publishEvent(
+                                    new com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.Changed(
+                                            wId, "RESERVATION_RELEASED")));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Non-fatal error releasing warehouse reservations for order {}: {}", orderId, e.getMessage());
         }
     }
 }

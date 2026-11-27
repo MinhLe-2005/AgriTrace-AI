@@ -27,7 +27,7 @@ public class WarehouseDashboardService {
         if (from.isAfter(to) || to.isAfter(from.plusYears(1)))
             throw new IllegalArgumentException("Date range must be ordered and at most one year");
         var warehouse = inventory.requireWarehouse(id);
-        var stock = inventory.getBalances(id);
+        var stock = inventory.nonZeroViews(id, null);
         int expiryWarningDays = risk.rule(id).expiryWarningDays();
         var zone = ZoneId.of("Asia/Ho_Chi_Minh");
         var start = from.atStartOfDay(zone).toInstant();

@@ -42,7 +42,7 @@ import java.util.concurrent.*;
     FefoAllocationService.class,
     StockReservationService.class,
     WarehouseOrderQuery.class,
-    WarehouseWeightService.class
+    WarehouseWeightService.class, BatchWarehouseTraceQuery.class
 })
 @EnabledIf("databaseAvailable")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -70,6 +70,9 @@ class WarehouseOutboundIntegrationTest {
     private WarehouseWeightService weights;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired private BatchWarehouseTraceQuery trace;
+    @Autowired private ShipmentRepository shipments;
+    @Autowired private WarehouseLotQuery lotLookup;
     private UUID warehouseId, locationId;
 
     @BeforeEach
@@ -112,6 +115,54 @@ class WarehouseOutboundIntegrationTest {
                                 new BigDecimal("4"),
                                 new BigDecimal("85")))
                 .id();
+    }
+
+    @Test
+    void exactQrAndStockSearchReachRowsBeyondTheInitialPage() {
+        jdbc.update("""
+                insert into agri_harvest_lots(id,code,product,expiry_date,qty,unit,status,harvest_date,created_at)
+                select n, 'Q-'||n, 'Rau', current_date+10, '1','kg','Đã duyệt xuất kho',current_date,now()
+                from generate_series(3000,3501) n
+                """);
+        assertEquals("1", lotLookup.eligibleByCode("LOT-1").id());
+        jdbc.update("""
+                insert into wh_stock_balances(id,warehouse_id,location_id,lot_id,lot_code,product_id,expiry_date,quantity_kg,held,version,received_at)
+                select gen_random_uuid(),?, ?, n::text,'Q-'||n,'Rau',current_date+10,1,false,0,now()
+                from generate_series(3000,3501) n
+                """, warehouseId, locationId);
+        assertTrue(inventory.search(warehouseId, "", 0, 500).hasNext());
+        assertEquals("Q-3501", inventory.search(warehouseId, "q-3501", 0, 100).rows().getFirst().lotCode());
+        var labels = inventory.labels(warehouseId, new InventoryLabelRequest(List.of(), List.of("3501")));
+        assertEquals("Q-3501", labels.getFirst().lotCode());
+    }
+
+    @Test
+    void refundedOrderCannotReserveOrConfirmEarlierDraft() {
+        assertEquals(1L, reservations.lookupOrder(warehouseId, "order-1").id());
+        var draft = outbound(reservations.create(warehouseId, request(1L, "8"), "staff"));
+        jdbc.update("update agri_orders set status='REFUNDED' where id=1");
+        assertThrows(ConflictException.class, () -> reservations.lookupOrder(warehouseId, "1"));
+        assertThrows(ConflictException.class, () -> reservations.create(warehouseId, request(1L, "1"), "staff"));
+        assertThrows(ConflictException.class, () -> documents.confirm(warehouseId, draft.id(), "staff"));
+        assertEquals(0, jdbc.queryForObject("select count(*) from wh_stock_movements where type='OUTBOUND'", Integer.class));
+    }
+
+    @Test
+    void oneHandoverLinksBothFefoLotsWithTheirOwnWeights() {
+        String code = "SHIP-" + UUID.randomUUID();
+        shipments.saveAndFlush(Shipment.builder().shipmentCode(code).orderCodes("ORDER-1")
+                .driverName("Test").vehicleNumber("Test").origin("A").destination("B").productSummary("Rau").build());
+        var draft = outbound(reservations.create(warehouseId, request(1L, "150"), "staff"));
+        documents.confirm(warehouseId, draft.id(), "staff");
+        assertTrue(trace.dispatches("LOT-1").isEmpty());
+        documents.handover(warehouseId, draft.id(), new HandoverInput("BB-1", code), "staff");
+        assertEquals(0, trace.dispatches("LOT-1").getFirst().quantityKg().compareTo(new BigDecimal("100")));
+        assertEquals(0, trace.dispatches("LOT-2").getFirst().quantityKg().compareTo(new BigDecimal("50")));
+        assertEquals(trace.dispatches("LOT-1").getFirst().shipmentId(), trace.dispatches("LOT-2").getFirst().shipmentId());
+        assertNull(trace.warehouseStops("LOT-2").getFirst().measurement());
+        assertEquals("1", lotLookup.eligibleByCode("lot-1").id());
+        assertEquals(1, inventory.search(warehouseId, "lot-2", 0, 1).rows().size());
+        assertTrue(inventory.search(warehouseId, "", 0, 1).hasNext());
     }
 
     private UUID location(UUID id) {
@@ -468,6 +519,30 @@ class WarehouseOutboundIntegrationTest {
         assertThrows(
                 ConflictException.class,
                 () -> reservations.create(warehouseId, request(1L, "1"), "staff"));
+    }
+
+    @Test
+    void linkShipmentAfterPaperHandoverKeepsOriginalAuditAndDispatch() {
+        String code = "SHIP-" + UUID.randomUUID();
+        for (String order : List.of("ORDER-1", "ORDER-2")) {
+            shipments.saveAndFlush(Shipment.builder().shipmentCode(code + order).orderCodes(order)
+                    .driverName("Test").vehicleNumber("Test").origin("A").destination("B").productSummary("Rau").build());
+        }
+        var draft = outbound(reservations.create(warehouseId, request(1L, "12"), "staff"));
+        documents.confirm(warehouseId, draft.id(), "staff");
+        documents.handover(warehouseId, draft.id(), new HandoverInput("BB-2"), "sender");
+        var original = documents.get(warehouseId, draft.id());
+        assertTrue(trace.dispatches("LOT-1").isEmpty());
+        var wrong = new HandoverInput("BB-2", code + "ORDER-2");
+        assertThrows(ConflictException.class, () -> documents.handover(warehouseId, draft.id(), wrong, "other"));
+        var valid = new HandoverInput("BB-2", code + "ORDER-1");
+        var linked = documents.handover(warehouseId, draft.id(), valid, "other");
+        assertEquals(original.handedOverAt(), linked.handedOverAt());
+        assertEquals("sender", linked.handoverBy());
+        assertEquals(valid.shipmentCode(), documents.handover(warehouseId, draft.id(), valid, "retry").shipmentCode());
+        assertThrows(ConflictException.class, () -> documents.handover(warehouseId, draft.id(), wrong, "other"));
+        assertEquals(0, trace.dispatches("LOT-1").getFirst().quantityKg().compareTo(new BigDecimal("12")));
+        assertEquals(1, jdbc.queryForObject("select count(*) from wh_stock_movements where type='OUTBOUND' and warehouse_id=?", Integer.class, warehouseId));
     }
 
     @Test

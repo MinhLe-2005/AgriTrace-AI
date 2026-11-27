@@ -78,11 +78,8 @@ public class WarehouseHeatmapService {
         for (var r : monitoring.latest(warehouseId)) latest.put(r.deviceId(), r);
         Map<UUID, WarehouseLocationLayout> placed = new HashMap<>();
         for (var l : layouts.findByWarehouseId(warehouseId)) placed.put(l.getLocationId(), l);
-        var activeAlerts =
-                risks.list(warehouseId).stream()
-                        .filter(a -> !"RESOLVED".equals(a.status()))
-                        .toList();
-        var stock = inventory.getBalances(warehouseId);
+        var activeAlerts = risks.listActive(warehouseId);
+        var stock = inventory.nonZeroViews(warehouseId, null);
         Map<UUID, List<BalanceView>> grouped = new HashMap<>();
         for (var b : stock)
             if (b.quantityKg().signum() > 0)

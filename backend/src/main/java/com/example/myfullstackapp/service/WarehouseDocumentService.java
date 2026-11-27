@@ -30,6 +30,8 @@ public class WarehouseDocumentService {
     private final WarehouseLotQuery lots;
     private final StockBalanceRepository balances;
     private final QualityInspectionRepository inspections;
+    private final ShipmentRepository shipments;
+    private final OrderRepository orders;
 
     @Autowired(required = false)
     private ApplicationEventPublisher eventPublisher;
@@ -325,13 +327,22 @@ public class WarehouseDocumentService {
                     reservationService.requireActive(
                             document.getWarehouseId(), document.getReservationId());
             Map<UUID, BalanceView> eligible = new HashMap<>();
-            for (var b : inventory.views(document.getWarehouseId(), reservation.getId(), true))
+            for (var b : inventory.nonZeroViews(document.getWarehouseId(), reservation.getId()))
                 if (b.availableKg().signum() > 0
                         && WarehouseExpiryPolicy.usableOn(b.expiryDate(), InventoryService.today()))
                     eligible.put(b.id(), b);
+            var balanceIds =
+                    reservation.getLines().stream()
+                            .map(StockReservation.Allocation::getBalanceId)
+                            .distinct()
+                            .toList();
+            var balanceMap = inventory.balancesById(document.getWarehouseId(), balanceIds);
             Map<String, BigDecimal> expected = new HashMap<>();
             for (var allocation : reservation.getLines()) {
-                var b = inventory.balance(document.getWarehouseId(), allocation.getBalanceId());
+                var b = balanceMap.get(allocation.getBalanceId());
+                if (b == null) {
+                    throw new ResourceNotFoundException("Stock balance not found");
+                }
                 if (allocation.remainingKg().signum() > 0 && eligible.containsKey(b.getId())) {
                     expected.merge(
                             key(b.getLocationId(), b.getLotId()),
@@ -373,18 +384,19 @@ public class WarehouseDocumentService {
             WarehouseDocument document,
             Map<String, LotSummary> lotData,
             Map<String, BigDecimal> actual) {
-        if (matchesFefo(document.getWarehouseId(), document.getLines(), lotData, actual, null)) {
+        var nonZeroStock = inventory.nonZeroViews(document.getWarehouseId(), null);
+        if (matchesFefo(nonZeroStock, document.getLines(), lotData, actual, null)) {
             return true;
         }
         if (document.getCreatedAt() != null
                 && matchesFefo(
-                        document.getWarehouseId(),
+                        nonZeroStock,
                         document.getLines(),
                         lotData,
                         actual,
                         document.getCreatedAt())) {
             var currentStockMap = new HashMap<String, BigDecimal>();
-            for (var b : inventory.views(document.getWarehouseId(), null, true)) {
+            for (var b : nonZeroStock) {
                 currentStockMap.put(key(b.locationId(), b.lotId()), b.availableKg());
             }
             return actual.entrySet().stream()
@@ -399,7 +411,7 @@ public class WarehouseDocumentService {
     }
 
     private boolean matchesFefo(
-            UUID warehouseId,
+            List<BalanceView> nonZeroStock,
             List<WarehouseDocumentLine> lines,
             Map<String, LotSummary> lotData,
             Map<String, BigDecimal> actual,
@@ -410,14 +422,31 @@ public class WarehouseDocumentService {
             if (lot == null) return false;
             byProduct.merge(lot.productId(), line.getQuantityKg(), BigDecimal::add);
         }
-        var stock = inventory.views(warehouseId, null, true);
-        if (asOf != null) {
-            stock =
-                    stock.stream()
-                            .filter(b -> b.receivedAt() != null && !b.receivedAt().isAfter(asOf))
-                            .toList();
+        var stock =
+                asOf == null
+                        ? nonZeroStock
+                        : nonZeroStock.stream()
+                                .filter(
+                                        b ->
+                                                b.receivedAt() != null
+                                                        && !b.receivedAt().isAfter(asOf))
+                                .toList();
+        // Ki?m tra t?ng d?ng th?c xu?t ph?i thu?c k? c?n ?? t?n kh? d?ng v? ch?a b? gi? ch?t l??ng.
+        var usableByKey = new HashMap<String, BigDecimal>();
+        for (var b : stock) {
+            if (!b.held()
+                    && b.availableKg().signum() > 0
+                    && WarehouseExpiryPolicy.usableOn(b.expiryDate(), InventoryService.today())) {
+                usableByKey.merge(key(b.locationId(), b.lotId()), b.availableKg(), BigDecimal::add);
+            }
         }
-        Map<String, BigDecimal> expected = new HashMap<>();
+        for (var entry : actual.entrySet()) {
+            if (usableByKey.getOrDefault(entry.getKey(), BigDecimal.ZERO).compareTo(entry.getValue()) < 0) {
+                return false;
+            }
+        }
+        // So s?nh theo (productId, expiryDate) ?? th? kho ???c ph?p l?y l? c?ng ng?y h?n ? k? g?n h?n.
+        Map<String, BigDecimal> expectedByExpiry = new HashMap<>();
         try {
             for (var product : byProduct.entrySet()) {
                 for (var allocation :
@@ -426,8 +455,8 @@ public class WarehouseDocumentService {
                                 product.getKey(),
                                 product.getValue(),
                                 InventoryService.today())) {
-                    expected.merge(
-                            key(allocation.locationId(), allocation.lotId()),
+                    expectedByExpiry.merge(
+                            product.getKey() + "|" + allocation.expiryDate(),
                             allocation.quantityKg(),
                             BigDecimal::add);
                 }
@@ -435,9 +464,19 @@ public class WarehouseDocumentService {
         } catch (ConflictException insufficient) {
             return false;
         }
-        return expected.keySet().equals(actual.keySet())
-                && actual.entrySet().stream()
-                        .allMatch(e -> expected.get(e.getKey()).compareTo(e.getValue()) == 0);
+        Map<String, BigDecimal> actualByExpiry = new HashMap<>();
+        for (var line : lines) {
+            var lot = lotData.get(line.getLotId());
+            if (lot == null) return false;
+            actualByExpiry.merge(
+                    lot.productId() + "|" + lot.expiryDate(),
+                    line.getQuantityKg(),
+                    BigDecimal::add);
+        }
+        return expectedByExpiry.keySet().equals(actualByExpiry.keySet())
+                && actualByExpiry.entrySet().stream()
+                        .allMatch(
+                                e -> expectedByExpiry.get(e.getKey()).compareTo(e.getValue()) == 0);
     }
 
     @Transactional
@@ -579,10 +618,21 @@ public class WarehouseDocumentService {
         if (document.getHandoverReference() != null) {
             if (!input.reference().trim().equals(document.getHandoverReference()))
                 throw new ConflictException("Handover already recorded with another reference");
-            return view(document);
+            String code = input.shipmentCode() == null ? "" : input.shipmentCode().trim();
+            if (code.isEmpty()) return view(document);
+            if (document.getHandoverShipment() != null) {
+                if (code.equalsIgnoreCase(document.getHandoverShipment().getShipmentCode()))
+                    return view(document);
+                throw new ConflictException("Phiếu đã bàn giao với thông tin chuyến khác.");
+            }
+            if (document.getType() != Type.OUTBOUND || document.getStatus() != Status.HANDED_OVER)
+                throw new ConflictException("Chỉ bổ sung chuyến cho phiếu xuất đã bàn giao.");
+            document.setHandoverShipment(shipmentForHandover(document, code));
+            return view(documents.saveAndFlush(document));
         }
         if (document.getStatus() != Status.CONFIRMED && document.getStatus() != Status.IN_TRANSIT)
             throw new ConflictException("Confirm document before handover");
+        document.setHandoverShipment(shipmentForHandover(document, input.shipmentCode()));
         document.setHandoverReference(input.reference().trim());
         document.setHandoverBy(actor);
         document.setHandedOverAt(Instant.now());
@@ -590,6 +640,36 @@ public class WarehouseDocumentService {
             document.setStatus(Status.HANDED_OVER);
         }
         return view(documents.saveAndFlush(document));
+    }
+
+    private Shipment shipmentForHandover(WarehouseDocument document, String requestedCode) {
+        String code = requestedCode == null ? "" : requestedCode.trim();
+        if (document.getType() != Type.OUTBOUND) {
+            if (!code.isEmpty()) throw new ConflictException("Chỉ phiếu xuất mới liên kết chuyến giao.");
+            return null;
+        }
+        Order order = null;
+        if (document.getReservationId() != null) {
+            Long orderId = reservationService.get(document.getWarehouseId(), document.getReservationId()).getOrderId();
+            order = orders.findById(orderId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn của phiếu xuất."));
+            if (code.isEmpty() && order.getShipmentCode() != null) code = order.getShipmentCode().trim();
+        }
+        if (code.isEmpty()) return null;
+        Shipment shipment = shipments.findByShipmentCodeIgnoreCase(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy mã chuyến giao."));
+        if ("CANCELLED".equalsIgnoreCase(shipment.getStatus()))
+            throw new ConflictException("Chuyến giao đã bị hủy, không thể bàn giao.");
+        if (order != null && !shipmentContainsOrder(shipment, order))
+            throw new ConflictException("Đơn của phiếu xuất chưa được gán vào chuyến này.");
+        return shipment;
+    }
+
+    private boolean shipmentContainsOrder(Shipment shipment, Order order) {
+        if (order.getShipmentCode() != null && !order.getShipmentCode().isBlank())
+            return shipment.getShipmentCode().equalsIgnoreCase(order.getShipmentCode());
+        return shipment.getOrderCodes() != null && Arrays.stream(shipment.getOrderCodes().split(","))
+                .map(String::trim).anyMatch(order.getOrderCode()::equalsIgnoreCase);
     }
 
     @Transactional(readOnly = true)
@@ -723,6 +803,7 @@ public class WarehouseDocumentService {
                 Boolean.TRUE.equals(d.getInTransit()),
                 d.getReceivedBy(),
                 d.getReceivedAt(),
-                d.getReceivingNote());
+                d.getReceivingNote(),
+                d.getHandoverShipment() == null ? null : d.getHandoverShipment().getShipmentCode());
     }
 }

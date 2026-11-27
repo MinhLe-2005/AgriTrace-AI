@@ -1,6 +1,7 @@
 package com.example.myfullstackapp.repository;
 
 import com.example.myfullstackapp.entity.StockBalance;
+import com.example.myfullstackapp.dto.warehouse.WarehouseOperations.InventoryLabel;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -33,6 +34,38 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, UUID
             Pageable page);
 
     List<StockBalance> findByWarehouseIdOrderByExpiryDateAscLotIdAscLocationIdAsc(UUID warehouseId);
+
+    List<StockBalance> findByWarehouseIdAndQuantityKgGreaterThanOrderByExpiryDateAscLotIdAscLocationIdAsc(
+            UUID warehouseId, BigDecimal minQuantityKg);
+
+    List<StockBalance> findByWarehouseIdAndIdIn(UUID warehouseId, Collection<UUID> ids);
+
+    @Query("""
+            select b from StockBalance b
+            join StorageLocation l on l.id=b.locationId and l.warehouse.id=b.warehouseId
+            where b.warehouseId=:warehouseId
+              and (:search='' or locate(lower(:search),lower(b.lotCode))>0
+                   or locate(lower(:search),lower(b.productId))>0
+                   or locate(lower(:search),lower(l.code))>0
+                   or locate(lower(:search),lower(l.name))>0)
+            """)
+    Slice<StockBalance> searchStockTable(
+            @Param("warehouseId") UUID warehouseId, @Param("search") String search, Pageable page);
+
+    @Query("select distinct b.productId from StockBalance b where b.warehouseId=:warehouseId order by b.productId")
+    List<String> productNames(@Param("warehouseId") UUID warehouseId);
+
+    @Query("""
+            select new com.example.myfullstackapp.dto.warehouse.WarehouseOperations$InventoryLabel(b.id,b.lotId,b.lotCode,b.productId) from StockBalance b
+            where b.warehouseId=:warehouseId and b.id in :ids
+            """)
+    List<InventoryLabel> labelsForBalances(@Param("warehouseId") UUID warehouseId, @Param("ids") List<UUID> ids);
+
+    @Query("""
+            select distinct new com.example.myfullstackapp.dto.warehouse.WarehouseOperations$LotLabel(b.lotId,b.lotCode,b.productId) from StockBalance b
+            where b.warehouseId=:warehouseId and b.lotId in :ids
+            """)
+    List<com.example.myfullstackapp.dto.warehouse.WarehouseOperations.LotLabel> labelsForLots(@Param("warehouseId") UUID warehouseId, @Param("ids") List<String> ids);
 
     List<StockBalance> findByLotCodeIgnoreCaseOrderByReceivedAtAsc(String lotCode);
 

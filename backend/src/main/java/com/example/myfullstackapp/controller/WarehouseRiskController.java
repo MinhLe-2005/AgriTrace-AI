@@ -20,6 +20,7 @@ import java.util.*;
 @PreAuthorize("hasAnyRole('WAREHOUSE','ADMIN')")
 public class WarehouseRiskController {
     private final WarehouseRiskService risk;
+    private final com.example.myfullstackapp.service.WarehouseReconciliationService reconciliation;
 
     @GetMapping("/risk-rules")
     public ApiResponse<RuleInput> rule(@PathVariable UUID warehouseId) {
@@ -40,6 +41,14 @@ public class WarehouseRiskController {
     @PostMapping("/alerts/refresh")
     public ApiResponse<List<AlertView>> refresh(@PathVariable UUID warehouseId) {
         return ApiResponse.ok("Alerts refreshed", risk.refresh(warehouseId));
+    }
+
+    @PostMapping("/reconcile")
+    public ApiResponse<com.example.myfullstackapp.service.WarehouseReconciliationService.ReconciliationReport> reconcile(
+            @PathVariable UUID warehouseId) {
+        return ApiResponse.ok(
+                "End-of-day reconciliation completed",
+                reconciliation.reconcileWarehouse(warehouseId));
     }
 
     @PutMapping("/alerts/{id}")

@@ -19,9 +19,12 @@ public class TraceabilityController {
     private final TraceabilityRecordRepository traceabilityRecordRepository;
     private final TraceabilityChainService traceabilityChainService;
 
+    @org.springframework.beans.factory.annotation.Value("${app.demo.trace-samples:false}")
+    private boolean traceSamples;
+
     @PostConstruct
     public void initSeedData() {
-        if (traceabilityRecordRepository.count() == 0) {
+        if (traceSamples && traceabilityRecordRepository.count() == 0) {
             traceabilityRecordRepository.saveAll(List.of(
                 TraceabilityRecord.builder()
                     .batchCode("XL-2026-08")

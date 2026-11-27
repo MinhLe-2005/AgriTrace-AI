@@ -17,6 +17,8 @@ import java.util.regex.*;
 public class WarehouseOrderQuery {
     private final JdbcTemplate jdbc;
     private final WarehouseWeightService weights;
+    private static final Set<String> CLOSED = Set.of("CANCELLED", "CANCELED", "DELIVERED", "COMPLETED", "REFUNDED");
+    public record OrderHeader(long id, String code, String status) {}
 
     public void lockOpen(Long orderId) {
         var states =
@@ -25,11 +27,61 @@ public class WarehouseOrderQuery {
                         String.class,
                         orderId);
         if (states.isEmpty()) throw new ResourceNotFoundException("Order not found");
-        String status = states.getFirst();
-        if (status == null
-                || Set.of("CANCELLED", "CANCELED", "DELIVERED", "COMPLETED")
-                        .contains(status.toUpperCase(Locale.ROOT)))
+        requireOpen(states.getFirst());
+    }
+
+    private void requireOpen(String status) {
+        if (status == null || status.isBlank() || CLOSED.contains(status.trim().toUpperCase(Locale.ROOT)))
             throw new ConflictException("Order is already closed");
+    }
+
+    public OrderHeader lookupOpen(String reference) {
+        String ref = reference.trim();
+        Long numericId = null;
+        if (ref.matches("[0-9]{1,19}")) {
+            try {
+                numericId = Long.valueOf(ref);
+            } catch (NumberFormatException ignored) {
+                // A numeric order code may exceed the database ID range.
+            }
+        }
+        var results = jdbc.query("""
+                select id, order_code, status from agri_orders
+                where upper(order_code)=upper(?) or id=?
+                order by case when upper(order_code)=upper(?) then 0 else 1 end
+                limit 1
+                """, (rs, n) -> new OrderHeader(rs.getLong(1), rs.getString(2), rs.getString(3)),
+                ref, numericId, ref);
+        if (results.isEmpty()) throw new ResourceNotFoundException("Order not found");
+        var order = results.getFirst();
+        requireOpen(order.status());
+        return order;
+    }
+
+    public Map<Long, String> codes(Collection<Long> orderIds) {
+        if (orderIds.isEmpty()) return Map.of();
+        String params = String.join(",", Collections.nCopies(orderIds.size(), "?"));
+        Map<Long, String> codes = new HashMap<>();
+        jdbc.query("select id, order_code from agri_orders where id in (" + params + ")",
+                rs -> { codes.put(rs.getLong(1), rs.getString(2)); }, orderIds.toArray());
+        return codes;
+    }
+
+    public List<String> products(long orderId) {
+        return jdbc.queryForList("select distinct name from agri_order_items where order_id=? order by name",
+                String.class, orderId);
+    }
+
+    public Map<String, BigDecimal> allocatedKg(long orderId) {
+        Map<String, BigDecimal> amounts = new HashMap<>();
+        jdbc.query("""
+                select b.product_id, sum(case when r.status='ACTIVE' and r.expires_at > current_timestamp
+                    then l.quantity_kg else l.dispatched_kg end)
+                from wh_reservations r join wh_reservation_lines l on l.reservation_id=r.id
+                join wh_stock_balances b on b.id=l.balance_id
+                where r.order_id=? group by b.product_id
+                """, rs -> { amounts.put(rs.getString(1), rs.getBigDecimal(2)); }, orderId);
+        return amounts;
     }
 
     public BigDecimal demandKg(UUID warehouseId, Long orderId, String product) {

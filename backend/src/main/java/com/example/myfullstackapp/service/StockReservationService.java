@@ -23,12 +23,32 @@ public class StockReservationService {
     private final StockReservationRepository reservations;
     private final WarehouseOrderQuery orders;
 
+    @Transactional(readOnly = true,
+            isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public EligibleOrder lookupOrder(UUID warehouseId, String reference) {
+        if (!inventory.requireWarehouse(warehouseId).isActive())
+            throw new ConflictException("Warehouse is inactive");
+        var order = orders.lookupOpen(reference);
+        var allocated = orders.allocatedKg(order.id());
+        List<OrderDemandLine> lines = new ArrayList<>();
+        for (String product : orders.products(order.id())) {
+            try {
+                var demand = orders.demandKg(warehouseId, order.id(), product);
+                var remaining = demand.subtract(allocated.getOrDefault(product, BigDecimal.ZERO));
+                lines.add(new OrderDemandLine(product, demand, remaining.max(BigDecimal.ZERO), null));
+            } catch (WarehouseIntegrationException e) {
+                lines.add(new OrderDemandLine(product, null, null, e.getMessage()));
+            }
+        }
+        return new EligibleOrder(order.id(), order.code(), order.status(), lines);
+    }
+
     @Transactional(
             readOnly = true,
             isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public List<AllocationView> preview(UUID warehouseId, FefoInput input) {
         return fefo.allocate(
-                inventory.views(warehouseId, null, true),
+                inventory.nonZeroViews(warehouseId, null),
                 input.productId(),
                 input.quantityKg(),
                 InventoryService.today());
@@ -49,7 +69,7 @@ public class StockReservationService {
                     "Reserved and dispatched stock would exceed the order quantity");
         var allocation =
                 fefo.allocate(
-                        inventory.views(warehouseId, null, true),
+                        inventory.nonZeroViews(warehouseId, null),
                         input.productId(),
                         input.quantityKg(),
                         InventoryService.today());
@@ -66,18 +86,35 @@ public class StockReservationService {
     }
 
     private BigDecimal allocatedToOrder(Long orderId, String product) {
-        BigDecimal total = BigDecimal.ZERO;
-        for (var reservation : reservations.findByOrderId(orderId)) {
+        var orderReservations = reservations.findByOrderId(orderId);
+        if (orderReservations.isEmpty()) return BigDecimal.ZERO;
+        var now = Instant.now();
+        List<StockReservation> expired = new ArrayList<>();
+        Map<UUID, Set<UUID>> idsByWarehouse = new HashMap<>();
+        for (var reservation : orderReservations) {
             if (reservation.getStatus() == StockReservation.Status.ACTIVE
-                    && !reservation.getExpiresAt().isAfter(Instant.now())) {
+                    && !reservation.getExpiresAt().isAfter(now)) {
                 reservation.setStatus(StockReservation.Status.EXPIRED);
-                reservations.saveAndFlush(reservation);
+                expired.add(reservation);
             }
+            var set = idsByWarehouse.computeIfAbsent(reservation.getWarehouseId(), k -> new HashSet<>());
+            for (var line : reservation.getLines()) set.add(line.getBalanceId());
+        }
+        if (!expired.isEmpty()) reservations.saveAllAndFlush(expired);
+        Map<UUID, StockBalance> balanceMap = new HashMap<>();
+        for (var entry : idsByWarehouse.entrySet()) {
+            balanceMap.putAll(inventory.balancesById(entry.getKey(), entry.getValue()));
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (var reservation : orderReservations) {
             boolean active =
                     reservation.getStatus() == StockReservation.Status.ACTIVE
-                            && reservation.getExpiresAt().isAfter(Instant.now());
+                            && reservation.getExpiresAt().isAfter(now);
             for (var line : reservation.getLines()) {
-                var balance = inventory.balance(reservation.getWarehouseId(), line.getBalanceId());
+                var balance = balanceMap.get(line.getBalanceId());
+                if (balance == null) {
+                    balance = inventory.balance(reservation.getWarehouseId(), line.getBalanceId());
+                }
                 if (balance.getProductId().equals(product))
                     total = total.add(active ? line.getQuantityKg() : line.getDispatchedKg());
             }
@@ -99,7 +136,7 @@ public class StockReservationService {
     public ReservationView reconcile(UUID warehouseId, UUID id) {
         inventory.lock(warehouseId, null);
         var reservation = requireActive(warehouseId, id);
-        var stock = inventory.views(warehouseId, id, true);
+        var stock = inventory.nonZeroViews(warehouseId, id);
         Map<UUID, BalanceView> available = new HashMap<>();
         Map<UUID, BigDecimal> free = new HashMap<>();
         for (var balance : stock) {
@@ -113,9 +150,18 @@ public class StockReservationService {
         Map<UUID, StockReservation.Allocation> result = new TreeMap<>();
         record Missing(UUID balanceId, String product, BigDecimal quantity) {}
         List<Missing> missing = new ArrayList<>();
+        var lineBalanceIds =
+                reservation.getLines().stream()
+                        .map(StockReservation.Allocation::getBalanceId)
+                        .distinct()
+                        .toList();
+        var lineBalanceMap = inventory.balancesById(warehouseId, lineBalanceIds);
         // Protect every valid original allocation before assigning replacement stock.
         for (var line : reservation.getLines()) {
-            var balance = inventory.balance(warehouseId, line.getBalanceId());
+            var balance = lineBalanceMap.get(line.getBalanceId());
+            if (balance == null) {
+                throw new ResourceNotFoundException("Stock balance not found");
+            }
             BigDecimal pending = line.remainingKg();
             if (pending.signum() == 0 || available.containsKey(balance.getId())) {
                 merge(result, balance.getId(), line.getQuantityKg(), line.getDispatchedKg());
@@ -211,6 +257,11 @@ public class StockReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
     }
 
+    @Transactional(readOnly = true)
+    public ReservationView getView(UUID warehouseId, UUID id) {
+        return view(get(warehouseId, id));
+    }
+
     public StockReservation requireActive(UUID warehouseId, UUID id) {
         var reservation = get(warehouseId, id);
         if (reservation.getStatus() == StockReservation.Status.ACTIVE
@@ -221,9 +272,16 @@ public class StockReservationService {
         if (reservation.getStatus() != StockReservation.Status.ACTIVE)
             throw new ConflictException("Reservation is expired or no longer active");
         orders.lockOpen(reservation.getOrderId());
+        var lineBalanceIds = reservation.getLines().stream()
+                .map(StockReservation.Allocation::getBalanceId)
+                .toList();
+        var balanceMap = inventory.balancesById(warehouseId, lineBalanceIds);
         Set<String> products = new HashSet<>();
-        for (var line : reservation.getLines())
-            products.add(inventory.balance(warehouseId, line.getBalanceId()).getProductId());
+        for (var line : reservation.getLines()) {
+            var balance = balanceMap.get(line.getBalanceId());
+            if (balance == null) balance = inventory.balance(warehouseId, line.getBalanceId());
+            products.add(balance.getProductId());
+        }
         for (String product : products)
             if (allocatedToOrder(reservation.getOrderId(), product)
                             .compareTo(
@@ -237,21 +295,46 @@ public class StockReservationService {
     @Transactional(readOnly = true)
     public List<ReservationView> list(UUID warehouseId, int page) {
         inventory.requireWarehouse(warehouseId);
-        return reservations
-                .findByWarehouseIdOrderByCreatedAtDesc(warehouseId, PageRequest.of(page, 100))
+        var rows = reservations.findByWarehouseIdOrderByCreatedAtDesc(warehouseId, PageRequest.of(page, 100));
+        if (rows.isEmpty()) return List.of();
+        var codes = orders.codes(rows.stream().map(StockReservation::getOrderId).distinct().toList());
+        var balanceIds = rows.stream()
+                .flatMap(r -> r.getLines().stream())
+                .map(StockReservation.Allocation::getBalanceId)
+                .toList();
+        var balanceMap = inventory.balancesById(warehouseId, balanceIds);
+        return rows
                 .stream()
-                .map(this::view)
+                .map(row -> view(row, codes.get(row.getOrderId()), balanceMap))
                 .toList();
     }
 
     public ReservationView view(StockReservation reservation) {
+        var balanceIds = reservation.getLines().stream()
+                .map(StockReservation.Allocation::getBalanceId)
+                .toList();
+        var balanceMap = inventory.balancesById(reservation.getWarehouseId(), balanceIds);
+        return view(
+                reservation,
+                orders.codes(List.of(reservation.getOrderId())).get(reservation.getOrderId()),
+                balanceMap);
+    }
+
+    private ReservationView view(
+            StockReservation reservation,
+            String orderCode,
+            Map<UUID, StockBalance> balanceMap) {
         var lines =
                 reservation.getLines().stream()
                         .map(
                                 a -> {
-                                    var balance =
-                                            inventory.balance(
-                                                    reservation.getWarehouseId(), a.getBalanceId());
+                                    var balance = balanceMap.get(a.getBalanceId());
+                                    if (balance == null) {
+                                        balance =
+                                                inventory.balance(
+                                                        reservation.getWarehouseId(),
+                                                        a.getBalanceId());
+                                    }
                                     return new AllocationView(
                                             balance.getId(),
                                             balance.getLotId(),
@@ -276,6 +359,7 @@ public class StockReservationService {
                 reservation.getOrderId(),
                 status,
                 reservation.getExpiresAt(),
-                lines);
+                lines,
+                orderCode);
     }
 }

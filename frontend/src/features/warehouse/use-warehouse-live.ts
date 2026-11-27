@@ -6,7 +6,45 @@ import { useAuthStore } from "@/stores/auth-store";
 import { warehouseMonitoringService } from "@/services/warehouse-monitoring.service";
 
 export type WarehouseLiveStatus =
-  "connecting" | "connected" | "reconnecting" | "offline";
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "offline";
+
+const ALL_LIVE_KEYS = ["monitoring", "alerts", "dashboard", "heatmap"] as const;
+
+function keysForEvent(rawEvent: string): readonly string[] {
+  if (rawEvent.includes("event:connected")) return ALL_LIVE_KEYS;
+  const dataLine = rawEvent
+    .split("\n")
+    .find((line) => line.startsWith("data:"))
+    ?.slice(5)
+    .trim();
+  if (!dataLine) return ALL_LIVE_KEYS;
+  try {
+    const parsed = JSON.parse(dataLine) as { reason?: string };
+    switch (parsed.reason) {
+      case "LAYOUT":
+        return ["heatmap"];
+      case "SETTINGS":
+        return ["monitoring"];
+      case "DEVICES":
+      case "TELEMETRY":
+        return ["monitoring", "heatmap"];
+      case "ALERTS":
+        return ["alerts", "dashboard", "heatmap"];
+      case "RULES":
+        return ["monitoring", "alerts", "dashboard", "heatmap"];
+      case "RESERVATION_RELEASED":
+        return ["reservations", "stock", "dashboard"];
+      default:
+        return ALL_LIVE_KEYS;
+    }
+  } catch {
+    return ALL_LIVE_KEYS;
+  }
+}
+
 export function useWarehouseLive(warehouseId: string) {
   const client = useQueryClient();
   const [status, setStatus] = useState<WarehouseLiveStatus>("offline");
@@ -17,11 +55,15 @@ export function useWarehouseLive(warehouseId: string) {
     }
     const controller = new AbortController();
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-    function refresh() {
+    const pendingKeys = new Set<string>();
+    function refresh(keys: readonly string[]) {
+      for (const key of keys) pendingKeys.add(key);
       if (refreshTimer) return;
       refreshTimer = setTimeout(() => {
         refreshTimer = undefined;
-        for (const key of ["monitoring", "alerts", "dashboard", "heatmap"]) {
+        const toInvalidate = [...pendingKeys];
+        pendingKeys.clear();
+        for (const key of toInvalidate) {
           void client.invalidateQueries({
             queryKey: ["warehouse", warehouseId, key],
           });
@@ -77,7 +119,7 @@ export function useWarehouseLive(warehouseId: string) {
           attempts = 0;
           authRetries = 0;
           setStatus("connected");
-          refresh();
+          refresh(ALL_LIVE_KEYS);
           const reader = response.body.getReader(),
             decoder = new TextDecoder();
           let buffer = "";
@@ -96,7 +138,7 @@ export function useWarehouseLive(warehouseId: string) {
                   event.includes("event:warehouse-change") ||
                   event.includes("event:connected")
                 )
-                  refresh();
+                  refresh(keysForEvent(event));
               }
               if (buffer.length > 65536)
                 throw new Error("Unexpected stream payload");
@@ -118,6 +160,6 @@ export function useWarehouseLive(warehouseId: string) {
       controller.abort();
       if (refreshTimer) clearTimeout(refreshTimer);
     };
-  }, [warehouseId, client]);
+  }, [client, warehouseId]);
   return status;
 }

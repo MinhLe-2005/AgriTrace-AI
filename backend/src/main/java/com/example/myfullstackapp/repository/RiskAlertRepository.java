@@ -9,6 +9,8 @@ import java.util.*;
 public interface RiskAlertRepository extends JpaRepository<RiskAlert, UUID> {
     List<RiskAlert> findByWarehouseIdOrderByUpdatedAtDesc(UUID warehouseId);
 
+    List<RiskAlert> findByWarehouseIdAndStatusNotOrderByUpdatedAtDesc(UUID warehouseId, String status);
+
     Optional<RiskAlert> findByWarehouseIdAndFingerprint(UUID warehouseId, String fingerprint);
 
     Optional<RiskAlert> findByIdAndWarehouseId(UUID id, UUID warehouseId);

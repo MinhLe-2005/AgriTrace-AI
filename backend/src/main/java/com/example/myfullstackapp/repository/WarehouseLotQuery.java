@@ -149,11 +149,46 @@ public class WarehouseLotQuery {
         }
     }
 
+    public LotSummary eligibleByCode(String code) {
+        var matches = jdbc.query(
+                SELECT + " where lower(code)=lower(?) order by id limit 2",
+                (rs, n) -> map(rs.getString("id"), rs.getString("product"), rs.getString("code"),
+                        rs.getString("expiry_date"), rs.getString("qty"), rs.getString("unit"), rs.getString("status")),
+                code.trim());
+        if (matches.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy lô mang mã này.");
+        if (matches.size() > 1) throw new ConflictException("Mã lô bị trùng. Hãy đối chiếu lại với nông trại.");
+        var lot = matches.getFirst();
+        if (!"APPROVED".equals(lot.status())) throw new ConflictException("Lô chưa được duyệt nhập kho.");
+        if (lot.expiryDate().isBefore(com.example.myfullstackapp.service.InventoryService.today()))
+            throw new ConflictException("Lô đã hết hạn sử dụng.");
+        return lot;
+    }
+
     public List<LotSummary> approved() {
+        return approved(null);
+    }
+
+    /**
+     * Truy vấn các lô đã duyệt xuất kho còn hạn sử dụng.
+     * Nếu có từ khóa {@code q}, lọc trực tiếp bằng SQL theo mã lô hoặc tên sản phẩm trước khi giới hạn 200 dòng.
+     */
+    public List<LotSummary> approved(String q) {
         try {
+            String keyword = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
+            String sql;
+            Object[] params;
+            if (keyword.isEmpty()) {
+                sql = SELECT + " where status=? order by id desc limit 200";
+                params = new Object[] {"Đã duyệt xuất kho"};
+            } else {
+                String pattern = "%" + keyword + "%";
+                sql = SELECT + " where status=? and (lower(code) like ? or lower(product) like ?) order by id desc limit 200";
+                params = new Object[] {"Đã duyệt xuất kho", pattern, pattern};
+            }
+            LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
             return jdbc
                     .query(
-                            SELECT + " where status=? order by id desc limit 200",
+                            sql,
                             (rs, n) ->
                                     map(
                                             Long.toString(rs.getLong("id")),
@@ -163,15 +198,9 @@ public class WarehouseLotQuery {
                                             rs.getString("qty"),
                                             rs.getString("unit"),
                                             rs.getString("status")),
-                            "Đã duyệt xuất kho")
+                            params)
                     .stream()
-                    .filter(
-                            l ->
-                                    !l.expiryDate()
-                                            .isBefore(
-                                                    LocalDate.now(
-                                                            java.time.ZoneId.of(
-                                                                    "Asia/Ho_Chi_Minh"))))
+                    .filter(l -> !l.expiryDate().isBefore(today))
                     .toList();
         } catch (DataAccessException ex) {
             throw new WarehouseIntegrationException(

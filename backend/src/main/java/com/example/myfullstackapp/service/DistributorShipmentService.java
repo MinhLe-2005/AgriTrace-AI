@@ -129,7 +129,7 @@ public class DistributorShipmentService {
                 .destination(request.destination().trim())
                 .productSummary(request.productSummary().trim())
                 .lotCode(optionalText(request.lotCode()))
-                .temperatureC(request.temperatureC() == null ? 4.5 : request.temperatureC())
+                .temperatureC(request.temperatureC())
                 .status("PREPARING")
                 .dispatchTime(parseInstant(request.dispatchTime()))
                 .estimatedArrival(parseInstant(request.estimatedArrival()))
@@ -141,9 +141,6 @@ public class DistributorShipmentService {
             }
             if (saved.getDriverPhone() != null && !saved.getDriverPhone().isBlank()) {
                 order.setDriverPhone(saved.getDriverPhone());
-            }
-            if (saved.getLotCode() != null && !saved.getLotCode().isBlank()) {
-                order.setLotCode(saved.getLotCode());
             }
         }
         orderRepository.saveAll(claimedOrders);
@@ -175,9 +172,6 @@ public class DistributorShipmentService {
             }
             if (shipment.getDriverPhone() != null && !shipment.getDriverPhone().isBlank()) {
                 order.setDriverPhone(shipment.getDriverPhone());
-            }
-            if (shipment.getLotCode() != null && !shipment.getLotCode().isBlank()) {
-                order.setLotCode(shipment.getLotCode());
             }
             orderRepository.save(order);
         }));
@@ -351,9 +345,6 @@ public class DistributorShipmentService {
                     }
                     if (shipment.getDriverPhone() != null && !shipment.getDriverPhone().isBlank()) {
                         order.setDriverPhone(shipment.getDriverPhone());
-                    }
-                    if (shipment.getLotCode() != null && !shipment.getLotCode().isBlank()) {
-                        order.setLotCode(shipment.getLotCode());
                     }
                     orderRepository.save(order);
                 }));

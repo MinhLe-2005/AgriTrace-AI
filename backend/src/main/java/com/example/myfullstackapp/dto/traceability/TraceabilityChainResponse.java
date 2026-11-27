@@ -5,82 +5,32 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * A read-only, end-to-end view of the information that is already recorded
- * for a harvested batch.  Nullable fields mean that the corresponding step
- * has not been recorded yet; they are not synthesized from seed data.
- */
+/** Public information only. Missing stages and measurements are left empty. */
 public record TraceabilityChainResponse(
-        String batchCode,
-        String productName,
-        FarmInfo farm,
-        HarvestInfo harvest,
-        WarehouseInfo warehouse,
-        List<ShipmentInfo> shipments,
-        DeliveryInfo delivery,
-        List<TimelineEvent> timeline
-) {
-    public record FarmInfo(
-            String name,
-            String location,
-            String certification,
-            String cultivation
-    ) { }
+        String batchCode, String productName, String source, FarmInfo farm, HarvestInfo harvest,
+        WarehouseInfo warehouse, List<ShipmentInfo> shipments, DeliveryInfo delivery,
+        List<TimelineEvent> timeline) {
+    public record FarmInfo(String name, String location, String certification, String cultivation) {}
 
-    public record HarvestInfo(
-            String harvestDate,
-            String expiryDate,
-            String qualityResult
-    ) { }
+    public record HarvestInfo(String harvestDate, String expiryDate, String qualityResult) {}
 
-    public record WarehouseInfo(List<WarehouseStop> stops) { }
+    public record WarehouseInfo(List<WarehouseStop> stops) {}
 
-    public record WarehouseStop(
-            UUID warehouseId,
-            String warehouseName,
-            String location,
-            Instant receivedAt,
-            Double targetTemperatureC,
-            BigDecimal quantityKg
-    ) { }
+    public record WarehouseStop(UUID warehouseId, String warehouseName, String location,
+            Instant receivedAt, Double targetTemperatureC, BigDecimal quantityKg, Measurement measurement) {}
 
-    public record ShipmentInfo(
-            String shipmentCode,
-            String status,
-            String driverName,
-            String vehicleNumber,
-            String origin,
-            String destination,
-            Double temperatureC,
-            Instant dispatchTime,
-            Instant estimatedArrival,
-            Instant actualArrival,
-            List<TrackingEventInfo> trackingEvents
-    ) { }
+    /** A representative warehouse-wide reading recorded during the lot's stay. */
+    public record Measurement(BigDecimal temperatureC, BigDecimal humidityPercent, Instant recordedAt,
+            boolean simulated) {}
 
-    public record TrackingEventInfo(
-            String location,
-            Double temperatureC,
-            Double humidityPercent,
-            String status,
-            String note,
-            Instant timestamp
-    ) { }
+    public record ShipmentInfo(String shipmentCode, String status, BigDecimal quantityKg,
+            Instant dispatchTime, Instant estimatedArrival, Instant actualArrival,
+            List<TrackingEventInfo> trackingEvents) {}
 
-    public record DeliveryInfo(
-            String receiverName,
-            String receiverPhone,
-            String receiverAddress,
-            Instant receivedAt,
-            String qrValue
-    ) { }
+    public record TrackingEventInfo(Double temperatureC, Double humidityPercent, String status, Instant timestamp) {}
 
-    public record TimelineEvent(
-            String stage,
-            String title,
-            String description,
-            String location,
-            Double temperatureC,
-            Instant timestamp
-    ) { }
+    public record DeliveryInfo(Instant receivedAt) {}
+
+    public record TimelineEvent(String stage, String title, String description, String location,
+            Double temperatureC, Instant timestamp) {}
 }

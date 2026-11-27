@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface WarehouseDocumentRepository extends JpaRepository<WarehouseDocument, UUID> {
+    @Query("select d from WarehouseDocument d left join fetch d.handoverShipment where d.warehouseId=:warehouseId and d.type=:type order by d.createdAt desc")
     List<WarehouseDocument> findByWarehouseIdAndTypeOrderByCreatedAtDesc(
             UUID warehouseId, WarehouseDocument.Type type, Pageable page);
 
@@ -43,7 +44,7 @@ public interface WarehouseDocumentRepository extends JpaRepository<WarehouseDocu
     Optional<WarehouseDocument> findByIdAndWarehouseId(UUID id, UUID warehouseId);
 
     @Query(
-            "select d from WarehouseDocument d where d.id=:id and (d.warehouseId=:warehouseId or"
+            "select d from WarehouseDocument d left join fetch d.handoverShipment where d.id=:id and (d.warehouseId=:warehouseId or"
                 + " (d.targetWarehouseId=:warehouseId and d.type=:type))")
     Optional<WarehouseDocument> findVisible(
             @Param("id") UUID id,
@@ -51,7 +52,7 @@ public interface WarehouseDocumentRepository extends JpaRepository<WarehouseDocu
             @Param("type") WarehouseDocument.Type type);
 
     @Query(
-            "select d from WarehouseDocument d where d.warehouseId=:warehouseId or"
+            "select d from WarehouseDocument d left join fetch d.handoverShipment where d.warehouseId=:warehouseId or"
                 + " (d.targetWarehouseId=:warehouseId and d.type=:type) order by d.createdAt desc,"
                 + " d.id desc")
     List<WarehouseDocument> findVisibleDocuments(
@@ -62,4 +63,7 @@ public interface WarehouseDocumentRepository extends JpaRepository<WarehouseDocu
     List<WarehouseDocument> findByWarehouseIdOrderByCreatedAtDesc(UUID warehouseId, Pageable page);
 
     long countByWarehouseIdAndStatus(UUID warehouseId, WarehouseDocument.Status status);
+
+    long countByWarehouseIdAndStatusAndCreatedAtBefore(
+            UUID warehouseId, WarehouseDocument.Status status, java.time.Instant cutoff);
 }

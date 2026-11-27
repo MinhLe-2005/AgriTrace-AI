@@ -86,6 +86,55 @@ public class InventoryService {
                 new HashMap<>());
     }
 
+    public List<BalanceView> nonZeroViews(UUID warehouseId, UUID exceptReservation) {
+        return project(
+                warehouseId,
+                balances.findByWarehouseIdAndQuantityKgGreaterThanOrderByExpiryDateAscLotIdAscLocationIdAsc(
+                        warehouseId, BigDecimal.ZERO),
+                exceptReservation,
+                new HashMap<>());
+    }
+
+    public Map<UUID, StockBalance> balancesById(UUID warehouseId, Collection<UUID> ids) {
+        Map<UUID, StockBalance> result = new HashMap<>();
+        if (ids == null || ids.isEmpty()) return result;
+        List<UUID> distinct = ids.stream().filter(Objects::nonNull).distinct().toList();
+        for (int offset = 0; offset < distinct.size(); offset += 500) {
+            var batch = distinct.subList(offset, Math.min(distinct.size(), offset + 500));
+            for (var balance : balances.findByWarehouseIdAndIdIn(warehouseId, batch)) {
+                result.put(balance.getId(), balance);
+            }
+        }
+        return result;
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public InventoryPage search(UUID warehouseId, String search, int page, int size) {
+        requireWarehouse(warehouseId);
+        var slice = balances.searchStockTable(warehouseId, search.strip(),
+                PageRequest.of(page, size, Sort.by("expiryDate", "lotId", "locationId", "id")));
+        var rows = project(warehouseId, slice.getContent(), null, new HashMap<>());
+        return new InventoryPage(rows, slice.hasNext());
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> productNames(UUID warehouseId) {
+        requireWarehouse(warehouseId);
+        return balances.productNames(warehouseId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryLabel> labels(UUID warehouseId, InventoryLabelRequest request) {
+        requireWarehouse(warehouseId);
+        var result = new ArrayList<InventoryLabel>();
+        if (!request.balanceIds().isEmpty()) result.addAll(balances.labelsForBalances(warehouseId, request.balanceIds()));
+        if (!request.lotIds().isEmpty()) {
+            for (var lot : balances.labelsForLots(warehouseId, request.lotIds()))
+                result.add(new InventoryLabel(null, lot.lotId(), lot.lotCode(), lot.productId()));
+        }
+        return result;
+    }
+
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<BalanceView> page(
             UUID warehouseId,

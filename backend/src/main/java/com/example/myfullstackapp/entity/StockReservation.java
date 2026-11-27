@@ -9,7 +9,12 @@ import java.time.Instant;
 import java.util.*;
 
 @Entity
-@Table(name = "wh_reservations")
+@Table(
+        name = "wh_reservations",
+        indexes =
+                @Index(
+                        name = "idx_wh_res_warehouse_status_exp",
+                        columnList = "warehouseId, status, expiresAt"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -43,6 +48,7 @@ public class StockReservation {
     @Column(nullable = false, length = 20)
     private Status status = Status.ACTIVE;
 
+    @org.hibernate.annotations.BatchSize(size = 100)
     @ElementCollection
     @CollectionTable(
             name = "wh_reservation_lines",

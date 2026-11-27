@@ -46,10 +46,15 @@ public class WarehouseMonitoringEvaluator {
                 rules.findByWarehouseIdOrderByUpdatedAtDesc(warehouseId).stream()
                         .filter(WarehouseMonitoringRule::isEnabled)
                         .toList();
+        var deviceIds = active.stream().map(WarehouseSensorDevice::getId).toList();
+        Map<UUID, WarehouseSensorReading> latestByDevice = new HashMap<>();
+        if (!deviceIds.isEmpty()) {
+            for (var r : readings.findLatestForDevices(deviceIds)) {
+                latestByDevice.putIfAbsent(r.getDeviceId(), r);
+            }
+        }
         for (var device : active) {
-            var latest =
-                    readings.findFirstByDeviceIdOrderByRecordedAtDescReceivedAtDesc(device.getId())
-                            .orElse(null);
+            var latest = latestByDevice.get(device.getId());
             boolean fresh =
                     latest != null
                             && !latest.getRecordedAt().isBefore(now.minusSeconds(gap))
@@ -73,12 +78,29 @@ public class WarehouseMonitoringEvaluator {
             } else if (fresh)
                 alertOperations.resolveFingerprint(warehouseId, offline, "Đã nhận được số đo mới");
         }
-        Map<UUID, List<WarehouseSensorReading>> history = new HashMap<>();
         int maxMinutes =
                 definitions.stream()
                         .mapToInt(r -> Math.max(r.getDurationMinutes(), r.getRecoveryMinutes()))
                         .max()
                         .orElse(0);
+        boolean needsDeviceHistory =
+                !deviceIds.isEmpty()
+                        && definitions.stream()
+                                .anyMatch(
+                                        r ->
+                                                r.getKind() != RuleKind.NEAR_EXPIRY_HIGH_STOCK
+                                                        && r.getKind()
+                                                                != RuleKind
+                                                                        .SHELF_LIFE_LOW_HIGH_STOCK);
+        Map<UUID, List<WarehouseSensorReading>> history = new HashMap<>();
+        if (needsDeviceHistory) {
+            for (var sample :
+                    readings.findByDeviceIdInAndRecordedAtBetweenOrderByRecordedAtAscReceivedAtAsc(
+                            deviceIds, now.minusSeconds(maxMinutes * 60L + gap), now)) {
+                history.computeIfAbsent(sample.getDeviceId(), ignored -> new ArrayList<>())
+                        .add(sample);
+            }
+        }
         for (var rule : definitions) {
             if (rule.getKind() == RuleKind.NEAR_EXPIRY_HIGH_STOCK
                     || rule.getKind() == RuleKind.SHELF_LIFE_LOW_HIGH_STOCK) {
@@ -88,22 +110,7 @@ public class WarehouseMonitoringEvaluator {
             for (var device : active) {
                 if (rule.getLocationId() != null
                         && !rule.getLocationId().equals(device.getLocationId())) continue;
-                var samples =
-                        history.computeIfAbsent(
-                                device.getId(),
-                                id -> {
-                                    var list =
-                                            new ArrayList<>(
-                                                    readings
-                                                            .findByDeviceIdAndRecordedAtBetweenOrderByRecordedAtDescReceivedAtDesc(
-                                                                    id,
-                                                                    now.minusSeconds(
-                                                                            maxMinutes * 60L + gap),
-                                                                    now,
-                                                                    PageRequest.of(0, 20000)));
-                                    Collections.reverse(list);
-                                    return list;
-                                });
+                var samples = history.getOrDefault(device.getId(), List.of());
                 if (samples.isEmpty()
                         || samples.getLast().getRecordedAt().isBefore(now.minusSeconds(gap)))
                     continue;

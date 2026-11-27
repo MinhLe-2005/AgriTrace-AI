@@ -197,3 +197,37 @@ button[aria-label*="Turbopack"],
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(0,0,0,0.08);
 }
+
+/* ??? Warehouse Classic Google Sheets Scope ??? */
+.warehouse-sheet button,
+.warehouse-sheet input,
+.warehouse-sheet select,
+.warehouse-sheet textarea {
+  border-radius: 2px;
+}
+.warehouse-sheet [role="dialog"] > section {
+  border-radius: 0px;
+  border-color: #cbd5e1;
+}
+
+/* ??? Isolated Warehouse Voucher Print ??? */
+@media print {
+  body.printing-warehouse-voucher * {
+    visibility: hidden !important;
+  }
+  body.printing-warehouse-voucher #warehouse-print-voucher,
+  body.printing-warehouse-voucher #warehouse-print-voucher * {
+    visibility: visible !important;
+  }
+  body.printing-warehouse-voucher #warehouse-print-voucher {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}

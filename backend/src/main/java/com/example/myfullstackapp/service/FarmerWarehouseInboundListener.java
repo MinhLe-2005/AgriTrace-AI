@@ -103,7 +103,21 @@ public class FarmerWarehouseInboundListener {
                 "Thủ kho %s đã xác nhận nhập kho thực tế tại %s. Tồn kho sẵn sàng điều phối theo chuẩn FEFO.",
                 staffName, warehouseName
         ));
-        timeline.add(entry);
+        int existingIdx = -1;
+        for (int i = 0; i < timeline.size(); i++) {
+            Map<String, String> prev = timeline.get(i);
+            if ("Nhập kho đích".equals(prev.get("stage"))
+                    && prev.get("note") != null
+                    && prev.get("note").contains(warehouseName)) {
+                existingIdx = i;
+                break;
+            }
+        }
+        if (existingIdx >= 0) {
+            timeline.set(existingIdx, entry);
+        } else {
+            timeline.add(entry);
+        }
 
         try {
             record.setTimelineJson(objectMapper.writeValueAsString(timeline));

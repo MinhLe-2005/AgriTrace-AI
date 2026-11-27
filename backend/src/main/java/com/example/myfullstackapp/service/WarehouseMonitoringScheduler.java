@@ -25,6 +25,7 @@ public class WarehouseMonitoringScheduler {
     private final WarehouseRepository warehouses;
     private final WarehouseMonitoringEvaluator evaluator;
     private final WarehouseRiskService legacy;
+    private final WarehouseReconciliationService reconciliation;
     private final WarehouseNotificationService notifications;
     private final WarehouseAlertDeliveryRepository deliveries;
     private final WarehouseMonitoringStream stream;
@@ -74,5 +75,23 @@ public class WarehouseMonitoringScheduler {
     @Scheduled(fixedDelay = 15000)
     public void heartbeat() {
         stream.heartbeat();
+    }
+
+    @Scheduled(
+            cron = "${warehouse.reconciliation.cron:0 30 23 * * *}",
+            zone = "Asia/Ho_Chi_Minh")
+    public void reconcileEndOfDay() {
+        for (var warehouse : warehouses.findAll()) {
+            if (!warehouse.isActive()) continue;
+            UUID id = warehouse.getId();
+            try {
+                reconciliation.reconcileWarehouse(id);
+            } catch (Exception failure) {
+                log.warn(
+                        "End-of-day reconciliation failed for {} ({})",
+                        id,
+                        failure.getClass().getSimpleName());
+            }
+        }
     }
 }

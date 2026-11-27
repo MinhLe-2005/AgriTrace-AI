@@ -367,7 +367,7 @@ const POSTS: BlogPost[] = [
       {
         heading: "2. Thuật toán phân bổ tự động tại kho lạnh AgriTrace",
         paragraphs: [
-          "Mỗi khi một lô nông sản được thủ kho quét mã QR nghiệm thu nhập kho tại /dashboard/warehouse, hệ thống tự động gán nhãn hạn sử dụng tối ưu (Dynamic Shelf-life) dựa trên nhiệt độ cảm biến và dữ liệu sinh hóa của lô hàng.",
+          "Thủ kho quét tem để tra lô đã duyệt và xác nhận khối lượng thực nhận. Khi xuất kho, hệ thống ưu tiên lô đủ điều kiện có hạn sử dụng sớm nhất; bản đo nhiệt độ được theo dõi riêng.",
         ],
         keyTakeaways: [
           "Tự động sắp xếp thứ tự ưu tiên đóng gói cho các đơn hàng xuất trong ngày.",

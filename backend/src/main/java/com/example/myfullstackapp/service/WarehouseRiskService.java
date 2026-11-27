@@ -58,19 +58,42 @@ public class WarehouseRiskService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<AlertView> listActive(UUID warehouseId) {
+        inventory.requireWarehouse(warehouseId);
+        return alerts.findByWarehouseIdAndStatusNotOrderByUpdatedAtDesc(warehouseId, "RESOLVED").stream()
+                .map(this::view)
+                .toList();
+    }
+
     @Transactional
     public List<AlertView> refresh(UUID warehouseId) {
         inventory.lock(warehouseId, null);
         var rule = rule(warehouseId);
         var stock = inventory.getBalances(warehouseId);
+        var existing = alerts.findByWarehouseIdOrderByUpdatedAtDesc(warehouseId);
+        Map<String, RiskAlert> byFingerprint = new HashMap<>();
+        for (var a : existing) byFingerprint.putIfAbsent(a.getFingerprint(), a);
+        List<RiskAlert> dirtyAlerts = new ArrayList<>();
+        List<AlertAction> newActions = new ArrayList<>();
+        List<com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.AlertOpened> openedEvents =
+                new ArrayList<>();
+        var now = Instant.now();
+        var today = InventoryService.today();
+        var staleCutoff = now.minus(rule.staleDays(), ChronoUnit.DAYS);
         Set<String> live = new HashSet<>();
         for (var b : stock) {
             if (b.quantityKg().signum() <= 0) continue;
-            long days = ChronoUnit.DAYS.between(InventoryService.today(), b.expiryDate());
+            long days = ChronoUnit.DAYS.between(today, b.expiryDate());
             if (days <= rule.expiryWarningDays())
-                upsert(
+                stageUpsert(
                         warehouseId,
+                        byFingerprint,
+                        dirtyAlerts,
+                        newActions,
+                        openedEvents,
                         live,
+                        now,
                         "EXPIRY:" + b.id(),
                         "EXPIRY",
                         days < 0 ? "CRITICAL" : "HIGH",
@@ -81,18 +104,28 @@ public class WarehouseRiskService {
                                 + ", tồn "
                                 + kilograms(b.quantityKg())
                                 + " kg");
-            if (b.receivedAt().isBefore(Instant.now().minus(rule.staleDays(), ChronoUnit.DAYS)))
-                upsert(
+            if (b.receivedAt().isBefore(staleCutoff))
+                stageUpsert(
                         warehouseId,
+                        byFingerprint,
+                        dirtyAlerts,
+                        newActions,
+                        openedEvents,
                         live,
+                        now,
                         "STALE:" + b.id(),
                         "STALE",
                         "MEDIUM",
                         b.lotCode() + ": tồn tại vị trí từ " + b.receivedAt());
             if (b.held())
-                upsert(
+                stageUpsert(
                         warehouseId,
+                        byFingerprint,
+                        dirtyAlerts,
+                        newActions,
+                        openedEvents,
                         live,
+                        now,
                         "HOLD:" + b.id(),
                         "QUALITY_HOLD",
                         "HIGH",
@@ -104,9 +137,14 @@ public class WarehouseRiskService {
         for (var b : stock) totals.merge(b.productId(), b.availableKg(), BigDecimal::add);
         for (var product : totals.entrySet())
             if (product.getValue().compareTo(rule.lowStockKg()) < 0)
-                upsert(
+                stageUpsert(
                         warehouseId,
+                        byFingerprint,
+                        dirtyAlerts,
+                        newActions,
+                        openedEvents,
                         live,
+                        now,
                         "LOW:"
                                 + UUID.nameUUIDFromBytes(
                                         product.getKey().getBytes(StandardCharsets.UTF_8)),
@@ -116,17 +154,24 @@ public class WarehouseRiskService {
                                 + ": còn "
                                 + kilograms(product.getValue())
                                 + " kg khả dụng");
-        for (var alert : alerts.findByWarehouseIdOrderByUpdatedAtDesc(warehouseId)) {
+        for (var alert : existing) {
             if (Set.of("EXPIRY", "STALE", "QUALITY_HOLD", "LOW_STOCK").contains(alert.getType())
                     && !live.contains(alert.getFingerprint())
                     && !"RESOLVED".equals(alert.getStatus())) {
                 alert.setStatus("RESOLVED");
-                alert.setUpdatedAt(Instant.now());
-                alerts.save(alert);
-                audit(alert, "RESOLVED", "Điều kiện cảnh báo không còn", "SYSTEM");
+                alert.setUpdatedAt(now);
+                dirtyAlerts.add(alert);
+                var action = new AlertAction();
+                action.setAlertId(alert.getId());
+                action.setStatus("RESOLVED");
+                action.setNote("Điều kiện cảnh báo không còn");
+                action.setActor("SYSTEM");
+                newActions.add(action);
             }
         }
-        alerts.flush();
+        if (!dirtyAlerts.isEmpty()) alerts.saveAllAndFlush(dirtyAlerts);
+        if (!newActions.isEmpty()) actions.saveAll(newActions);
+        for (var opened : openedEvents) events.publishEvent(opened);
         events.publishEvent(
                 new com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.Changed(
                         warehouseId, "ALERTS"));
@@ -137,34 +182,44 @@ public class WarehouseRiskService {
         return value.stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
-    private void upsert(
+    private void stageUpsert(
             UUID warehouseId,
+            Map<String, RiskAlert> byFingerprint,
+            List<RiskAlert> dirtyAlerts,
+            List<AlertAction> newActions,
+            List<com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.AlertOpened>
+                    openedEvents,
             Set<String> live,
+            Instant now,
             String fingerprint,
             String type,
             String severity,
             String message) {
         live.add(fingerprint);
-        var alert =
-                alerts.findByWarehouseIdAndFingerprint(warehouseId, fingerprint)
-                        .orElseGet(RiskAlert::new);
-        boolean fresh = alert.getWarehouseId() == null;
+        var alert = byFingerprint.get(fingerprint);
+        boolean fresh = alert == null;
+        if (fresh) {
+            alert = new RiskAlert();
+            byFingerprint.put(fingerprint, alert);
+        }
         boolean reopen = "RESOLVED".equals(alert.getStatus());
         alert.setWarehouseId(warehouseId);
         alert.setFingerprint(fingerprint);
         alert.setType(type);
         alert.setSeverity(severity);
         alert.setMessage(message);
-        alert.setUpdatedAt(Instant.now());
+        alert.setUpdatedAt(now);
         if (reopen) alert.setStatus("OPEN");
-        alerts.saveAndFlush(alert);
+        dirtyAlerts.add(alert);
         if (fresh || reopen) {
-            audit(
-                    alert,
-                    "OPEN",
-                    fresh ? "Phát hiện điều kiện cảnh báo" : "Điều kiện cảnh báo xuất hiện lại",
-                    "SYSTEM");
-            events.publishEvent(
+            var action = new AlertAction();
+            action.setAlertId(alert.getId());
+            action.setStatus("OPEN");
+            action.setNote(
+                    fresh ? "Phát hiện điều kiện cảnh báo" : "Điều kiện cảnh báo xuất hiện lại");
+            action.setActor("SYSTEM");
+            newActions.add(action);
+            openedEvents.add(
                     new com.example.myfullstackapp.dto.warehouse.WarehouseMonitoring.AlertOpened(
                             UUID.randomUUID(), warehouseId, alert.getId(), severity, message));
         }
