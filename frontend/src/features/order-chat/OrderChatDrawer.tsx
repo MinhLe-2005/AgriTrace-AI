@@ -22,6 +22,7 @@ import Image from "next/image";
 import { orderChatService, type OrderMessage } from "@/services/order-chat.service";
 import type { ApiOrder } from "@/services/catalog.service";
 import { toast } from "@/stores/toast-store";
+import { useOrderChatSocket } from "./useOrderChatSocket";
 
 interface OrderChatDrawerProps {
   order: ApiOrder | null;
@@ -47,6 +48,24 @@ export function OrderChatDrawer({
   const [previewPhotoModal, setPreviewPhotoModal] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  const handleScroll = () => {
+    if (!chatScrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollContainerRef.current;
+    isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTo({
+        top: chatScrollContainerRef.current.scrollHeight,
+        behavior,
+      });
+      isNearBottomRef.current = true;
+    }
+  };
 
   function handleChatFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -66,17 +85,38 @@ export function OrderChatDrawer({
 
   const orderCode = order?.orderCode || "";
   const firstItem = order?.items?.[0];
-  const farmName = firstItem?.origin || (order?.lotCode?.includes("MC") ? "Hợp Tác Xã Nông Sản Mộc Châu" : "Nông Trại Xanh Thủy Canh Đà Lạt");
+  const farmName = firstItem?.origin || (order?.lotCode?.includes("MC") ? "Hợp Tác XÃ Nông Sản Mộc Châu" : "Nông Trại Xanh Thủy Canh Đà Lạt");
+
+  const handleIncomingMessage = (newMsg: OrderMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === newMsg.id)) return prev;
+      return [...prev, newMsg];
+    });
+  };
+
+  const {
+    connected: socketConnected,
+    typingUser,
+    sendTyping,
+  } = useOrderChatSocket({
+    orderCode,
+    currentUserRole,
+    currentUserName,
+    onMessageReceived: handleIncomingMessage,
+  });
 
   // Fetch messages
   useEffect(() => {
     if (isOpen && orderCode) {
+      isNearBottomRef.current = true;
       loadMessages();
     }
   }, [isOpen, orderCode]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isNearBottomRef.current) {
+      scrollToBottom("smooth");
+    }
   }, [messages]);
 
   // Notify floating widgets (like Gemini Assistant) so they don't overlap the drawer
@@ -110,6 +150,7 @@ export function OrderChatDrawer({
     if (!text && !selectedPhoto) return;
     if (!orderCode) return;
 
+    sendTyping(false);
     setIsSending(true);
     try {
       const newMsg = await orderChatService.sendMessage(orderCode, {
@@ -120,7 +161,7 @@ export function OrderChatDrawer({
         messageType: "CHAT",
       });
 
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
       setInputText("");
       setSelectedPhoto(null);
 
@@ -173,7 +214,10 @@ export function OrderChatDrawer({
                   Chủ Nhà Vườn Official
                 </span>
                 <span>•</span>
-                <span className="text-emerald-400">Trực tuyến</span>
+                <span className="flex items-center gap-1 font-semibold text-emerald-300">
+                  <span className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-400 animate-pulse" : "bg-emerald-400/50"}`} />
+                  {socketConnected ? "WebSocket Realtime" : "Trực tuyến"}
+                </span>
               </div>
             </div>
           </div>
@@ -235,7 +279,7 @@ export function OrderChatDrawer({
         </div>
 
         {/* Message Feed */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+        <div ref={chatScrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-3.5">
           {/* Dispute Banner if PENDING */}
           {order.refundStatus === "PENDING" && (
             <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 shadow-2xs space-y-1.5 animate-pulse">
@@ -402,9 +446,22 @@ export function OrderChatDrawer({
             </div>
           )}
 
+          {/* Animated Typing Indicator */}
+          {typingUser && (
+            <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-emerald-800 bg-emerald-50/90 border-t border-emerald-100 transition-all shrink-0">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce" />
+              </div>
+              <span className="italic font-medium">{typingUser.senderName || "Chủ vườn"} đang soạn tin...</span>
+            </div>
+          )}
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              sendTyping(false);
               handleSend();
             }}
             className="flex items-center gap-2"
@@ -429,7 +486,10 @@ export function OrderChatDrawer({
             <input
               type="text"
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                sendTyping(e.target.value.trim().length > 0);
+              }}
               placeholder="Nhập tin nhắn trao đổi với Shop..."
               className="flex-1 py-2.5 px-3.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-gray-50/50"
             />

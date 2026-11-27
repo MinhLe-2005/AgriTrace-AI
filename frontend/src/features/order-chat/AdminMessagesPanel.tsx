@@ -31,6 +31,7 @@ import {
   type OrderMessage,
 } from "@/services/order-chat.service";
 import { toast } from "@/stores/toast-store";
+import { useOrderChatSocket } from "./useOrderChatSocket";
 
 export function AdminMessagesPanel({
   initialOrderCode,
@@ -52,6 +53,24 @@ export function AdminMessagesPanel({
   const [rejectReason, setRejectReason] = useState("");
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  const handleScroll = () => {
+    if (!chatScrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollContainerRef.current;
+    isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTo({
+        top: chatScrollContainerRef.current.scrollHeight,
+        behavior,
+      });
+      isNearBottomRef.current = true;
+    }
+  };
 
   useEffect(() => {
     if (initialOrderCode) {
@@ -80,7 +99,15 @@ export function AdminMessagesPanel({
           orderChatService
             .getMessages(selectedOrderCode)
             .then((msgs) => {
-              setMessages(msgs);
+              setMessages((prev) => {
+                if (
+                  prev.length === msgs.length &&
+                  (prev.length === 0 || prev[prev.length - 1]?.id === msgs[msgs.length - 1]?.id)
+                ) {
+                  return prev;
+                }
+                return msgs;
+              });
             })
             .catch(() => {});
         }
@@ -112,6 +139,7 @@ export function AdminMessagesPanel({
 
   function handleSelectConversation(code: string) {
     setSelectedOrderCode(code);
+    isNearBottomRef.current = true;
     setConversations((prev) =>
       prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
     );
@@ -127,13 +155,17 @@ export function AdminMessagesPanel({
   }, [selectedOrderCode]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only scroll to bottom if user is already near bottom (prevent drag down when scrolling up)
+    if (isNearBottomRef.current) {
+      scrollToBottom("smooth");
+    }
   }, [messages]);
 
   async function loadMessages(code: string) {
     try {
       const msgs = await orderChatService.getMessages(code);
       setMessages(msgs);
+      setTimeout(() => scrollToBottom("instant"), 50);
     } catch {
       // ignore
     }
@@ -141,10 +173,39 @@ export function AdminMessagesPanel({
 
   const activeConv = conversations.find((c) => c.orderCode === selectedOrderCode);
 
+  const handleIncomingMessage = (newMsg: OrderMessage) => {
+    setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.orderCode.toUpperCase() === newMsg.orderCode.toUpperCase()
+          ? {
+              ...c,
+              lastMessage: newMsg.message,
+              lastMessageTime: newMsg.createdAt,
+              messageCount: c.messageCount + 1,
+            }
+          : c
+      )
+    );
+  };
+
+  const {
+    connected: socketConnected,
+    typingUser,
+    sendTyping,
+  } = useOrderChatSocket({
+    orderCode: selectedOrderCode,
+    currentUserRole: "ADMIN",
+    currentUserName: "CSKH AgriTrace",
+    onMessageReceived: handleIncomingMessage,
+  });
+
   async function handleSendReply(customText?: string) {
     const text = (customText || replyText).trim();
     if (!text || !selectedOrderCode) return;
 
+    sendTyping(false);
+    isNearBottomRef.current = true;
     setIsSending(true);
     try {
       const newMsg = await orderChatService.sendMessage(selectedOrderCode, {
@@ -154,10 +215,11 @@ export function AdminMessagesPanel({
         messageType: "CHAT",
       });
 
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
       setReplyText("");
       toast.success("Đã gửi tin nhắn CSKH tới khách hàng!");
       loadInbox();
+      setTimeout(() => scrollToBottom("smooth"), 50);
     } catch {
       toast.error("Không thể gửi tin nhắn. Vui lòng thử lại!");
     } finally {
@@ -437,6 +499,11 @@ export function AdminMessagesPanel({
                     </span>
                     <span>•</span>
                     <span>Tổng đơn: <strong className="font-mono">{activeConv.total?.toLocaleString("vi-VN")} đ</strong></span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 font-semibold text-emerald-700">
+                      <span className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
+                      {socketConnected ? "WebSocket Trực tiếp" : "Trực tuyến"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -502,7 +569,7 @@ export function AdminMessagesPanel({
             )}
 
             {/* Message Thread */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f8faf8]">
+            <div ref={chatScrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f8faf8]">
               {messages.map((m) => {
                 const isAdmin = m.senderRole === "ADMIN";
                 const isDispute =
@@ -617,11 +684,24 @@ export function AdminMessagesPanel({
               ))}
             </div>
 
+            {/* Animated Typing Indicator */}
+            {typingUser && (
+              <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-emerald-800 bg-emerald-50/90 border-t border-emerald-100 transition-all shrink-0">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce" />
+                </div>
+                <span className="italic font-medium">{typingUser.senderName || "Khách hàng"} đang soạn tin nhắn...</span>
+              </div>
+            )}
+
             {/* Reply Input Bar */}
             <div className="p-3 bg-white border-t border-gray-200 shrink-0">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
+                  sendTyping(false);
                   handleSendReply();
                 }}
                 className="flex items-center gap-2"
@@ -629,7 +709,10 @@ export function AdminMessagesPanel({
                 <input
                   type="text"
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
+                  onChange={(e) => {
+                    setReplyText(e.target.value);
+                    sendTyping(e.target.value.trim().length > 0);
+                  }}
                   placeholder="Gõ tin nhắn hỗ trợ khách hàng với danh nghĩa CSKH AgriTrace..."
                   className="flex-1 py-2.5 px-3.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-gray-50/50"
                 />

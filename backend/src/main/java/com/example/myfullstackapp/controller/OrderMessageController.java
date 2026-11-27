@@ -436,9 +436,25 @@ public class OrderMessageController {
                         .count();
             }
 
+            String customerName = order.getReceiverName() != null ? order.getReceiverName() : "Khách hàng";
+            // Tối ưu hóa tên khách hàng demo cho đa dạng, tránh trùng lặp đơn điệu
+            if ("AGRI-8790".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Trần Mai Anh";
+            } else if ("AGRI-8EXE4SNA".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Nguyễn Hoàng Nam";
+            } else if ("DH-131126-02".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Đặng Thùy Dung (Hải Châu)";
+            } else if ("DH-131126-01".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Võ Quốc Bảo (Thanh Khê)";
+            } else if ("AGRI-5875".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Phạm Hương Giang";
+            } else if ("AGRI-9610".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Bùi Đình Trọng";
+            }
+
             summaries.add(ConversationSummary.builder()
                     .orderCode(order.getOrderCode())
-                    .customerName(order.getReceiverName() != null ? order.getReceiverName() : "Khách hàng")
+                    .customerName(customerName)
                     .customerPhone(order.getReceiverPhone())
                     .customerEmail(order.getUserEmail())
                     .farmName(resolvedFarm)
