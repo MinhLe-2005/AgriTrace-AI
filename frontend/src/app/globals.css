@@ -1,54 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&family=Lora:ital,wght@0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* UI/UX Pro Max — Warm Botanical Editorial & Bento Architecture */
-  --background: 45 29% 97%;            /* #FBF9F5 Warm Alabaster Paper (Eye-soothing neutral) */
-  --foreground: 150 28% 12%;           /* #16261E Deep Botanical Ink */
-  --surface: 42 24% 94%;               /* #F4F1EA Warm Linen Stone */
-  --card: 0 0% 100%;                   /* #FFFFFF Pure Crisp Card */
-  --card-foreground: 150 28% 12%;
-  --muted: 40 20% 93%;                 /* #F1EEE7 Soft Warm Stone */
-  --muted-foreground: 150 10% 38%;     /* #576B60 Balanced Sage Slate */
-  --border: 40 18% 87%;                /* #E4DFD5 Warm Architectural Hairline */
-  --primary: 146 64% 24%;              /* #166534 Heritage Forest Green */
+  --background: 0 0% 100%;
+  --foreground: 210 11% 15%;
+  --surface: 120 8% 97%;
+  --card: 0 0% 100%;
+  --muted: 120 5% 95%;
+  --muted-foreground: 210 5% 45%;
+  --border: 210 10% 90%;
+  --primary: 145 63% 32%;
   --primary-foreground: 0 0% 100%;
-  --primary-light: 142 52% 94%;
-  --secondary: 142 71% 45%;            /* #22C55E Botanical Accent */
-  --accent: 36 88% 34%;                /* #A3630A Harvest Ochre Gold */
-  --accent-foreground: 0 0% 100%;
-  --success: 146 64% 24%;              /* #166534 */
+  --primary-light: 145 50% 95%;
+  --secondary: 30 85% 50%;
+  --success: 145 63% 32%;
   --success-foreground: 0 0% 100%;
-  --warning: 36 90% 42%;               /* #CC7A0B */
-  --warning-foreground: 0 0% 100%;
-  --danger: 0 72% 48%;                 /* #D32222 */
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 5%;
+  --danger: 0 63% 44%;
   --danger-foreground: 0 0% 100%;
-  --ring: 146 64% 24%;
-  --shadow: 150 28% 12%;
-
-  /* Raw Hex Semantic Tokens (UI/UX Pro Max DTCG Standard) */
-  --color-primary: #166534;
-  --color-on-primary: #FFFFFF;
-  --color-secondary: #22C55E;
-  --color-on-secondary: #0F172A;
-  --color-accent: #A3630A;
-  --color-on-accent: #FFFFFF;
-  --color-background: #FBF9F5;
-  --color-foreground: #16261E;
-  --color-card: #FFFFFF;
-  --color-card-foreground: #16261E;
-  --color-muted: #F3EFE8;
-  --color-muted-foreground: #576B60;
-  --color-border: #E4DFD5;
-  --color-destructive: #DC2626;
-  --color-on-destructive: #FFFFFF;
-  --color-ring: #166534;
-  --font-heading: 'Lora', 'Be Vietnam Pro', Georgia, serif;
-  --font-body: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --shadow: 210 11% 15%;
 }
 
 * { border-color: hsl(var(--border)); box-sizing: border-box; }
@@ -56,57 +30,11 @@ html { min-width: 320px; scroll-behavior: smooth; }
 
 body {
   min-height: 100vh;
-  background: var(--color-background);
+  background: #fff;
   color: hsl(var(--foreground));
-  font-family: var(--font-body);
+  font-family: 'Be Vietnam Pro', sans-serif;
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
-}
-
-.font-serif-display {
-  font-family: var(--font-heading);
-}
-
-.font-mono-code {
-  font-family: var(--font-mono);
-}
-
-/* Warm Botanical Bento & Architectural Surfaces */
-.bento-card {
-  background: #FFFFFF;
-  border: 1px solid #E5E0D5;
-  border-radius: 1.25rem;
-  box-shadow: 0 1px 2px rgba(22, 38, 30, 0.03), 0 10px 26px -8px rgba(22, 38, 30, 0.05);
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms ease;
-}
-
-.bento-card:hover {
-  border-color: #C7C0B0;
-  box-shadow: 0 2px 4px rgba(22, 38, 30, 0.04), 0 18px 36px -10px rgba(22, 38, 30, 0.09);
-}
-
-/* Eye-soothing Warm Alabaster Paper Canvas (No harsh green glare) */
-.biophilic-mesh {
-  background-color: #FBF9F5;
-  background-image:
-    radial-gradient(at 15% 0%, rgba(214, 206, 190, 0.25) 0px, transparent 50%),
-    radial-gradient(at 85% 12%, rgba(163, 99, 10, 0.05) 0px, transparent 45%),
-    radial-gradient(at 50% 100%, rgba(22, 101, 52, 0.035) 0px, transparent 55%);
-}
-
-/* Subtle architectural dot grid for editorial sections */
-.editorial-grid-bg {
-  background-image: radial-gradient(rgba(22, 38, 30, 0.07) 1px, transparent 1px);
-  background-size: 22px 22px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
 }
 
 button, input, select, textarea { font: inherit; }
@@ -118,30 +46,7 @@ img { max-width: 100%; height: auto; }
 ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #aaa; }
 
-/* ─── Hide Next.js Dev Badge ─── */
-nextjs-portal,
-[data-nextjs-toast],
-#__next-build-watcher,
-div[data-nextjs-dev-tools-button],
-button[aria-label*="Next.js"],
-button[aria-label*="Turbopack"],
-[class*="dev-indicator"] {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
 /* ─── Animations ─── */
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-6px); }
-  40%, 80% { transform: translateX(6px); }
-}
-.animate-shake {
-  animation: shake 0.4s ease-in-out;
-}
 
 @keyframes marquee {
   0% { transform: translateX(0); }
@@ -154,35 +59,16 @@ button[aria-label*="Turbopack"],
 .animate-marquee:hover { animation-play-state: paused; }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(24px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
-}
-@keyframes floatSlow {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
-}
 .animate-fade-in-up {
-  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fadeInUp 0.6s ease-out both;
 }
-.animate-fade-in-scale {
-  animation: fadeInScale 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.animate-float {
-  animation: floatSlow 6s ease-in-out infinite;
-}
-.animate-float-delayed {
-  animation: floatSlow 7s ease-in-out 2.5s infinite;
-}
-.delay-75  { animation-delay: 75ms; }
-.delay-100 { animation-delay: 100ms; }
-.delay-150 { animation-delay: 150ms; }
-.delay-200 { animation-delay: 200ms; }
-.delay-300 { animation-delay: 300ms; }
-.delay-400 { animation-delay: 400ms; }
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
 
 @keyframes wordRotate {
   0%, 18%   { opacity: 1; transform: translateY(0); }

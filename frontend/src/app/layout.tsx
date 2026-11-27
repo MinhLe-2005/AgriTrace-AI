@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { type ReactNode } from "react";
 
 import "@/app/globals.css";
-import { GeminiFloatingBubble } from "@/components/ai-chat/gemini-floating-bubble";
 import { PublicLayoutWrapper } from "@/components/layout/public-layout";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,11 +18,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body suppressHydrationWarning className="antialiased text-[#16261E] bg-[#FBF9F5]">
+      <body suppressHydrationWarning className="antialiased text-gray-800 bg-[#fbfdfb]">
         <Providers>
           <PublicLayoutWrapper>{children}</PublicLayoutWrapper>
         </Providers>
-        <GeminiFloatingBubble />
         <Toaster />
       </body>
     </html>

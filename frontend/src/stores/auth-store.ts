@@ -8,7 +8,6 @@ interface AuthState extends Partial<AuthTokens> {
   user: User | null;
   hasHydrated: boolean;
   setSession: (session: AuthTokens & { user?: User | null }) => void;
-  updateUser: (partial: Partial<User>) => void;
   clearSession: () => void;
   setHasHydrated: (value: boolean) => void;
 }
@@ -26,12 +25,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: undefined,
       user: null,
       hasHydrated: false,
-      setSession: ({ accessToken, refreshToken, user }) =>
-        set((state) => ({ accessToken, refreshToken, user: user ?? state.user })),
-      updateUser: (partial) =>
-        set((state) => ({
-          user: state.user ? { ...state.user, ...partial } : null,
-        })),
+      setSession: ({ accessToken, refreshToken, user }) => set((state) => ({ accessToken, refreshToken, user: user ?? state.user })),
       clearSession: () => set({ accessToken: undefined, refreshToken: undefined, user: null }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated })
     }),

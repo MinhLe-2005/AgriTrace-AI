@@ -25,20 +25,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { useAuthStore } from "@/stores/auth-store";
 
 export default function GuidesPage() {
-  const { user } = useAuthStore();
   const [activeRole, setActiveRole] = useState<"customer" | "farmer" | "warehouse" | "distributor">("customer");
-
-  const checkRole = (r: string) =>
-    Boolean(user?.roles?.some((x) => x === r || x === `ROLE_${r}`));
-  const canAccessActiveRole =
-    checkRole("ADMIN") ||
-    activeRole === "customer" ||
-    (activeRole === "farmer" && checkRole("FARMER")) ||
-    (activeRole === "warehouse" && (checkRole("WAREHOUSE") || checkRole("WAREHOUSE_STAFF"))) ||
-    (activeRole === "distributor" && checkRole("DISTRIBUTOR"));
 
   const ROLES_TABS = [
     { key: "customer" as const, label: "Khách Hàng (Customer)", icon: Users, color: "text-purple-600", desc: "Mua sắm, quét QR, dùng voucher & tích điểm" },
@@ -78,8 +67,8 @@ export default function GuidesPage() {
     },
     {
       step: 5,
-      title: "Tương tác trực tiếp: Hỏi nhanh Trợ lý AI",
-      desc: "Nếu có bất kỳ thắc mắc nào về cách chế biến hay nguồn gốc nông sản, bạn có thể hỏi nhanh Trợ lý Trí tuệ Nhân tạo 24/7 ở góc dưới màn hình.",
+      title: "Tương tác trực tiếp: Chat chủ hàng & Hỏi AI",
+      desc: "Nếu có bất kỳ thắc mắc nào về cách chế biến hay nguồn gốc nông sản, bạn có thể nhắn tin trực tiếp với chủ nông trại qua cổng Chat hoặc hỏi nhanh Trợ lý Trí tuệ Nhân tạo 24/7.",
       icon: MessageSquare,
       tip: "Mẹo: Nút trợ lý AI luôn xuất hiện ở góc dưới bên phải màn hình để bạn hỏi đáp bất cứ lúc nào.",
     },
@@ -226,28 +215,21 @@ export default function GuidesPage() {
               </p>
             </div>
 
-            {canAccessActiveRole ? (
-              <Link
-                href={
-                  activeRole === "customer"
-                    ? "/products"
-                    : activeRole === "farmer"
-                    ? "/dashboard/farmer"
-                    : activeRole === "warehouse"
-                    ? "/dashboard/warehouse"
-                    : "/dashboard/distributor"
-                }
-                className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 text-[#1a7a3a] text-xs font-bold hover:bg-emerald-100 transition-colors"
-              >
-                <span>Vào Cổng Thực Hành</span>
-                <ArrowRight size={13} />
-              </Link>
-            ) : (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold">
-                <ShieldCheck size={14} className="text-emerald-700" />
-                <span>Dành riêng cho {ROLES_TABS.find((r) => r.key === activeRole)?.label}</span>
-              </span>
-            )}
+            <Link
+              href={
+                activeRole === "customer"
+                  ? "/products"
+                  : activeRole === "farmer"
+                  ? "/dashboard/farmer"
+                  : activeRole === "warehouse"
+                  ? "/dashboard/warehouse"
+                  : "/dashboard/distributor"
+              }
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 text-[#1a7a3a] text-xs font-bold hover:bg-emerald-100 transition-colors"
+            >
+              <span>Vào Cổng Thực Hành</span>
+              <ArrowRight size={13} />
+            </Link>
           </div>
 
           <div className="space-y-8">
@@ -315,15 +297,15 @@ export default function GuidesPage() {
           </Link>
 
           <Link
-            href="/contact"
-            className="p-5 rounded-2xl bg-white border border-gray-200 hover:border-emerald-300 shadow-xs transition-all flex items-center gap-3.5 group"
+            href="/chat"
+            className="p-5 rounded-2xl bg-white border border-gray-200 hover:border-amber-300 shadow-xs transition-all flex items-center gap-3.5 group"
           >
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
               <MessageSquare size={20} />
             </div>
             <div>
-              <div className="font-bold text-gray-900 text-sm">Trung Tâm Hỗ Trợ</div>
-              <div className="text-xs text-gray-500">Gửi phản hồi & Liên hệ</div>
+              <div className="font-bold text-gray-900 text-sm">Kênh Chat Hỗ Trợ</div>
+              <div className="text-xs text-gray-500">Nhân viên & Chủ nông trại</div>
             </div>
           </Link>
         </div>

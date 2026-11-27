@@ -18,20 +18,12 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 function messageFromError(error: AxiosError<ApiErrorResponse>) {
-  if (error.response?.data?.details && error.response.data.details.length > 0) {
-    return error.response.data.details[0];
-  }
-  return error.response?.data?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.";
+  return error.response?.data?.message ?? "Something went wrong. Please try again.";
 }
 
 function signOut() {
   useAuthStore.getState().clearSession();
-  if (typeof window !== "undefined") {
-    const isProtectedRoute = window.location.pathname.startsWith("/dashboard");
-    if (isProtectedRoute && window.location.pathname !== "/login") {
-      window.location.assign("/login");
-    }
-  }
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") window.location.assign("/login");
 }
 
 api.interceptors.response.use(
@@ -66,17 +58,8 @@ api.interceptors.response.use(
     }
 
     if (typeof window !== "undefined") {
-      const reqUrl = request?.url ?? "";
-      const isBackgroundGet =
-        request?.method?.toLowerCase() === "get" &&
-        (reqUrl.includes("/loyalty/me") ||
-          reqUrl.includes("/orders") ||
-          reqUrl.includes("/users/me") ||
-          reqUrl.includes("/verifications"));
-      if (!isBackgroundGet) {
-        if (status === 403) toast.error("Bạn không có quyền thực hiện thao tác này.");
-        else if (status && status >= 400 && status !== 401 && status !== 404) toast.error(messageFromError(error));
-      }
+      if (status === 403) toast.error("You do not have permission to do that.");
+      else if (status && status >= 400 && status !== 401) toast.error(messageFromError(error));
     }
     return Promise.reject(error);
   }
@@ -87,5 +70,5 @@ export function unpack<T>(response: ApiResponse<T> | T) {
 }
 
 export function getApiErrorMessage(error: unknown) {
-  return axios.isAxiosError<ApiErrorResponse>(error) ? messageFromError(error) : "Có lỗi xảy ra. Vui lòng thử lại.";
+  return axios.isAxiosError<ApiErrorResponse>(error) ? messageFromError(error) : "Something went wrong. Please try again.";
 }

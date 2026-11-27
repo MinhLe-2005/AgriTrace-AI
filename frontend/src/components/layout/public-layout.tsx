@@ -8,13 +8,10 @@ import { MainNavbar } from "./main-navbar";
 
 export function PublicLayoutWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  // Khách hàng xem đơn hàng (/dashboard/customer) vẫn giữ Navbar & Footer công khai như web mua sắm
-  const isInternalDashboard =
-    pathname.startsWith("/dashboard") && pathname !== "/dashboard/customer";
-  const isAuth =
-    pathname === "/login" || pathname === "/register" || pathname === "/forgot-password";
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isAuth = pathname === "/login" || pathname === "/register";
 
-  if (isInternalDashboard || isAuth) {
+  if (isDashboard) {
     return <>{children}</>;
   }
 
@@ -22,7 +19,7 @@ export function PublicLayoutWrapper({ children }: { children: ReactNode }) {
     <div className="flex flex-col min-h-screen">
       <MainNavbar />
       <main className="flex-1">{children}</main>
-      <MainFooter />
+      {!isAuth && <MainFooter />}
     </div>
   );
 }
