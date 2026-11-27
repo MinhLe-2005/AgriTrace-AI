@@ -1746,7 +1746,9 @@ function FarmerPortalContent() {
         ...newBatch,
         code: saved.code || newBatch.code,
         transportDestination: saved.transportDestination || newBatch.transportDestination,
-        transportStatus: (saved.transportStatus as BatchItem["transportStatus"]) || newBatch.transportStatus,
+        transportStatus: saved.transportStatus
+          ? normalizeTransportStatus(saved.transportStatus)
+          : newBatch.transportStatus,
       };
       setBatches([persistedBatch, ...batches]);
       setIsBatchModalOpen(false);
@@ -1778,8 +1780,9 @@ function FarmerPortalContent() {
   // XỬ LÝ NHẬT KÝ VÒNG ĐỜI LÔ THU HOẠCH & TIẾN TRÌNH DUYỆT XUẤT KHO
   // =========================================================================
   const handleOpenLotTimeline = async (lot: BatchItem) => {
-    setSelectedLotForTimeline(lot);
-    setEditTransportStatus(lot.transportStatus || "Chưa vận chuyển");
+    const normalizedTransport = normalizeTransportStatus(lot.transportStatus);
+    setSelectedLotForTimeline({ ...lot, transportStatus: normalizedTransport });
+    setEditTransportStatus(normalizedTransport);
     setEditTransportDest(lot.transportDestination || "Kho phân phối");
     setIsAddingCustomEvent(false);
     setIsLotTimelineModalOpen(true);
@@ -1815,8 +1818,8 @@ function FarmerPortalContent() {
           {
             stage: "Lưu kho & Vận chuyển chuỗi lạnh",
             time: lot.harvestDate,
-            badge: lot.transportStatus || "Chưa vận chuyển",
-            note: `Trạng thái: ${lot.transportStatus || "Chưa vận chuyển"} - Điểm đến: ${lot.transportDestination || "Kho bảo quản"}`,
+            badge: normalizedTransport,
+            note: `Trạng thái: ${normalizedTransport} - Điểm đến: ${lot.transportDestination || "Kho bảo quản"}`,
           },
         ]);
       }
@@ -1847,8 +1850,8 @@ function FarmerPortalContent() {
         {
           stage: "Lưu kho & Vận chuyển chuỗi lạnh",
           time: lot.harvestDate,
-          badge: lot.transportStatus || "Chưa vận chuyển",
-          note: `Trạng thái: ${lot.transportStatus || "Chưa vận chuyển"} - Điểm đến: ${lot.transportDestination || "Kho bảo quản"}`,
+          badge: normalizedTransport,
+          note: `Trạng thái: ${normalizedTransport} - Điểm đến: ${lot.transportDestination || "Kho bảo quản"}`,
         },
       ]);
     } finally {
@@ -1871,7 +1874,7 @@ function FarmerPortalContent() {
           b.code === updated.code
             ? {
                 ...b,
-                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportStatus: normalizeTransportStatus(updated.transportStatus),
                 transportDestination: updated.transportDestination,
               }
             : b
@@ -1882,7 +1885,7 @@ function FarmerPortalContent() {
         prev
           ? {
               ...prev,
-              transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+              transportStatus: normalizeTransportStatus(updated.transportStatus),
               transportDestination: updated.transportDestination,
             }
           : null
@@ -1908,7 +1911,7 @@ function FarmerPortalContent() {
           b.code === updated.code
             ? {
                 ...b,
-                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportStatus: normalizeTransportStatus(updated.transportStatus),
                 transportDestination: updated.transportDestination,
               }
             : b
@@ -1919,7 +1922,7 @@ function FarmerPortalContent() {
           prev
             ? {
                 ...prev,
-                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportStatus: normalizeTransportStatus(updated.transportStatus),
                 transportDestination: updated.transportDestination,
               }
             : null
@@ -1944,7 +1947,7 @@ function FarmerPortalContent() {
           b.code === updated.code
             ? {
                 ...b,
-                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportStatus: normalizeTransportStatus(updated.transportStatus),
                 transportDestination: updated.transportDestination,
               }
             : b
@@ -1955,7 +1958,7 @@ function FarmerPortalContent() {
           prev
             ? {
                 ...prev,
-                transportStatus: updated.transportStatus as BatchItem["transportStatus"],
+                transportStatus: normalizeTransportStatus(updated.transportStatus),
                 transportDestination: updated.transportDestination,
               }
             : null
@@ -2522,7 +2525,7 @@ function FarmerPortalContent() {
   const filteredBatches = visibleBatches.filter((b) => {
     const matchStatus = activeFilter === "Tất cả" || b.status === activeFilter;
     const matchFarm = selectedBatchFarm === "ALL" || b.farmCode === selectedBatchFarm;
-    const effectiveTransport = b.transportStatus || "Chưa vận chuyển";
+    const effectiveTransport = normalizeTransportStatus(b.transportStatus);
     const matchTransport =
       selectedTransportFilter === "Tất cả" || effectiveTransport === selectedTransportFilter;
     return matchStatus && matchFarm && matchTransport;
@@ -3023,14 +3026,14 @@ function FarmerPortalContent() {
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-blue-700 font-semibold uppercase">Đang vận chuyển</div>
               <div className="text-xl font-extrabold text-blue-600 mt-1">
-                {visibleBatches.filter((b) => b.transportStatus === "Đang vận chuyển").length} Lô
+                {visibleBatches.filter((b) => normalizeTransportStatus(b.transportStatus) === "Đang vận chuyển").length} Lô
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">Đang trên đường đến kho đích</div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
               <div className="text-[11px] text-amber-700 font-semibold uppercase">Lưu tại kho vườn</div>
               <div className="text-xl font-extrabold text-amber-600 mt-1">
-                {visibleBatches.filter((b) => !b.transportStatus || b.transportStatus === "Chưa vận chuyển").length} Lô
+                {visibleBatches.filter((b) => normalizeTransportStatus(b.transportStatus) === "Chưa vận chuyển").length} Lô
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">Chưa vận chuyển đi</div>
             </div>
@@ -4732,39 +4735,39 @@ function FarmerPortalContent() {
 
                     <div
                       className={`p-2 rounded-lg border transition-all ${
-                        selectedLotForTimeline.transportStatus === "Đang vận chuyển"
+                        normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đang vận chuyển"
                           ? "bg-blue-100 border-blue-400 text-blue-900 font-bold shadow-2xs animate-pulse ring-2 ring-blue-300/40"
-                          : selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                          : normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đã nhập kho đích"
                           ? "bg-blue-50 border-blue-200 text-blue-800 font-semibold"
                           : "bg-white/90 border-gray-200 text-gray-500"
                       }`}
                     >
                       <div className="text-sm mb-0.5">
-                        {selectedLotForTimeline.transportStatus === "Đang vận chuyển"
+                        {normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đang vận chuyển"
                           ? "🚚"
-                          : selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                          : normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đã nhập kho đích"
                           ? "📦"
                           : "🏡"}
                       </div>
                       <div className="font-bold">2. Tài Xế Nhận Hàng</div>
                       <div className="text-[9px] mt-0.5">
-                        {selectedLotForTimeline.transportStatus || "Chưa vận chuyển"}
+                        {normalizeTransportStatus(selectedLotForTimeline.transportStatus)}
                       </div>
                     </div>
 
                     <div
                       className={`p-2 rounded-lg border transition-all ${
-                        selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                        normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đã nhập kho đích"
                           ? "bg-purple-100 border-purple-300 text-purple-900 font-bold shadow-2xs"
                           : "bg-white/90 border-gray-200 text-gray-500"
                       }`}
                     >
                       <div className="text-sm mb-0.5">
-                        {selectedLotForTimeline.transportStatus === "Đã nhập kho đích" ? "🏢" : "⏳"}
+                        {normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đã nhập kho đích" ? "🏢" : "⏳"}
                       </div>
                       <div className="font-bold">3. Thủ Kho Nhập Kho</div>
                       <div className="text-[9px] mt-0.5">
-                        {selectedLotForTimeline.transportStatus === "Đã nhập kho đích"
+                        {normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đã nhập kho đích"
                           ? "Đã nhập kho đích"
                           : "Chờ nhập kho"}
                       </div>
@@ -4943,7 +4946,7 @@ function FarmerPortalContent() {
 
                       <div className="mt-1.5 text-gray-600 text-[11px] space-y-0.5">
                         <div>
-                          • <strong>Hiện trạng:</strong> {selectedLotForTimeline.transportStatus || "Lưu tại vườn (Chưa chuyển)"}
+                          • <strong>Hiện trạng:</strong> {normalizeTransportStatus(selectedLotForTimeline.transportStatus)}
                         </div>
                         <div>
                           • <strong>Kho đích / Điểm giao:</strong> {selectedLotForTimeline.transportDestination || "Kho phân phối"}
@@ -4966,7 +4969,7 @@ function FarmerPortalContent() {
                       ) : (
                         <div className="mt-3 pt-2.5 border-t border-gray-100 space-y-3">
                           {/* Trạng thái liên thông vận chuyển */}
-                          {selectedLotForTimeline.transportStatus === "Chưa vận chuyển" || !selectedLotForTimeline.transportStatus ? (
+                          {normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Chưa vận chuyển" ? (
                             <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
                               <div className="flex items-center justify-between text-blue-900 font-bold text-[11px]">
                                 <span className="flex items-center gap-1.5"><Truck size={13} className="text-blue-700" /> Bước tiếp theo: Tài xế nhận hàng</span>
@@ -4985,7 +4988,7 @@ function FarmerPortalContent() {
                                 🚚 Mô phỏng Tài xế quét QR nhận hàng (Bắt đầu vận chuyển)
                               </button>
                             </div>
-                          ) : selectedLotForTimeline.transportStatus === "Đang vận chuyển" ? (
+                          ) : normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đang vận chuyển" ? (
                             <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl space-y-2">
                               <div className="flex items-center justify-between text-purple-900 font-bold text-[11px]">
                                 <span className="flex items-center gap-1.5"><Truck size={13} className="text-purple-700 animate-pulse" /> Đang vận chuyển chuỗi lạnh</span>
