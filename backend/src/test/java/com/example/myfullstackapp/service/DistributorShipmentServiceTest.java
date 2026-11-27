@@ -4,6 +4,7 @@ import com.example.myfullstackapp.dto.distributor.CreateShipmentRequest;
 import com.example.myfullstackapp.dto.distributor.CreateTrackingEventRequest;
 import com.example.myfullstackapp.dto.distributor.UpdateShipmentStatusRequest;
 import com.example.myfullstackapp.entity.Order;
+import com.example.myfullstackapp.entity.DistributorNotificationType;
 import com.example.myfullstackapp.entity.Shipment;
 import com.example.myfullstackapp.entity.ShipmentTrackingEvent;
 import com.example.myfullstackapp.exception.ConflictException;
@@ -30,6 +31,7 @@ class DistributorShipmentServiceTest {
     private ShipmentTrackingEventRepository trackingEvents;
     private ShipmentReceiptRepository receipts;
     private OrderRepository orders;
+    private DistributorNotificationService notifications;
     private DistributorShipmentService service;
 
     @BeforeEach
@@ -38,7 +40,8 @@ class DistributorShipmentServiceTest {
         trackingEvents = mock(ShipmentTrackingEventRepository.class);
         receipts = mock(ShipmentReceiptRepository.class);
         orders = mock(OrderRepository.class);
-        service = new DistributorShipmentService(shipments, trackingEvents, receipts, orders, mock(HarvestLotRepository.class), mock(ApplicationEventPublisher.class));
+        notifications = mock(DistributorNotificationService.class);
+        service = new DistributorShipmentService(shipments, trackingEvents, receipts, orders, mock(HarvestLotRepository.class), mock(ApplicationEventPublisher.class), notifications);
         when(trackingEvents.findByShipmentIdOrderByEventTimeAsc(any())).thenReturn(List.of());
         when(receipts.findByShipmentId(any())).thenReturn(Optional.empty());
     }
@@ -102,9 +105,9 @@ class DistributorShipmentServiceTest {
         when(orders.findAllByOrderCodeInForUpdate(List.of("ORD-1"))).thenReturn(List.of(order));
 
         CreateShipmentRequest request = new CreateShipmentRequest("SHIP-2", List.of("ORD-1"), "Driver", "0900000000",
-                "51A-123.45", "Warehouse", "Customer", "Produce", null, 4.0, null, null);
+                "51A-123.45", "Warehouse", "Customer", "Produce", null, 4.0, null, null, null);
 
-        assertThrows(ConflictException.class, () -> service.create(request, "distributor@example.com"));
+        assertThrows(ConflictException.class, () -> service.create(request, "distributor@example.com", false));
         verify(shipments, never()).save(any());
     }
 
@@ -116,11 +119,28 @@ class DistributorShipmentServiceTest {
         when(shipments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         CreateShipmentRequest request = new CreateShipmentRequest("SHIP-3", List.of("ORD-PAID"), "Driver", "0900000000",
-                "51A-123.45", "Warehouse", "Customer", "Produce", null, 4.0, null, null);
+                "51A-123.45", "Warehouse", "Customer", "Produce", null, 4.0, null, null, null);
 
-        var response = service.create(request, "distributor@example.com");
+        var response = service.create(request, "distributor@example.com", false);
         assertEquals("SHIP-3", response.shipmentCode());
         assertEquals("distributor@example.com", order.getDistributorEmail());
         assertEquals("SHIP-3", order.getShipmentCode());
+        verify(notifications).notifyDistributor("distributor@example.com", DistributorNotificationType.SHIPMENT_ASSIGNED,
+                "Có chuyến hàng mới", "Bạn được phân công xử lý chuyến SHIP-3.", "SHIP-3");
+    }
+
+    @Test
+    void informsAdminsWhenDistributorChangesShipmentStatus() {
+        Shipment shipment = Shipment.builder().id(1L).shipmentCode("SHIP-1").distributorEmail("distributor@example.com")
+                .status("PREPARING").driverName("Driver").vehicleNumber("51A-123.45").origin("A").destination("B")
+                .productSummary("Produce").build();
+        when(shipments.findByShipmentCodeIgnoreCase("SHIP-1")).thenReturn(Optional.of(shipment));
+
+        service.updateStatus("SHIP-1", new UpdateShipmentStatusRequest(
+                "IN_TRANSIT", "Warehouse", 4.0, null, null, null, null, null, null),
+                "distributor@example.com", false);
+
+        verify(notifications).notifyAdmins(DistributorNotificationType.STATUS_UPDATED,
+                "Distributor đã cập nhật trạng thái", "Chuyến SHIP-1 đã chuyển sang trạng thái IN_TRANSIT.", "SHIP-1");
     }
 }
