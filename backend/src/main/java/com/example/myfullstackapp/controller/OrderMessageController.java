@@ -123,37 +123,34 @@ public class OrderMessageController {
                 orderMessageRepository.save(welcomeMsg);
                 messages = List.of(welcomeMsg);
             }
-        } else {
-            // Tự động đánh dấu đã đọc khi mở xem tin nhắn
-            boolean hasUnread = false;
-            for (OrderMessage m : messages) {
-                if (!m.isRead()) {
-                    m.setRead(true);
-                    hasUnread = true;
-                }
-            }
-            if (hasUnread) {
-                orderMessageRepository.saveAll(messages);
-            }
         }
 
         return ApiResponse.ok("Lấy lịch sử tin nhắn thành công", messages);
     }
 
     /**
-     * Đánh dấu tất cả tin nhắn trong đơn hàng là đã đọc.
+     * Đánh dấu các tin nhắn từ phía đối phương trong đơn hàng là đã đọc.
      */
     @PatchMapping("/{orderCode}/messages/read")
     @Transactional
-    public ApiResponse<Void> markAsRead(@PathVariable String orderCode) {
+    public ApiResponse<Void> markAsRead(
+            @PathVariable String orderCode,
+            @RequestParam(required = false) String readerRole
+    ) {
         String cleanCode = orderCode.trim().toUpperCase();
         List<OrderMessage> messages = orderMessageRepository.findByOrderCodeOrderByCreatedAtAsc(cleanCode);
         boolean hasUnread = false;
         for (OrderMessage m : messages) {
-            if (!m.isRead()) {
-                m.setRead(true);
-                hasUnread = true;
+            if (m.isRead()) continue;
+            if ("CUSTOMER".equalsIgnoreCase(readerRole) && "CUSTOMER".equalsIgnoreCase(m.getSenderRole())) {
+                continue;
             }
+            if (("FARMER".equalsIgnoreCase(readerRole) || "ADMIN".equalsIgnoreCase(readerRole))
+                    && ("FARMER".equalsIgnoreCase(m.getSenderRole()) || "ADMIN".equalsIgnoreCase(m.getSenderRole()))) {
+                continue;
+            }
+            m.setRead(true);
+            hasUnread = true;
         }
         if (hasUnread) {
             orderMessageRepository.saveAll(messages);
@@ -262,6 +259,7 @@ public class OrderMessageController {
      * Quản trị viên (Admin) hoặc Nhà vườn duyệt / từ chối khiếu nại hoàn tiền.
      */
     @PatchMapping("/{orderCode}/dispute/resolve")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'FARMER')")
     @Transactional
     public ApiResponse<Order> resolveDispute(
             @PathVariable String orderCode,
@@ -338,7 +336,7 @@ public class OrderMessageController {
             @RequestParam(required = false) String status
     ) {
         List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
-        List<ConversationSummary> summaries = new ArrayList<>();
+        List<Order> matchedOrders = new ArrayList<>();
 
         for (Order order : orders) {
             if (customerEmail != null && !customerEmail.isBlank()) {
@@ -353,7 +351,36 @@ public class OrderMessageController {
                 continue;
             }
 
-            List<OrderMessage> msgs = orderMessageRepository.findByOrderCodeOrderByCreatedAtAsc(order.getOrderCode());
+            boolean hasPending = "PENDING".equalsIgnoreCase(order.getRefundStatus());
+            if ("DISPUTE".equalsIgnoreCase(status) && !hasPending) {
+                continue;
+            }
+            matchedOrders.add(order);
+        }
+
+        List<String> orderCodes = matchedOrders.stream()
+                .map(Order::getOrderCode)
+                .filter(Objects::nonNull)
+                .toList();
+
+        Map<String, List<OrderMessage>> messagesByOrder = orderCodes.isEmpty()
+                ? Collections.emptyMap()
+                : orderMessageRepository.findByOrderCodeInOrderByCreatedAtAsc(orderCodes)
+                        .stream()
+                        .collect(Collectors.groupingBy(
+                                m -> m.getOrderCode() != null ? m.getOrderCode().toUpperCase() : "",
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        List<ConversationSummary> summaries = new ArrayList<>(matchedOrders.size());
+
+        for (Order order : matchedOrders) {
+            String resolvedFarm = resolveFarmName(order);
+            List<OrderMessage> msgs = messagesByOrder.getOrDefault(
+                    order.getOrderCode() != null ? order.getOrderCode().toUpperCase() : "",
+                    Collections.emptyList()
+            );
             String lastMsgText = "Chưa có tin nhắn mới";
             LocalDateTime lastMsgTime = order.getCreatedAt();
             if (!msgs.isEmpty()) {
@@ -368,10 +395,6 @@ public class OrderMessageController {
 
             boolean hasPending = "PENDING".equalsIgnoreCase(order.getRefundStatus());
 
-            if ("DISPUTE".equalsIgnoreCase(status) && !hasPending) {
-                continue;
-            }
-
             long unread;
             if (customerEmail != null && !customerEmail.isBlank()) {
                 // Khách hàng: chỉ đếm tin nhắn chưa đọc từ phía Nông trại hoặc Admin
@@ -381,7 +404,7 @@ public class OrderMessageController {
             } else {
                 // Nông dân / Quản trị viên: đếm tin nhắn chưa đọc từ phía Khách hàng
                 unread = msgs.stream()
-                        .filter(m -> !m.isRead() && !"FARMER".equalsIgnoreCase(m.getSenderRole()))
+                        .filter(m -> !m.isRead() && "CUSTOMER".equalsIgnoreCase(m.getSenderRole()))
                         .count();
             }
 
