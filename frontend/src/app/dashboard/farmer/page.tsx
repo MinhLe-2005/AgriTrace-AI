@@ -3485,7 +3485,7 @@ function FarmerPortalContent() {
             return (
               <div className="space-y-4">
                 {allGroups.length > 0 && (
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-gray-500 font-semibold shrink-0 mr-1 flex items-center gap-1">
                       <Sprout size={13} className="text-emerald-700" /> Chốt theo Cây / Lô:
                     </span>
