@@ -26,6 +26,7 @@ import {
   type OrderMessage,
 } from "@/services/order-chat.service";
 import { toast } from "@/stores/toast-store";
+import { useOrderChatSocket } from "./useOrderChatSocket";
 
 interface FarmerMessagesPanelProps {
   farmerFarmName?: string;
@@ -41,6 +42,24 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  const handleScroll = () => {
+    if (!chatScrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollContainerRef.current;
+    isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTo({
+        top: chatScrollContainerRef.current.scrollHeight,
+        behavior,
+      });
+      isNearBottomRef.current = true;
+    }
+  };
 
   // Load inbox
   useEffect(() => {
@@ -63,7 +82,15 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
           orderChatService
             .getMessages(selectedOrderCode)
             .then((msgs) => {
-              setMessages(msgs);
+              setMessages((prev) => {
+                if (
+                  prev.length === msgs.length &&
+                  (prev.length === 0 || prev[prev.length - 1]?.id === msgs[msgs.length - 1]?.id)
+                ) {
+                  return prev;
+                }
+                return msgs;
+              });
             })
             .catch(() => {});
         }
@@ -93,6 +120,7 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
 
   function handleSelectConversation(code: string) {
     setSelectedOrderCode(code);
+    isNearBottomRef.current = true;
     // Xóa ngay chấm đỏ trong giao diện khi xem
     setConversations((prev) =>
       prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
@@ -109,13 +137,17 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
   }, [selectedOrderCode]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only scroll to bottom if user is already near bottom (prevent unwanted dragging when scrolling up)
+    if (isNearBottomRef.current) {
+      scrollToBottom("smooth");
+    }
   }, [messages]);
 
   async function loadMessages(code: string) {
     try {
       const msgs = await orderChatService.getMessages(code);
       setMessages(msgs);
+      setTimeout(() => scrollToBottom("instant"), 50);
     } catch {
       // ignore
     }
@@ -123,10 +155,41 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
 
   const activeConv = conversations.find((c) => c.orderCode === selectedOrderCode);
 
+  const handleIncomingMessage = (newMsg: OrderMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === newMsg.id)) return prev;
+      return [...prev, newMsg];
+    });
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.orderCode.toUpperCase() === newMsg.orderCode.toUpperCase()
+          ? {
+              ...c,
+              lastMessage: newMsg.message,
+              lastMessageTime: newMsg.createdAt,
+              messageCount: c.messageCount + 1,
+            }
+          : c
+      )
+    );
+  };
+
+  const {
+    connected: socketConnected,
+    typingUser,
+    sendTyping,
+  } = useOrderChatSocket({
+    orderCode: selectedOrderCode,
+    currentUserRole: "FARMER",
+    currentUserName: activeConv?.farmName || farmerFarmName || "Chủ vườn",
+    onMessageReceived: handleIncomingMessage,
+  });
+
   async function handleSendReply(customText?: string) {
     const text = (customText || replyText).trim();
     if (!text || !selectedOrderCode) return;
 
+    sendTyping(false);
     setIsSending(true);
     try {
       const farmName = activeConv?.farmName || "Chủ Nông Trại Xanh";
@@ -137,7 +200,7 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
         messageType: "CHAT",
       });
 
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
       setReplyText("");
       toast.success("Đã gửi tin nhắn phản hồi tới khách hàng!");
       loadInbox();
@@ -323,6 +386,11 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
                   </span>
                   <span>•</span>
                   <span>Tổng tiền: <strong>{activeConv.total?.toLocaleString("vi-VN")} đ</strong></span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 font-semibold text-emerald-700">
+                    <span className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
+                    {socketConnected ? "WebSocket Trực tiếp" : "Trực tuyến"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -365,7 +433,7 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
           )}
 
           {/* Message History */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f8faf8]">
+          <div ref={chatScrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f8faf8]">
             {messages.map((m) => {
               const isFarmer = m.senderRole === "FARMER";
               const isDispute =
@@ -464,11 +532,24 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
             ))}
           </div>
 
+          {/* Animated Typing Indicator */}
+          {typingUser && (
+            <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-emerald-800 bg-emerald-50/90 border-t border-emerald-100 transition-all shrink-0">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce" />
+              </div>
+              <span className="italic font-medium">{typingUser.senderName || "Khách hàng"} đang soạn tin nhắn...</span>
+            </div>
+          )}
+
           {/* Reply Input Bar */}
           <div className="p-3 bg-white border-t border-gray-200 shrink-0">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                sendTyping(false);
                 handleSendReply();
               }}
               className="flex items-center gap-2"
@@ -476,7 +557,10 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
               <input
                 type="text"
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={(e) => {
+                  setReplyText(e.target.value);
+                  sendTyping(e.target.value.trim().length > 0);
+                }}
                 placeholder="Gõ tin nhắn phản hồi tới khách hàng với tư cách Chủ Nông Trại..."
                 className="flex-1 py-2.5 px-3.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-gray-50/50"
               />

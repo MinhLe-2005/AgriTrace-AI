@@ -30,6 +30,7 @@ import {
 } from "@/services/order-chat.service";
 import { toast } from "@/stores/toast-store";
 import { OrderDisputeModal } from "./OrderDisputeModal";
+import { useOrderChatSocket } from "./useOrderChatSocket";
 import type { ApiOrder } from "@/services/catalog.service";
 
 interface CustomerMessagesPanelProps {
@@ -86,6 +87,23 @@ export function CustomerMessagesPanel({
   const [imageAttachment, setImageAttachment] = useState<string | null>(null);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  const handleChatScroll = () => {
+    if (!chatScrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollRef.current;
+    isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTo({
+        top: chatScrollRef.current.scrollHeight,
+        behavior,
+      });
+      isNearBottomRef.current = true;
+    }
+  };
 
   // Sync initialOrderCode when prop changes
   useEffect(() => {
@@ -122,7 +140,15 @@ export function CustomerMessagesPanel({
             .getMessages(currentActive)
             .then((msgs) => {
               if (selectedOrderCodeRef.current === currentActive) {
-                setMessages(msgs);
+                setMessages((prev) => {
+                  if (
+                    prev.length === msgs.length &&
+                    (prev.length === 0 || prev[prev.length - 1]?.id === msgs[msgs.length - 1]?.id)
+                  ) {
+                    return prev;
+                  }
+                  return msgs;
+                });
               }
             })
             .catch(() => {});
@@ -158,6 +184,7 @@ export function CustomerMessagesPanel({
   function handleSelectConversation(code: string) {
     if (code === selectedOrderCode) return;
     setSelectedOrderCode(code);
+    isNearBottomRef.current = true;
     setMessages([]); // Clear previous thread immediately to avoid stale overlap
     orderChatService.markAsRead(code);
     loadMessages(code);
@@ -174,8 +201,9 @@ export function CustomerMessagesPanel({
   }, [selectedOrderCode]);
 
   useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    // Only scroll to bottom if user is already near bottom (prevent unwanted dragging when scrolling up)
+    if (isNearBottomRef.current) {
+      scrollToBottom("smooth");
     }
   }, [messages]);
 
@@ -184,6 +212,7 @@ export function CustomerMessagesPanel({
       const msgs = await orderChatService.getMessages(code);
       if (selectedOrderCodeRef.current === code) {
         setMessages(msgs);
+        setTimeout(() => scrollToBottom("instant"), 50);
       }
     } catch {
       // ignore
@@ -192,10 +221,41 @@ export function CustomerMessagesPanel({
 
   const activeConv = conversations.find((c) => c.orderCode === selectedOrderCode);
 
+  const handleIncomingMessage = (newMsg: OrderMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === newMsg.id)) return prev;
+      return [...prev, newMsg];
+    });
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.orderCode.toUpperCase() === newMsg.orderCode.toUpperCase()
+          ? {
+              ...c,
+              lastMessage: newMsg.message,
+              lastMessageTime: newMsg.createdAt,
+              messageCount: c.messageCount + 1,
+            }
+          : c
+      )
+    );
+  };
+
+  const {
+    connected: socketConnected,
+    typingUser,
+    sendTyping,
+  } = useOrderChatSocket({
+    orderCode: selectedOrderCode,
+    currentUserRole: "CUSTOMER",
+    currentUserName: activeConv?.customerName || "Khách Hàng",
+    onMessageReceived: handleIncomingMessage,
+  });
+
   async function handleSendMessage(customText?: string) {
     const text = (customText || replyText).trim();
     if (!text || !selectedOrderCode) return;
 
+    sendTyping(false);
     setIsSending(true);
     try {
       const newMsg = await orderChatService.sendMessage(selectedOrderCode, {
@@ -207,7 +267,7 @@ export function CustomerMessagesPanel({
         messageType: "CHAT",
       });
 
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
       setReplyText("");
       setImageAttachment(null);
       toast.success("Đã gửi tin nhắn tới chủ nhà vườn!");
@@ -436,9 +496,9 @@ export function CustomerMessagesPanel({
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-gray-500">
-                    <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Trực tuyến
+                    <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                      <span className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
+                      {socketConnected ? "Trực tuyến (WebSocket)" : "Trực tuyến"}
                     </span>
                     <span>•</span>
                     <span className="truncate">Chuỗi lạnh VietGAP khép kín</span>
@@ -513,7 +573,7 @@ export function CustomerMessagesPanel({
             </div>
 
             {/* Message Stream */}
-            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-gray-50/40 min-w-0">
+            <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-gray-50/40 min-w-0">
               {/* Default Welcome System Card */}
               <div className="max-w-md mx-auto p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200/90 text-center space-y-1.5 text-xs text-emerald-950 shadow-2xs">
                 <div className="flex items-center justify-center gap-1.5 font-bold text-emerald-900">
@@ -656,6 +716,18 @@ export function CustomerMessagesPanel({
               </div>
             )}
 
+            {/* Animated Typing Indicator */}
+            {typingUser && (
+              <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-emerald-800 bg-emerald-50/90 border-t border-emerald-100 transition-all shrink-0">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce" />
+                </div>
+                <span className="italic font-medium">{typingUser.senderName || "Chủ vườn"} đang soạn tin nhắn...</span>
+              </div>
+            )}
+
             {/* Message Input Box */}
             <div className="p-3 sm:p-4 bg-white border-t border-gray-200 flex items-center gap-2 shrink-0">
               {/* Demo Image Picker Menu */}
@@ -678,10 +750,14 @@ export function CustomerMessagesPanel({
               <input
                 type="text"
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={(e) => {
+                  setReplyText(e.target.value);
+                  sendTyping(e.target.value.trim().length > 0);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
+                    sendTyping(false);
                     handleSendMessage();
                   }
                 }}

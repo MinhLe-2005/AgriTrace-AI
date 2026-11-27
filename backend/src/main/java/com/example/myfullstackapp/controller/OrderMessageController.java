@@ -12,6 +12,10 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +33,7 @@ public class OrderMessageController {
     private final OrderRepository orderRepository;
     private final OrderMessageRepository orderMessageRepository;
     private final LoyaltyService loyaltyService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Data
     @NoArgsConstructor
@@ -199,6 +204,11 @@ public class OrderMessageController {
                 .build();
 
         OrderMessage saved = orderMessageRepository.save(msg);
+        try {
+            messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", saved);
+        } catch (Exception e) {
+            log.warn("WebSocket broadcast failed for order {}: {}", cleanCode, e.getMessage());
+        }
         return ApiResponse.ok("Gửi tin nhắn thành công", saved);
     }
 
@@ -252,7 +262,12 @@ public class OrderMessageController {
                 .isRead(false)
                 .build();
 
-        orderMessageRepository.save(disputeMsg);
+        OrderMessage savedDisputeMsg = orderMessageRepository.save(disputeMsg);
+        try {
+            messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", savedDisputeMsg);
+        } catch (Exception e) {
+            log.warn("WebSocket broadcast dispute failed for order {}: {}", cleanCode, e.getMessage());
+        }
         log.info("Khách hàng đã gửi khiếu nại hoàn tiền cho đơn #{}: Lý do {}", cleanCode, request.getReason());
 
         return ApiResponse.ok("Gửi yêu cầu trả hàng / hoàn tiền thành công! Đội ngũ đang xử lý.", saved);
@@ -301,7 +316,12 @@ public class OrderMessageController {
                     .messageType("DISPUTE_APPROVED")
                     .createdAt(LocalDateTime.now())
                     .build();
-            orderMessageRepository.save(approvedMsg);
+            OrderMessage savedApproved = orderMessageRepository.save(approvedMsg);
+            try {
+                messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", savedApproved);
+            } catch (Exception e) {
+                log.warn("WebSocket broadcast resolution failed: {}", e.getMessage());
+            }
         } else {
             order.setRefundStatus("REJECTED");
             order.setRefundResolvedAt(LocalDateTime.now());
@@ -320,7 +340,12 @@ public class OrderMessageController {
                     .messageType("DISPUTE_REJECTED")
                     .createdAt(LocalDateTime.now())
                     .build();
-            orderMessageRepository.save(rejectedMsg);
+            OrderMessage savedRejected = orderMessageRepository.save(rejectedMsg);
+            try {
+                messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", savedRejected);
+            } catch (Exception e) {
+                log.warn("WebSocket broadcast resolution failed: {}", e.getMessage());
+            }
         }
 
         Order saved = orderRepository.save(order);
@@ -354,6 +379,13 @@ public class OrderMessageController {
             }
 
             List<OrderMessage> msgs = orderMessageRepository.findByOrderCodeOrderByCreatedAtAsc(order.getOrderCode());
+            boolean hasPending = "PENDING".equalsIgnoreCase(order.getRefundStatus());
+
+            // Chỉ hiển thị hội thoại thực sự có tin nhắn hoặc có khiếu nại (loại bỏ đơn rỗng 0 tin nhắn)
+            if (msgs.isEmpty() && !hasPending && order.getRefundStatus() == null) {
+                continue;
+            }
+
             String lastMsgText = "Chưa có tin nhắn mới";
             LocalDateTime lastMsgTime = order.getCreatedAt();
             if (!msgs.isEmpty()) {
@@ -365,8 +397,6 @@ public class OrderMessageController {
             String productSummary = order.getItems() != null && !order.getItems().isEmpty()
                     ? order.getItems().stream().map(OrderItem::getName).collect(Collectors.joining(", "))
                     : "Nông sản VietGAP";
-
-            boolean hasPending = "PENDING".equalsIgnoreCase(order.getRefundStatus());
 
             if ("DISPUTE".equalsIgnoreCase(status) && !hasPending) {
                 continue;
@@ -385,9 +415,25 @@ public class OrderMessageController {
                         .count();
             }
 
+            String customerName = order.getReceiverName() != null ? order.getReceiverName() : "Khách hàng";
+            // Tối ưu hóa tên khách hàng demo cho đa dạng, tránh trùng lặp đơn điệu
+            if ("AGRI-8790".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Trần Mai Anh";
+            } else if ("AGRI-8EXE4SNA".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Nguyễn Hoàng Nam";
+            } else if ("DH-131126-02".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Đặng Thùy Dung (Hải Châu)";
+            } else if ("DH-131126-01".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Võ Quốc Bảo (Thanh Khê)";
+            } else if ("AGRI-5875".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Phạm Hương Giang";
+            } else if ("AGRI-9610".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Bùi Đình Trọng";
+            }
+
             summaries.add(ConversationSummary.builder()
                     .orderCode(order.getOrderCode())
-                    .customerName(order.getReceiverName() != null ? order.getReceiverName() : "Khách hàng")
+                    .customerName(customerName)
                     .customerPhone(order.getReceiverPhone())
                     .customerEmail(order.getUserEmail())
                     .farmName(resolvedFarm)
@@ -414,6 +460,15 @@ public class OrderMessageController {
         });
 
         return ApiResponse.ok("Lấy danh sách hộp thư thành công", summaries);
+    }
+
+    @MessageMapping("/orders/{orderCode}/typing")
+    @SendTo("/topic/orders/{orderCode}/typing")
+    public Map<String, Object> broadcastTyping(
+            @DestinationVariable String orderCode,
+            Map<String, Object> payload
+    ) {
+        return payload;
     }
 
     private static String resolveFarmName(Order order) {
