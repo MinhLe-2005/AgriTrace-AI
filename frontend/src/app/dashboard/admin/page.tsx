@@ -5,6 +5,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Award,
+  BarChart3,
   BookOpen,
   Check,
   CheckCircle2,
@@ -43,6 +44,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { ErrorState, LoadingSkeleton } from "@/components/ui/states";
 import { AdminPageHeader, AdminStatCard } from "@/features/admin/admin-ui";
+import { AdminRevenueDashboard } from "@/features/admin/AdminRevenueDashboard";
 import { AdminMessagesPanel } from "@/features/order-chat/AdminMessagesPanel";
 import { useUsers } from "@/hooks/use-users";
 import { useVerificationMutations, useVerifications } from "@/hooks/use-verifications";
@@ -90,12 +92,13 @@ function submittedAt(value: string) {
   return new Date(value).toLocaleString("vi-VN");
 }
 
-type AdminTab = "verifications" | "farms" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog" | "messages";
-const ADMIN_TABS: AdminTab[] = ["verifications", "farms", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog", "messages"];
+type AdminTab = "verifications" | "revenue" | "farms" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog" | "messages";
+const ADMIN_TABS: AdminTab[] = ["verifications", "revenue", "farms", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog", "messages"];
 
 function AdminPortalContent() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab") as AdminTab | null;
+  const orderParam = searchParams.get("order");
   const activeTab: AdminTab = tabParam && ADMIN_TABS.includes(tabParam) ? tabParam : "verifications";
 
   // Member 1: Users & Verifications Hooks
@@ -523,8 +526,10 @@ function AdminPortalContent() {
   });
 
   useEffect(() => {
-    // Luôn tải danh sách đơn hàng từ lúc vào Admin để KPI Doanh thu ở tab Tổng quan hiện đúng ngay
+    // Luôn tải danh sách đơn hàng, voucher, hội viên từ lúc vào Admin để KPI Doanh thu & badge tab hiện đúng ngay
     fetchOrders();
+    fetchVouchers();
+    fetchMembers();
   }, []);
 
   // Load Member 4 data on tab change
@@ -1098,6 +1103,7 @@ function AdminPortalContent() {
   const pendingCount = verifications.isPending ? "…" : verifications.isError ? "—" : pendingRequests.length.toLocaleString("vi-VN");
   const headerByTab = {
     verifications: { title: "Tổng quan & duyệt hồ sơ", description: "Theo dõi tài khoản hệ thống và xử lý hồ sơ đăng ký quyền Nông dân, Thủ kho, Nhà phân phối.", icon: Shield, tone: "forest" as const, meta: `${pendingCount} hồ sơ chờ` },
+    revenue: { title: "Báo cáo doanh thu đa chiều & xuất PDF", description: "Tổng hợp doanh thu thuần theo mảng ngành hàng, nông trại, chứng nhận VietGAP/GlobalGAP, kênh thanh toán và kết xuất báo cáo PDF A4.", icon: BarChart3, tone: "forest" as const, meta: `${totalRevenue.toLocaleString("vi-VN")} đ` },
     farms: { title: "Duyệt hồ sơ đất & nông trại", description: "Kiểm tra giấy tờ quyền sử dụng đất canh tác, địa chỉ vườn và xác minh nông trại mới do Nông dân khai báo.", icon: Sprout, tone: "forest" as const, meta: `${pendingFarmsCount} nông trại chờ` },
     batches: { title: "Duyệt lô thu hoạch & xuất kho", description: "Thẩm định hồ sơ kiểm nghiệm KCS và tiêu chuẩn VietGAP/GlobalGAP trước khi cấp lệnh xuất kho.", icon: Package, tone: "forest" as const, meta: `${pendingBatchesCount} lô chờ duyệt` },
     certs: { title: "Duyệt chứng nhận & gia hạn", description: "Thẩm định hồ sơ đăng ký cấp mới hoặc gia hạn chứng chỉ chất lượng nông trại.", icon: Award, tone: "amber" as const, meta: `${pendingCertsCount} chứng nhận chờ` },
@@ -1110,13 +1116,19 @@ function AdminPortalContent() {
   } satisfies Record<AdminTab, { title: string; description: string; icon: typeof Shield; tone: "forest" | "ocean" | "violet" | "amber" | "teal" | "indigo"; meta: string }>;
   const pageHeader = headerByTab[activeTab];
 
+  const pendingDisputesBadge = useMemo(
+    () => orders.filter((o) => o.refundStatus === "PENDING").length,
+    [orders]
+  );
+
   const tabNavItems = [
     { key: "verifications" as const, label: "Duyệt Hồ Sơ Vị Trí", icon: Shield, badge: pendingRequests.length },
+    { key: "revenue" as const, label: "Báo Cáo Doanh Thu", icon: BarChart3, badge: "PDF" },
     { key: "farms" as const, label: "Duyệt Hồ Sơ Nông Trại", icon: Sprout, badge: pendingFarmsCount },
     { key: "batches" as const, label: "Duyệt Lô Xuất Kho", icon: Package, badge: pendingBatchesCount },
     { key: "certs" as const, label: "Duyệt Chứng Nhận", icon: Award, badge: pendingCertsCount },
     { key: "orders" as const, label: "Đơn Hàng", icon: ShoppingBag, badge: orders.length },
-    { key: "messages" as const, label: "Hộp Thư & Khiếu Nại", icon: MessageSquare },
+    { key: "messages" as const, label: "Hộp Thư & Khiếu Nại", icon: MessageSquare, badge: pendingDisputesBadge },
     { key: "vouchers" as const, label: "Voucher", icon: Ticket, badge: vouchers.length },
     { key: "loyalty" as const, label: "Hội Viên AgriClub", icon: Crown, badge: members.length },
     { key: "events" as const, label: "Sự Kiện & Mùa Vụ", icon: CalendarDays, badge: campaigns.length },
@@ -1166,10 +1178,16 @@ function AdminPortalContent() {
       {activeTab === "verifications" && (
         <div className="space-y-6 animate-fade-in">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <AdminStatCard label="Tổng tài khoản" value={totalUsers} helper={users.isError ? "Không tải được dữ liệu người dùng" : "Tất cả tài khoản trong hệ thống"} icon={Users} />
+            <Link href="/dashboard/users" className="block group">
+              <AdminStatCard label="Tổng tài khoản" value={totalUsers} helper={users.isError ? "Không tải được dữ liệu người dùng" : "Bấm để quản lý người dùng & phân quyền →"} icon={Users} />
+            </Link>
             <AdminStatCard label="Chờ duyệt xác minh" value={pendingCount} helper={verifications.isError ? "Không tải được hồ sơ xác minh" : "Hồ sơ cần quản trị viên xử lý"} icon={UserCheck} tone="warning" />
-            <AdminStatCard label="Tài khoản bị khóa" value={lockedUsers} helper="Tài khoản hiện không thể truy cập" icon={AlertCircle} tone="danger" />
-            <AdminStatCard label="Doanh thu hệ thống" value={`${totalRevenue.toLocaleString("vi-VN")} đ`} helper="Từ các đơn hàng đã xác nhận" icon={DollarSign} tone="success" />
+            <Link href="/dashboard/users" className="block group">
+              <AdminStatCard label="Tài khoản bị khóa" value={lockedUsers} helper="Bấm để mở khóa hoặc kiểm tra trạng thái →" icon={AlertCircle} tone="danger" />
+            </Link>
+            <Link href="/dashboard/admin?tab=revenue" className="block group">
+              <AdminStatCard label="Doanh thu hệ thống" value={`${totalRevenue.toLocaleString("vi-VN")} đ`} helper="Bấm để xem biểu đồ từng mảng & xuất PDF →" icon={DollarSign} tone="success" />
+            </Link>
           </div>
 
           <section className="bento-card overflow-hidden">
@@ -1490,6 +1508,19 @@ function AdminPortalContent() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 1.1: BÁO CÁO DOANH THU ĐA CHIỀU & KẾT XUẤT PDF A4       */}
+      {/* ========================================================= */}
+      {activeTab === "revenue" && (
+        <AdminRevenueDashboard
+          orders={orders}
+          ordersLoading={ordersLoading}
+          onRefreshOrders={fetchOrders}
+          farms={adminFarms}
+          batches={adminBatches}
+        />
       )}
 
       {/* ========================================================= */}
@@ -2990,7 +3021,7 @@ function AdminPortalContent() {
 
                               {order.refundStatus === "PENDING" && (
                                 <Link
-                                  href="/dashboard/admin?tab=messages"
+                                  href={`/dashboard/admin?tab=messages&order=${encodeURIComponent(order.orderCode)}`}
                                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-[9px] border border-amber-300 animate-pulse"
                                   title="Đơn đang có khiếu nại hoàn tiền. Bấm để duyệt trong hộp thư."
                                 >
@@ -3043,9 +3074,9 @@ function AdminPortalContent() {
                                   ))}
 
                               <Link
-                                href="/dashboard/admin?tab=messages"
+                                href={`/dashboard/admin?tab=messages&order=${encodeURIComponent(order.orderCode)}`}
                                 className="px-2 py-1 rounded-lg border border-stone-300 hover:border-emerald-600 hover:bg-emerald-50/50 bg-white text-stone-700 hover:text-emerald-950 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                                title="Mở hộp thư chat & khiếu nại"
+                                title="Mở hộp thư chat & khiếu nại của đơn này"
                               >
                                 <MessageSquare size={11} className="text-emerald-700" />
                                 <span>Chat</span>
@@ -3242,7 +3273,7 @@ function AdminPortalContent() {
                 </div>
 
                 {/* Drawer Footer Actions */}
-                <div className="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-end gap-2 shrink-0">
+                <div className="p-4 bg-stone-50 border-t border-stone-200 flex flex-wrap items-center justify-end gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => setSelectedOrder(null)}
@@ -3251,23 +3282,46 @@ function AdminPortalContent() {
                     Đóng
                   </button>
 
+                  {selectedOrder.status === "PENDING_PAYMENT" &&
+                    selectedOrder.paymentRef === "PENDING_ADMIN_APPROVAL" && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleRejectTransfer(selectedOrder.orderCode)}
+                          className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <X size={13} />
+                          <span>Từ chối CK</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleApproveTransfer(selectedOrder.orderCode)}
+                          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <Check size={13} />
+                          <span>Duyệt chuyển khoản VietQR</span>
+                        </button>
+                      </>
+                    )}
+
                   {/* Next Status Transitions inside Drawer */}
-                  {(selectedOrder.allowedNextStatuses ?? [])
-                    .filter((st) => st !== "CANCELLED")
-                    .map((st) => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={async () => {
-                          await handleUpdateOrderStatus(selectedOrder.orderCode, st);
-                          setSelectedOrder((prev) => (prev ? { ...prev, status: st as ApiOrder["status"] } : null));
-                        }}
-                        className="px-4 py-2 rounded-xl bg-[#16261E] hover:bg-emerald-900 text-white font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-                      >
-                        <span>{orderNextActionLabel(st)}</span>
-                        <ArrowRight size={13} />
-                      </button>
-                    ))}
+                  {!(
+                    selectedOrder.status === "PENDING_PAYMENT" &&
+                    selectedOrder.paymentRef === "PENDING_ADMIN_APPROVAL"
+                  ) &&
+                    (selectedOrder.allowedNextStatuses ?? [])
+                      .filter((st) => st !== "CANCELLED")
+                      .map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => void handleUpdateOrderStatus(selectedOrder.orderCode, st)}
+                          className="px-4 py-2 rounded-xl bg-[#16261E] hover:bg-emerald-900 text-white font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <span>{orderNextActionLabel(st)}</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      ))}
                 </div>
               </aside>
             </div>
@@ -3882,7 +3936,10 @@ function AdminPortalContent() {
       {/* TAB 10: HỘP THƯ & KHIẾU NẠI KHÁCH HÀNG TOÀN SÀN          */}
       {/* ========================================================= */}
       {activeTab === "messages" && (
-        <AdminMessagesPanel />
+        <AdminMessagesPanel
+          initialOrderCode={orderParam}
+          onDisputeResolved={fetchOrders}
+        />
       )}
       {showCreateVoucherModal && (
         <div onClick={() => setShowCreateVoucherModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">

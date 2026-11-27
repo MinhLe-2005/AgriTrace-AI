@@ -14,14 +14,14 @@ export function DistributorPageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="bg-amber-950 text-white p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-sm border border-amber-900">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-amber-800 flex items-center justify-center text-white shrink-0">
+    <div className="bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] text-white p-5 sm:p-6 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-xl border border-[#243B2E]">
+      <div className="flex items-center gap-3.5">
+        <div className="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-300/30 flex items-center justify-center text-amber-300 shrink-0">
           <Icon size={22} />
         </div>
         <div>
-          <h1 className="text-lg font-bold">{title}</h1>
-          <p className="text-xs text-amber-200/80 mt-0.5">{description}</p>
+          <h1 className="font-serif text-lg sm:text-xl font-bold">{title}</h1>
+          <p className="text-xs text-emerald-100/80 mt-0.5">{description}</p>
         </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -31,7 +31,7 @@ export function DistributorPageHeader({
 
 export function ShipmentStatusBadge({ status }: { status: ShipmentStatus }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold ${shipmentStatusClass[status]}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold ${shipmentStatusClass[status]}`}>
       {shipmentStatusLabel[status]}
     </span>
   );
@@ -51,18 +51,18 @@ export function MetricCard({
   tone?: "amber" | "emerald" | "blue" | "violet";
 }) {
   const colors = {
-    amber: "bg-amber-50 text-amber-700 border-amber-100",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    blue: "bg-blue-50 text-blue-700 border-blue-100",
-    violet: "bg-violet-50 text-violet-700 border-violet-100",
+    amber: "bg-amber-50 text-amber-800 border-amber-200",
+    emerald: "bg-emerald-50 text-[#166534] border-emerald-200",
+    blue: "bg-[#F6F3EC] text-[#16261E] border-[#E4DFD5]",
+    violet: "bg-[#F6F3EC] text-[#16261E] border-[#E4DFD5]",
   };
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs">
+    <div className="bento-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
-          <p className="text-2xl font-extrabold text-gray-900 mt-1">{value}</p>
-          <p className="text-[11px] text-gray-500 mt-1">{hint}</p>
+          <p className="text-[11px] font-mono font-bold uppercase tracking-wide text-stone-500">{label}</p>
+          <p className="text-2xl font-mono font-extrabold text-[#16261E] mt-1">{value}</p>
+          <p className="text-[11px] text-stone-500 mt-1">{hint}</p>
         </div>
         <span className={`w-9 h-9 rounded-xl border flex items-center justify-center ${colors[tone]}`}>
           <Icon size={18} />

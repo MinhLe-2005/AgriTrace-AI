@@ -1405,26 +1405,26 @@ function CustomerDashboardContent() {
       />
 
       {/* ── Breadcrumb ── */}
-      <div className="flex items-center gap-2 text-xs text-gray-500">
-        <Link href="/" className="hover:text-emerald-700 transition-colors">
+      <div className="flex items-center gap-2 text-xs text-stone-500">
+        <Link href="/" className="hover:text-[#166534] transition-colors">
           Trang chủ
         </Link>
         <span>/</span>
-        <span className="font-semibold text-gray-800">Tài khoản khách hàng</span>
+        <span className="font-semibold text-[#16261E]">Tài khoản khách hàng</span>
       </div>
 
       {/* ── Customer Summary Card ── */}
-      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bento-card p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="relative group shrink-0">
             {avatarPreview || user?.avatarUrl ? (
               <img
                 src={avatarPreview || user?.avatarUrl}
                 alt={user?.name || "Avatar"}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-emerald-300 shadow-sm"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-[#166534] shadow-sm"
               />
             ) : (
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-800 text-white flex items-center justify-center font-bold text-xl sm:text-2xl shadow-sm">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#16261E] text-amber-300 flex items-center justify-center font-serif font-bold text-xl sm:text-2xl shadow-sm">
                 {user?.name?.charAt(0)?.toUpperCase() || "K"}
               </div>
             )}
@@ -1439,91 +1439,91 @@ function CustomerDashboardContent() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900">
+              <h1 className="font-serif text-lg sm:text-xl font-bold text-[#16261E]">
                 {user?.name || "Khách Hàng"}
               </h1>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                <Star size={11} className="fill-amber-500 text-amber-500" /> Hội Viên Vàng
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-100/80 text-amber-900 border border-amber-300">
+                <Star size={11} className="fill-amber-600 text-amber-600" /> Hội Viên Vàng
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-stone-500 mt-1">
               {user?.email} · Khách hàng thân thiết AgriTrace
             </p>
           </div>
         </div>
 
         {/* Quick Stats */}
-        <div className="flex items-center gap-4 sm:gap-6 border-t md:border-t-0 pt-4 md:pt-0 border-gray-100">
+        <div className="flex items-center gap-4 sm:gap-6 border-t md:border-t-0 pt-4 md:pt-0 border-[#F0ECE1]">
           <button
             onClick={() => setActiveTab("orders")}
             className="text-center group transition-transform hover:-translate-y-0.5"
           >
-            <div className="text-lg sm:text-xl font-extrabold text-emerald-800 group-hover:text-emerald-600">
+            <div className="text-lg sm:text-xl font-mono font-extrabold text-[#166534] group-hover:text-emerald-600">
               {orders.length}
             </div>
-            <div className="text-xs text-gray-500">Đơn hàng</div>
+            <div className="text-xs text-stone-500">Đơn hàng</div>
           </button>
-          <div className="w-px h-8 bg-gray-200" />
+          <div className="w-px h-8 bg-[#E4DFD5]" />
           <button
             onClick={() => setActiveTab("messages")}
             className="text-center group transition-transform hover:-translate-y-0.5 relative"
           >
-            <div className="text-lg sm:text-xl font-extrabold text-teal-700 group-hover:text-teal-600">
+            <div className="text-lg sm:text-xl font-extrabold text-[#16261E] group-hover:text-[#166534]">
               {unreadMessagesCount > 0 ? (
                 <span className="text-red-600 font-black animate-pulse">{unreadMessagesCount} mới</span>
               ) : (
                 <span className="inline-flex items-center justify-center gap-1"><MessageSquare size={16} /> Chat</span>
               )}
             </div>
-            <div className="text-xs text-gray-500">Hộp thư Shop</div>
+            <div className="text-xs text-stone-500">Hộp thư Shop</div>
           </button>
-          <div className="w-px h-8 bg-gray-200" />
+          <div className="w-px h-8 bg-[#E4DFD5]" />
           <button
             onClick={() => setActiveTab("vouchers")}
             className="text-center group transition-transform hover:-translate-y-0.5"
           >
-            <div className="text-lg sm:text-xl font-extrabold text-blue-600 group-hover:text-blue-500">
+            <div className="text-lg sm:text-xl font-mono font-extrabold text-[#16261E] group-hover:text-[#166534]">
               {savedVouchers.filter((v) => v.status === "active").length}
             </div>
-            <div className="text-xs text-gray-500">Voucher ví</div>
+            <div className="text-xs text-stone-500">Voucher ví</div>
           </button>
-          <div className="w-px h-8 bg-gray-200" />
+          <div className="w-px h-8 bg-[#E4DFD5]" />
           <button
             onClick={() => setActiveTab("notifications")}
             className="text-center group transition-transform hover:-translate-y-0.5 relative"
           >
-            <div className="text-lg sm:text-xl font-extrabold text-purple-600 group-hover:text-purple-500">
+            <div className="text-lg sm:text-xl font-mono font-extrabold text-[#16261E] group-hover:text-[#166534]">
               {unreadCount}
             </div>
-            <div className="text-xs text-gray-500">Thông báo mới</div>
+            <div className="text-xs text-stone-500">Thông báo mới</div>
           </button>
-          <div className="w-px h-8 bg-gray-200" />
+          <div className="w-px h-8 bg-[#E4DFD5]" />
           <button
             onClick={() => setActiveTab("points")}
             className="text-center group transition-transform hover:-translate-y-0.5"
           >
-            <div className="text-lg sm:text-xl font-extrabold text-amber-600 group-hover:text-amber-500">
+            <div className="text-lg sm:text-xl font-mono font-extrabold text-amber-700 group-hover:text-amber-600">
               {totalLoyaltyPoints}
             </div>
-            <div className="text-xs text-gray-500">Điểm tích lũy</div>
+            <div className="text-xs text-stone-500">Điểm tích lũy</div>
           </button>
         </div>
       </div>
 
       {/* ── Main Navigation Tabs ── */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-px overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-[#E4DFD5] pb-px overflow-x-auto">
         <button
           onClick={() => setActiveTab("orders")}
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap",
             activeTab === "orders"
-              ? "border-emerald-600 text-emerald-800 bg-white"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] bg-white"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           )}
         >
-          <ShoppingBag size={16} />
+          <ShoppingBag size={16} className={activeTab === "orders" ? "text-[#166534]" : ""} />
           <span>Đơn mua của tôi</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-[#F6F3EC] border border-[#E4DFD5] text-[#16261E] font-bold">
             {orders.length}
           </span>
         </button>
@@ -1533,11 +1533,11 @@ function CustomerDashboardContent() {
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer",
             activeTab === "messages"
-              ? "border-emerald-600 text-emerald-800 bg-white"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] bg-white"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           )}
         >
-          <MessageSquare size={16} />
+          <MessageSquare size={16} className={activeTab === "messages" ? "text-[#166534]" : ""} />
           <span>Hộp Thư & Trò Chuyện</span>
           {unreadMessagesCount > 0 && (
             <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-red-600 text-white font-bold animate-pulse">
@@ -1551,13 +1551,13 @@ function CustomerDashboardContent() {
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap",
             activeTab === "vouchers"
-              ? "border-emerald-600 text-emerald-800 bg-white"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] bg-white"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           )}
         >
-          <Gift size={16} />
+          <Gift size={16} className={activeTab === "vouchers" ? "text-[#166534]" : ""} />
           <span>Kho Voucher đã lưu</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-[#F6F3EC] border border-[#E4DFD5] text-[#16261E] font-bold">
             {savedVouchers.filter((v) => v.status === "active").length}
           </span>
         </button>
@@ -1567,11 +1567,11 @@ function CustomerDashboardContent() {
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap",
             activeTab === "notifications"
-              ? "border-emerald-600 text-emerald-800 bg-white"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] bg-white"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           )}
         >
-          <Bell size={16} />
+          <Bell size={16} className={activeTab === "notifications" ? "text-[#166534]" : ""} />
           <span>Thông báo</span>
           {unreadCount > 0 && (
             <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-red-100 text-red-700 font-bold">
@@ -1585,11 +1585,11 @@ function CustomerDashboardContent() {
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap",
             activeTab === "profile"
-              ? "border-emerald-600 text-emerald-800 bg-white"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] bg-white"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           )}
         >
-          <UserIcon size={16} />
+          <UserIcon size={16} className={activeTab === "profile" ? "text-[#166534]" : ""} />
           <span>Hồ sơ tài khoản</span>
         </button>
 
@@ -1598,11 +1598,11 @@ function CustomerDashboardContent() {
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap",
             activeTab === "password"
-              ? "border-emerald-600 text-emerald-800 bg-white"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] bg-white"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           )}
         >
-          <KeyRound size={16} />
+          <KeyRound size={16} className={activeTab === "password" ? "text-[#166534]" : ""} />
           <span>Đổi mật khẩu</span>
         </button>
 
@@ -1611,11 +1611,11 @@ function CustomerDashboardContent() {
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap",
             activeTab === "points"
-              ? "border-emerald-600 text-emerald-800 bg-white"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] bg-white"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           )}
         >
-          <Award size={16} />
+          <Award size={16} className={activeTab === "points" ? "text-[#166534]" : ""} />
           <span>Điểm & Hội viên</span>
         </button>
       </div>
@@ -2271,7 +2271,7 @@ function CustomerDashboardContent() {
                       {/* FEATURE: Khiếu nại / Trả hàng (Shopee-style) */}
                       {order.refundStatus === "PENDING" ? (
                         <button
-                          onClick={() => setChatOrder({ ...(order as any), orderCode: order.id, total: order.total } as ApiOrder)}
+                          onClick={() => setChatOrder({ ...order, orderCode: order.id, total: order.total } as unknown as ApiOrder)}
                           className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-950 border border-amber-400 text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer animate-pulse"
                           title="Đang có yêu cầu hoàn tiền, bấm để xem chi tiết trao đổi"
                         >
@@ -2285,7 +2285,7 @@ function CustomerDashboardContent() {
                         </span>
                       ) : (order.status === "DELIVERED" || order.status === "COMPLETED" || order.status === "SHIPPING") ? (
                         <button
-                          onClick={() => setDisputeOrder({ ...(order as any), orderCode: order.id, total: order.total } as ApiOrder)}
+                          onClick={() => setDisputeOrder({ ...order, orderCode: order.id, total: order.total } as unknown as ApiOrder)}
                           className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-red-50 text-red-800 border border-red-200 hover:border-red-300 text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                           title="Gửi yêu cầu đổi trả hoặc hoàn tiền nếu nông sản bị hư hại"
                         >
