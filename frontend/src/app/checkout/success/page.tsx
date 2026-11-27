@@ -59,20 +59,20 @@ function SuccessContent() {
   }, [router, targetUrl]);
 
   return (
-    <div className="min-h-screen bg-[#f8faf8] flex items-center justify-center p-4 py-12">
-      <div className="max-w-lg w-full bg-white rounded-3xl border border-emerald-100 shadow-xl p-6 sm:p-8 text-center space-y-6">
-        <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-3xl mx-auto flex items-center justify-center shadow-inner animate-bounce">
+    <div className="min-h-screen bg-[#FBF9F5] text-[#16261E] flex items-center justify-center p-4 py-12">
+      <div className="max-w-lg w-full bento-card p-6 sm:p-8 text-center space-y-6">
+        <div className="w-20 h-20 bg-[#16261E] text-amber-300 rounded-3xl mx-auto flex items-center justify-center shadow-inner animate-bounce">
           <CheckCircle2 size={44} className="stroke-[2.5]" />
         </div>
 
         <div className="space-y-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
-            <Sparkles size={13} /> Thanh toán chuyển khoản VietQR thành công
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-[#166534] font-mono text-[11px] font-bold border border-emerald-200">
+            <Sparkles size={13} /> THANH TOÁN CHUYỂN KHOẢN VIETQR THÀNH CÔNG
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] tracking-tight">
             Đặt Hàng Thành Công!
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-stone-600">
             Giao dịch chuyển khoản qua mã QR Napas 247 đã được hệ thống xác nhận an toàn.
           </p>
         </div>

@@ -276,27 +276,27 @@ export default function LoyaltyPage() {
   }
 
   return (
-    <div className="bg-[#f8faf8] min-h-screen py-8">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
         {/* ── Breadcrumb ── */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700 transition-colors">
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534] transition-colors">
             Trang chủ
           </Link>
           <span>/</span>
-          <span className="font-semibold text-gray-800">Hội viên AgriClub</span>
+          <span className="font-semibold text-[#16261E]">Hội viên AgriClub</span>
         </div>
 
         {/* ── Page Header ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2.5">
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] tracking-tight flex items-center gap-2.5">
               <span>Hội Viên Thân Thiết & Tích Điểm</span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-100/80 text-amber-900 border border-amber-300">
                 AgriClub
               </span>
             </h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            <p className="text-xs sm:text-sm text-stone-600 mt-1">
               Tích lũy điểm thưởng tự động trên mỗi đơn hàng nông sản, tận hưởng chiết khấu độc quyền và ưu tiên vận chuyển xe lạnh.
             </p>
           </div>
@@ -304,7 +304,7 @@ export default function LoyaltyPage() {
           <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
             <Link
               href="/vouchers"
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer whitespace-nowrap"
+              className="px-3.5 py-2 rounded-xl bg-[#16261E] hover:bg-[#1E3328] text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap"
               title="Xem tất cả mã giảm giá nông sản trên toàn sàn"
             >
               <Gift size={14} />
@@ -313,10 +313,10 @@ export default function LoyaltyPage() {
 
             <Link
               href="/dashboard/customer?tab=vouchers"
-              className="px-3.5 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs whitespace-nowrap"
+              className="px-3.5 py-2 rounded-xl bg-white border border-[#E4DFD5] text-[#16261E] hover:bg-[#F6F3EC] text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs whitespace-nowrap"
               title="Xem các voucher đã lưu vào ví của tài khoản"
             >
-              <Ticket size={14} />
+              <Ticket size={14} className="text-[#166534]" />
               <span>Ví Voucher Của Tôi</span>
             </Link>
           </div>
@@ -325,7 +325,7 @@ export default function LoyaltyPage() {
         {/* ── Digital VIP Membership Card ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Card Presentation */}
-          <div className="lg:col-span-2 relative rounded-3xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden bg-gradient-to-tr from-[#0b2414] via-[#123e21] to-[#1c5d33] border border-emerald-700/50 flex flex-col justify-between min-h-[250px]">
+          <div className="lg:col-span-2 relative rounded-3xl p-6 sm:p-8 text-white shadow-2xl overflow-hidden bg-gradient-to-tr from-[#16261E] via-[#1B3326] to-[#12241B] border border-[#243B2E] flex flex-col justify-between min-h-[250px]">
             <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-amber-400/10 via-emerald-300/5 to-transparent pointer-events-none" />
 
             {/* Top Row: Brand & Chip */}
@@ -391,45 +391,45 @@ export default function LoyaltyPage() {
           </div>
 
           {/* Points Box */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/90 shadow-xs flex flex-col justify-between space-y-4">
+          <div className="bento-card p-6 sm:p-7 flex flex-col justify-between space-y-4">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-stone-500">
                 Ví Điểm Thưởng Của Bạn
               </span>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-4xl sm:text-5xl font-black text-gray-900 tracking-tight">
+                <span className="text-4xl sm:text-5xl font-mono font-black text-[#16261E] tracking-tight">
                   {loading ? "…" : currentPoints}
                 </span>
-                <span className="text-sm font-bold text-emerald-700">điểm khả dụng</span>
+                <span className="text-sm font-bold text-[#166534]">điểm khả dụng</span>
               </div>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+              <p className="text-xs text-stone-600 mt-2 leading-relaxed">
                 Tương đương khoảng <strong>~{(currentPoints * 500).toLocaleString("vi-VN")} đ</strong> giá trị quy đổi voucher giảm giá trên giỏ hàng.
               </p>
             </div>
 
-            <div className="space-y-2 pt-4 border-t border-gray-100 text-xs">
-              <div className="flex items-center justify-between text-gray-600">
+            <div className="space-y-2 pt-4 border-t border-[#F0ECE1] text-xs">
+              <div className="flex items-center justify-between text-stone-600">
                 <span>Điểm trọn đời:</span>
-                <span className="font-semibold text-gray-800">{profile?.lifetimePoints ?? currentPoints} điểm</span>
+                <span className="font-mono font-semibold text-[#16261E]">{profile?.lifetimePoints ?? currentPoints} điểm</span>
               </div>
-              <div className="flex items-center justify-between text-gray-600">
+              <div className="flex items-center justify-between text-stone-600">
                 <span>Hạng thẻ:</span>
-                <span className="font-semibold text-emerald-700">{tierKey}</span>
+                <span className="font-mono font-semibold text-[#166534]">{tierKey}</span>
               </div>
             </div>
 
             <div className="space-y-2">
               <a
                 href="#redeem-section"
-                className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold text-center transition-colors shadow-xs block"
+                className="w-full py-2.5 rounded-xl bg-[#166534] hover:bg-[#14532D] text-white text-xs font-bold text-center transition-colors shadow-xs block"
               >
                 Đổi Điểm Lấy Voucher Ngay ↓
               </a>
               <Link
                 href="/vouchers"
-                className="w-full py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                className="w-full py-2 rounded-xl bg-[#F6F3EC] hover:bg-[#EFECE4] border border-[#E4DFD5] text-[#16261E] text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
               >
-                <Gift size={14} className="text-amber-600" />
+                <Gift size={14} className="text-amber-700" />
                 <span>Đến Kho Mã Giảm Giá Toàn Sàn →</span>
               </Link>
             </div>
@@ -534,7 +534,7 @@ export default function LoyaltyPage() {
             ].map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveVoucherTab(tab.key as any)}
+                onClick={() => setActiveVoucherTab(tab.key as typeof activeVoucherTab)}
                 className={cn(
                   "px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all duration-150 cursor-pointer",
                   activeVoucherTab === tab.key

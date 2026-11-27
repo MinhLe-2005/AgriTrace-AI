@@ -118,29 +118,29 @@ export default function FarmingTechniquesPage() {
   const activeData = FARMING_DATA.find((g) => g.id === selectedGuide) || FARMING_DATA[0];
 
   return (
-    <div className="bg-gray-50/50 min-h-screen py-10 sm:py-14">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-10 sm:py-14">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         {/* Header Hero */}
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#16261E] text-amber-300 text-xs font-mono font-bold mb-3">
             <Leaf size={14} /> HỒ SƠ CANH TÁC & KỸ THUẬT NÔNG NGHIỆP
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#16261E] tracking-tight">
             Kỹ Thuật Chăm Sóc Cây Trồng
           </h1>
-          <p className="mt-3 text-gray-600 text-sm sm:text-base leading-relaxed">
+          <p className="mt-3 text-stone-600 text-sm sm:text-base leading-relaxed">
             Quy trình canh tác chuẩn VietGAP & GlobalGAP từ các nông trại liên kết AgriTrace AI — Hướng dẫn chi tiết từng giai đoạn sinh trưởng, dinh dưỡng và thu hoạch an toàn.
           </p>
 
           {/* Search bar */}
           <div className="relative mt-6 max-w-lg mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={17} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo giống cây, nông trại, chứng chỉ (ví dụ: xà lách, cam sành, VietGAP...)"
-              className="w-full pl-11 pr-4 py-2.5 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full pl-11 pr-4 py-2.5 bg-white rounded-xl border border-[#E4DFD5] text-sm focus:outline-none focus:border-[#166534] focus:ring-2 focus:ring-emerald-700/15"
             />
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function FarmingTechniquesPage() {
               onClick={() => setActiveCategory(cat.key)}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                 activeCategory === cat.key
-                  ? "bg-[#1a7a3a] text-white shadow-xs font-semibold"
+                  ? "bg-[#16261E] text-amber-300 shadow-xs font-semibold"
                   : "bg-white text-gray-600 hover:text-gray-900 border border-gray-200/80"
               }`}
             >

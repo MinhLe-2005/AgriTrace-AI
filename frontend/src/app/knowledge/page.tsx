@@ -145,17 +145,17 @@ function KnowledgeContent() {
   ];
 
   return (
-    <div className="bg-gray-50/50 min-h-screen py-10 sm:py-14">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-10 sm:py-14">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         {/* Header Hero */}
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#16261E] text-amber-300 text-xs font-mono font-bold mb-3">
             <BookOpen size={14} /> CHUYÊN TRANG KIẾN THỨC & NÔNG SẢN
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#16261E] tracking-tight">
             Kiến Thức & Chia Sẻ
           </h1>
-          <p className="mt-3 text-gray-600 text-sm sm:text-base leading-relaxed">
+          <p className="mt-3 text-stone-600 text-sm sm:text-base leading-relaxed">
             Chuyên đề chuyên sâu về tiêu chuẩn xuất khẩu nông sản quốc tế, kỹ thuật chuỗi lạnh và bộ mẹo vặt hữu ích dành cho người tiêu dùng thông thái.
           </p>
 

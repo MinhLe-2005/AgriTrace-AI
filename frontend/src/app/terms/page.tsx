@@ -18,33 +18,33 @@ import Link from "next/link";
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 via-white to-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#FBF9F5] text-[#16261E] py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700 transition-colors flex items-center gap-1 font-medium">
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534] transition-colors flex items-center gap-1 font-medium">
             <ArrowLeft size={13} />
             <span>Trang chủ</span>
           </Link>
-          <ChevronRight size={12} className="text-gray-400" />
-          <span className="text-emerald-900 font-bold">Điều khoản dịch vụ & Chính sách nông sản</span>
+          <ChevronRight size={12} className="text-stone-400" />
+          <span className="text-[#16261E] font-bold">Điều khoản dịch vụ & Chính sách nông sản</span>
         </div>
 
         {/* Hero Header */}
-        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-emerald-500/10 to-transparent pointer-events-none" />
+        <div className="bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] border border-[#243B2E] text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-amber-300/15 to-transparent pointer-events-none" />
           <div className="relative z-10 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold shadow-inner">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-300/30 text-amber-300 text-xs font-mono font-bold shadow-inner">
               <Scale size={14} />
-              <span>Chính Sách & Quy Định Mua Bán Chính Thức</span>
+              <span>CHÍNH SÁCH & QUY ĐỊNH MUA BÁN CHÍNH THỨC</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
+            <h1 className="font-serif text-2xl sm:text-4xl font-bold tracking-tight">
               Điều Khoản Dịch Vụ & Chính Sách Nông Sản
             </h1>
-            <p className="text-emerald-200/90 text-xs sm:text-sm max-w-2xl leading-relaxed">
+            <p className="text-emerald-100/85 text-xs sm:text-sm max-w-2xl leading-relaxed">
               Quy chế hoạt động, cam kết chuỗi cung ứng lạnh khép kín, chính sách bảo vệ người tiêu dùng và quy định đổi trả 1-đổi-1 trong vòng 24 giờ của hệ sinh thái AgriTrace AI.
             </p>
-            <div className="pt-2 flex items-center gap-4 text-[11px] text-emerald-300/80">
+            <div className="pt-2 flex items-center gap-4 text-[11px] font-mono text-amber-200/85">
               <span>Hiệu lực: Tháng 11/2026</span>
               <span>•</span>
               <span>Áp dụng toàn quốc</span>
@@ -57,16 +57,16 @@ export default function TermsPage() {
         {/* Main Content Sections */}
         <div className="space-y-6">
           {/* Section 1 */}
-          <div id="standards" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+          <div id="standards" className="scroll-mt-24 bento-card p-6 space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-[#F0ECE1]">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#166534] flex items-center justify-center font-bold">
                 <Leaf size={20} />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-black text-gray-900">
+                <h2 className="font-serif text-base sm:text-lg font-bold text-[#16261E]">
                   1. Cam Kết Tiêu Chuẩn Nông Sản & Nguồn Gốc Minh Bạch
                 </h2>
-                <p className="text-xs text-gray-500">Tiêu chí chất lượng và truy xuất nguồn gốc điện tử</p>
+                <p className="text-xs text-stone-500">Tiêu chí chất lượng và truy xuất nguồn gốc điện tử</p>
               </div>
             </div>
             <div className="space-y-3 text-xs text-gray-700 leading-relaxed">
