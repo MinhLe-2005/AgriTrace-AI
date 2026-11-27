@@ -203,19 +203,9 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <strong className="block text-white">Kênh hỗ trợ trực tuyến:</strong>
-                    <span className="text-emerald-100/80">Chat trực tuyến & Trợ lý AI hoạt động 24/7</span>
+                    <span className="text-emerald-100/80">Trợ lý AI AgriTrace hoạt động 24/7 (nút nổi góc phải)</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="pt-4 border-t border-emerald-800/80 flex items-center justify-between">
-                <span className="text-[11px] text-emerald-200">Kênh giải đáp nhanh:</span>
-                <Link
-                  href="/chat"
-                  className="px-3.5 py-1.5 rounded-xl bg-white text-[#1a7a3a] text-xs font-bold hover:bg-emerald-50 transition-colors shadow-xs"
-                >
-                  Mở Kênh Chat Live
-                </Link>
               </div>
             </div>
 

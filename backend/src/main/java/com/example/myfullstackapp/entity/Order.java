@@ -78,6 +78,27 @@ public class Order {
 
     private LocalDateTime cancelledAt;
 
+    @Column(length = 32)
+    private String refundStatus;
+
+    @Column(length = 255)
+    private String refundReason;
+
+    @Column(length = 64)
+    private String refundSolution;
+
+    private Long refundAmount;
+
+    @Column(length = 500)
+    private String refundPhotoUrl;
+
+    private LocalDateTime refundRequestedAt;
+
+    private LocalDateTime refundResolvedAt;
+
+    @Column(length = 255)
+    private String refundNote;
+
     private LocalDateTime paidAt;
 
     @Column(length = 128)

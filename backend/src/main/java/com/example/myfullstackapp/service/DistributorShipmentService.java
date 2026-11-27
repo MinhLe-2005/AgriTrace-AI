@@ -2,6 +2,7 @@ package com.example.myfullstackapp.service;
 
 import com.example.myfullstackapp.dto.distributor.*;
 import com.example.myfullstackapp.event.DistributorShipmentChanged;
+import com.example.myfullstackapp.entity.DistributorNotificationType;
 import com.example.myfullstackapp.entity.Shipment;
 import com.example.myfullstackapp.entity.ShipmentReceipt;
 import com.example.myfullstackapp.entity.ShipmentTrackingEvent;
@@ -40,6 +41,7 @@ public class DistributorShipmentService {
     private final OrderRepository orderRepository;
     private final HarvestLotRepository harvestLotRepository;
     private final ApplicationEventPublisher events;
+    private final DistributorNotificationService notificationService;
 
     @Transactional(readOnly = true)
     public DistributorDashboardResponse dashboard(String actorEmail, boolean isAdmin) {
@@ -108,19 +110,25 @@ public class DistributorShipmentService {
     }
 
     @Transactional
-    public ShipmentResponse create(CreateShipmentRequest request, String actorEmail) {
+    public ShipmentResponse create(CreateShipmentRequest request, String actorEmail, boolean isAdmin) {
         String shipmentCode = optionalText(request.shipmentCode());
         if (shipmentCode == null) shipmentCode = generatedShipmentCode();
         shipmentCode = shipmentCode.toUpperCase(Locale.ROOT);
         if (shipmentRepository.findByShipmentCodeIgnoreCase(shipmentCode).isPresent()) {
             throw new ConflictException("Mã chuyến vận chuyển đã tồn tại");
         }
+        String assigneeEmail = optionalText(request.distributorEmail());
+        if (!isAdmin && assigneeEmail != null && !actorEmail.equalsIgnoreCase(assigneeEmail)) {
+            throw new AccessDeniedException("Distributor chỉ có thể tạo chuyến cho chính mình");
+        }
+        if (assigneeEmail == null) assigneeEmail = actorEmail;
+        assigneeEmail = assigneeEmail.toLowerCase(Locale.ROOT);
         List<String> orderCodes = splitCodes(joinCodes(request.orderCodes()));
-        List<com.example.myfullstackapp.entity.Order> claimedOrders = claimOrders(orderCodes, actorEmail, shipmentCode);
+        List<com.example.myfullstackapp.entity.Order> claimedOrders = claimOrders(orderCodes, assigneeEmail, shipmentCode);
 
         Shipment shipment = Shipment.builder()
                 .shipmentCode(shipmentCode)
-                .distributorEmail(actorEmail)
+                .distributorEmail(assigneeEmail)
                 .orderCodes(joinCodes(orderCodes))
                 .driverName(request.driverName().trim())
                 .driverPhone(optionalText(request.driverPhone()))
@@ -146,6 +154,8 @@ public class DistributorShipmentService {
         orderRepository.saveAll(claimedOrders);
         recordEvent(saved, saved.getOrigin(), saved.getTemperatureC(), null, null, null, null,
                 "PREPARING", "Đã tạo phiếu vận chuyển, chờ xuất phát.", Instant.now());
+        notificationService.notifyDistributor(assigneeEmail, DistributorNotificationType.SHIPMENT_ASSIGNED,
+                "Có chuyến hàng mới", "Bạn được phân công xử lý chuyến " + saved.getShipmentCode() + ".", saved.getShipmentCode());
         publishChange(saved);
         return toResponse(saved);
     }
@@ -175,6 +185,7 @@ public class DistributorShipmentService {
             }
             orderRepository.save(order);
         }));
+        if (isAdmin) notifyDistributorShipmentUpdated(shipment, "Thông tin chuyến hàng đã được quản trị viên cập nhật.");
         publishChange(shipment);
         return toResponse(shipment);
     }
@@ -195,6 +206,7 @@ public class DistributorShipmentService {
         recordEvent(shipment, Optional.ofNullable(optionalText(request.location())).orElse(shipment.getDestination()), request.temperatureC(), request.humidityPercent(),
                 request.latitude(), request.longitude(), request.accuracyMeters(), status, optionalText(request.note()), now);
         synchronizeOrderStatuses(shipment, status);
+        notifyStatusChange(shipment, status, isAdmin);
         publishChange(shipment);
         return toResponse(shipment);
     }
@@ -233,6 +245,12 @@ public class DistributorShipmentService {
         recordEvent(shipment, request.location().trim(), request.temperatureC(), request.humidityPercent(),
                 request.latitude(), request.longitude(), request.accuracyMeters(), eventStatus, optionalText(request.note()), now);
         synchronizeOrderStatuses(shipment, eventStatus);
+        if ("INCIDENT".equals(eventStatus) && !isAdmin) {
+            notificationService.notifyAdmins(DistributorNotificationType.INCIDENT_REPORTED,
+                    "Distributor báo sự cố", "Chuyến " + shipment.getShipmentCode() + ": " + Optional.ofNullable(optionalText(request.note())).orElse("Cần kiểm tra ngay."), shipment.getShipmentCode());
+        } else if (lifecycleChanged) {
+            notifyStatusChange(shipment, eventStatus, isAdmin);
+        }
         publishChange(shipment);
         return toResponse(shipment);
     }
@@ -288,8 +306,40 @@ public class DistributorShipmentService {
         recordEvent(shipment, shipment.getDestination(), shipment.getTemperatureC(), null, null, null, null, "RECEIVED",
                 "Tiếp nhận QR bởi " + receipt.getReceiverName() + (receipt.getNote() == null ? "" : ": " + receipt.getNote()), receivedAt);
         synchronizeOrderStatuses(shipment, "RECEIVED");
+        if (!isAdmin) {
+            notificationService.notifyAdmins(DistributorNotificationType.STATUS_UPDATED,
+                    "Chuyến hàng đã được tiếp nhận", "Chuyến " + shipment.getShipmentCode() + " đã có biên nhận QR.", shipment.getShipmentCode());
+        }
         publishChange(shipment);
         return toResponse(shipment);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DistributorNotificationResponse> notifications(String actorEmail, boolean unreadOnly) {
+        return notificationService.list(actorEmail, unreadOnly);
+    }
+
+    @Transactional(readOnly = true)
+    public long unreadNotificationCount(String actorEmail) {
+        return notificationService.unreadCount(actorEmail);
+    }
+
+    @Transactional
+    public DistributorNotificationResponse markNotificationRead(UUID notificationId, String actorEmail) {
+        return notificationService.markRead(notificationId, actorEmail);
+    }
+
+    @Transactional
+    public long markAllNotificationsRead(String actorEmail) {
+        return notificationService.markAllRead(actorEmail);
+    }
+
+    @Transactional
+    public void requestSupport(String shipmentCode, CreateShipmentSupportRequest request, String actorEmail, boolean isAdmin) {
+        Shipment shipment = findVisibleShipment(shipmentCode, actorEmail, isAdmin);
+        if (isAdmin) throw new AccessDeniedException("Chỉ Distributor mới có thể gửi yêu cầu hỗ trợ");
+        notificationService.notifyAdmins(DistributorNotificationType.SUPPORT_REQUEST,
+                "Distributor cần hỗ trợ", "Chuyến " + shipment.getShipmentCode() + ": " + request.message().trim(), shipment.getShipmentCode());
     }
 
     private List<Shipment> visibleShipments(String actorEmail, boolean isAdmin, String status) {
@@ -466,6 +516,30 @@ public class DistributorShipmentService {
 
     private void publishChange(Shipment shipment) {
         events.publishEvent(new DistributorShipmentChanged(shipment.getShipmentCode(), shipment.getDistributorEmail(), Instant.now()));
+    }
+
+    private void notifyDistributorShipmentUpdated(Shipment shipment, String message) {
+        notificationService.notifyDistributor(shipment.getDistributorEmail(), DistributorNotificationType.SHIPMENT_UPDATED,
+                "Thông tin chuyến hàng đã thay đổi", "Chuyến " + shipment.getShipmentCode() + ": " + message,
+                shipment.getShipmentCode());
+    }
+
+    /** Sends the state change to the party that did not perform it. */
+    private void notifyStatusChange(Shipment shipment, String status, boolean changedByAdmin) {
+        if (changedByAdmin) {
+            DistributorNotificationType type = "CANCELLED".equals(status)
+                    ? DistributorNotificationType.SHIPMENT_CANCELLED
+                    : DistributorNotificationType.STATUS_UPDATED;
+            String title = "CANCELLED".equals(status) ? "Chuyến hàng đã bị hủy" : "Trạng thái chuyến hàng đã đổi";
+            notificationService.notifyDistributor(shipment.getDistributorEmail(), type, title,
+                    "Chuyến " + shipment.getShipmentCode() + " đã chuyển sang trạng thái " + status + ".",
+                    shipment.getShipmentCode());
+            return;
+        }
+        notificationService.notifyAdmins(DistributorNotificationType.STATUS_UPDATED,
+                "Distributor đã cập nhật trạng thái",
+                "Chuyến " + shipment.getShipmentCode() + " đã chuyển sang trạng thái " + status + ".",
+                shipment.getShipmentCode());
     }
 
     private String generatedShipmentCode() {

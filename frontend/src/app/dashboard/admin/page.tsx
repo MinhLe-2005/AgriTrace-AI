@@ -35,6 +35,7 @@ import {
   Users,
   X,
   ArrowRight,
+  MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -42,6 +43,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { ErrorState, LoadingSkeleton } from "@/components/ui/states";
 import { AdminPageHeader, AdminStatCard } from "@/features/admin/admin-ui";
+import { AdminMessagesPanel } from "@/features/order-chat/AdminMessagesPanel";
 import { useUsers } from "@/hooks/use-users";
 import { useVerificationMutations, useVerifications } from "@/hooks/use-verifications";
 import { getApiErrorMessage } from "@/lib/api";
@@ -88,8 +90,8 @@ function submittedAt(value: string) {
   return new Date(value).toLocaleString("vi-VN");
 }
 
-type AdminTab = "verifications" | "farms" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog";
-const ADMIN_TABS: AdminTab[] = ["verifications", "farms", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog"];
+type AdminTab = "verifications" | "farms" | "batches" | "certs" | "orders" | "vouchers" | "loyalty" | "events" | "blog" | "messages";
+const ADMIN_TABS: AdminTab[] = ["verifications", "farms", "batches", "certs", "orders", "vouchers", "loyalty", "events", "blog", "messages"];
 
 function AdminPortalContent() {
   const searchParams = useSearchParams();
@@ -1104,6 +1106,7 @@ function AdminPortalContent() {
     loyalty: { title: "Hội viên AgriClub", description: "Theo dõi hạng thành viên, điểm thưởng và lịch sử chi tiêu của khách hàng.", icon: Crown, tone: "amber" as const, meta: `${members.length} hội viên` },
     events: { title: "Sự kiện & mùa vụ", description: "Quản lý thời gian, ưu đãi và phạm vi nông sản áp dụng cho từng chiến dịch.", icon: CalendarDays, tone: "teal" as const, meta: `${campaigns.length} chiến dịch` },
     blog: { title: "Quản trị blog & cẩm nang", description: "Quản lý nội dung, chuyên mục, trạng thái xuất bản và thông tin tác giả.", icon: BookOpen, tone: "indigo" as const, meta: `${blogPosts.length} bài viết` },
+    messages: { title: "Hộp thư & khiếu nại khách hàng", description: "Tiếp nhận khiếu nại hoàn tiền, chat trực tiếp với người mua và phê duyệt bồi hoàn theo chuẩn chuỗi lạnh.", icon: MessageSquare, tone: "amber" as const, meta: "Hộp Thư Đơn Hàng" },
   } satisfies Record<AdminTab, { title: string; description: string; icon: typeof Shield; tone: "forest" | "ocean" | "violet" | "amber" | "teal" | "indigo"; meta: string }>;
   const pageHeader = headerByTab[activeTab];
 
@@ -1113,6 +1116,7 @@ function AdminPortalContent() {
     { key: "batches" as const, label: "Duyệt Lô Xuất Kho", icon: Package, badge: pendingBatchesCount },
     { key: "certs" as const, label: "Duyệt Chứng Nhận", icon: Award, badge: pendingCertsCount },
     { key: "orders" as const, label: "Đơn Hàng", icon: ShoppingBag, badge: orders.length },
+    { key: "messages" as const, label: "Hộp Thư & Khiếu Nại", icon: MessageSquare },
     { key: "vouchers" as const, label: "Voucher", icon: Ticket, badge: vouchers.length },
     { key: "loyalty" as const, label: "Hội Viên AgriClub", icon: Crown, badge: members.length },
     { key: "events" as const, label: "Sự Kiện & Mùa Vụ", icon: CalendarDays, badge: campaigns.length },
@@ -2952,36 +2956,49 @@ function AdminPortalContent() {
 
                           {/* Trạng thái đơn hàng */}
                           <td className="py-2 px-2 whitespace-nowrap">
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 shadow-2xs",
-                                order.status === "DELIVERED" || order.status === "COMPLETED"
-                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                  : order.status === "SHIPPING"
-                                  ? "bg-sky-50 text-sky-800 border-sky-200"
-                                  : order.status === "CANCELLED" || order.status === "REFUNDED"
-                                  ? "bg-stone-100 text-stone-600 border-stone-200"
-                                  : order.status === "PAID"
-                                  ? "bg-teal-50 text-teal-800 border-teal-200"
-                                  : "bg-amber-50 text-amber-800 border-amber-200"
-                              )}
-                            >
+                            <div className="flex flex-col gap-1 items-start">
                               <span
                                 className={cn(
-                                  "w-1.5 h-1.5 rounded-full",
+                                  "px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 shadow-2xs",
                                   order.status === "DELIVERED" || order.status === "COMPLETED"
-                                    ? "bg-emerald-600"
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                                     : order.status === "SHIPPING"
-                                    ? "bg-sky-600 animate-pulse"
+                                    ? "bg-sky-50 text-sky-800 border-sky-200"
                                     : order.status === "CANCELLED" || order.status === "REFUNDED"
-                                    ? "bg-stone-400"
+                                    ? "bg-stone-100 text-stone-600 border-stone-200"
                                     : order.status === "PAID"
-                                    ? "bg-teal-600"
-                                    : "bg-amber-500"
+                                    ? "bg-teal-50 text-teal-800 border-teal-200"
+                                    : "bg-amber-50 text-amber-800 border-amber-200"
                                 )}
-                              />
-                              <span>{orderStatusLabel(order.status)}</span>
-                            </span>
+                              >
+                                <span
+                                  className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    order.status === "DELIVERED" || order.status === "COMPLETED"
+                                      ? "bg-emerald-600"
+                                      : order.status === "SHIPPING"
+                                      ? "bg-sky-600 animate-pulse"
+                                      : order.status === "CANCELLED" || order.status === "REFUNDED"
+                                      ? "bg-stone-400"
+                                      : order.status === "PAID"
+                                      ? "bg-teal-600"
+                                      : "bg-amber-500"
+                                  )}
+                                />
+                                <span>{orderStatusLabel(order.status)}</span>
+                              </span>
+
+                              {order.refundStatus === "PENDING" && (
+                                <Link
+                                  href="/dashboard/admin?tab=messages"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-[9px] border border-amber-300 animate-pulse"
+                                  title="Đơn đang có khiếu nại hoàn tiền. Bấm để duyệt trong hộp thư."
+                                >
+                                  <AlertTriangle size={9} className="text-amber-700" />
+                                  <span>Khiếu nại hoàn tiền</span>
+                                </Link>
+                              )}
+                            </div>
                           </td>
 
                           {/* Thao tác */}
@@ -3024,6 +3041,15 @@ function AdminPortalContent() {
                                       <ArrowRight size={10} />
                                     </button>
                                   ))}
+
+                              <Link
+                                href="/dashboard/admin?tab=messages"
+                                className="px-2 py-1 rounded-lg border border-stone-300 hover:border-emerald-600 hover:bg-emerald-50/50 bg-white text-stone-700 hover:text-emerald-950 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                title="Mở hộp thư chat & khiếu nại"
+                              >
+                                <MessageSquare size={11} className="text-emerald-700" />
+                                <span>Chat</span>
+                              </Link>
 
                               <button
                                 type="button"
@@ -3850,6 +3876,13 @@ function AdminPortalContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 10: HỘP THƯ & KHIẾU NẠI KHÁCH HÀNG TOÀN SÀN          */}
+      {/* ========================================================= */}
+      {activeTab === "messages" && (
+        <AdminMessagesPanel />
       )}
       {showCreateVoucherModal && (
         <div onClick={() => setShowCreateVoucherModal(false)} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in cursor-pointer">

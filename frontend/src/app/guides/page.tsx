@@ -78,8 +78,8 @@ export default function GuidesPage() {
     },
     {
       step: 5,
-      title: "Tương tác trực tiếp: Chat chủ hàng & Hỏi AI",
-      desc: "Nếu có bất kỳ thắc mắc nào về cách chế biến hay nguồn gốc nông sản, bạn có thể nhắn tin trực tiếp với chủ nông trại qua cổng Chat hoặc hỏi nhanh Trợ lý Trí tuệ Nhân tạo 24/7.",
+      title: "Tương tác trực tiếp: Hỏi nhanh Trợ lý AI",
+      desc: "Nếu có bất kỳ thắc mắc nào về cách chế biến hay nguồn gốc nông sản, bạn có thể hỏi nhanh Trợ lý Trí tuệ Nhân tạo 24/7 ở góc dưới màn hình.",
       icon: MessageSquare,
       tip: "Mẹo: Nút trợ lý AI luôn xuất hiện ở góc dưới bên phải màn hình để bạn hỏi đáp bất cứ lúc nào.",
     },
@@ -315,15 +315,15 @@ export default function GuidesPage() {
           </Link>
 
           <Link
-            href="/chat"
-            className="p-5 rounded-2xl bg-white border border-gray-200 hover:border-amber-300 shadow-xs transition-all flex items-center gap-3.5 group"
+            href="/contact"
+            className="p-5 rounded-2xl bg-white border border-gray-200 hover:border-emerald-300 shadow-xs transition-all flex items-center gap-3.5 group"
           >
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
               <MessageSquare size={20} />
             </div>
             <div>
-              <div className="font-bold text-gray-900 text-sm">Kênh Chat Hỗ Trợ</div>
-              <div className="text-xs text-gray-500">Nhân viên & Chủ nông trại</div>
+              <div className="font-bold text-gray-900 text-sm">Trung Tâm Hỗ Trợ</div>
+              <div className="text-xs text-gray-500">Gửi phản hồi & Liên hệ</div>
             </div>
           </Link>
         </div>

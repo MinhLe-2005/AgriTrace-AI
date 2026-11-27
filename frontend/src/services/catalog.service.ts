@@ -109,6 +109,14 @@ export type ApiOrder = {
   pointsAwarded: number;
   lotCode: string;
   createdAt: string;
+  refundStatus?: "PENDING" | "APPROVED" | "REJECTED" | null;
+  refundReason?: string | null;
+  refundSolution?: "REFUND_MONEY" | "REPLACE_GOODS" | "VOUCHER" | null;
+  refundAmount?: number | null;
+  refundPhotoUrl?: string | null;
+  refundRequestedAt?: string | null;
+  refundResolvedAt?: string | null;
+  refundNote?: string | null;
   items: ApiOrderItem[];
 };
 

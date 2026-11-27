@@ -13,6 +13,7 @@ import {
   Leaf,
   LogOut,
   Menu,
+  MessageSquare,
   PackageCheck,
   PackageSearch,
   QrCode,
@@ -59,6 +60,7 @@ const customerNavigation: NavItem[] = [
 
 const farmerNavigation: NavItem[] = [
   { href: "/dashboard/farmer", label: "Quản Lý Nông Trại", icon: Leaf },
+  { href: "/dashboard/farmer?tab=messages", label: "Hộp Thư & Khiếu Nại", icon: MessageSquare },
   { href: "/dashboard/farmer?tab=seasons", label: "Mùa Vụ Canh Tác", icon: CalendarRange },
   { href: "/dashboard/farmer?tab=forecast", label: "AI Dự Báo Nhu Cầu", icon: TrendingUp },
   { href: "/traceability", label: "Cấp Mã QR Lô Hàng", icon: QrCode },
@@ -86,6 +88,7 @@ const adminNavigation: NavItem[] = [
   { href: "/dashboard/admin?tab=batches", label: "Duyệt Lô Xuất Kho", icon: PackageCheck, group: "Tổng quan" },
   { href: "/dashboard/admin?tab=certs", label: "Duyệt Chứng Nhận Nông Trại", icon: Award, group: "Tổng quan" },
   { href: "/dashboard/admin?tab=orders", label: "Quản Lý Đơn Hàng Hệ Thống", icon: ClipboardList, group: "Vận hành" },
+  { href: "/dashboard/admin?tab=messages", label: "Hộp Thư & Khiếu Nại", icon: MessageSquare, group: "Vận hành" },
   { href: "/dashboard/farmer", label: "Giám Sát Nông Trại", icon: Leaf, group: "Vận hành" },
   { href: "/dashboard/warehouse", label: "Giám Sát Kho Hàng", icon: Warehouse, group: "Vận hành" },
   { href: "/dashboard/distributor", label: "Giám Sát Vận Chuyển", icon: Truck, group: "Vận hành" },
@@ -254,6 +257,14 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const roleLabel = roleLabelMap[primaryRole] ?? "Khách hàng";
   const badgeStyle = roleBadgeColor[primaryRole] ?? roleBadgeColor.CUSTOMER;
 
+  const rawName = user.name || "";
+  const cleanedName = rawName.replace(/\s*demo/gi, "").trim();
+  const displayName = cleanedName && cleanedName.toLowerCase() !== "demo"
+    ? (cleanedName === "Nông dân" || cleanedName === "Quản trị viên" || cleanedName === "Thủ kho" || cleanedName === "Nhà phân phối"
+        ? `Lê Quang Minh (${roleLabel})`
+        : cleanedName)
+    : `Lê Quang Minh (${roleLabel})`;
+
   // Lựa chọn Menu Navigation theo đúng vai trò thực tế
   let navItems = customerNavigation;
   if (user.roles.includes("ADMIN")) {
@@ -267,7 +278,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#FBF9F5] font-sans text-[#16261E]">
+    <div className="min-h-screen flex bg-[#FBF9F5] font-sans text-[#16261E] overflow-x-hidden w-full">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <button
@@ -317,10 +328,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <div className="p-4 border-b border-[#E4DFD5]">
           <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-[#E4DFD5] shadow-2xs">
             <div className="w-10 h-10 rounded-xl bg-[#16261E] text-amber-300 flex items-center justify-center font-serif font-bold text-sm shadow-xs shrink-0">
-              {user.name?.charAt(0)?.toUpperCase() || "U"}
+              {displayName.charAt(0)?.toUpperCase() || "L"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-extrabold text-[#16261E] truncate">{user.name}</p>
+              <p className="text-xs font-extrabold text-[#16261E] truncate">{displayName}</p>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeStyle.bg}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${badgeStyle.dot}`} />
@@ -378,7 +389,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main Content Area: Exact lg:pl-[280px] matching w-[280px] sidebar so zero overlap occurs */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-[280px]">
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-[280px] overflow-x-hidden">
         {/* Top Architectural Bar */}
         <header className="sticky top-0 z-30 h-16 bg-[#FBF9F5]/90 backdrop-blur-md border-b border-[#E4DFD5] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -425,7 +436,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0">
           {children}
         </main>
       </div>

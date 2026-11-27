@@ -18,6 +18,8 @@ export type NotificationItem = {
 
 type NotificationStore = {
   notifications: NotificationItem[];
+  readIds: string[];
+  dismissedIds: string[];
   addNotification: (item: {
     id?: string;
     title: string;
@@ -43,17 +45,21 @@ export const useNotificationStore = create<NotificationStore>()(
   persist(
     (set) => ({
       notifications: initialNotifications,
+      readIds: [],
+      dismissedIds: [],
       addNotification: (item) =>
         set((state) => {
           const newId = item.id || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
           const filtered = state.notifications.filter((n) => n.id !== newId);
+          const readIdsSet = new Set(state.readIds || []);
+          const isRead = readIdsSet.has(newId);
           const newNotif: NotificationItem = {
             id: newId,
             title: item.title,
             message: item.message,
             type: item.type,
             createdAt: item.createdAt || "Vừa xong",
-            read: false,
+            read: isRead,
             link: item.link,
             badge: item.badge,
           };
@@ -63,13 +69,22 @@ export const useNotificationStore = create<NotificationStore>()(
         }),
       syncFromLiveSystem: ({ orders, vouchers, verification }) =>
         set((state) => {
-          // Remove legacy fake notifications
-          const currentList = state.notifications.filter(
+          const readIdsSet = new Set(state.readIds || []);
+          const dismissedIdsSet = new Set(state.dismissedIds || []);
+
+          // Filter out legacy items and dismissed ones
+          const currentList = (state.notifications || []).filter(
             (n) =>
               n.id !== "notif-season-pricing" &&
               !n.title.includes("QĐ #88") &&
-              !n.title.includes("Quyết định")
+              !n.title.includes("Quyết định") &&
+              !dismissedIdsSet.has(n.id)
           );
+
+          // Seed readIdsSet with any existing items that are already read
+          currentList.forEach((n) => {
+            if (n.read) readIdsSet.add(n.id);
+          });
 
           const newItems: NotificationItem[] = [];
 
@@ -77,8 +92,11 @@ export const useNotificationStore = create<NotificationStore>()(
           if (orders && orders.length > 0) {
             orders.slice(0, 5).forEach((ord) => {
               const code = ord.orderCode || `DH-${ord.id}`;
-              const exists = currentList.some((n) => n.id === `notif-order-${code}`);
-              if (!exists) {
+              const notifId = `notif-order-${code}`;
+              if (dismissedIdsSet.has(notifId)) return;
+
+              const existing = currentList.find((n) => n.id === notifId);
+              if (!existing) {
                 let title = `📦 Đơn hàng #${code} đã được tiếp nhận`;
                 let message = `Đơn hàng gồm ${ord.items?.length || 1} món nông sản đang được xử lý tại kho lạnh. Bấm để xem chi tiết!`;
                 let badge = "Đã đặt";
@@ -95,13 +113,15 @@ export const useNotificationStore = create<NotificationStore>()(
                   message = `Nông sản tươi sạch đã được giao an toàn. Chúc bạn và gia đình có bữa ăn ngon lành!`;
                   badge = "Đã nhận";
                 }
+
+                const isRead = readIdsSet.has(notifId);
                 newItems.push({
-                  id: `notif-order-${code}`,
+                  id: notifId,
                   title,
                   message,
                   type: "order",
                   createdAt: "Gần đây",
-                  read: false,
+                  read: isRead,
                   link: `/dashboard/customer?tab=orders&order=${code}`,
                   badge,
                 });
@@ -115,8 +135,11 @@ export const useNotificationStore = create<NotificationStore>()(
               .filter((v) => v.active)
               .slice(0, 3)
               .forEach((v) => {
-                const exists = currentList.some((n) => n.id === `notif-voucher-${v.code}`);
-                if (!exists) {
+                const notifId = `notif-voucher-${v.code}`;
+                if (dismissedIdsSet.has(notifId)) return;
+
+                const existing = currentList.find((n) => n.id === notifId);
+                if (!existing) {
                   const discountText = v.discount.toLowerCase().startsWith("giảm")
                     ? v.discount
                     : `Giảm ${v.discount}`;
@@ -124,13 +147,14 @@ export const useNotificationStore = create<NotificationStore>()(
                     ? v.minOrder
                     : `đơn từ ${v.minOrder}`;
                   const expText = v.exp.replace(/^HSD:\s*/i, "");
+                  const isRead = readIdsSet.has(notifId);
                   newItems.push({
-                    id: `notif-voucher-${v.code}`,
+                    id: notifId,
                     title: `🎟️ Voucher Mới: ${v.code} (${v.badge || "Ưu đãi"})`,
                     message: `${discountText} cho ${minOrderText}. HSD: ${expText}. Bấm để nhận và áp dụng!`,
                     type: "voucher",
                     createdAt: "Mới cập nhật",
-                    read: false,
+                    read: isRead,
                     link: `/vouchers`,
                     badge: v.badge || "Voucher",
                   });
@@ -140,51 +164,73 @@ export const useNotificationStore = create<NotificationStore>()(
 
           // 3. Sync partner verification status
           if (verification) {
-            const exists = currentList.some((n) => n.id === `notif-verify-${verification.id}-${verification.status}`);
-            if (!exists) {
-              const roleTitle = verification.type === "FARMER" ? "Nông dân" : "Vận chuyển";
-              let title = `📋 Hồ sơ đối tác ${roleTitle}: Đang thẩm định`;
-              let message = `Hồ sơ ${roleTitle} (${verification.organizationName}) đang được Ban Quản Trị xem xét trong 24h.`;
-              let badge = "Chờ duyệt";
-              if (verification.status === "APPROVED") {
-                title = `🎉 Chúc mừng! Hồ sơ đối tác ${roleTitle} đã được phê duyệt!`;
-                message = `Bạn đã có quyền truy cập Cổng Quản Trị Vận Hành. Bấm để bắt đầu!`;
-                badge = "Đã duyệt";
-              } else if (verification.status === "CHANGES_REQUESTED") {
-                title = `⚠️ Hồ sơ đối tác ${roleTitle}: Cần bổ sung tài liệu`;
-                message = `${verification.decisionReason || "Vui lòng cập nhật lại hồ sơ năng lực."} Bấm để hoàn thiện.`;
-                badge = "Cần bổ sung";
+            const notifId = `notif-verify-${verification.id}-${verification.status}`;
+            if (!dismissedIdsSet.has(notifId)) {
+              const existing = currentList.find((n) => n.id === notifId);
+              if (!existing) {
+                const roleTitle = verification.type === "FARMER" ? "Nông dân" : "Vận chuyển";
+                let title = `📋 Hồ sơ đối tác ${roleTitle}: Đang thẩm định`;
+                let message = `Hồ sơ ${roleTitle} (${verification.organizationName}) đang được Ban Quản Trị xem xét trong 24h.`;
+                let badge = "Chờ duyệt";
+                if (verification.status === "APPROVED") {
+                  title = `🎉 Chúc mừng! Hồ sơ đối tác ${roleTitle} đã được phê duyệt!`;
+                  message = `Bạn đã có quyền truy cập Cổng Quản Trị Vận Hành. Bấm để bắt đầu!`;
+                  badge = "Đã duyệt";
+                } else if (verification.status === "CHANGES_REQUESTED") {
+                  title = `⚠️ Hồ sơ đối tác ${roleTitle}: Cần bổ sung tài liệu`;
+                  message = `${verification.decisionReason || "Vui lòng cập nhật lại hồ sơ năng lực."} Bấm để hoàn thiện.`;
+                  badge = "Cần bổ sung";
+                }
+                const isRead = readIdsSet.has(notifId);
+                newItems.push({
+                  id: notifId,
+                  title,
+                  message,
+                  type: "system",
+                  createdAt: "Mới nhất",
+                  read: isRead,
+                  link: `/dashboard`,
+                  badge,
+                });
               }
-              newItems.push({
-                id: `notif-verify-${verification.id}-${verification.status}`,
-                title,
-                message,
-                type: "system",
-                createdAt: "Mới nhất",
-                read: false,
-                link: `/dashboard`,
-                badge,
-              });
             }
           }
 
-          if (newItems.length === 0) return { notifications: currentList };
-          return { notifications: [...newItems, ...currentList] };
+          const combined = newItems.length === 0 ? currentList : [...newItems, ...currentList];
+          return {
+            readIds: Array.from(readIdsSet),
+            notifications: combined,
+          };
         }),
       markAsRead: (id) =>
-        set((state) => ({
-          notifications: state.notifications.map((n) =>
-            n.id === id ? { ...n, read: true } : n
-          ),
-        })),
+        set((state) => {
+          const readIdsSet = new Set(state.readIds || []);
+          readIdsSet.add(id);
+          return {
+            readIds: Array.from(readIdsSet),
+            notifications: state.notifications.map((n) =>
+              n.id === id ? { ...n, read: true } : n
+            ),
+          };
+        }),
       markAllAsRead: () =>
-        set((state) => ({
-          notifications: state.notifications.map((n) => ({ ...n, read: true })),
-        })),
+        set((state) => {
+          const readIdsSet = new Set(state.readIds || []);
+          state.notifications.forEach((n) => readIdsSet.add(n.id));
+          return {
+            readIds: Array.from(readIdsSet),
+            notifications: state.notifications.map((n) => ({ ...n, read: true })),
+          };
+        }),
       deleteNotification: (id) =>
-        set((state) => ({
-          notifications: state.notifications.filter((n) => n.id !== id),
-        })),
+        set((state) => {
+          const dismissedIdsSet = new Set(state.dismissedIds || []);
+          dismissedIdsSet.add(id);
+          return {
+            dismissedIds: Array.from(dismissedIdsSet),
+            notifications: state.notifications.filter((n) => n.id !== id),
+          };
+        }),
     }),
     {
       name: "agritrace-notifications-v8",

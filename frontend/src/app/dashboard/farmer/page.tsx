@@ -28,6 +28,7 @@ import {
   Trash2,
   Star,
   MessageCircle,
+  MessageSquare,
   TrendingUp,
   Truck,
   Upload,
@@ -36,12 +37,13 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { farmerService, parseFarmDocUrls, serializeFarmDocUrls, LotTimelineEvent, BatchChangeEvent, ApiHarvestLot, ApiForecastProductItem } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
 import { DemandForecastPanel } from "@/components/farmer/demand-forecast-panel";
 import { CropSeasonsPanel } from "@/components/farmer/crop-seasons-panel";
+import { FarmerMessagesPanel } from "@/features/order-chat/FarmerMessagesPanel";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { reviewService, type ApiReview } from "@/services/review.service";
@@ -769,9 +771,10 @@ function resolveFarmerOwnerId(user: { id?: string; name?: string; email?: string
 }
 
 function FarmerPortalContent() {
-  // 8 Tab nghiệp vụ: Nông trại, Lô hàng, Nhật ký, Sản phẩm, Chứng nhận, Đánh giá, Mùa vụ & AI Dự báo
+  // 9 Tab nghiệp vụ: Nông trại, Lô hàng, Nhật ký, Sản phẩm, Chứng nhận, Đánh giá, Mùa vụ, AI Dự báo & Hộp thư
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast">("farms");
+  const [activeTab, setActiveTab] = useState<"farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast" | "messages">("farms");
   const [farmerReviews, setFarmerReviews] = useState<ApiReview[]>([]);
   const [farmerReplyText, setFarmerReplyText] = useState<{ [id: number]: string }>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [id: number]: boolean }>({});
@@ -824,8 +827,8 @@ function FarmerPortalContent() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "seasons", "forecast"].includes(tab)) {
-      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast");
+    if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "seasons", "forecast", "messages"].includes(tab)) {
+      setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast" | "messages");
     } else if (!tab) {
       setActiveTab((prev) => (prev === "forecast" || prev === "seasons" ? "farms" : prev));
     }
@@ -2609,6 +2612,20 @@ function FarmerPortalContent() {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => {
+              setActiveTab("messages");
+              router.push("/dashboard/farmer?tab=messages");
+            }}
+            className={`px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all transform active:scale-95 cursor-pointer ${
+              activeTab === "messages"
+                ? "bg-amber-400 text-stone-950 ring-2 ring-amber-300 font-extrabold"
+                : "bg-amber-500 hover:bg-amber-400 text-stone-950"
+            }`}
+          >
+            <MessageSquare size={15} />
+            <span>Hộp Thư & Khiếu Nại</span>
+          </button>
+          <button
             onClick={openAddFarmModal}
             className="px-3.5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-emerald-700/60 transition-all cursor-pointer"
           >
@@ -2626,7 +2643,10 @@ function FarmerPortalContent() {
       {/* 2. Navigation Tabs (5 Khối nghiệp vụ chuẩn bài nói, QUẢN LÝ NÔNG TRẠI đứng đầu tiên) */}
       <div className="flex border-b border-gray-200 overflow-x-auto gap-2 text-xs font-bold">
         <button
-          onClick={() => setActiveTab("farms")}
+          onClick={() => {
+            setActiveTab("farms");
+            router.push("/dashboard/farmer");
+          }}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "farms"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
@@ -2637,6 +2657,21 @@ function FarmerPortalContent() {
           <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full">
             {visibleFarms.length} Trang trại
           </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("messages");
+            router.push("/dashboard/farmer?tab=messages");
+          }}
+          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "messages"
+              ? "border-amber-600 text-amber-950 font-extrabold bg-amber-50/60"
+              : "border-transparent text-amber-800 hover:text-amber-950 hover:bg-amber-50/40"
+          }`}
+        >
+          <MessageSquare size={16} className="text-amber-600" />
+          <span>Hộp Thư & Khiếu Nại</span>
         </button>
 
         <button
@@ -4009,6 +4044,15 @@ function FarmerPortalContent() {
           farms={visibleFarms.map((f) => ({ code: f.code, name: f.name }))}
           onPlanHarvestBatch={handlePlanHarvestBatchFromForecast}
         />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: HỘP THƯ & KHIẾU NẠI KHÁCH HÀNG */}
+      {/* ========================================================================= */}
+      {activeTab === "messages" && (
+        <div className="w-full min-w-0 overflow-hidden">
+          <FarmerMessagesPanel />
+        </div>
       )}
 
       {/* ========================================================================= */}
