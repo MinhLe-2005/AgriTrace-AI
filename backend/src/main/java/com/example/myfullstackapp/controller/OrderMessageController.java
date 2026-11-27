@@ -12,6 +12,10 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +33,7 @@ public class OrderMessageController {
     private final OrderRepository orderRepository;
     private final OrderMessageRepository orderMessageRepository;
     private final LoyaltyService loyaltyService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Data
     @NoArgsConstructor
@@ -199,6 +204,11 @@ public class OrderMessageController {
                 .build();
 
         OrderMessage saved = orderMessageRepository.save(msg);
+        try {
+            messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", saved);
+        } catch (Exception e) {
+            log.warn("WebSocket broadcast failed for order {}: {}", cleanCode, e.getMessage());
+        }
         return ApiResponse.ok("Gửi tin nhắn thành công", saved);
     }
 
@@ -252,7 +262,12 @@ public class OrderMessageController {
                 .isRead(false)
                 .build();
 
-        orderMessageRepository.save(disputeMsg);
+        OrderMessage savedDisputeMsg = orderMessageRepository.save(disputeMsg);
+        try {
+            messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", savedDisputeMsg);
+        } catch (Exception e) {
+            log.warn("WebSocket broadcast dispute failed for order {}: {}", cleanCode, e.getMessage());
+        }
         log.info("Khách hàng đã gửi khiếu nại hoàn tiền cho đơn #{}: Lý do {}", cleanCode, request.getReason());
 
         return ApiResponse.ok("Gửi yêu cầu trả hàng / hoàn tiền thành công! Đội ngũ đang xử lý.", saved);
@@ -301,7 +316,12 @@ public class OrderMessageController {
                     .messageType("DISPUTE_APPROVED")
                     .createdAt(LocalDateTime.now())
                     .build();
-            orderMessageRepository.save(approvedMsg);
+            OrderMessage savedApproved = orderMessageRepository.save(approvedMsg);
+            try {
+                messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", savedApproved);
+            } catch (Exception e) {
+                log.warn("WebSocket broadcast resolution failed: {}", e.getMessage());
+            }
         } else {
             order.setRefundStatus("REJECTED");
             order.setRefundResolvedAt(LocalDateTime.now());
@@ -320,7 +340,12 @@ public class OrderMessageController {
                     .messageType("DISPUTE_REJECTED")
                     .createdAt(LocalDateTime.now())
                     .build();
-            orderMessageRepository.save(rejectedMsg);
+            OrderMessage savedRejected = orderMessageRepository.save(rejectedMsg);
+            try {
+                messagingTemplate.convertAndSend("/topic/orders/" + cleanCode + "/messages", savedRejected);
+            } catch (Exception e) {
+                log.warn("WebSocket broadcast resolution failed: {}", e.getMessage());
+            }
         }
 
         Order saved = orderRepository.save(order);
@@ -414,6 +439,15 @@ public class OrderMessageController {
         });
 
         return ApiResponse.ok("Lấy danh sách hộp thư thành công", summaries);
+    }
+
+    @MessageMapping("/orders/{orderCode}/typing")
+    @SendTo("/topic/orders/{orderCode}/typing")
+    public Map<String, Object> broadcastTyping(
+            @DestinationVariable String orderCode,
+            Map<String, Object> payload
+    ) {
+        return payload;
     }
 
     private static String resolveFarmName(Order order) {

@@ -30,6 +30,7 @@ import {
 } from "@/services/order-chat.service";
 import { toast } from "@/stores/toast-store";
 import { OrderDisputeModal } from "./OrderDisputeModal";
+import { useOrderChatSocket } from "./useOrderChatSocket";
 import type { ApiOrder } from "@/services/catalog.service";
 
 interface CustomerMessagesPanelProps {
@@ -192,10 +193,41 @@ export function CustomerMessagesPanel({
 
   const activeConv = conversations.find((c) => c.orderCode === selectedOrderCode);
 
+  const handleIncomingMessage = (newMsg: OrderMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === newMsg.id)) return prev;
+      return [...prev, newMsg];
+    });
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.orderCode.toUpperCase() === newMsg.orderCode.toUpperCase()
+          ? {
+              ...c,
+              lastMessage: newMsg.message,
+              lastMessageTime: newMsg.createdAt,
+              messageCount: c.messageCount + 1,
+            }
+          : c
+      )
+    );
+  };
+
+  const {
+    connected: socketConnected,
+    typingUser,
+    sendTyping,
+  } = useOrderChatSocket({
+    orderCode: selectedOrderCode,
+    currentUserRole: "CUSTOMER",
+    currentUserName: activeConv?.customerName || "Khách Hàng",
+    onMessageReceived: handleIncomingMessage,
+  });
+
   async function handleSendMessage(customText?: string) {
     const text = (customText || replyText).trim();
     if (!text || !selectedOrderCode) return;
 
+    sendTyping(false);
     setIsSending(true);
     try {
       const newMsg = await orderChatService.sendMessage(selectedOrderCode, {
@@ -207,7 +239,7 @@ export function CustomerMessagesPanel({
         messageType: "CHAT",
       });
 
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
       setReplyText("");
       setImageAttachment(null);
       toast.success("Đã gửi tin nhắn tới chủ nhà vườn!");
@@ -436,9 +468,9 @@ export function CustomerMessagesPanel({
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-gray-500">
-                    <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Trực tuyến
+                    <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                      <span className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
+                      {socketConnected ? "Trực tuyến (WebSocket)" : "Trực tuyến"}
                     </span>
                     <span>•</span>
                     <span className="truncate">Chuỗi lạnh VietGAP khép kín</span>
@@ -656,6 +688,18 @@ export function CustomerMessagesPanel({
               </div>
             )}
 
+            {/* Animated Typing Indicator */}
+            {typingUser && (
+              <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-emerald-800 bg-emerald-50/90 border-t border-emerald-100 transition-all shrink-0">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce" />
+                </div>
+                <span className="italic font-medium">{typingUser.senderName || "Chủ vườn"} đang soạn tin nhắn...</span>
+              </div>
+            )}
+
             {/* Message Input Box */}
             <div className="p-3 sm:p-4 bg-white border-t border-gray-200 flex items-center gap-2 shrink-0">
               {/* Demo Image Picker Menu */}
@@ -678,10 +722,14 @@ export function CustomerMessagesPanel({
               <input
                 type="text"
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={(e) => {
+                  setReplyText(e.target.value);
+                  sendTyping(e.target.value.trim().length > 0);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
+                    sendTyping(false);
                     handleSendMessage();
                   }
                 }}

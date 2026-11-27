@@ -26,20 +26,18 @@ public class DistributorStompAuthenticationInterceptor implements ChannelInterce
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (accessor == null || !StompCommand.CONNECT.equals(accessor.getCommand())) return message;
         String header = accessor.getFirstNativeHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new AccessDeniedException("Thiếu access token cho WebSocket");
-        }
-        try {
-            String token = header.substring(7);
-            String email = jwtTokenService.parse(token).getSubject();
-            UserDetails user = userDetailsService.loadUserByUsername(email);
-            if (!user.isEnabled() || !user.isAccountNonLocked() || !jwtTokenService.isValidAccessToken(token, user.getUsername())) {
-                throw new AccessDeniedException("Access token WebSocket không hợp lệ");
+        if (header != null && header.startsWith("Bearer ")) {
+            try {
+                String token = header.substring(7);
+                String email = jwtTokenService.parse(token).getSubject();
+                UserDetails user = userDetailsService.loadUserByUsername(email);
+                if (user.isEnabled() && user.isAccountNonLocked() && jwtTokenService.isValidAccessToken(token, user.getUsername())) {
+                    accessor.setUser(new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
+                }
+            } catch (RuntimeException ignored) {
+                // Ignore token error for public / order topics
             }
-            accessor.setUser(new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
-            return message;
-        } catch (RuntimeException exception) {
-            throw new AccessDeniedException("Access token WebSocket không hợp lệ");
         }
+        return message;
     }
 }

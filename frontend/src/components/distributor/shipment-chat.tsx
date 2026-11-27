@@ -1,6 +1,6 @@
 "use client";
 
-import { Client } from "@stomp/stompjs";
+import { Client, type IMessage } from "@stomp/stompjs";
 import { Circle, MessageCircle, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -64,7 +64,7 @@ export function ShipmentChat({ shipmentCode }: { shipmentCode: string }) {
       onConnect: () => {
         if (!active) return;
         setConnected(true);
-        stomp.subscribe(`/user/queue/distributor/chat/${encodeURIComponent(shipmentCode)}`, (frame) => {
+        stomp.subscribe(`/user/queue/distributor/chat/${encodeURIComponent(shipmentCode)}`, (frame: IMessage) => {
           const message = parseMessage(frame.body);
           if (message?.shipmentCode === shipmentCode) append(message);
         });

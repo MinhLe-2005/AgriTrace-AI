@@ -42,7 +42,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint).accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/actuator/health", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/ws/distributor", "/ws/distributor/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**", "/actuator/health", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/ws/**").permitAll()
                         // A self-locked user cannot create a JWT; this endpoint
                         // verifies the current password and clears self-locks only.
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/lock").permitAll()

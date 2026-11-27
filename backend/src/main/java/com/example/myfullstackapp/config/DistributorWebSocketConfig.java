@@ -19,7 +19,7 @@ public class DistributorWebSocketConfig implements WebSocketMessageBrokerConfigu
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/queue");
+        registry.enableSimpleBroker("/queue", "/topic");
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }
@@ -31,6 +31,8 @@ public class DistributorWebSocketConfig implements WebSocketMessageBrokerConfigu
                 .filter(value -> !value.isBlank())
                 .toArray(String[]::new);
         registry.addEndpoint("/ws/distributor").setAllowedOriginPatterns(origins);
+        registry.addEndpoint("/ws/orders").setAllowedOriginPatterns(origins);
+        registry.addEndpoint("/ws/chat").setAllowedOriginPatterns(origins);
     }
 
     @Override
