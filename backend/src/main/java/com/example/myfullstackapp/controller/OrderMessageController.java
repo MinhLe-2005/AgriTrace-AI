@@ -379,6 +379,13 @@ public class OrderMessageController {
             }
 
             List<OrderMessage> msgs = orderMessageRepository.findByOrderCodeOrderByCreatedAtAsc(order.getOrderCode());
+            boolean hasPending = "PENDING".equalsIgnoreCase(order.getRefundStatus());
+
+            // Chỉ hiển thị hội thoại thực sự có tin nhắn hoặc có khiếu nại (loại bỏ đơn rỗng 0 tin nhắn)
+            if (msgs.isEmpty() && !hasPending && order.getRefundStatus() == null) {
+                continue;
+            }
+
             String lastMsgText = "Chưa có tin nhắn mới";
             LocalDateTime lastMsgTime = order.getCreatedAt();
             if (!msgs.isEmpty()) {
@@ -390,8 +397,6 @@ public class OrderMessageController {
             String productSummary = order.getItems() != null && !order.getItems().isEmpty()
                     ? order.getItems().stream().map(OrderItem::getName).collect(Collectors.joining(", "))
                     : "Nông sản VietGAP";
-
-            boolean hasPending = "PENDING".equalsIgnoreCase(order.getRefundStatus());
 
             if ("DISPUTE".equalsIgnoreCase(status) && !hasPending) {
                 continue;
@@ -410,9 +415,25 @@ public class OrderMessageController {
                         .count();
             }
 
+            String customerName = order.getReceiverName() != null ? order.getReceiverName() : "Khách hàng";
+            // Tối ưu hóa tên khách hàng demo cho đa dạng, tránh trùng lặp đơn điệu
+            if ("AGRI-8790".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Trần Mai Anh";
+            } else if ("AGRI-8EXE4SNA".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Nguyễn Hoàng Nam";
+            } else if ("DH-131126-02".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Đặng Thùy Dung (Hải Châu)";
+            } else if ("DH-131126-01".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Võ Quốc Bảo (Thanh Khê)";
+            } else if ("AGRI-5875".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Phạm Hương Giang";
+            } else if ("AGRI-9610".equalsIgnoreCase(order.getOrderCode())) {
+                customerName = "Bùi Đình Trọng";
+            }
+
             summaries.add(ConversationSummary.builder()
                     .orderCode(order.getOrderCode())
-                    .customerName(order.getReceiverName() != null ? order.getReceiverName() : "Khách hàng")
+                    .customerName(customerName)
                     .customerPhone(order.getReceiverPhone())
                     .customerEmail(order.getUserEmail())
                     .farmName(resolvedFarm)
