@@ -313,7 +313,7 @@ public class DistributorShipmentService {
                 "Tiếp nhận QR bởi " + receipt.getReceiverName() + (receipt.getNote() == null ? "" : ": " + receipt.getNote()), receivedAt);
         synchronizeOrderStatuses(shipment, "RECEIVED");
         if (!isAdmin) {
-            notificationService.notifyAdmins(DistributorNotificationType.STATUS_UPDATED,
+            notificationService.notifyAdmins(DistributorNotificationType.QR_RECEIVED,
                     "Chuyến hàng đã được tiếp nhận", "Chuyến " + shipment.getShipmentCode() + " đã có biên nhận QR.", shipment.getShipmentCode());
         }
         publishChange(shipment);
