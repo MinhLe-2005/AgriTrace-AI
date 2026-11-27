@@ -1,4 +1,5 @@
 {
   "extends": ["next/core-web-vitals", "next/typescript", "prettier"],
-  "rules": { "@typescript-eslint/no-explicit-any": "error" }
+  "rules": { "@typescript-eslint/no-explicit-any": "error" },
+  "ignorePatterns": ["next-env.d.ts", ".next/*"]
 }
