@@ -32,10 +32,25 @@ import { toast } from "@/stores/toast-store";
 import { OrderDisputeModal } from "./OrderDisputeModal";
 import type { ApiOrder } from "@/services/catalog.service";
 
+interface FallbackOrder {
+  id?: string;
+  orderCode?: string;
+  receiverName?: string;
+  receiverPhone?: string;
+  items?: { name: string; origin?: string }[];
+  userEmail?: string;
+  total?: number;
+  status?: string;
+  refundStatus?: string | null;
+  refundReason?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
 interface CustomerMessagesPanelProps {
   customerEmail?: string;
   initialOrderCode?: string;
-  fallbackOrders?: any[];
+  fallbackOrders?: FallbackOrder[];
   onViewOrderDetail?: (orderCode: string) => void;
 }
 
@@ -49,7 +64,7 @@ export function CustomerMessagesPanel({
   const initialList: ConversationSummary[] = (fallbackOrders || []).map((o) => {
     const code = (o.id || o.orderCode || "").replace(/^#/, "");
     const farm = o.items?.[0]?.origin || "Nông Trại Xanh Thủy Canh Đà Lạt";
-    const prod = o.items?.map((it: any) => it.name).join(", ") || "Nông sản VietGAP";
+    const prod = o.items?.map((it) => it.name).join(", ") || "Nông sản VietGAP";
     return {
       orderCode: code,
       customerName: o.receiverName || "Khách Hàng",
@@ -59,7 +74,7 @@ export function CustomerMessagesPanel({
       productSummary: prod,
       total: o.total || 0,
       orderStatus: o.status || "CONFIRMED",
-      refundStatus: o.refundStatus,
+      refundStatus: o.refundStatus as ConversationSummary["refundStatus"],
       refundReason: o.refundReason,
       lastMessage: o.refundStatus === "PENDING" ? "Đang có yêu cầu khiếu nại hoàn tiền" : "Chưa có tin nhắn mới",
       lastMessageTime: o.createdAt || new Date().toISOString(),
@@ -114,7 +129,7 @@ export function CustomerMessagesPanel({
               setConversations(Array.from(map.values()));
             }
           })
-          .catch(() => {});
+          .catch(() => { });
 
         const currentActive = selectedOrderCodeRef.current;
         if (currentActive) {
@@ -125,7 +140,7 @@ export function CustomerMessagesPanel({
                 setMessages(msgs);
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
     }, 3500);
@@ -159,7 +174,7 @@ export function CustomerMessagesPanel({
     if (code === selectedOrderCode) return;
     setSelectedOrderCode(code);
     setMessages([]); // Clear previous thread immediately to avoid stale overlap
-    orderChatService.markAsRead(code);
+    orderChatService.markAsRead(code, "CUSTOMER");
     loadMessages(code);
     setConversations((prev) =>
       prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
@@ -285,21 +300,19 @@ export function CustomerMessagesPanel({
           <div className="flex items-center gap-1.5 text-[11px] font-semibold">
             <button
               onClick={() => setFilterType("ALL")}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                filterType === "ALL"
-                  ? "bg-emerald-700 text-white shadow-2xs"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${filterType === "ALL"
+                ? "bg-emerald-700 text-white shadow-2xs"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               Tất cả ({conversations.length})
             </button>
             <button
               onClick={() => setFilterType("UNREAD")}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
-                filterType === "UNREAD"
-                  ? "bg-emerald-700 text-white shadow-2xs"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${filterType === "UNREAD"
+                ? "bg-emerald-700 text-white shadow-2xs"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               <span>Chưa đọc</span>
               {totalUnread > 0 && (
@@ -308,11 +321,10 @@ export function CustomerMessagesPanel({
             </button>
             <button
               onClick={() => setFilterType("DISPUTE")}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
-                filterType === "DISPUTE"
-                  ? "bg-amber-700 text-white shadow-2xs"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${filterType === "DISPUTE"
+                ? "bg-amber-700 text-white shadow-2xs"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               <AlertTriangle size={11} className="text-amber-500" />
               <span>Khiếu nại</span>
@@ -342,13 +354,12 @@ export function CustomerMessagesPanel({
                 <div
                   key={conv.orderCode}
                   onClick={() => handleSelectConversation(conv.orderCode)}
-                  className={`p-3.5 transition-colors cursor-pointer relative border-l-4 ${
-                    isSelected
-                      ? "bg-emerald-50/70 border-emerald-600 shadow-2xs"
-                      : hasUnread
+                  className={`p-3.5 transition-colors cursor-pointer relative border-l-4 ${isSelected
+                    ? "bg-emerald-50/70 border-emerald-600 shadow-2xs"
+                    : hasUnread
                       ? "bg-emerald-50/25 border-emerald-400 hover:bg-gray-100/70"
                       : "border-transparent hover:bg-gray-100/60"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     {/* Farm Avatar */}
@@ -368,9 +379,9 @@ export function CustomerMessagesPanel({
                         <span className="text-[10px] text-gray-400 shrink-0">
                           {conv.lastMessageTime
                             ? new Date(conv.lastMessageTime).toLocaleTimeString("vi-VN", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                             : ""}
                         </span>
                       </div>
@@ -394,11 +405,10 @@ export function CustomerMessagesPanel({
                       {/* Last Message Preview */}
                       <div className="flex items-center justify-between gap-1">
                         <p
-                          className={`text-xs truncate ${
-                            hasUnread
-                              ? "font-bold text-gray-900"
-                              : "text-gray-500 font-normal"
-                          }`}
+                          className={`text-xs truncate ${hasUnread
+                            ? "font-bold text-gray-900"
+                            : "text-gray-500 font-normal"
+                            }`}
                         >
                           {conv.lastMessage}
                         </p>
@@ -460,11 +470,10 @@ export function CustomerMessagesPanel({
 
                 <button
                   onClick={() => setShowDisputeModal(true)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                    activeConv.hasPendingDispute
-                      ? "bg-amber-100 text-amber-900 border border-amber-300"
-                      : "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${activeConv.hasPendingDispute
+                    ? "bg-amber-100 text-amber-900 border border-amber-300"
+                    : "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                    }`}
                 >
                   <AlertTriangle size={13} />
                   <span>
@@ -495,19 +504,18 @@ export function CustomerMessagesPanel({
 
               <div className="shrink-0 flex items-center gap-1.5 text-[11px]">
                 <span
-                  className={`px-2 py-0.5 rounded-full font-bold ${
-                    activeConv.orderStatus === "DELIVERED" || activeConv.orderStatus === "COMPLETED"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : activeConv.orderStatus === "SHIPPING"
+                  className={`px-2 py-0.5 rounded-full font-bold ${activeConv.orderStatus === "DELIVERED" || activeConv.orderStatus === "COMPLETED"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : activeConv.orderStatus === "SHIPPING"
                       ? "bg-blue-100 text-blue-800"
                       : "bg-amber-100 text-amber-800"
-                  }`}
+                    }`}
                 >
                   {activeConv.orderStatus === "DELIVERED" || activeConv.orderStatus === "COMPLETED"
                     ? "Đã nhận hàng"
                     : activeConv.orderStatus === "SHIPPING"
-                    ? "Đang giao xe lạnh"
-                    : "Chờ xuất kho"}
+                      ? "Đang giao xe lạnh"
+                      : "Chờ xuất kho"}
                 </span>
               </div>
             </div>
@@ -563,9 +571,8 @@ export function CustomerMessagesPanel({
                 return (
                   <div
                     key={m.id}
-                    className={`flex items-end gap-2.5 ${
-                      isCustomer ? "justify-end" : "justify-start"
-                    }`}
+                    className={`flex items-end gap-2.5 ${isCustomer ? "justify-end" : "justify-start"
+                      }`}
                   >
                     {!isCustomer && (
                       <div className="w-8 h-8 rounded-xl bg-emerald-800 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
@@ -574,11 +581,10 @@ export function CustomerMessagesPanel({
                     )}
 
                     <div
-                      className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 text-xs shadow-2xs space-y-1.5 ${
-                        isCustomer
-                          ? "bg-emerald-700 text-white rounded-br-xs"
-                          : "bg-white text-gray-900 border border-gray-200/90 rounded-bl-xs"
-                      }`}
+                      className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 text-xs shadow-2xs space-y-1.5 ${isCustomer
+                        ? "bg-emerald-700 text-white rounded-br-xs"
+                        : "bg-white text-gray-900 border border-gray-200/90 rounded-bl-xs"
+                        }`}
                     >
                       {!isCustomer && (
                         <div className="font-bold text-[11px] text-emerald-800 flex items-center gap-1">
@@ -603,9 +609,8 @@ export function CustomerMessagesPanel({
                       )}
 
                       <div
-                        className={`text-[10px] flex items-center justify-end gap-1 ${
-                          isCustomer ? "text-emerald-200" : "text-gray-400"
-                        }`}
+                        className={`text-[10px] flex items-center justify-end gap-1 ${isCustomer ? "text-emerald-200" : "text-gray-400"
+                          }`}
                       >
                         <span>
                           {new Date(m.createdAt).toLocaleTimeString("vi-VN", {
@@ -728,11 +733,11 @@ export function CustomerMessagesPanel({
         <OrderDisputeModal
           isOpen={showDisputeModal}
           order={{
-            id: activeConv.orderCode as any,
+            id: activeConv.orderCode,
             orderCode: activeConv.orderCode,
             total: activeConv.total,
-            items: [{ name: activeConv.productSummary, price: activeConv.total, quantity: 1 } as any],
-          } as ApiOrder}
+            items: [{ name: activeConv.productSummary, price: activeConv.total, quantity: 1 }],
+          } as unknown as ApiOrder}
           onClose={() => setShowDisputeModal(false)}
           onSuccess={() => {
             setShowDisputeModal(false);

@@ -97,7 +97,7 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
     setConversations((prev) =>
       prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
     );
-    orderChatService.markAsRead(code);
+    orderChatService.markAsRead(code, "FARMER");
     loadMessages(code);
   }
 
@@ -285,7 +285,7 @@ export function FarmerMessagesPanel({ farmerFarmName }: FarmerMessagesPanelProps
                   </div>
                 ) : (
                   <p className="text-[11px] text-gray-400 truncate italic">
-                    "{conv.lastMessage}"
+                    &ldquo;{conv.lastMessage}&rdquo;
                   </p>
                 )}
               </div>
