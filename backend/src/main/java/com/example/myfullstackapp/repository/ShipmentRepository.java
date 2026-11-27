@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +14,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     Optional<Shipment> findByShipmentCodeIgnoreCase(String shipmentCode);
     List<Shipment> findAllByOrderByCreatedAtDesc();
     List<Shipment> findByStatusOrderByCreatedAtDesc(String status);
+    List<Shipment> findByStatusAndEstimatedArrivalBeforeOrderByEstimatedArrivalAsc(String status, Instant estimatedArrival);
     List<Shipment> findByDistributorEmailIgnoreCaseOrderByCreatedAtDesc(String distributorEmail);
     List<Shipment> findByDistributorEmailIgnoreCaseAndStatusOrderByCreatedAtDesc(String distributorEmail, String status);
     List<Shipment> findByLotCodeIgnoreCaseOrderByCreatedAtAsc(String lotCode);
