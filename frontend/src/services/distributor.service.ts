@@ -3,7 +3,9 @@ import type { ApiResponse } from "@/types/api";
 import type {
   CreateShipmentInput,
   DistributorDashboardStats,
+  DistributorNotification,
   DistributorShipment,
+  ShipmentChatMessage,
   ShipmentReceipt,
   ShipmentStatus,
   TrackingEvent,
@@ -70,6 +72,43 @@ export const distributorService = {
 
   async getHistory(): Promise<DistributorShipment[]> {
     const { data } = await api.get<ApiPayload<DistributorShipment[]>>("/distributor/shipments/history");
+    return payload(data);
+  },
+
+  async getNotifications(params?: { unreadOnly?: boolean }): Promise<DistributorNotification[]> {
+    const { data } = await api.get<ApiPayload<DistributorNotification[]>>("/distributor/notifications", { params });
+    return payload(data);
+  },
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const { data } = await api.get<ApiPayload<number>>("/distributor/notifications/unread-count");
+    return payload(data);
+  },
+
+  async markNotificationRead(notificationId: string): Promise<DistributorNotification> {
+    const { data } = await api.post<ApiPayload<DistributorNotification>>(
+      `/distributor/notifications/${encodeURIComponent(notificationId)}/read`
+    );
+    return payload(data);
+  },
+
+  async markAllNotificationsRead(): Promise<number> {
+    const { data } = await api.post<ApiPayload<number>>("/distributor/notifications/read-all");
+    return payload(data);
+  },
+
+  async getShipmentMessages(shipmentCode: string): Promise<ShipmentChatMessage[]> {
+    const { data } = await api.get<ApiPayload<ShipmentChatMessage[]>>(
+      `/distributor/shipments/${encodeURIComponent(shipmentCode)}/messages`
+    );
+    return payload(data);
+  },
+
+  async sendShipmentMessage(shipmentCode: string, content: string): Promise<ShipmentChatMessage> {
+    const { data } = await api.post<ApiPayload<ShipmentChatMessage>>(
+      `/distributor/shipments/${encodeURIComponent(shipmentCode)}/messages`,
+      { content }
+    );
     return payload(data);
   },
 };

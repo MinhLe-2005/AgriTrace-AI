@@ -13,6 +13,16 @@ function streamUrl() {
  * sends a message only after its shipment transaction has committed.
  */
 export function subscribeToDistributorChanges(onChange: () => void) {
+  return subscribeToDistributorEvents({ onShipmentChange: onChange });
+}
+
+export function subscribeToDistributorEvents({
+  onShipmentChange,
+  onNotification,
+}: {
+  onShipmentChange?: () => void;
+  onNotification?: () => void;
+}) {
   let active = true;
   let controller: AbortController | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -44,7 +54,8 @@ export function subscribeToDistributorChanges(onChange: () => void) {
         buffer = messages.pop() ?? "";
         for (const message of messages) {
           const eventName = message.match(/^event:\s*(.+)$/m)?.[1]?.trim();
-          if (eventName === "shipment-change") onChange();
+          if (eventName === "shipment-change") onShipmentChange?.();
+          if (eventName === "notification") onNotification?.();
         }
       }
     } catch (error) {

@@ -23,6 +23,7 @@ import {
   shipmentDate,
   shipmentTemperature,
 } from "@/components/distributor/distributor-ui";
+import { ShipmentChat } from "@/components/distributor/shipment-chat";
 import { subscribeToDistributorChanges } from "@/features/distributor/realtime";
 import type {
   DistributorShipment,
@@ -692,6 +693,8 @@ export default function ShipmentDetailPage() {
               )}
             </div>
           </section>
+
+          <ShipmentChat shipmentCode={shipment.shipmentCode} />
 
           <section className="shadow-xs rounded-2xl border border-gray-200 bg-white p-4">
             <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">

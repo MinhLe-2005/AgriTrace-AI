@@ -35,6 +35,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { LoadingSkeleton } from "@/components/ui/states";
+import { DistributorNotificationBell } from "@/components/distributor/distributor-notification-bell";
 import { authService } from "@/services/auth.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
@@ -424,6 +425,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               <span className={`w-2 h-2 rounded-full ${badgeStyle.dot}`} />
               <span>{roleLabel}</span>
             </span>
+
+            {(isDistributor || isAdmin) && <DistributorNotificationBell />}
 
             <Link
               href="/"
