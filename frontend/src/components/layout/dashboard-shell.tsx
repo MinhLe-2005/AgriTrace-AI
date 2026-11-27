@@ -2,6 +2,7 @@
 
 import {
   Award,
+  BarChart3,
   BookOpen,
   CalendarRange,
   ClipboardList,
@@ -21,6 +22,7 @@ import {
   Shield,
   ShoppingBag,
   ShoppingCart,
+  Sprout,
   Star,
   Store,
   Ticket,
@@ -86,18 +88,17 @@ const distributorNavigation: NavItem[] = [
 ];
 
 const adminNavigation: NavItem[] = [
-  { href: "/dashboard/admin?tab=verifications", label: "Tổng Quan & Duyệt Hồ Sơ", icon: Shield, group: "Tổng quan" },
-  { href: "/dashboard/admin?tab=batches", label: "Duyệt Lô Xuất Kho", icon: PackageCheck, group: "Tổng quan" },
-  { href: "/dashboard/admin?tab=certs", label: "Duyệt Chứng Nhận Nông Trại", icon: Award, group: "Tổng quan" },
-  { href: "/dashboard/admin?tab=orders", label: "Quản Lý Đơn Hàng Hệ Thống", icon: ClipboardList, group: "Vận hành" },
-  { href: "/dashboard/admin?tab=messages", label: "Hộp Thư & Khiếu Nại", icon: MessageSquare, group: "Vận hành" },
-  { href: "/dashboard/farmer", label: "Giám Sát Nông Trại", icon: Leaf, group: "Vận hành" },
-  { href: "/dashboard/warehouse", label: "Giám Sát Kho Hàng", icon: Warehouse, group: "Vận hành" },
-  { href: "/dashboard/distributor", label: "Giám Sát Vận Chuyển", icon: Truck, group: "Vận hành" },
-  { href: "/dashboard/admin?tab=loyalty", label: "Quản Lý Hội Viên AgriClub", icon: Crown, group: "Khách hàng" },
-  { href: "/dashboard/admin?tab=events", label: "Quản Lý Sự Kiện & Mùa Vụ", icon: CalendarRange, group: "Marketing & nội dung" },
-  { href: "/dashboard/admin?tab=vouchers", label: "Quản Lý Voucher & Ưu Đãi", icon: Ticket, group: "Marketing & nội dung" },
-  { href: "/dashboard/admin?tab=blog", label: "Quản Trị Blog & Cẩm Nang", icon: BookOpen, group: "Marketing & nội dung" },
+  { href: "/dashboard/admin?tab=verifications", label: "Tổng Quan & Duyệt Hồ Sơ", icon: Shield, group: "Tổng quan & Phê duyệt" },
+  { href: "/dashboard/admin?tab=revenue", label: "Báo Cáo Doanh Thu & PDF", icon: BarChart3, group: "Tổng quan & Phê duyệt" },
+  { href: "/dashboard/admin?tab=farms", label: "Duyệt Hồ Sơ Nông Trại", icon: Sprout, group: "Tổng quan & Phê duyệt" },
+  { href: "/dashboard/admin?tab=batches", label: "Duyệt Lô Xuất Kho", icon: PackageCheck, group: "Tổng quan & Phê duyệt" },
+  { href: "/dashboard/admin?tab=certs", label: "Duyệt Chứng Nhận Nông Trại", icon: Award, group: "Tổng quan & Phê duyệt" },
+  { href: "/dashboard/admin?tab=orders", label: "Quản Lý Đơn Hàng Hệ Thống", icon: ClipboardList, group: "Vận hành & Khách hàng" },
+  { href: "/dashboard/admin?tab=messages", label: "Hộp Thư & Khiếu Nại", icon: MessageSquare, group: "Vận hành & Khách hàng" },
+  { href: "/dashboard/admin?tab=loyalty", label: "Quản Lý Hội Viên AgriClub", icon: Crown, group: "Vận hành & Khách hàng" },
+  { href: "/dashboard/admin?tab=events", label: "Quản Lý Sự Kiện & Mùa Vụ", icon: CalendarRange, group: "Marketing & Nội dung" },
+  { href: "/dashboard/admin?tab=vouchers", label: "Quản Lý Voucher & Ưu Đãi", icon: Ticket, group: "Marketing & Nội dung" },
+  { href: "/dashboard/admin?tab=blog", label: "Quản Trị Blog & Cẩm Nang", icon: BookOpen, group: "Marketing & Nội dung" },
   { href: "/dashboard/users", label: "Quản Lý Người Dùng", icon: Users, group: "Hệ thống" },
 ];
 
@@ -136,8 +137,10 @@ function SidebarNavItems({
       {navItems.map((item, index) => {
         const [itemPath, itemQuery] = item.href.split("?");
         const itemTab = itemQuery ? new URLSearchParams(itemQuery).get("tab") : null;
+        const effectiveCurrentTab =
+          pathname === "/dashboard/admin" && !currentTab ? "verifications" : currentTab;
         const active = itemTab
-          ? pathname === itemPath && currentTab === itemTab
+          ? pathname === itemPath && effectiveCurrentTab === itemTab
           : pathname === item.href &&
             (!currentTab ||
               (pathname !== "/dashboard/admin" &&
@@ -207,9 +210,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const forbidden =
     Boolean(user) &&
     ((isAdminRoute && !isAdmin) ||
-      (isFarmerRoute && !isFarmer && !isAdmin) ||
-      (isWarehouseRoute && !isWarehouse && !isAdmin) ||
-      (isDistributorRoute && !isDistributor && !isAdmin));
+      (isFarmerRoute && !isFarmer) ||
+      (isWarehouseRoute && !isWarehouse) ||
+      (isDistributorRoute && !isDistributor));
 
   useEffect(() => {
     if (hasHydrated && !user) router.replace("/login");
@@ -272,13 +275,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   // Lựa chọn Menu Navigation theo đúng vai trò thực tế
   let navItems = customerNavigation;
-  if (user.roles.includes("ADMIN")) {
+  if (hasRole("ADMIN")) {
     navItems = adminNavigation;
-  } else if (user.roles.includes("FARMER")) {
+  } else if (hasRole("FARMER")) {
     navItems = farmerNavigation;
-  } else if (user.roles.includes("WAREHOUSE") || user.roles.includes("WAREHOUSE_STAFF")) {
+  } else if (hasRole("WAREHOUSE") || hasRole("WAREHOUSE_STAFF")) {
     navItems = warehouseNavigation;
-  } else if (user.roles.includes("DISTRIBUTOR")) {
+  } else if (hasRole("DISTRIBUTOR")) {
     navItems = distributorNavigation;
   }
 

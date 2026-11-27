@@ -974,8 +974,8 @@ export function AuthForm({
         disabled={isSubmitting || isSendingOtp}
         className={cn(
           "w-full h-11 mt-2 flex items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white transition-all duration-200",
-          "bg-gradient-to-r from-emerald-600 via-emerald-700 to-green-700 hover:from-emerald-700 hover:to-green-800",
-          "shadow-lg shadow-emerald-700/20 hover:shadow-emerald-700/30 active:scale-[0.99]",
+          "bg-[#166534] hover:bg-[#14532D]",
+          "shadow-md shadow-emerald-900/15 active:scale-[0.99]",
           (isSubmitting || isSendingOtp) && "opacity-75 cursor-not-allowed"
         )}
       >
