@@ -35,16 +35,47 @@ import type { ApiOrder } from "@/services/catalog.service";
 interface CustomerMessagesPanelProps {
   customerEmail?: string;
   initialOrderCode?: string;
+  fallbackOrders?: any[];
   onViewOrderDetail?: (orderCode: string) => void;
 }
 
 export function CustomerMessagesPanel({
   customerEmail,
   initialOrderCode,
+  fallbackOrders,
   onViewOrderDetail,
 }: CustomerMessagesPanelProps) {
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [selectedOrderCode, setSelectedOrderCode] = useState<string | null>(initialOrderCode || null);
+  // Map fallback orders to initial conversations so UI is immediately populated without waiting for network
+  const initialList: ConversationSummary[] = (fallbackOrders || []).map((o) => {
+    const code = (o.id || o.orderCode || "").replace(/^#/, "");
+    const farm = o.items?.[0]?.origin || "Nông Trại Xanh Thủy Canh Đà Lạt";
+    const prod = o.items?.map((it: any) => it.name).join(", ") || "Nông sản VietGAP";
+    return {
+      orderCode: code,
+      customerName: o.receiverName || "Khách Hàng",
+      customerPhone: o.receiverPhone || "",
+      customerEmail: o.userEmail,
+      farmName: farm,
+      productSummary: prod,
+      total: o.total || 0,
+      orderStatus: o.status || "CONFIRMED",
+      refundStatus: o.refundStatus,
+      refundReason: o.refundReason,
+      lastMessage: o.refundStatus === "PENDING" ? "Đang có yêu cầu khiếu nại hoàn tiền" : "Chưa có tin nhắn mới",
+      lastMessageTime: o.createdAt || new Date().toISOString(),
+      messageCount: 0,
+      hasPendingDispute: o.refundStatus === "PENDING",
+      unreadCount: 0,
+    };
+  });
+
+  const [conversations, setConversations] = useState<ConversationSummary[]>(initialList);
+  const [selectedOrderCode, setSelectedOrderCode] = useState<string | null>(
+    initialOrderCode || (initialList.length > 0 ? initialList[0].orderCode : null)
+  );
+  const selectedOrderCodeRef = useRef<string | null>(selectedOrderCode);
+  selectedOrderCodeRef.current = selectedOrderCode;
+
   const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [searchQ, setSearchQ] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | "UNREAD" | "DISPUTE">("ALL");
@@ -54,7 +85,7 @@ export function CustomerMessagesPanel({
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [imageAttachment, setImageAttachment] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // Sync initialOrderCode when prop changes
   useEffect(() => {
@@ -76,15 +107,23 @@ export function CustomerMessagesPanel({
             status: filterType === "DISPUTE" ? "DISPUTE" : undefined,
           })
           .then((list) => {
-            setConversations(list);
+            if (list && list.length > 0) {
+              const map = new Map<string, ConversationSummary>();
+              initialList.forEach((c) => map.set(c.orderCode, c));
+              list.forEach((c) => map.set(c.orderCode, c));
+              setConversations(Array.from(map.values()));
+            }
           })
           .catch(() => {});
 
-        if (selectedOrderCode) {
+        const currentActive = selectedOrderCodeRef.current;
+        if (currentActive) {
           orderChatService
-            .getMessages(selectedOrderCode)
+            .getMessages(currentActive)
             .then((msgs) => {
-              setMessages(msgs);
+              if (selectedOrderCodeRef.current === currentActive) {
+                setMessages(msgs);
+              }
             })
             .catch(() => {});
         }
@@ -92,7 +131,7 @@ export function CustomerMessagesPanel({
     }, 3500);
 
     return () => clearInterval(interval);
-  }, [customerEmail, filterType, selectedOrderCode]);
+  }, [customerEmail, filterType]);
 
   async function loadInbox() {
     setIsLoading(true);
@@ -101,9 +140,13 @@ export function CustomerMessagesPanel({
         customerEmail: customerEmail || undefined,
         status: filterType === "DISPUTE" ? "DISPUTE" : undefined,
       });
-      setConversations(list);
-      if (list.length > 0 && !selectedOrderCode) {
-        setSelectedOrderCode(list[0].orderCode);
+      const map = new Map<string, ConversationSummary>();
+      initialList.forEach((c) => map.set(c.orderCode, c));
+      (list || []).forEach((c) => map.set(c.orderCode, c));
+      const merged = Array.from(map.values());
+      if (merged.length > 0) {
+        setConversations(merged);
+        setSelectedOrderCode((curr) => curr || merged[0].orderCode);
       }
     } catch {
       // ignore
@@ -113,10 +156,11 @@ export function CustomerMessagesPanel({
   }
 
   function handleSelectConversation(code: string) {
+    if (code === selectedOrderCode) return;
     setSelectedOrderCode(code);
+    setMessages([]); // Clear previous thread immediately to avoid stale overlap
     orderChatService.markAsRead(code);
     loadMessages(code);
-    // Cập nhật số unreadCount trong danh sách
     setConversations((prev) =>
       prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
     );
@@ -130,13 +174,17 @@ export function CustomerMessagesPanel({
   }, [selectedOrderCode]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
   }, [messages]);
 
   async function loadMessages(code: string) {
     try {
       const msgs = await orderChatService.getMessages(code);
-      setMessages(msgs);
+      if (selectedOrderCodeRef.current === code) {
+        setMessages(msgs);
+      }
     } catch {
       // ignore
     }
@@ -465,7 +513,7 @@ export function CustomerMessagesPanel({
             </div>
 
             {/* Message Stream */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-gray-50/40 min-w-0">
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-gray-50/40 min-w-0">
               {/* Default Welcome System Card */}
               <div className="max-w-md mx-auto p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200/90 text-center space-y-1.5 text-xs text-emerald-950 shadow-2xs">
                 <div className="flex items-center justify-center gap-1.5 font-bold text-emerald-900">
@@ -534,7 +582,7 @@ export function CustomerMessagesPanel({
                     >
                       {!isCustomer && (
                         <div className="font-bold text-[11px] text-emerald-800 flex items-center gap-1">
-                          <span>{m.senderName || activeConv.farmName}</span>
+                          <span>{activeConv?.farmName || m.senderName || "Chủ vườn"}</span>
                           <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-normal">
                             Chủ vườn
                           </span>
@@ -571,7 +619,6 @@ export function CustomerMessagesPanel({
                   </div>
                 );
               })}
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Quick Suggestion Chips */}

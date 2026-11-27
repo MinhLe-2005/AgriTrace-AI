@@ -2357,6 +2357,7 @@ function CustomerDashboardContent() {
         <div className="space-y-4 animate-fade-in-up">
           <CustomerMessagesPanel
             customerEmail={user?.email}
+            fallbackOrders={orders}
             initialOrderCode={orderParam || undefined}
             onViewOrderDetail={(code) => {
               const cleanParam = code.replace(/^#/, "").trim().toLowerCase();
