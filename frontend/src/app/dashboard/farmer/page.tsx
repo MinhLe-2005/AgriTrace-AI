@@ -2636,82 +2636,82 @@ function FarmerPortalContent() {
       </div>
 
       {/* 2. Navigation Tabs (5 Khối nghiệp vụ cốt lõi; Hộp Thư, Đánh Giá, Mùa Vụ, AI Dự Báo truy cập ở Sidebar trái) */}
-      <div className="flex border-b border-gray-200 overflow-x-auto gap-2 text-xs font-bold">
+      <div className="flex flex-wrap border-b border-gray-200 gap-x-1.5 gap-y-1 text-xs font-bold">
         <button
           onClick={() => selectCoreTab("farms")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "farms"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Home size={16} /> Quản Lý Nông Trại
+          <Home size={15} /> Nông Trại
           <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleFarms.length} Trang trại
+            {visibleFarms.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("batches")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "batches"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Package size={16} /> Quản Lý Lô Thu Hoạch
+          <Package size={15} /> Lô Thu Hoạch
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleBatches.length} Lô
+            {visibleBatches.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("logs")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "logs"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <FileText size={16} /> Sổ Nhật Ký Canh Tác
+          <FileText size={15} /> Nhật Ký Canh Tác
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleLogs.length} Ghi chép
+            {visibleLogs.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("products")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "products"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Sprout size={16} /> Quản Lý Sản Phẩm (Xoài, Sầu riêng...)
+          <Sprout size={15} /> Sản Phẩm
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleProducts.length} Loại
+            {visibleProducts.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("certs")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "certs"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Award size={16} /> Chứng Nhận & Cảnh Báo
-          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full mr-1">
+          <Award size={15} /> Chứng Nhận
+          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
             {visibleCerts.length}
           </span>
           {visibleCerts.some((c) => c.status === "EXPIRED") ? (
-            <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
-              ⛔ Có chứng chỉ hết hạn
+            <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+              Hết hạn
             </span>
           ) : visibleCerts.some((c) => c.status === "EXPIRING_SOON") ? (
-            <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
-              ⚠️ Sắp hết hạn
+            <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+              Sắp hết hạn
             </span>
           ) : null}
         </button>
