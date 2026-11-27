@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   Award,
   BookOpen,
-  CalendarRange,
   Check,
   CheckCircle2,
   Clock,
@@ -28,8 +27,6 @@ import {
   Trash2,
   Star,
   MessageCircle,
-  MessageSquare,
-  TrendingUp,
   Truck,
   Upload,
   User,
@@ -830,9 +827,21 @@ function FarmerPortalContent() {
     if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "seasons", "forecast", "messages"].includes(tab)) {
       setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast" | "messages");
     } else if (!tab) {
-      setActiveTab((prev) => (prev === "forecast" || prev === "seasons" ? "farms" : prev));
+      setActiveTab((prev) =>
+        prev === "forecast" || prev === "seasons" || prev === "reviews" || prev === "messages" ? "farms" : prev
+      );
     }
   }, [searchParams]);
+
+  const selectCoreTab = (tab: "farms" | "batches" | "logs" | "products" | "certs") => {
+    setActiveTab(tab);
+    const currentQueryTab = searchParams.get("tab");
+    if (tab === "farms") {
+      if (currentQueryTab) router.push("/dashboard/farmer");
+    } else if (["messages", "reviews", "seasons", "forecast"].includes(currentQueryTab || "")) {
+      router.push(`/dashboard/farmer?tab=${tab}`);
+    }
+  };
 
   // =========================================================================
   // 1. DỮ LIỆU QUẢN LÝ NÔNG TRẠI (Quản lý nhiều nông trại canh tác)
@@ -2612,20 +2621,6 @@ function FarmerPortalContent() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setActiveTab("messages");
-              router.push("/dashboard/farmer?tab=messages");
-            }}
-            className={`px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all transform active:scale-95 cursor-pointer ${
-              activeTab === "messages"
-                ? "bg-amber-400 text-stone-950 ring-2 ring-amber-300 font-extrabold"
-                : "bg-amber-500 hover:bg-amber-400 text-stone-950"
-            }`}
-          >
-            <MessageSquare size={15} />
-            <span>Hộp Thư & Khiếu Nại</span>
-          </button>
-          <button
             onClick={openAddFarmModal}
             className="px-3.5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-emerald-700/60 transition-all cursor-pointer"
           >
@@ -2640,13 +2635,10 @@ function FarmerPortalContent() {
         </div>
       </div>
 
-      {/* 2. Navigation Tabs (5 Khối nghiệp vụ chuẩn bài nói, QUẢN LÝ NÔNG TRẠI đứng đầu tiên) */}
+      {/* 2. Navigation Tabs (5 Khối nghiệp vụ cốt lõi; Hộp Thư, Đánh Giá, Mùa Vụ, AI Dự Báo truy cập ở Sidebar trái) */}
       <div className="flex border-b border-gray-200 overflow-x-auto gap-2 text-xs font-bold">
         <button
-          onClick={() => {
-            setActiveTab("farms");
-            router.push("/dashboard/farmer");
-          }}
+          onClick={() => selectCoreTab("farms")}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "farms"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
@@ -2660,22 +2652,7 @@ function FarmerPortalContent() {
         </button>
 
         <button
-          onClick={() => {
-            setActiveTab("messages");
-            router.push("/dashboard/farmer?tab=messages");
-          }}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "messages"
-              ? "border-amber-600 text-amber-950 font-extrabold bg-amber-50/60"
-              : "border-transparent text-amber-800 hover:text-amber-950 hover:bg-amber-50/40"
-          }`}
-        >
-          <MessageSquare size={16} className="text-amber-600" />
-          <span>Hộp Thư & Khiếu Nại</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("batches")}
+          onClick={() => selectCoreTab("batches")}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "batches"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
@@ -2689,7 +2666,7 @@ function FarmerPortalContent() {
         </button>
 
         <button
-          onClick={() => setActiveTab("logs")}
+          onClick={() => selectCoreTab("logs")}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "logs"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
@@ -2703,7 +2680,7 @@ function FarmerPortalContent() {
         </button>
 
         <button
-          onClick={() => setActiveTab("products")}
+          onClick={() => selectCoreTab("products")}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "products"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
@@ -2717,7 +2694,7 @@ function FarmerPortalContent() {
         </button>
 
         <button
-          onClick={() => setActiveTab("certs")}
+          onClick={() => selectCoreTab("certs")}
           className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "certs"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
@@ -2737,46 +2714,6 @@ function FarmerPortalContent() {
               ⚠️ Sắp hết hạn
             </span>
           ) : null}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("reviews")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "reviews"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
-          }`}
-        >
-          <Star size={16} className={activeTab === "reviews" ? "fill-amber-400 text-amber-500" : "text-gray-400"} />
-          <span>Đánh Giá Khách Hàng ({farmerReviews.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("seasons")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "seasons"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
-          }`}
-        >
-          <CalendarRange size={16} /> Mùa Vụ Canh Tác
-          <span className="bg-sky-100 text-sky-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-            4 Trạng thái
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("forecast")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "forecast"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
-          }`}
-        >
-          <TrendingUp size={16} /> AI Dự Báo Nhu Cầu
-          <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-            7-30 Ngày
-          </span>
         </button>
       </div>
 
