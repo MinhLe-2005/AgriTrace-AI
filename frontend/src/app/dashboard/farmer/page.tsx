@@ -545,6 +545,19 @@ const DEFAULT_CERTS: CertificationItem[] = [
   },
 ];
 
+function normalizeTransportStatus(
+  raw?: string | null
+): "Chưa vận chuyển" | "Đang vận chuyển" | "Đã nhập kho đích" {
+  const lower = (raw || "").trim().toLowerCase();
+  if (lower.includes("đang vận chuyển") || lower.includes("đang giao")) {
+    return "Đang vận chuyển";
+  }
+  if (lower.includes("đã nhập kho") || lower.includes("đã giao kho")) {
+    return "Đã nhập kho đích";
+  }
+  return "Chưa vận chuyển";
+}
+
 function getLocalIsoDate(offsetDays = 0): string {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -1082,7 +1095,7 @@ function FarmerPortalContent() {
             cert: b.cert || "VietGAP",
             cultivation: b.cultivation || "Theo tiêu chuẩn",
             transportDestination: b.transportDestination || "Lưu tại kho bảo quản nông trại",
-            transportStatus: (b.transportStatus as BatchItem["transportStatus"]) || "Chưa vận chuyển",
+            transportStatus: normalizeTransportStatus(b.transportStatus),
           }));
           setBatches(mapped);
         }
@@ -1207,7 +1220,7 @@ function FarmerPortalContent() {
                     ...item,
                     status: (data.status as BatchItem["status"]) || item.status,
                     statusColor: resolveBatchStatusColor(data.status, data.statusColor),
-                    transportStatus: (data.transportStatus as BatchItem["transportStatus"]) || item.transportStatus,
+                    transportStatus: data.transportStatus ? normalizeTransportStatus(data.transportStatus) : item.transportStatus,
                     transportDestination: data.transportDestination || item.transportDestination,
                   };
                 }
@@ -1223,7 +1236,7 @@ function FarmerPortalContent() {
                   ...prev,
                   status: (data.status as BatchItem["status"]) || prev.status,
                   statusColor: resolveBatchStatusColor(data.status, data.statusColor),
-                  transportStatus: (data.transportStatus as BatchItem["transportStatus"]) || prev.transportStatus,
+                  transportStatus: data.transportStatus ? normalizeTransportStatus(data.transportStatus) : prev.transportStatus,
                   transportDestination: data.transportDestination || prev.transportDestination,
                 };
               });
@@ -1276,7 +1289,7 @@ function FarmerPortalContent() {
                 ...oldItem,
                 status: (fresh.status as BatchItem["status"]) || oldItem.status,
                 statusColor: resolveBatchStatusColor(fresh.status, fresh.statusColor),
-                transportStatus: (fresh.transportStatus as BatchItem["transportStatus"]) || oldItem.transportStatus,
+                transportStatus: fresh.transportStatus ? normalizeTransportStatus(fresh.transportStatus) : oldItem.transportStatus,
                 transportDestination: fresh.transportDestination || oldItem.transportDestination,
               };
             });
@@ -3212,21 +3225,28 @@ function FarmerPortalContent() {
 
                           {/* Tình Trạng Vận Chuyển */}
                           <td className="py-3 px-3">
-                            {b.transportStatus === "Đang vận chuyển" && (
-                              <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1">
-                                <Truck size={11} className="text-blue-600 animate-pulse" /> Đang vận chuyển
-                              </span>
-                            )}
-                            {b.transportStatus === "Đã nhập kho đích" && (
-                              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1">
-                                <CheckCircle2 size={11} className="text-emerald-600" /> Đã nhập kho đích
-                              </span>
-                            )}
-                            {(!b.transportStatus || b.transportStatus === "Chưa vận chuyển") && (
-                              <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1">
-                                🏡 Lưu tại vườn (Chưa chuyển)
-                              </span>
-                            )}
+                            {(() => {
+                              const normalizedTransport = normalizeTransportStatus(b.transportStatus);
+                              if (normalizedTransport === "Đang vận chuyển") {
+                                return (
+                                  <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1 whitespace-nowrap">
+                                    <Truck size={11} className="text-blue-600 animate-pulse" /> Đang vận chuyển
+                                  </span>
+                                );
+                              }
+                              if (normalizedTransport === "Đã nhập kho đích") {
+                                return (
+                                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1 whitespace-nowrap">
+                                    <CheckCircle2 size={11} className="text-emerald-600" /> Đã nhập kho đích
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px] inline-flex items-center gap-1 whitespace-nowrap">
+                                  <Clock size={11} className="text-amber-600" /> Chưa vận chuyển
+                                </span>
+                              );
+                            })()}
                             <div className="text-[10px] text-gray-500 font-medium mt-1 truncate max-w-[150px]" title={b.transportDestination}>
                               Đến: {b.transportDestination || "Kho phân phối"}
                             </div>
@@ -4625,17 +4645,17 @@ function FarmerPortalContent() {
                 <div>
                   <div className="text-[10px] text-gray-500 font-medium">Vận chuyển & Lưu kho</div>
                   <div className="mt-0.5">
-                    {selectedLotForTimeline.transportStatus === "Đang vận chuyển" ? (
-                      <span className="bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                    {normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đang vận chuyển" ? (
+                      <span className="bg-blue-100 text-blue-800 border border-blue-200 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
                         <Truck size={10} className="animate-pulse" /> Đang vận chuyển
                       </span>
-                    ) : selectedLotForTimeline.transportStatus === "Đã nhập kho đích" ? (
-                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                    ) : normalizeTransportStatus(selectedLotForTimeline.transportStatus) === "Đã nhập kho đích" ? (
+                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
                         <CheckCircle2 size={10} /> Đã nhập kho đích
                       </span>
                     ) : (
-                      <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
-                        🏡 Lưu kho nông trại
+                      <span className="bg-amber-100 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                        <Clock size={10} /> Chưa vận chuyển
                       </span>
                     )}
                   </div>
