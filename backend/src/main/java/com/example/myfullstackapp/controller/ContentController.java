@@ -32,21 +32,25 @@ public class ContentController {
     }
 
     @PostMapping("/campaigns")
+    @PreAuthorize("hasRole('ADMIN')")
     public Campaign createCampaign(@Valid @RequestBody CampaignRequest req) {
         return contentService.createCampaign(req);
     }
 
     @PutMapping("/campaigns/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Campaign updateCampaign(@PathVariable String id, @Valid @RequestBody CampaignRequest req) {
         return contentService.updateCampaign(id, req);
     }
 
     @PatchMapping("/campaigns/{id}/toggle")
+    @PreAuthorize("hasRole('ADMIN')")
     public Campaign toggleCampaign(@PathVariable String id) {
         return contentService.toggleCampaign(id);
     }
 
     @DeleteMapping("/campaigns/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteCampaign(@PathVariable String id) {
         contentService.deleteCampaign(id);
         return ResponseEntity.noContent().build();
@@ -60,26 +64,31 @@ public class ContentController {
     }
 
     @GetMapping("/blog-posts/all")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<BlogPost> listAllBlogPosts() {
         return contentService.listBlogPosts(true);
     }
 
     @PostMapping("/blog-posts")
+    @PreAuthorize("hasRole('ADMIN')")
     public BlogPost createBlogPost(@Valid @RequestBody BlogPostRequest req) {
         return contentService.createBlogPost(req);
     }
 
     @PutMapping("/blog-posts/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public BlogPost updateBlogPost(@PathVariable String id, @Valid @RequestBody BlogPostRequest req) {
         return contentService.updateBlogPost(id, req);
     }
 
     @PatchMapping("/blog-posts/{id}/toggle")
+    @PreAuthorize("hasRole('ADMIN')")
     public BlogPost toggleBlogPost(@PathVariable String id) {
         return contentService.toggleBlogPost(id);
     }
 
     @DeleteMapping("/blog-posts/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteBlogPost(@PathVariable String id) {
         contentService.deleteBlogPost(id);
         return ResponseEntity.noContent().build();
