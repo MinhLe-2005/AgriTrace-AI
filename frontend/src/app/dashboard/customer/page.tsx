@@ -56,6 +56,8 @@ import { authService } from "@/services/auth.service";
 import { catalogService, type ApiOrder } from "@/services/catalog.service";
 import { OrderChatDrawer } from "@/features/order-chat/OrderChatDrawer";
 import { OrderDisputeModal } from "@/features/order-chat/OrderDisputeModal";
+import { CustomerMessagesPanel } from "@/features/order-chat/CustomerMessagesPanel";
+import { orderChatService } from "@/services/order-chat.service";
 import { loyaltyService, type LoyaltyProfile } from "@/services/loyalty.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { reviewService } from "@/services/review.service";
@@ -414,14 +416,41 @@ function CustomerDashboardContent() {
   const tabParam = searchParams.get("tab");
   const orderParam = searchParams.get("order");
 
-  type TabType = "orders" | "profile" | "password" | "vouchers" | "notifications" | "points";
+  type TabType = "orders" | "messages" | "profile" | "password" | "vouchers" | "notifications" | "points";
 
   const [activeTab, setActiveTab] = useState<TabType>(() => {
-    if (tabParam === "profile" || tabParam === "password" || tabParam === "vouchers" || tabParam === "notifications" || tabParam === "points") {
+    if (
+      tabParam === "profile" ||
+      tabParam === "password" ||
+      tabParam === "vouchers" ||
+      tabParam === "notifications" ||
+      tabParam === "points" ||
+      tabParam === "messages"
+    ) {
       return tabParam;
     }
     return "orders";
   });
+
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  // Poll unread messages count for customer across all farms
+  useEffect(() => {
+    if (!user?.email) return;
+    const fetchUnread = () => {
+      orderChatService
+        .getInbox({ customerEmail: user.email })
+        .then((list) => {
+          const total = list.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+          setUnreadMessagesCount(total);
+        })
+        .catch(() => {});
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 5000);
+    return () => clearInterval(interval);
+  }, [user?.email, activeTab]);
 
   // Selected Order for Detail Modal
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -641,6 +670,7 @@ function CustomerDashboardContent() {
       tabParam === "vouchers" ||
       tabParam === "notifications" ||
       tabParam === "points" ||
+      tabParam === "messages" ||
       tabParam === "orders"
     ) {
       setActiveTab(tabParam);
@@ -1435,6 +1465,20 @@ function CustomerDashboardContent() {
           </button>
           <div className="w-px h-8 bg-gray-200" />
           <button
+            onClick={() => setActiveTab("messages")}
+            className="text-center group transition-transform hover:-translate-y-0.5 relative"
+          >
+            <div className="text-lg sm:text-xl font-extrabold text-teal-700 group-hover:text-teal-600">
+              {unreadMessagesCount > 0 ? (
+                <span className="text-red-600 font-black animate-pulse">{unreadMessagesCount} mới</span>
+              ) : (
+                <span className="inline-flex items-center justify-center gap-1"><MessageSquare size={16} /> Chat</span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500">Hộp thư Shop</div>
+          </button>
+          <div className="w-px h-8 bg-gray-200" />
+          <button
             onClick={() => setActiveTab("vouchers")}
             className="text-center group transition-transform hover:-translate-y-0.5"
           >
@@ -1482,6 +1526,24 @@ function CustomerDashboardContent() {
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
             {orders.length}
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("messages")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer",
+            activeTab === "messages"
+              ? "border-emerald-600 text-emerald-800 bg-white"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          )}
+        >
+          <MessageSquare size={16} />
+          <span>Hộp Thư & Trò Chuyện</span>
+          {unreadMessagesCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-red-600 text-white font-bold animate-pulse">
+              {unreadMessagesCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -2195,9 +2257,12 @@ function CustomerDashboardContent() {
 
                       {/* FEATURE: Chat với Shop (Shopee-style) */}
                       <button
-                        onClick={() => setChatOrder({ ...(order as any), orderCode: order.id, total: order.total } as ApiOrder)}
+                        onClick={() => {
+                          setActiveTab("messages");
+                          router.push(`/dashboard/customer?tab=messages&order=${order.id}`);
+                        }}
                         className="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer hover:border-emerald-400 active:scale-95"
-                        title="Chat trực tiếp với chủ nông trại và shop về đơn hàng này"
+                        title="Mở hộp thư chat trực tiếp với chủ nông trại về đơn hàng này"
                       >
                         <MessageSquare size={13} className="text-emerald-700" />
                         <span>Chat với Shop</span>
@@ -2286,7 +2351,24 @@ function CustomerDashboardContent() {
       )}
 
       {/* ========================================================= */}
-      {/* TAB 2: KHO VOUCHER ĐÃ LƯU                                 */}
+      {/* TAB 2: HỘP THƯ & TRÒ CHUYỆN VỚI CÁC NHÀ VƯỜN               */}
+      {/* ========================================================= */}
+      {activeTab === "messages" && (
+        <div className="space-y-4 animate-fade-in-up">
+          <CustomerMessagesPanel
+            customerEmail={user?.email}
+            initialOrderCode={orderParam || undefined}
+            onViewOrderDetail={(code) => {
+              const cleanParam = code.replace(/^#/, "").trim().toLowerCase();
+              const match = orders.find((o) => o.id?.replace(/^#/, "").trim().toLowerCase() === cleanParam);
+              if (match) setSelectedOrder(match);
+            }}
+          />
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 3: KHO VOUCHER ĐÃ LƯU                                 */}
       {/* ========================================================= */}
       {activeTab === "vouchers" && (
         <div className="space-y-5 animate-fade-in-up">

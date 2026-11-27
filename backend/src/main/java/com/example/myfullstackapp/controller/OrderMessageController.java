@@ -328,18 +328,26 @@ public class OrderMessageController {
     }
 
     /**
-     * Hộp thư đến (Inbox) cho Quản trị viên (Admin) và Chủ Nông Trại (Farmer).
-     * Hỗ trợ lọc theo farmName nếu Farmer chỉ muốn xem tin nhắn nông trại của mình.
+     * Hộp thư đến (Inbox) cho Khách hàng (Customer), Chủ Nông Trại (Farmer) và Quản trị viên (Admin).
+     * Hỗ trợ lọc theo farmName (cho Farmer) hoặc customerEmail (cho Customer).
      */
     @GetMapping("/messages/inbox")
     public ApiResponse<List<ConversationSummary>> getInbox(
             @RequestParam(required = false) String farmName,
+            @RequestParam(required = false) String customerEmail,
             @RequestParam(required = false) String status
     ) {
         List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
         List<ConversationSummary> summaries = new ArrayList<>();
 
         for (Order order : orders) {
+            if (customerEmail != null && !customerEmail.isBlank()) {
+                String orderEmail = order.getUserEmail();
+                if (orderEmail == null || !orderEmail.trim().equalsIgnoreCase(customerEmail.trim())) {
+                    continue;
+                }
+            }
+
             String resolvedFarm = resolveFarmName(order);
             if (farmName != null && !farmName.isBlank() && !resolvedFarm.toLowerCase().contains(farmName.trim().toLowerCase())) {
                 continue;
@@ -364,7 +372,18 @@ public class OrderMessageController {
                 continue;
             }
 
-            long unread = msgs.stream().filter(m -> !m.isRead()).count();
+            long unread;
+            if (customerEmail != null && !customerEmail.isBlank()) {
+                // Khách hàng: chỉ đếm tin nhắn chưa đọc từ phía Nông trại hoặc Admin
+                unread = msgs.stream()
+                        .filter(m -> !m.isRead() && !"CUSTOMER".equalsIgnoreCase(m.getSenderRole()))
+                        .count();
+            } else {
+                // Nông dân / Quản trị viên: đếm tin nhắn chưa đọc từ phía Khách hàng
+                unread = msgs.stream()
+                        .filter(m -> !m.isRead() && !"FARMER".equalsIgnoreCase(m.getSenderRole()))
+                        .count();
+            }
 
             summaries.add(ConversationSummary.builder()
                     .orderCode(order.getOrderCode())

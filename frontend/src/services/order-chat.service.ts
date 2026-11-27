@@ -81,7 +81,7 @@ export const orderChatService = {
     return res.data?.data || res.data;
   },
 
-  async getInbox(params?: { farmName?: string; status?: string }): Promise<ConversationSummary[]> {
+  async getInbox(params?: { farmName?: string; customerEmail?: string; status?: string }): Promise<ConversationSummary[]> {
     try {
       const res = await api.get("/orders/messages/inbox", { params });
       return res.data?.data || res.data || [];
