@@ -1,6 +1,13 @@
 import { api } from "@/lib/api";
 import type { ApiOrder } from "./catalog.service";
 
+export type ChatChannel = "SHOP" | "ADMIN";
+export type ChatViewerRole = "CUSTOMER" | "FARMER" | "ADMIN";
+
+function normalizeOrderCode(orderCode: string): string {
+  return orderCode.replace(/^#/, "").trim().toUpperCase();
+}
+
 export type OrderMessage = {
   id: number;
   orderCode: string;
@@ -10,7 +17,14 @@ export type OrderMessage = {
   senderEmail?: string;
   message: string;
   imageUrl?: string;
-  messageType: "CHAT" | "DISPUTE_SUBMITTED" | "DISPUTE_APPROVED" | "DISPUTE_REJECTED" | "VOUCHER_OFFERED";
+  channel?: ChatChannel;
+  messageType:
+    | "CHAT"
+    | "DISPUTE_SUBMITTED"
+    | "DISPUTE_APPROVED"
+    | "DISPUTE_REJECTED"
+    | "VOUCHER_OFFERED"
+    | "SUPPORT_ESCALATED";
   createdAt: string;
   isRead: boolean;
 };
@@ -30,6 +44,8 @@ export type ConversationSummary = {
   lastMessageTime: string;
   messageCount: number;
   hasPendingDispute: boolean;
+  adminSupportRequested?: boolean;
+  adminSupportRequestedAt?: string | null;
   unreadCount?: number;
 };
 
@@ -39,6 +55,7 @@ export type SendMessagePayload = {
   senderEmail?: string;
   message: string;
   imageUrl?: string;
+  channel?: ChatChannel;
   messageType?: string;
 };
 
@@ -57,9 +74,13 @@ export type ResolveDisputePayload = {
 };
 
 export const orderChatService = {
-  async getMessages(orderCode: string): Promise<OrderMessage[]> {
+  async getMessages(
+    orderCode: string,
+    params?: { channel?: ChatChannel; viewerRole?: ChatViewerRole }
+  ): Promise<OrderMessage[]> {
     try {
-      const res = await api.get(`/orders/${encodeURIComponent(orderCode)}/messages`);
+      const cleanCode = normalizeOrderCode(orderCode);
+      const res = await api.get(`/orders/${encodeURIComponent(cleanCode)}/messages`, { params });
       return res.data?.data || res.data || [];
     } catch {
       return [];
@@ -67,21 +88,41 @@ export const orderChatService = {
   },
 
   async sendMessage(orderCode: string, payload: SendMessagePayload): Promise<OrderMessage> {
-    const res = await api.post(`/orders/${encodeURIComponent(orderCode)}/messages`, payload);
+    const cleanCode = normalizeOrderCode(orderCode);
+    const res = await api.post(`/orders/${encodeURIComponent(cleanCode)}/messages`, payload);
+    return res.data?.data || res.data;
+  },
+
+  async escalateToAdmin(
+    orderCode: string,
+    payload?: { reason?: string; customerName?: string; customerEmail?: string }
+  ): Promise<{ order: ApiOrder; message: OrderMessage | null }> {
+    const cleanCode = normalizeOrderCode(orderCode);
+    const res = await api.post(`/orders/${encodeURIComponent(cleanCode)}/support-escalate`, payload || {});
     return res.data?.data || res.data;
   },
 
   async createDispute(orderCode: string, payload: CreateDisputePayload): Promise<ApiOrder> {
-    const res = await api.post(`/orders/${encodeURIComponent(orderCode)}/dispute`, payload);
+    const cleanCode = normalizeOrderCode(orderCode);
+    const res = await api.post(`/orders/${encodeURIComponent(cleanCode)}/dispute`, payload);
     return res.data?.data || res.data;
   },
 
   async resolveDispute(orderCode: string, payload: ResolveDisputePayload): Promise<ApiOrder> {
-    const res = await api.patch(`/orders/${encodeURIComponent(orderCode)}/dispute/resolve`, payload);
+    const cleanCode = normalizeOrderCode(orderCode);
+    const res = await api.patch(`/orders/${encodeURIComponent(cleanCode)}/dispute/resolve`, payload);
     return res.data?.data || res.data;
   },
 
-  async getInbox(params?: { farmName?: string; customerEmail?: string; status?: string }): Promise<ConversationSummary[]> {
+  async getInbox(params?: {
+    farmName?: string;
+    farmNames?: string;
+    ownerId?: string;
+    customerEmail?: string;
+    status?: string;
+    viewerRole?: ChatViewerRole;
+    channel?: ChatChannel;
+  }): Promise<ConversationSummary[]> {
     try {
       const res = await api.get("/orders/messages/inbox", { params });
       return res.data?.data || res.data || [];
@@ -90,11 +131,14 @@ export const orderChatService = {
     }
   },
 
-  async markAsRead(orderCode: string, readerRole?: "CUSTOMER" | "FARMER" | "ADMIN"): Promise<void> {
+  async markAsRead(
+    orderCode: string,
+    options?: { channel?: ChatChannel; viewerRole?: ChatViewerRole } | ChatViewerRole
+  ): Promise<void> {
     try {
-      await api.patch(`/orders/${encodeURIComponent(orderCode)}/messages/read`, null, {
-        params: readerRole ? { readerRole } : undefined,
-      });
+      const cleanCode = normalizeOrderCode(orderCode);
+      const params = typeof options === "string" ? { viewerRole: options } : options;
+      await api.patch(`/orders/${encodeURIComponent(cleanCode)}/messages/read`, null, { params });
     } catch {
       // ignore
     }

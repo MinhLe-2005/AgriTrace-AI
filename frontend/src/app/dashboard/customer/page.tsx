@@ -506,17 +506,18 @@ function CustomerDashboardContent() {
 
   // Live Supabase data
   const [orders, setOrders] = useState<Order[]>([]);
-  const [savedVouchers, setSavedVouchers] = useState<SavedVoucher[]>(mockSavedVouchers);
+  const [savedVouchers, setSavedVouchers] = useState<SavedVoucher[]>([]);
   const [loyaltyProfile, setLoyaltyProfile] = useState<LoyaltyProfile | null>(null);
-  const totalLoyaltyPoints = loyaltyProfile?.currentPoints ?? orders.reduce((sum, o) => sum + (o.pointsAwarded || 0), 100);
+  const totalLoyaltyPoints = loyaltyProfile?.currentPoints ?? 0;
 
   useEffect(() => {
     async function loadSupabaseCustomerData() {
       try {
         const targetEmail = user?.email || "customer@gmail.com";
-        const [apiOrders, apiVouchers, apiLoyalty, usedCodes] = await Promise.all([
+        const [apiOrders, walletVouchers, apiVouchers, apiLoyalty, usedCodes] = await Promise.all([
           catalogService.getOrders(targetEmail),
-          catalogService.getVouchers(),
+          catalogService.getWalletVouchers(targetEmail),
+          catalogService.getVouchers(targetEmail),
           loyaltyService.getLoyaltyMe(targetEmail),
           catalogService.getUsedVouchers(targetEmail),
         ]);
@@ -590,7 +591,7 @@ function CustomerDashboardContent() {
               driverPhone: o.driverPhone || "0912.888.777",
               shippingFee: o.shippingFee || 0,
               total: o.total,
-              pointsAwarded: o.pointsAwarded || 20,
+              pointsAwarded: o.pointsAwarded ?? Math.max(1, Math.floor((o.total || 0) / 10000)),
               voucherUsed: o.voucherUsed,
               discount: o.discount,
               cancelReason: o.cancelReason,
@@ -632,29 +633,46 @@ function CustomerDashboardContent() {
               ],
             };
           });
-          const combined = [...mapped];
-          mockOrders.forEach((m) => {
-            if (!combined.some((c) => c.id === m.id)) {
-              combined.push(m);
-            }
-          });
-          setOrders(combined);
+          setOrders(mapped);
         } else {
-          setOrders(mockOrders);
+          setOrders([]);
         }
-        if (apiVouchers && apiVouchers.length > 0) {
+        const voucherSource =
+          walletVouchers && walletVouchers.length > 0
+            ? [
+                ...walletVouchers,
+                ...(apiVouchers || []).filter(
+                  (av) => !walletVouchers.some((wv) => wv.code.toUpperCase() === av.code.toUpperCase())
+                ),
+              ]
+            : apiVouchers || [];
+
+        if (voucherSource.length > 0) {
           const usedUpper = new Set((usedCodes || []).map((c) => c.toUpperCase()));
-          const mappedVouchers: SavedVoucher[] = apiVouchers.map((v) => ({
-            code: v.code,
-            title: v.title,
-            desc: v.description,
-            min: v.minOrder?.startsWith("Đơn") ? v.minOrder : `Đơn từ ${v.minOrder || "100.000đ"}`,
-            exp: v.exp,
-            status: usedUpper.has(v.code.toUpperCase()) ? "used" : v.active ? "active" : "expired",
-            type: v.code.includes("SHIP") ? "shipping" : "discount",
-            category: v.code.includes("SHIP") ? "Vận chuyển" : "Giảm giá hàng",
-          }));
+          const walletSet = new Set((walletVouchers || []).map((w) => w.code.toUpperCase()));
+          const mappedVouchers: SavedVoucher[] = voucherSource.map((v) => {
+            const numericMin = Number(String(v.minOrder || "0").replace(/[^0-9]/g, ""));
+            const formattedMin =
+              numericMin > 0
+                ? `Đơn từ ${numericMin.toLocaleString("vi-VN")}đ`
+                : String(v.minOrder || "").startsWith("Đơn")
+                  ? String(v.minOrder)
+                  : "Áp dụng mọi đơn";
+            const isRedeemedOrSaved = walletSet.has(v.code.toUpperCase());
+            return {
+              code: v.code,
+              title: isRedeemedOrSaved ? `${v.title} (Đã lưu ví)` : v.title,
+              desc: v.description,
+              min: formattedMin,
+              exp: v.exp,
+              status: usedUpper.has(v.code.toUpperCase()) ? "used" : v.active ? "active" : "expired",
+              type: v.code.toUpperCase().includes("SHIP") ? "shipping" : "discount",
+              category: v.code.toUpperCase().includes("SHIP") ? "Vận chuyển" : "Giảm giá hàng",
+            };
+          });
           setSavedVouchers(mappedVouchers);
+        } else {
+          setSavedVouchers([]);
         }
       } catch (err) {
         console.error("Error loading customer data from Supabase:", err);
@@ -675,12 +693,14 @@ function CustomerDashboardContent() {
     ) {
       setActiveTab(tabParam);
     }
-    if (orderParam && orders.length > 0) {
+    if (orderParam && tabParam !== "messages" && orders.length > 0) {
       const cleanParam = orderParam.replace(/^#/, "").trim().toLowerCase();
       const match = orders.find((o) => o.id?.replace(/^#/, "").trim().toLowerCase() === cleanParam);
       if (match) {
         setSelectedOrder(match);
       }
+    } else if (tabParam === "messages") {
+      setSelectedOrder(null);
     }
   }, [tabParam, orderParam, orders]);
 
@@ -1081,7 +1101,9 @@ function CustomerDashboardContent() {
         toast.success(`Đơn #${orderCode} đã chuyển sang trạng thái Đang giao hàng xe lạnh!`);
       } else {
         const targetOrd = orders.find((o) => o.id === orderCode);
-        const pts = targetOrd?.pointsAwarded || 20;
+        const pts =
+          targetOrd?.pointsAwarded ??
+          Math.max(1, Math.floor((targetOrd?.total || 0) / 10000));
         addNotification({
           id: `notif-delivered-${orderCode}`,
           title: `🎉 Giao thành công & Hoàn tất thanh toán đơn #${orderCode}`,
@@ -1111,7 +1133,7 @@ function CustomerDashboardContent() {
         setReviewFreshCheck(true);
         setReviewColdCheck(true);
         setReviewDriverCheck(true);
-        setReviewPhotoUrl(targetOrd?.items?.[0]?.image || "/images/products/cai-kale.png");
+        setReviewPhotoUrl("");
         setReviewComment("Rau củ rất tươi giòn, cuống mới hái, thùng lạnh bảo quản đạt chuẩn 4.2°C!");
         setShowReviewModal(true);
       }
@@ -1198,6 +1220,7 @@ function CustomerDashboardContent() {
     if (!reviewOrderCode || !reviewProductName) return;
     setIsSubmittingReview(true);
     try {
+      const cleanCode = reviewOrderCode.replace(/^#/, "").trim();
       const criteria: string[] = [];
       if (reviewFreshCheck) criteria.push("Rau giòn tươi nguyên vẹn");
       if (reviewColdCheck) criteria.push("Thùng lạnh 4.2°C đạt chuẩn");
@@ -1207,49 +1230,27 @@ function CustomerDashboardContent() {
         reviewPhotoUrl ? ` [Ảnh thực tế: ${reviewPhotoUrl}]` : ""
       }`;
 
-      // 1. Submit review to backend
-      try {
-        await reviewService.createReview({
-          orderCode: reviewOrderCode,
-          productName: reviewProductName,
-          rating: reviewRating,
-          comment: compositeComment,
-        });
-      } catch (err) {
-        console.warn("Backend review submission warning:", err);
-      }
+      const prevPoints = loyaltyProfile?.currentPoints ?? 0;
 
-      // 2. Award +20 points via loyaltyService
-      try {
-        const updated = await loyaltyService.awardReviewReward(reviewOrderCode, user?.email || "customer@gmail.com");
-        if (updated) {
-          setLoyaltyProfile(updated);
-        } else {
-          setLoyaltyProfile((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  currentPoints: prev.currentPoints + 20,
-                  lifetimePoints: prev.lifetimePoints + 20,
-                }
-              : null
-          );
-        }
-      } catch {
-        setLoyaltyProfile((prev) =>
-          prev
-            ? {
-                ...prev,
-                currentPoints: prev.currentPoints + 20,
-                lifetimePoints: prev.lifetimePoints + 20,
-              }
-            : null
-        );
-      }
+      // 1. Gửi đánh giá về backend (backend tự cộng đúng +20 điểm 1 lần duy nhất cho đơn này)
+      await reviewService.createReview({
+        orderCode: cleanCode,
+        productName: reviewProductName,
+        rating: reviewRating,
+        comment: compositeComment,
+      });
 
-      // 3. Mark order as reviewed in state & localStorage
+      // 2. Lấy lại số điểm chính xác từ server sau khi cộng
+      const targetEmail = user?.email || "customer@gmail.com";
+      const updated = await loyaltyService.getLoyaltyMe(targetEmail);
+      if (updated) {
+        setLoyaltyProfile(updated);
+      }
+      const gained = updated ? Math.max(0, updated.currentPoints - prevPoints) : 20;
+
+      // 3. Lưu trạng thái đã đánh giá
       setReviewedOrders((prev) => {
-        const next = { ...prev, [reviewOrderCode]: true };
+        const next = { ...prev, [cleanCode]: true, [reviewOrderCode]: true };
         try {
           localStorage.setItem("agri_reviewed_orders", JSON.stringify(next));
         } catch {}
@@ -1257,20 +1258,27 @@ function CustomerDashboardContent() {
       });
 
       addNotification({
-        id: `notif-review-${reviewOrderCode}-${Date.now()}`,
-        title: `🎁 +20 Điểm AgriClub từ Đồng Kiểm Đơn #${reviewOrderCode}`,
-        message: `Chúc mừng bạn đã nhận +20 điểm AgriClub vào Thẻ VIP từ việc đánh giá & đồng kiểm độ tươi. Dùng điểm này để đổi voucher giảm giá tại trang /loyalty ngay!`,
+        id: `notif-review-${cleanCode}-${Date.now()}`,
+        title:
+          gained > 0
+            ? `+${gained} Điểm AgriClub từ Đánh Giá Đơn #${cleanCode}`
+            : `Đã ghi nhận đánh giá đơn #${cleanCode}`,
+        message:
+          gained > 0
+            ? `Bạn vừa nhận đúng +${gained} điểm AgriClub vào Thẻ Hội Viên từ đánh giá đơn #${cleanCode}. Dùng điểm này để đổi voucher tại /loyalty.`
+            : `Cảm ơn bạn đã đánh giá đơn #${cleanCode}.`,
         type: "voucher",
         link: `/loyalty`,
       });
 
       toast.success(
-        `🎉 Đánh giá thành công! Bạn vừa nhận ngay +20 Điểm AgriClub vào thẻ VIP (Dùng đổi voucher ở /loyalty).`
+        gained > 0
+          ? `Đánh giá thành công! Đã cộng đúng +${gained} điểm AgriClub.`
+          : "Cảm ơn bạn đã gửi đánh giá đơn hàng!"
       );
       setShowReviewModal(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể gửi đánh giá.";
-      toast.error(msg);
+      toast.error(getApiErrorMessage(err));
     } finally {
       setIsSubmittingReview(false);
     }
@@ -2258,8 +2266,10 @@ function CustomerDashboardContent() {
                       {/* FEATURE: Chat với Shop (Shopee-style) */}
                       <button
                         onClick={() => {
+                          const cleanOrderId = (order.id || "").replace(/^#/, "");
+                          setSelectedOrder(null);
                           setActiveTab("messages");
-                          router.push(`/dashboard/customer?tab=messages&order=${order.id}`);
+                          router.push(`/dashboard/customer?tab=messages&order=${encodeURIComponent(cleanOrderId)}`);
                         }}
                         className="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer hover:border-emerald-400 active:scale-95"
                         title="Mở hộp thư chat trực tiếp với chủ nông trại về đơn hàng này"
@@ -3780,14 +3790,19 @@ function CustomerDashboardContent() {
 
                   <label className="w-full border border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/50 p-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold text-emerald-800 cursor-pointer transition-colors">
                     <Upload size={13} />
-                    <span>{reviewPhotoUrl ? "Đổi ảnh khác..." : "Tải ảnh từ máy / điện thoại"}</span>
+                    <span>{reviewPhotoUrl ? "Đổi ảnh khác..." : "Tải ảnh chụp thực tế từ thiết bị"}</span>
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
+                        if (!file) return;
+                        try {
+                          const compressed = await compressAvatarImage(file, 720, 720, 0.8);
+                          setReviewPhotoUrl(compressed.dataUrl);
+                          toast.success("Đã tải ảnh thực tế!");
+                        } catch {
                           const reader = new FileReader();
                           reader.onload = () => {
                             if (typeof reader.result === "string") {
@@ -3799,32 +3814,6 @@ function CustomerDashboardContent() {
                       }}
                     />
                   </label>
-
-                  {/* Sample chips */}
-                  <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-                    <span className="text-gray-400">Hoặc ảnh mẫu:</span>
-                    <button
-                      type="button"
-                      onClick={() => setReviewPhotoUrl("/images/products/cai-kale.png")}
-                      className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-emerald-100 text-gray-700 hover:text-emerald-900 border border-gray-200 transition-colors cursor-pointer"
-                    >
-                      Cải Kale
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReviewPhotoUrl("/images/products/dau-tay-moc-chau.png")}
-                      className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-emerald-100 text-gray-700 hover:text-emerald-900 border border-gray-200 transition-colors cursor-pointer"
-                    >
-                      Dâu Mộc Châu
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReviewPhotoUrl("/images/products/rau-cu-combo.png")}
-                      className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-emerald-100 text-gray-700 hover:text-emerald-900 border border-gray-200 transition-colors cursor-pointer"
-                    >
-                      Mở thùng tươi
-                    </button>
-                  </div>
 
                   {/* Preview */}
                   {reviewPhotoUrl && (
@@ -4048,7 +4037,7 @@ function CustomerDashboardContent() {
           setDisputeOrder(ord);
         }}
         currentUserRole="CUSTOMER"
-        currentUserName={user?.name || "Lê Quang Minh"}
+        currentUserName={user?.name || "Khách hàng"}
       />
 
       {/* SHOPEE-STYLE: Modal Yêu Cầu Trả Hàng / Hoàn Tiền */}

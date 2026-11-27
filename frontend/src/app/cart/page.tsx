@@ -36,6 +36,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { catalogService } from "@/services/catalog.service";
+import { loyaltyService } from "@/services/loyalty.service";
 import { paymentService, type PaymentLinkResponse } from "@/services/payment.service";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCartStore } from "@/stores/cart-store";
@@ -119,14 +120,42 @@ function CartContent() {
   const [showPayosModal, setShowPayosModal] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [holdSecondsLeft, setHoldSecondsLeft] = useState(1800); // 30 minutes = 1800s
+  const subtotal = getSubtotal();
   const [usedVoucherCodes, setUsedVoucherCodes] = useState<string[]>([]);
+  const [walletVouchers, setWalletVouchers] = useState<VoucherOption[]>(availableVouchers);
+  const [pointsMultiplier, setPointsMultiplier] = useState<number>(1.0);
 
   useEffect(() => {
-    catalogService
-      .getUsedVouchers(user?.email || "customer@gmail.com")
-      .then((used) => setUsedVoucherCodes(used))
-      .catch(() => {});
-  }, [user?.email]);
+    const email = user?.email || "customer@gmail.com";
+    Promise.all([
+      catalogService.getUsedVouchers(email).catch(() => []),
+      catalogService.getWalletVouchers(user?.email).catch(() => []),
+      catalogService.getVouchers(user?.email).catch(() => []),
+      loyaltyService.getLoyaltyMe(user?.email).catch(() => null),
+    ]).then(([used, wallet, activeVouchers, loyalty]) => {
+      setUsedVoucherCodes(used || []);
+      if (loyalty?.pointsMultiplier) {
+        setPointsMultiplier(loyalty.pointsMultiplier);
+      }
+      const map = new Map<string, VoucherOption>();
+      availableVouchers.forEach((v) => map.set(v.code.toUpperCase(), v));
+      [...(wallet || []), ...(activeVouchers || [])].forEach((av) => {
+        const cleanCode = av.code.toUpperCase();
+        const isShip = cleanCode.includes("SHIP");
+        const numDiscount = Number(String(av.discount || "").replace(/[^0-9]/g, "")) || (isShip ? 25000 : 10000);
+        const pctDiscount = String(av.discount || "").includes("%") ? Math.round((subtotal * numDiscount) / 100) : numDiscount;
+        const minNum = Number(String(av.minOrder || "0").replace(/[^0-9]/g, "")) || 0;
+        map.set(cleanCode, {
+          code: cleanCode,
+          title: av.ownerEmail ? `${av.title} (Voucher của bạn)` : av.title,
+          discount: pctDiscount,
+          type: isShip ? "freeship" : "discount",
+          minOrder: minNum,
+        });
+      });
+      setWalletVouchers(Array.from(map.values()));
+    });
+  }, [user?.email, subtotal]);
 
   useEffect(() => {
     if (!showPayosModal) return;
@@ -196,13 +225,12 @@ function CartContent() {
     return () => clearInterval(interval);
   }, [showPayosModal, completedOrderId, clearCart, router, addNotification]);
 
-  const subtotal = getSubtotal();
   const baseShippingFee = items.length > 0 ? 25000 : 0;
   const isFreeship = !!selectedFreeshipVoucher;
   const voucherDiscount = (selectedDiscountVoucher ? selectedDiscountVoucher.discount : 0) + (isFreeship ? baseShippingFee : 0);
   const shippingFee = isFreeship ? 0 : baseShippingFee;
   const total = Math.max(0, subtotal + (isFreeship ? 0 : baseShippingFee) - (selectedDiscountVoucher ? selectedDiscountVoucher.discount : 0));
-  const pointsEarned = Math.max(10, Math.round(total / 5000));
+  const pointsEarned = total > 0 ? Math.max(1, Math.round(Math.floor(total / 10000) * pointsMultiplier)) : 0;
 
   async function handleSelectVoucher(v: VoucherOption) {
     if (v.type === "freeship" && selectedFreeshipVoucher?.code === v.code) {
@@ -694,8 +722,8 @@ function CartContent() {
                     Mã ưu đãi áp dụng:
                   </span>
 
-                  <div className="space-y-1.5">
-                    {availableVouchers.map((v) => {
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                    {walletVouchers.map((v) => {
                       const isUsed = usedVoucherCodes.includes(v.code.toUpperCase());
                       const isChosen =
                         (v.type === "freeship" && selectedFreeshipVoucher?.code === v.code) ||

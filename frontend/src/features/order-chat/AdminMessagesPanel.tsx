@@ -24,6 +24,7 @@ import {
   Check,
   X,
   ShieldCheck,
+  Headset,
 } from "lucide-react";
 import {
   orderChatService,
@@ -31,17 +32,28 @@ import {
   type OrderMessage,
 } from "@/services/order-chat.service";
 import { toast } from "@/stores/toast-store";
+import { getApiErrorMessage } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
 import { useOrderChatSocket } from "./useOrderChatSocket";
 
-export function AdminMessagesPanel({
-  initialOrderCode,
-  onDisputeResolved,
-}: {
+interface AdminMessagesPanelProps {
+  adminName?: string;
   initialOrderCode?: string | null;
   onDisputeResolved?: () => void;
-} = {}) {
+}
+
+export function AdminMessagesPanel({
+  adminName,
+  initialOrderCode,
+  onDisputeResolved,
+}: AdminMessagesPanelProps = {}) {
+  const authUser = useAuthStore((s) => s.user);
+  const resolvedAdminName = adminName?.trim() || authUser?.name?.trim() || "Quản trị viên CSKH";
+
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [selectedOrderCode, setSelectedOrderCode] = useState<string | null>(initialOrderCode || null);
+  const [selectedOrderCode, setSelectedOrderCode] = useState<string | null>(
+    initialOrderCode ? initialOrderCode.replace(/^#/, "").trim().toUpperCase() : null
+  );
   const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [searchQ, setSearchQ] = useState("");
   const [filterDispute, setFilterDispute] = useState<"ALL" | "PENDING_DISPUTE" | "RESOLVED">("ALL");
@@ -74,20 +86,20 @@ export function AdminMessagesPanel({
 
   useEffect(() => {
     if (initialOrderCode) {
-      setSelectedOrderCode(initialOrderCode);
-      orderChatService.markAsRead(initialOrderCode, "ADMIN");
+      const normalized = initialOrderCode.replace(/^#/, "").trim().toUpperCase();
+      setSelectedOrderCode(normalized);
+      orderChatService.markAsRead(normalized, { channel: "ADMIN", viewerRole: "ADMIN" });
     }
   }, [initialOrderCode]);
-
-  // Load inbox
   useEffect(() => {
     loadInbox();
 
-    // Smart polling
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         orderChatService
           .getInbox({
+            viewerRole: "ADMIN",
+            channel: "ADMIN",
             status: filterDispute === "PENDING_DISPUTE" ? "DISPUTE" : undefined,
           })
           .then((list) => {
@@ -97,7 +109,7 @@ export function AdminMessagesPanel({
 
         if (selectedOrderCode) {
           orderChatService
-            .getMessages(selectedOrderCode)
+            .getMessages(selectedOrderCode, { channel: "ADMIN", viewerRole: "ADMIN" })
             .then((msgs) => {
               setMessages((prev) => {
                 if (
@@ -121,6 +133,8 @@ export function AdminMessagesPanel({
     setIsLoading(true);
     try {
       const list = await orderChatService.getInbox({
+        viewerRole: "ADMIN",
+        channel: "ADMIN",
         status: filterDispute === "PENDING_DISPUTE" ? "DISPUTE" : undefined,
       });
       setConversations(list);
@@ -143,11 +157,10 @@ export function AdminMessagesPanel({
     setConversations((prev) =>
       prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
     );
-    orderChatService.markAsRead(code, "ADMIN");
+    orderChatService.markAsRead(code, { channel: "ADMIN", viewerRole: "ADMIN" });
     loadMessages(code);
   }
 
-  // Load messages
   useEffect(() => {
     if (selectedOrderCode) {
       loadMessages(selectedOrderCode);
@@ -155,7 +168,6 @@ export function AdminMessagesPanel({
   }, [selectedOrderCode]);
 
   useEffect(() => {
-    // Only scroll to bottom if user is already near bottom (prevent drag down when scrolling up)
     if (isNearBottomRef.current) {
       scrollToBottom("smooth");
     }
@@ -163,7 +175,10 @@ export function AdminMessagesPanel({
 
   async function loadMessages(code: string) {
     try {
-      const msgs = await orderChatService.getMessages(code);
+      const msgs = await orderChatService.getMessages(code, {
+        channel: "ADMIN",
+        viewerRole: "ADMIN",
+      });
       setMessages(msgs);
       setTimeout(() => scrollToBottom("instant"), 50);
     } catch {
@@ -195,9 +210,19 @@ export function AdminMessagesPanel({
     sendTyping,
   } = useOrderChatSocket({
     orderCode: selectedOrderCode,
+    channel: "ADMIN",
+    subscribeAdminInbox: true,
     currentUserRole: "ADMIN",
-    currentUserName: "CSKH AgriTrace",
+    currentUserName: resolvedAdminName,
     onMessageReceived: handleIncomingMessage,
+    onAdminInboxEvent: (ev) => {
+      loadInbox();
+      if (ev?.type === "SUPPORT_ESCALATED" && ev.orderCode) {
+        toast.info(
+          `Khách hàng ${ev.customerName || ""} vừa yêu cầu Hỗ trợ Tổng đài cho đơn #${ev.orderCode}`
+        );
+      }
+    },
   });
 
   async function handleSendReply(customText?: string) {
@@ -210,18 +235,20 @@ export function AdminMessagesPanel({
     try {
       const newMsg = await orderChatService.sendMessage(selectedOrderCode, {
         senderRole: "ADMIN",
-        senderName: "CSKH AgriTrace",
+        senderName: resolvedAdminName,
+        senderEmail: authUser?.email,
+        channel: "ADMIN",
         message: text,
         messageType: "CHAT",
       });
 
       setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
       setReplyText("");
-      toast.success("Đã gửi tin nhắn CSKH tới khách hàng!");
+      toast.success("Đã gửi phản hồi trực tiếp tới khách hàng!");
       loadInbox();
       setTimeout(() => scrollToBottom("smooth"), 50);
-    } catch {
-      toast.error("Không thể gửi tin nhắn. Vui lòng thử lại!");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể gửi tin nhắn. Vui lòng thử lại!"));
     } finally {
       setIsSending(false);
     }
@@ -297,106 +324,87 @@ export function AdminMessagesPanel({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
-      {/* ── Metric Header Cards ── */}
+      {/* ── Compact Clean Metric Bar ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tổng hội thoại</div>
-            <div className="text-xl font-extrabold text-gray-900 mt-0.5">{conversations.length} đơn</div>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-            <MessageSquare size={18} />
-          </div>
+        <div className="bg-white px-4 py-3.5 rounded-2xl border border-stone-200/90 shadow-2xs">
+          <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Tổng đài hội thoại</div>
+          <div className="text-xl font-extrabold text-stone-900 mt-0.5">{conversations.length} đơn</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-amber-300 shadow-2xs flex items-center justify-between bg-amber-50/30">
+        <div className="bg-white px-4 py-3.5 rounded-2xl border border-amber-200 shadow-2xs flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Khiếu nại chờ duyệt</div>
-            <div className="text-xl font-extrabold text-amber-900 mt-0.5 flex items-center gap-2">
-              <span>{pendingDisputesCount} đơn</span>
-              {pendingDisputesCount > 0 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-bold animate-pulse">
-                  Cần xử lý
-                </span>
-              )}
-            </div>
+            <div className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider">Chờ duyệt hoàn tiền</div>
+            <div className="text-xl font-extrabold text-amber-900 mt-0.5">{pendingDisputesCount} đơn</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-            <AlertTriangle size={18} />
-          </div>
+          {pendingDisputesCount > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
+              Cần xử lý
+            </span>
+          )}
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Chủ Nông Trại Đang Kết Nối</div>
-            <div className="text-xl font-extrabold text-emerald-800 mt-0.5">{connectedFarmsCount || 1} Hợp Tác Xã</div>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
-            <Store size={18} />
+        <div className="bg-white px-4 py-3.5 rounded-2xl border border-stone-200/90 shadow-2xs">
+          <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Nhà vườn liên quan</div>
+          <div className="text-xl font-extrabold text-emerald-900 mt-0.5">
+            {new Set(conversations.map((c) => c.farmName).filter(Boolean)).size} nhà vườn
           </div>
         </div>
       </div>
 
       {/* ── Main Chat Room Container ── */}
-      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden flex flex-col md:flex-row h-[760px] w-full min-w-0">
+      <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden flex flex-col md:flex-row h-[720px] w-full min-w-0">
         {/* Left Sidebar */}
-        <div className="w-full md:w-80 lg:w-[320px] xl:w-[360px] border-r border-gray-200 flex flex-col shrink-0 bg-gray-50/50 min-w-0">
-          <div className="p-4 border-b border-gray-200 bg-white space-y-3">
+        <div className="w-full md:w-80 lg:w-[320px] xl:w-[340px] border-r border-stone-200 flex flex-col shrink-0 bg-stone-50/40 min-w-0">
+          <div className="p-4 border-b border-stone-200 bg-white space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-sm text-gray-900 flex items-center gap-2">
-                <ShieldCheck size={17} className="text-emerald-700" />
-                <span>Khiếu Nại & Tin Nhắn Toàn Sàn</span>
-              </h3>
+              <h3 className="font-bold text-sm text-stone-900">Tổng đài CSKH & Khiếu nại</h3>
               <button
                 onClick={loadInbox}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-stone-400 hover:text-emerald-700 hover:bg-stone-100 transition-colors cursor-pointer"
                 title="Làm mới"
               >
                 <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
               </button>
             </div>
 
-            {/* Search */}
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 placeholder="Tìm mã đơn, khách, nhà vườn..."
-                className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-white"
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 bg-stone-50 focus:bg-white"
               />
             </div>
 
-            {/* Filter buttons */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[11px] font-semibold">
               <button
                 onClick={() => setFilterDispute("ALL")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
                   filterDispute === "ALL"
-                    ? "bg-emerald-800 text-white shadow-2xs"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                    ? "bg-stone-900 text-white"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 }`}
               >
                 Tất cả ({conversations.length})
               </button>
               <button
                 onClick={() => setFilterDispute("PENDING_DISPUTE")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
                   filterDispute === "PENDING_DISPUTE"
-                    ? "bg-amber-600 text-white shadow-2xs"
-                    : "bg-white text-amber-800 border border-amber-300 hover:bg-amber-50"
+                    ? "bg-amber-700 text-white"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 }`}
               >
-                <AlertTriangle size={12} />
-                <span>Chờ duyệt ({pendingDisputesCount})</span>
+                Chờ duyệt ({pendingDisputesCount})
               </button>
               <button
                 onClick={() => setFilterDispute("RESOLVED")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
                   filterDispute === "RESOLVED"
-                    ? "bg-gray-900 text-white shadow-2xs"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                    ? "bg-stone-900 text-white"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 }`}
               >
                 Đã xử lý
@@ -404,8 +412,7 @@ export function AdminMessagesPanel({
             </div>
           </div>
 
-          {/* List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+          <div className="flex-1 overflow-y-auto divide-y divide-stone-100">
             {filteredConvs.map((conv) => {
               const isSelected = conv.orderCode === selectedOrderCode;
               const hasUnread = Boolean(conv.unreadCount && conv.unreadCount > 0);
@@ -413,61 +420,55 @@ export function AdminMessagesPanel({
                 <div
                   key={conv.orderCode}
                   onClick={() => handleSelectConversation(conv.orderCode)}
-                  className={`p-3.5 transition-colors cursor-pointer text-xs ${
-                    isSelected ? "bg-emerald-50/80 border-l-4 border-emerald-700" : "hover:bg-gray-100/70"
+                  className={`p-3.5 transition-colors cursor-pointer text-xs border-l-3 ${
+                    isSelected ? "bg-rose-50/50 border-rose-700" : "border-transparent hover:bg-stone-100/70"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-1 mb-1">
+                  <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-mono font-bold text-emerald-800">#{conv.orderCode}</span>
+                      <span className="font-mono font-bold text-stone-900">#{conv.orderCode}</span>
                       {hasUnread && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white font-extrabold text-[9px] animate-pulse shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                          {conv.unreadCount} tin mới
+                        <span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white font-bold text-[9px] shrink-0">
+                          {conv.unreadCount} mới
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-gray-400 shrink-0">
+                    <span className="text-[10px] text-stone-400 shrink-0">
                       {conv.lastMessageTime
                         ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                         : ""}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="font-bold text-gray-900 truncate">{conv.customerName || "Khách Hàng"}</span>
-                    <span className="text-[10px] text-emerald-800 font-semibold truncate bg-emerald-100/80 px-1.5 py-0.5 rounded">
-                      {(conv.farmName || "Nông trại").replace("Nông Trại Xanh ", "").replace("Hợp Tác Xã Nông Sản ", "")}
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="font-semibold text-stone-900 truncate">{conv.customerName || "Khách hàng"}</span>
+                    <span className="text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[140px]">
+                      {(conv.farmName || "Nhà vườn").replace("Nông Trại Xanh ", "").replace("Hợp Tác Xã Nông Sản ", "")}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-gray-600 line-clamp-1 mb-1.5 font-medium">
-                    {conv.productSummary} • <strong>{conv.total?.toLocaleString("vi-VN")} đ</strong>
+                  <p className="text-[11px] text-stone-500 line-clamp-1 mb-1">
+                    {conv.productSummary} · <strong>{conv.total?.toLocaleString("vi-VN")} đ</strong>
                   </p>
 
                   {conv.hasPendingDispute ? (
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 font-bold text-[10px] border border-amber-300 animate-pulse">
-                      <AlertTriangle size={11} className="text-amber-700" />
-                      <span>Yêu cầu hoàn tiền: {conv.refundReason || "Khiếu nại"}</span>
-                    </div>
+                    <span className="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold text-[10px]">
+                      Hoàn tiền: {conv.refundReason || "Khiếu nại"}
+                    </span>
                   ) : conv.refundStatus === "APPROVED" ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold">
-                      <CheckCircle2 size={11} /> Đã duyệt hoàn tiền
-                    </span>
+                    <span className="text-[10px] text-emerald-700 font-semibold">Đã duyệt hoàn tiền</span>
                   ) : conv.refundStatus === "REJECTED" ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-red-600 font-bold">
-                      <XCircle size={11} /> Đã từ chối khiếu nại
-                    </span>
+                    <span className="text-[10px] text-red-600 font-semibold">Đã từ chối</span>
                   ) : (
-                    <p className="text-[11px] text-gray-400 truncate italic">&ldquo;{conv.lastMessage}&rdquo;</p>
+                    <p className="text-[11px] text-stone-400 truncate">{conv.lastMessage}</p>
                   )}
                 </div>
               );
             })}
 
             {filteredConvs.length === 0 && (
-              <div className="p-8 text-center text-gray-400 text-xs">
-                Không tìm thấy cuộc hội thoại nào.
+              <div className="p-8 text-center text-stone-400 text-xs">
+                Chưa có đơn hàng nào yêu cầu Hỗ trợ tổng đài hoặc Khiếu nại.
               </div>
             )}
           </div>
@@ -477,58 +478,48 @@ export function AdminMessagesPanel({
         {activeConv ? (
           <div className="flex-1 flex flex-col bg-white min-w-0 overflow-hidden">
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 shadow-2xs">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-950 text-white font-bold flex items-center justify-center text-sm shadow-xs">
-                  {(activeConv.customerName || "K").charAt(0)}
+            <div className="px-5 py-3.5 border-b border-stone-200 bg-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-rose-900 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                  {(activeConv.customerName || "K").charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-sm text-gray-900">{activeConv.customerName}</h4>
-                    <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-sm text-stone-900 truncate">{activeConv.customerName}</h4>
+                    <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-stone-100 text-stone-800 font-semibold">
                       #{activeConv.orderCode}
                     </span>
-                    <span className="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-semibold">
-                      🌿 {activeConv.farmName}
+                    <span className="text-[10px] text-rose-800 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full font-semibold">
+                      Kênh riêng Khách & Admin
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
+                  <div className="flex items-center gap-2 text-[11px] text-stone-500 mt-0.5">
+                    {activeConv.customerPhone && <span>{activeConv.customerPhone}</span>}
+                    <span>·</span>
+                    <span className="truncate">{activeConv.farmName}</span>
+                    <span>·</span>
+                    <span className="font-mono font-semibold text-stone-800">{activeConv.total?.toLocaleString("vi-VN")} đ</span>
+                    <span>·</span>
                     <span className="flex items-center gap-1">
-                      <Phone size={11} />
-                      {activeConv.customerPhone}
-                    </span>
-                    <span>•</span>
-                    <span>Tổng đơn: <strong className="font-mono">{activeConv.total?.toLocaleString("vi-VN")} đ</strong></span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1 font-semibold text-emerald-700">
-                      <span className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
-                      {socketConnected ? "WebSocket Trực tiếp" : "Trực tuyến"}
+                      <span className={`w-1.5 h-1.5 rounded-full ${socketConnected ? "bg-emerald-500" : "bg-stone-300"}`} />
+                      {socketConnected ? "Đang kết nối" : "Ngoại tuyến"}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Status Badge */}
-              <div className="text-right flex items-center gap-2">
-                <span className="text-[11px] px-2.5 py-1 rounded-xl bg-gray-100 text-gray-800 font-bold border border-gray-200">
-                  {activeConv.orderStatus}
-                </span>
-              </div>
+              <span className="text-[11px] px-2.5 py-1 rounded-lg bg-stone-100 text-stone-700 font-semibold">
+                {activeConv.orderStatus}
+              </span>
             </div>
 
-            {/* Dispute Action Banner for Admin */}
+            {/* Dispute Action Banner */}
             {activeConv.hasPendingDispute && (
-              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-300 text-amber-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-2xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-sm">
-                    <ShieldAlert size={17} className="text-amber-700 shrink-0" />
-                    <span>YÊU CẦU TRẢ HÀNG / HOÀN TIỀN CẦN ADMIN DUYỆT</span>
-                  </div>
-                  <p className="text-xs text-amber-900">
-                    • Lý do khiếu nại: <strong>{activeConv.refundReason}</strong>
-                  </p>
-                  <p className="text-[11px] text-amber-800">
-                    • Số tiền đề xuất hoàn: <strong className="font-mono text-emerald-800 text-sm">{activeConv.total?.toLocaleString("vi-VN")} đ</strong> (Hoàn tiền 100% không cần trả hàng)
+              <div className="px-5 py-3.5 bg-amber-50/70 border-b border-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                <div className="space-y-0.5">
+                  <p className="font-bold text-amber-950">Yêu cầu Trả hàng / Hoàn tiền chờ Admin duyệt</p>
+                  <p className="text-[11px] text-amber-900">
+                    Lý do: <strong>{activeConv.refundReason}</strong> · Hoàn đề xuất: <strong className="font-mono">{activeConv.total?.toLocaleString("vi-VN")} đ</strong>
                   </p>
                 </div>
 
@@ -536,81 +527,88 @@ export function AdminMessagesPanel({
                   <button
                     onClick={() => setRejectModalOpen(true)}
                     disabled={isResolving}
-                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-red-50 text-red-700 border border-red-300 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-red-50 text-red-700 border border-red-200 font-semibold text-xs transition-colors cursor-pointer"
                   >
-                    Từ chối khiếu nại
+                    Từ chối
                   </button>
-
                   <button
                     onClick={handleApproveRefund}
                     disabled={isResolving}
-                    className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs transition-colors cursor-pointer"
                   >
-                    <Check size={14} />
-                    <span>{isResolving ? "Đang xử lý..." : "Duyệt Hoàn Tiền 100%"}</span>
+                    {isResolving ? "Đang xử lý..." : "Duyệt hoàn tiền 100%"}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Resolved Notice */}
             {activeConv.refundStatus === "APPROVED" && (
-              <div className="p-3 bg-emerald-50 border-b border-emerald-300 text-emerald-950 text-xs flex items-center gap-2 shrink-0">
-                <CheckCircle2 size={16} className="text-emerald-700" />
-                <span>Đơn hàng đã được <strong>Quản Trị Viên Duyệt Hoàn Tiền</strong> thành công. Trạng thái đơn: <strong>REFUNDED</strong>.</span>
+              <div className="px-5 py-2.5 bg-emerald-50/70 border-b border-emerald-200 text-emerald-900 text-xs shrink-0">
+                Đã duyệt hoàn tiền cho đơn hàng này (REFUNDED).
               </div>
             )}
 
             {activeConv.refundStatus === "REJECTED" && (
-              <div className="p-3 bg-red-50 border-b border-red-300 text-red-950 text-xs flex items-center gap-2 shrink-0">
-                <XCircle size={16} className="text-red-600" />
-                <span>Yêu cầu khiếu nại của đơn này đã bị từ chối do không đủ căn cứ đối soát.</span>
+              <div className="px-5 py-2.5 bg-red-50/70 border-b border-red-200 text-red-900 text-xs shrink-0">
+                Yêu cầu hoàn tiền cho đơn này đã bị từ chối.
               </div>
             )}
 
             {/* Message Thread */}
-            <div ref={chatScrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f8faf8]">
+            <div ref={chatScrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-5 py-4 space-y-3.5 bg-[#f7f8f7]">
+              {messages.length === 0 && (
+                <div className="text-center py-8 text-xs text-stone-400">
+                  Kênh trao đổi riêng 1-1 giữa {resolvedAdminName} và Khách hàng {activeConv.customerName}.
+                </div>
+              )}
+
               {messages.map((m) => {
                 const isAdmin = m.senderRole === "ADMIN";
-                const isDispute =
+                const isNotice =
                   m.messageType === "DISPUTE_SUBMITTED" ||
                   m.messageType === "DISPUTE_APPROVED" ||
-                  m.messageType === "DISPUTE_REJECTED";
+                  m.messageType === "DISPUTE_REJECTED" ||
+                  m.messageType === "SUPPORT_ESCALATED";
 
-                if (isDispute) {
+                if (isNotice) {
                   const isApproved = m.messageType === "DISPUTE_APPROVED";
                   const isRejected = m.messageType === "DISPUTE_REJECTED";
+                  const isEscalation = m.messageType === "SUPPORT_ESCALATED";
                   return (
                     <div
                       key={m.id}
-                      className={`p-3.5 rounded-2xl border text-xs shadow-2xs space-y-1.5 max-w-lg mx-auto ${
+                      className={`p-3.5 rounded-xl bg-white border border-stone-200 border-l-4 text-xs shadow-2xs space-y-1.5 max-w-lg mx-auto ${
                         isApproved
-                          ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                          ? "border-l-emerald-600"
                           : isRejected
-                          ? "bg-red-50 border-red-300 text-red-950"
-                          : "bg-amber-50 border-amber-300 text-amber-950"
+                          ? "border-l-red-600"
+                          : isEscalation
+                          ? "border-l-rose-600"
+                          : "border-l-amber-500"
                       }`}
                     >
-                      <div className="flex items-center justify-between font-bold text-xs">
-                        <span className="flex items-center gap-1.5">
-                          {isApproved ? <CheckCircle2 size={14} className="text-emerald-700" /> : isRejected ? <XCircle size={14} className="text-red-600" /> : <AlertTriangle size={14} className="text-amber-600" />}
-                          {m.senderName} ({new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})
+                      <div className="flex items-center justify-between font-bold text-stone-900">
+                        <span>
+                          {isEscalation
+                            ? "Yêu cầu Hỗ trợ Tổng đài"
+                            : isApproved
+                            ? "Đã duyệt hoàn tiền"
+                            : isRejected
+                            ? "Từ chối khiếu nại"
+                            : "Yêu cầu Trả hàng / Hoàn tiền"}
                         </span>
-                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-white border">
-                          {m.messageType}
+                        <span className="text-[10px] text-stone-400 font-normal">
+                          {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
-                      <pre className="font-sans text-[11px] whitespace-pre-wrap leading-relaxed">
-                        {m.message}
-                      </pre>
+                      <p className="text-xs text-stone-700 whitespace-pre-wrap leading-relaxed">{m.message}</p>
                       {m.imageUrl && (
-                        <div className="mt-2">
-                          <p className="text-[10px] font-bold text-gray-600 mb-1">Ảnh khách tải lên lúc khui thùng:</p>
+                        <div className="pt-1">
                           <img
                             src={m.imageUrl}
                             alt="Evidence"
                             onClick={() => setPreviewPhoto(m.imageUrl || null)}
-                            className="w-32 h-32 object-cover rounded-xl border border-gray-300 shadow-2xs cursor-pointer hover:opacity-90"
+                            className="w-36 h-36 object-cover rounded-lg border border-stone-200 cursor-pointer hover:opacity-90"
                           />
                         </div>
                       )}
@@ -619,29 +617,18 @@ export function AdminMessagesPanel({
                 }
 
                 return (
-                  <div
-                    key={m.id}
-                    className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}
-                  >
-                    <span className="text-[10px] font-bold text-gray-500 mb-1 px-1">
-                      {isAdmin ? (
-                        <span className="text-red-700 bg-red-100 px-1.5 py-0.5 rounded-md font-bold">
-                          🛡️ CSKH AgriTrace (Bạn)
-                        </span>
-                      ) : m.senderRole === "FARMER" ? (
-                        <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-md">
-                          🌿 {m.senderName}
-                        </span>
-                      ) : (
-                        <span className="text-gray-700 font-semibold">Khách hàng: {m.senderName}</span>
-                      )}
+                  <div key={m.id} className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}>
+                    <span className="text-[11px] font-semibold text-stone-500 mb-1 px-1">
+                      {isAdmin
+                        ? m.senderName || resolvedAdminName
+                        : `Khách hàng · ${m.senderName || activeConv.customerName}`}
                     </span>
 
                     <div
-                      className={`max-w-[80%] rounded-2xl p-3 text-xs shadow-2xs leading-relaxed ${
+                      className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-xs shadow-2xs leading-relaxed ${
                         isAdmin
-                          ? "bg-[#0b281f] text-white rounded-br-xs"
-                          : "bg-white text-gray-900 border border-gray-200/90 rounded-bl-xs"
+                          ? "bg-stone-900 text-white rounded-br-sm"
+                          : "bg-white text-stone-900 border border-stone-200 rounded-bl-sm"
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{m.message}</p>
@@ -653,11 +640,7 @@ export function AdminMessagesPanel({
                           className="w-48 h-32 object-cover rounded-xl mt-2 border border-black/10 cursor-pointer"
                         />
                       )}
-                      <div
-                        className={`text-[9px] mt-1 text-right ${
-                          isAdmin ? "text-emerald-300" : "text-gray-400"
-                        }`}
-                      >
+                      <div className={`text-[10px] mt-1 text-right ${isAdmin ? "text-stone-300" : "text-stone-400"}`}>
                         {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
                     </div>
@@ -667,37 +650,26 @@ export function AdminMessagesPanel({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Quick Chips for CSKH */}
-            <div className="p-2.5 bg-gray-50 border-t border-gray-200 overflow-x-auto flex items-center gap-1.5 shrink-0">
-              <span className="text-[10px] font-bold text-gray-700 whitespace-nowrap flex items-center gap-1">
-                <Sparkles size={11} className="text-amber-500 fill-amber-500" />
-                Mẫu CSKH:
-              </span>
+            {/* Clean Quick Reply Pills */}
+            <div className="px-4 py-2 bg-white border-t border-stone-100 overflow-x-auto flex items-center gap-1.5 shrink-0 no-scrollbar">
               {adminChips.map((chip, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleSendReply(chip)}
-                  className="px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 text-gray-800 text-[11px] border border-gray-200 whitespace-nowrap transition-colors shadow-2xs cursor-pointer shrink-0"
+                  className="px-3 py-1 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] border border-stone-200/80 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                 >
-                  {chip.substring(0, 32)}...
+                  {chip.substring(0, 38)}...
                 </button>
               ))}
             </div>
 
-            {/* Animated Typing Indicator */}
             {typingUser && (
-              <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-emerald-800 bg-emerald-50/90 border-t border-emerald-100 transition-all shrink-0">
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce" />
-                </div>
-                <span className="italic font-medium">{typingUser.senderName || "Khách hàng"} đang soạn tin nhắn...</span>
+              <div className="px-5 py-1.5 text-[11px] text-stone-500 italic bg-stone-50 border-t border-stone-100 shrink-0">
+                {typingUser.senderName || activeConv.customerName} đang nhập tin nhắn...
               </div>
             )}
 
-            {/* Reply Input Bar */}
-            <div className="p-3 bg-white border-t border-gray-200 shrink-0">
+            <div className="p-3 sm:px-4 bg-white border-t border-stone-200 shrink-0">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -713,23 +685,22 @@ export function AdminMessagesPanel({
                     setReplyText(e.target.value);
                     sendTyping(e.target.value.trim().length > 0);
                   }}
-                  placeholder="Gõ tin nhắn hỗ trợ khách hàng với danh nghĩa CSKH AgriTrace..."
-                  className="flex-1 py-2.5 px-3.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-gray-50/50"
+                  placeholder={`Nhắn tin riêng với ${activeConv.customerName} về đơn #${activeConv.orderCode}...`}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-stone-200 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-stone-700 bg-stone-50 focus:bg-white"
                 />
                 <button
                   type="submit"
                   disabled={isSending || !replyText.trim()}
-                  className="px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                  className="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-black disabled:bg-stone-200 disabled:text-stone-400 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
-                  <Send size={14} />
-                  <span>Gửi CSKH</span>
+                  Gửi
                 </button>
               </form>
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center p-8 text-center text-gray-400 text-xs">
-            Chọn một cuộc hội thoại từ danh sách bên trái để kiểm tra.
+          <div className="flex-1 flex items-center justify-center p-8 text-center text-stone-400 text-xs">
+            Chọn một cuộc hội thoại ở danh sách bên trái để kiểm tra.
           </div>
         )}
       </div>

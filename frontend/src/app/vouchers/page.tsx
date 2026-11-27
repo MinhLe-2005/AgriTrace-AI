@@ -18,7 +18,10 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { catalogService, type ApiVoucher } from "@/services/catalog.service";
+import { getApiErrorMessage } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
 
@@ -146,21 +149,49 @@ const vouchersList: VoucherItem[] = [
 ];
 
 export default function VouchersPage() {
-  const [claimedCodes, setClaimedCodes] = useState<string[]>(["FREESHIP25"]);
+  const { user } = useAuthStore();
+  const [claimedCodes, setClaimedCodes] = useState<string[]>([]);
+  const [walletPersonalVouchers, setWalletPersonalVouchers] = useState<ApiVoucher[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [customCode, setCustomCode] = useState("");
 
-  function handleClaim(code: string) {
-    if (claimedCodes.includes(code)) {
-      toast.info(`Mã [${code}] đã có sẵn trong ví của bạn!`);
+  useEffect(() => {
+    if (!user?.email) return;
+    catalogService
+      .getWalletVouchers(user.email)
+      .then((wallet) => {
+        const list = wallet || [];
+        setWalletPersonalVouchers(list.filter((v) => Boolean(v.ownerEmail)));
+        setClaimedCodes(list.map((v) => v.code.toUpperCase()));
+      })
+      .catch(() => {});
+  }, [user?.email]);
+
+  async function handleClaim(code: string) {
+    if (!user?.email) {
+      toast.error("Vui lòng đăng nhập tài khoản để lưu voucher vào ví!");
       return;
     }
-    setClaimedCodes((prev) => [...prev, code]);
-    toast.success(`Đã lưu mã [${code}] vào ví thành công!`);
+    const clean = code.trim().toUpperCase();
+    if (claimedCodes.includes(clean)) {
+      toast.info(`Mã [${clean}] đã có sẵn trong ví của bạn!`);
+      return;
+    }
+    try {
+      await catalogService.saveVoucherToWallet(clean, user.email);
+      setClaimedCodes((prev) => Array.from(new Set([...prev, clean])));
+      toast.success(`Đã lưu mã [${clean}] vào ví tài khoản thành công!`);
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
+    }
   }
 
-  function handleApplyCustomCode(e: React.FormEvent) {
+  async function handleApplyCustomCode(e: React.FormEvent) {
     e.preventDefault();
+    if (!user?.email) {
+      toast.error("Vui lòng đăng nhập tài khoản để lưu voucher!");
+      return;
+    }
     const clean = customCode.trim().toUpperCase();
     if (!clean) return;
 
@@ -168,9 +199,14 @@ export default function VouchersPage() {
       toast.info(`Mã [${clean}] đã có sẵn trong ví!`);
       return;
     }
-    setClaimedCodes((prev) => [...prev, clean]);
-    toast.success(`Đã lưu thành công mã ưu đãi [${clean}] vào ví!`);
-    setCustomCode("");
+    try {
+      await catalogService.saveVoucherToWallet(clean, user.email);
+      setClaimedCodes((prev) => Array.from(new Set([...prev, clean])));
+      toast.success(`Đã lưu thành công mã ưu đãi [${clean}] vào ví!`);
+      setCustomCode("");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
+    }
   }
 
   function handleCopy(code: string) {
@@ -293,6 +329,24 @@ export default function VouchersPage() {
             </button>
           ))}
         </div>
+
+          {/* Action Bar */}
+          {walletPersonalVouchers.length > 0 && (
+            <div className="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-emerald-950">
+                <strong className="block text-sm">Bạn có {walletPersonalVouchers.length} mã voucher đã đổi từ điểm AgriClub trong ví</strong>
+                <span className="text-emerald-800">
+                  Mã: {walletPersonalVouchers.map((v) => v.code).join(", ")} — Sẵn sàng áp dụng ngay khi đặt hàng tại Giỏ hàng.
+                </span>
+              </div>
+              <Link
+                href="/cart"
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors shrink-0"
+              >
+                Dùng ngay tại Giỏ hàng →
+              </Link>
+            </div>
+          )}
 
         {/* ── Voucher Tickets Grid (Clean Perforated Card Layout) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

@@ -35,6 +35,14 @@ public class FarmerSchemaCompatibilityInitializer implements ApplicationRunner {
                 try (Statement st = conn.createStatement()) {
                     st.execute("ALTER TABLE IF EXISTS agri_products ALTER COLUMN image TYPE TEXT");
                     st.execute("ALTER TABLE IF EXISTS agri_order_items ALTER COLUMN image TYPE TEXT");
+                    st.execute("ALTER TABLE IF EXISTS agri_orders ALTER COLUMN refund_photo_url TYPE TEXT");
+                    st.execute("ALTER TABLE IF EXISTS agri_orders ALTER COLUMN refund_note TYPE TEXT");
+                    st.execute("ALTER TABLE IF EXISTS agri_orders ADD COLUMN IF NOT EXISTS admin_support_requested BOOLEAN DEFAULT FALSE");
+                    st.execute("ALTER TABLE IF EXISTS agri_orders ADD COLUMN IF NOT EXISTS admin_support_requested_at TIMESTAMPTZ");
+                    st.execute("ALTER TABLE IF EXISTS agri_order_messages ALTER COLUMN image_url TYPE TEXT");
+                    st.execute("ALTER TABLE IF EXISTS agri_order_messages ADD COLUMN IF NOT EXISTS channel VARCHAR(16) DEFAULT 'SHOP'");
+                    st.execute("UPDATE agri_order_messages SET channel = 'ADMIN' WHERE (channel IS NULL OR channel = '') AND UPPER(sender_role) = 'ADMIN'");
+                    st.execute("UPDATE agri_order_messages SET channel = 'SHOP' WHERE channel IS NULL OR channel = ''");
                     st.execute("ALTER TABLE IF EXISTS verification_requests DROP CONSTRAINT IF EXISTS verification_requests_type_check");
                     st.execute("ALTER TABLE IF EXISTS verification_requests ALTER COLUMN document_url TYPE TEXT");
                     st.execute("INSERT INTO roles (name) VALUES ('ADMIN'), ('USER'), ('FARMER'), ('WAREHOUSE'), ('DISTRIBUTOR'), ('CUSTOMER') ON CONFLICT (name) DO NOTHING");
@@ -73,6 +81,23 @@ public class FarmerSchemaCompatibilityInitializer implements ApplicationRunner {
                     st.execute("ALTER TABLE IF EXISTS agri_reviews ADD COLUMN IF NOT EXISTS reply VARCHAR(1000)");
                     st.execute("ALTER TABLE IF EXISTS agri_reviews ADD COLUMN IF NOT EXISTS reply_author VARCHAR(128)");
                     st.execute("ALTER TABLE IF EXISTS agri_reviews ADD COLUMN IF NOT EXISTS replied_at TIMESTAMPTZ");
+                    st.execute("ALTER TABLE IF EXISTS agri_reviews ALTER COLUMN comment TYPE TEXT");
+                    st.execute("ALTER TABLE IF EXISTS agri_vouchers ADD COLUMN IF NOT EXISTS owner_email VARCHAR(254)");
+                    st.execute("CREATE TABLE IF NOT EXISTS user_vouchers (id BIGSERIAL PRIMARY KEY, user_email VARCHAR(254) NOT NULL, voucher_code VARCHAR(64) NOT NULL, saved_at TIMESTAMP NOT NULL DEFAULT NOW(), CONSTRAINT uk_user_voucher_email_code UNIQUE (user_email, voucher_code))");
+                    st.execute("INSERT INTO agri_vouchers (code, title, description, badge, badge_color, discount, min_order, exp, active) VALUES "
+                            + "('FREESHIP25', 'Miễn Phí Vận Chuyển Xe Lạnh Toàn Quốc', 'Giảm tối đa 25.000đ phí giao hàng xe lạnh bảo quản nông sản tươi', 'FREESHIP', 'bg-emerald-100 text-emerald-800', '25000', '100000', '31/12/2026', TRUE), "
+                            + "('MUAVU10', 'Ưu Đãi Trái Cây & Nông Sản Chính Vụ', 'Giảm 10% đơn hàng nông sản tươi vào vụ thu hoạch', 'Giảm 10%', 'bg-amber-100 text-amber-800', '10%', '150000', '31/12/2026', TRUE), "
+                            + "('CHAOBANMOI', 'Voucher Chào Mừng Khách Hàng Mới', 'Giảm trực tiếp 20.000đ cho khách hàng mới trên AgriTrace', 'Giảm 20K', 'bg-blue-100 text-blue-800', '20000', '120000', '31/12/2026', TRUE), "
+                            + "('VANGVIP5', 'Đặc Quyền Thành Viên Hạng Vàng & Kim Cương', 'Chiết khấu 5% dành cho hội viên thân thiết hạng Vàng trở lên', 'VIP -5%', 'bg-amber-100 text-amber-800', '5%', '300000', '31/12/2026', TRUE), "
+                            + "('RAUSACH50', 'Siêu Sale Nông Sản Đầu Tuần', 'Giảm 15% cho đơn hàng rau củ hữu cơ VietGAP', 'Giảm 15%', 'bg-rose-100 text-rose-800', '15%', '250000', '31/12/2026', TRUE), "
+                            + "('VIETGAP10', 'Khuyến Mãi Nông Sản VietGAP', 'Giảm 10% cho tất cả nông sản đạt chứng nhận VietGAP', 'VietGAP 10%', 'bg-emerald-100 text-emerald-800', '10%', '120000', '31/12/2026', TRUE), "
+                            + "('VIP-FREESHIP', 'Voucher Freeship Xe Lạnh Hội Viên', 'Đặc quyền miễn phí ship xe lạnh 2°C - 5°C hàng tháng', 'FREESHIP 25K', 'bg-emerald-100 text-emerald-800', '25000', '100000', '31/12/2026', TRUE), "
+                            + "('VIP-GOLD5', 'Voucher Giảm 5% Toàn Giỏ Hàng VIP', 'Chiết khấu độc quyền cho thành viên đạt hạng Vàng & Kim Cương', 'GIẢM 5%', 'bg-amber-100 text-amber-800', '5%', '300000', '31/12/2026', TRUE) "
+                            + "ON CONFLICT (code) DO NOTHING");
+                    st.execute("UPDATE agri_vouchers v SET owner_email = u.email FROM users u WHERE v.owner_email IS NULL AND v.description ILIKE ('%dành cho ' || u.full_name) AND (SELECT COUNT(*) FROM users u2 WHERE LOWER(u2.full_name) = LOWER(u.full_name)) = 1");
+                    st.execute("INSERT INTO user_vouchers (user_email, voucher_code, saved_at) SELECT LOWER(owner_email), UPPER(code), NOW() FROM agri_vouchers WHERE owner_email IS NOT NULL AND active = TRUE ON CONFLICT (user_email, voucher_code) DO NOTHING");
+                    st.execute("DELETE FROM loyalty_transactions t1 USING loyalty_transactions t2 WHERE t1.user_id = t2.user_id AND t1.transaction_type = 'BONUS' AND t2.transaction_type = 'BONUS' AND t1.description = t2.description AND t1.description ILIKE '%Đánh giá đơn #%' AND (t1.created_at > t2.created_at OR (t1.created_at = t2.created_at AND t1.id > t2.id))");
+                    st.execute("UPDATE loyalty_memberships m SET current_points = COALESCE((SELECT SUM(points) FROM loyalty_transactions t WHERE t.user_id = m.user_id), 0), lifetime_points = COALESCE((SELECT SUM(CASE WHEN points > 0 THEN points ELSE 0 END) FROM loyalty_transactions t WHERE t.user_id = m.user_id), 0)");
                     st.execute("UPDATE agri_products SET harvest = 'Thu hoạch sáng sớm theo đơn' WHERE name ILIKE '%Dâu Tây%'");
                     st.execute("UPDATE agri_products SET harvest = 'Thu hoạch đúng độ già 8.5 tuổi' WHERE name ILIKE '%Bơ Sáp%'");
                     st.execute("UPDATE agri_products SET harvest = 'Thu hoạch thủy canh hằng ngày' WHERE name ILIKE '%Xà Lách%'");

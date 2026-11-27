@@ -18,6 +18,8 @@ import {
 import type { ApiOrder } from "@/services/catalog.service";
 import { orderChatService } from "@/services/order-chat.service";
 import { toast } from "@/stores/toast-store";
+import { getApiErrorMessage } from "@/lib/api";
+import { compressAvatarImage } from "@/utils/image-compress";
 
 interface OrderDisputeModalProps {
   order: ApiOrder | null;
@@ -35,26 +37,32 @@ export function OrderDisputeModal({
   const [reason, setReason] = useState("Rau củ bị dập nát, thối úng do vận chuyển");
   const [solution, setSolution] = useState<"REFUND_MONEY" | "REPLACE_GOODS" | "VOUCHER">("REFUND_MONEY");
   const [note, setNote] = useState("");
-  const [photoUrl, setPhotoUrl] = useState(
-    "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop"
-  );
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 8 * 1024 * 1024) {
-        toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 8MB.");
-        return;
-      }
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 10MB.");
+      return;
+    }
+    setIsCompressingPhoto(true);
+    try {
+      const compressed = await compressAvatarImage(file, 960, 960, 0.8);
+      setPhotoUrl(compressed.dataUrl);
+      toast.success("Đã tải ảnh bằng chứng mở thùng thành công!");
+    } catch {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setPhotoUrl(result);
-        toast.success("Đã tải ảnh chụp mở thùng thành công!");
+        setPhotoUrl((event.target?.result as string) || "");
+        toast.success("Đã tải ảnh bằng chứng mở thùng thành công!");
       };
       reader.readAsDataURL(file);
+    } finally {
+      setIsCompressingPhoto(false);
     }
   }
 
@@ -75,22 +83,27 @@ export function OrderDisputeModal({
       toast.error("Vui lòng chọn lý do khiếu nại!");
       return;
     }
+    if (isCompressingPhoto) {
+      toast.error("Ảnh bằng chứng đang được xử lý, vui lòng đợi một chút.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const updated = await orderChatService.createDispute(order!.orderCode, {
+      const cleanOrderCode = (order!.orderCode || "").replace(/^#/, "").trim();
+      const updated = await orderChatService.createDispute(cleanOrderCode, {
         reason,
         solution,
         amount: totalAmt,
-        photoUrl,
+        photoUrl: photoUrl || undefined,
         note: note.trim() || undefined,
       });
 
-      toast.success("Đã gửi yêu cầu Trả hàng / Hoàn tiền thành công! Shop và Admin sẽ đối soát ngay.");
+      toast.success("Đã gửi yêu cầu Trả hàng / Hoàn tiền thành công! Quản trị viên Tổng đài & Nhà vườn đã tiếp nhận.");
       onSuccess(updated);
       onClose();
-    } catch {
-      toast.error("Không thể gửi yêu cầu khiếu nại. Vui lòng thử lại!");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể gửi yêu cầu khiếu nại. Vui lòng thử lại!"));
     } finally {
       setIsSubmitting(false);
     }
@@ -284,39 +297,14 @@ export function OrderDisputeModal({
                 </div>
                 <div>
                   <span className="font-bold text-xs text-gray-900 group-hover:text-amber-900 block">
-                    Bấm để tải ảnh chụp từ máy tính / điện thoại
+                    {isCompressingPhoto ? "Đang xử lý ảnh..." : "Bấm để tải ảnh chụp từ máy tính / điện thoại"}
                   </span>
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    Hỗ trợ định dạng JPG, PNG, WEBP (Tối đa 8MB)
+                    Hỗ trợ định dạng JPG, PNG, WEBP (Tối đa 10MB, tự động tối ưu kích thước)
                   </p>
                 </div>
               </div>
             )}
-
-            {/* Quick Sample Selector for testing convenience */}
-            <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
-              <span>Hoặc thử nghiệm nhanh với ảnh mẫu:</span>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPhotoUrl("https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop")
-                  }
-                  className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[10px] font-semibold text-gray-700 cursor-pointer"
-                >
-                  🥬 Rau dập lá
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPhotoUrl("https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=600&auto=format&fit=crop")
-                  }
-                  className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[10px] font-semibold text-gray-700 cursor-pointer"
-                >
-                  🍓 Dâu tây dập
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Section 4: Notes */}

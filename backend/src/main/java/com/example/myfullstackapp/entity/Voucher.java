@@ -40,6 +40,9 @@ public class Voucher {
     @Column(length = 64)
     private String exp;
 
+    @Column(name = "owner_email", length = 254)
+    private String ownerEmail;
+
     @Builder.Default
     private Boolean active = true;
 }

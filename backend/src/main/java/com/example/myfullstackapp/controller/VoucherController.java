@@ -3,16 +3,17 @@ package com.example.myfullstackapp.controller;
 import com.example.myfullstackapp.dto.voucher.CreateVoucherRequest;
 import com.example.myfullstackapp.entity.Voucher;
 import com.example.myfullstackapp.exception.ConflictException;
-import jakarta.validation.Valid;
 import com.example.myfullstackapp.repository.OrderRepository;
 import com.example.myfullstackapp.repository.VoucherRepository;
+import com.example.myfullstackapp.service.LoyaltyService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1/vouchers")
@@ -21,10 +22,65 @@ public class VoucherController {
 
     private final VoucherRepository voucherRepository;
     private final OrderRepository orderRepository;
+    private final LoyaltyService loyaltyService;
 
     @GetMapping
-    public ResponseEntity<List<Voucher>> getActiveVouchers() {
-        return ResponseEntity.ok(voucherRepository.findByActiveTrue());
+    public ResponseEntity<List<Voucher>> getActiveVouchers(
+            @RequestParam(required = false) String email,
+            Authentication authentication
+    ) {
+        String resolvedEmail = resolveOptionalEmail(email, authentication);
+        Map<String, Voucher> result = new LinkedHashMap<>();
+        for (Voucher v : voucherRepository.findByActiveTrueAndOwnerEmailIsNull()) {
+            result.put(v.getCode().toUpperCase(), v);
+        }
+        if (resolvedEmail != null && !resolvedEmail.isBlank()) {
+            for (Voucher v : voucherRepository.findByActiveTrueAndOwnerEmailIgnoreCase(resolvedEmail)) {
+                result.put(v.getCode().toUpperCase(), v);
+            }
+        }
+        return ResponseEntity.ok(new ArrayList<>(result.values()));
+    }
+
+    @GetMapping("/wallet")
+    public ResponseEntity<List<Voucher>> getWalletVouchers(
+            @RequestParam(required = false) String email,
+            Authentication authentication
+    ) {
+        String resolvedEmail = resolveOptionalEmail(email, authentication);
+        if (resolvedEmail == null || resolvedEmail.isBlank()) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(loyaltyService.getWalletVouchers(resolvedEmail));
+    }
+
+    @PostMapping("/save")
+    public ResponseEntity<Voucher> saveVoucherToWallet(
+            @RequestBody Map<String, String> body,
+            Authentication authentication
+    ) {
+        String code = body != null ? body.get("code") : null;
+        String requestedEmail = body != null ? body.get("email") : null;
+        String resolvedEmail = resolveOptionalEmail(requestedEmail, authentication);
+        if (resolvedEmail == null || resolvedEmail.isBlank()) {
+            throw new IllegalArgumentException("Vui lòng đăng nhập để lưu voucher vào ví");
+        }
+        Voucher saved = loyaltyService.saveVoucherToWallet(resolvedEmail, code);
+        return ResponseEntity.ok(saved);
+    }
+
+    private String resolveOptionalEmail(String requestedEmail, Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated()
+                && !"anonymousUser".equalsIgnoreCase(authentication.getName())) {
+            String own = authentication.getName();
+            if (requestedEmail == null || requestedEmail.isBlank() || requestedEmail.trim().equalsIgnoreCase(own)) {
+                return own;
+            }
+            boolean admin = authentication.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+            return admin ? requestedEmail.trim() : own;
+        }
+        return (requestedEmail != null && !requestedEmail.isBlank()) ? requestedEmail.trim() : null;
     }
 
     @GetMapping("/all")
@@ -132,12 +188,22 @@ public class VoucherController {
         var opt = voucherRepository.findByCodeIgnoreCaseAndActiveTrue(cleanCode);
 
         // Fallback for standard codes
-        if (opt.isEmpty() && !List.of("AGRI30", "FREESHIP", "FREESHIP25", "VIPGOLD", "VIETGAP10").contains(cleanCode)) {
+        if (opt.isEmpty() && !List.of("AGRI30", "FREESHIP", "FREESHIP25", "VIPGOLD", "VIETGAP10", "MUAVU10", "CHAOBANMOI", "VANGVIP5", "RAUSACH50", "VIP-FREESHIP", "VIP-GOLD5").contains(cleanCode)) {
             return ResponseEntity.ok(Map.of(
                     "valid", false,
                     "code", cleanCode,
                     "message", "Mã ưu đãi [" + cleanCode + "] không tồn tại hoặc đã hết hiệu lực."
             ));
+        }
+
+        if (opt.isPresent() && opt.get().getOwnerEmail() != null && !opt.get().getOwnerEmail().isBlank()) {
+            if (email == null || email.isBlank() || !opt.get().getOwnerEmail().equalsIgnoreCase(email.trim())) {
+                return ResponseEntity.ok(Map.of(
+                        "valid", false,
+                        "code", cleanCode,
+                        "message", "Mã ưu đãi [" + cleanCode + "] chỉ dành riêng cho tài khoản đã đổi điểm."
+                ));
+            }
         }
 
         // Check if user already used this voucher (1 use per account)
@@ -206,7 +272,7 @@ public class VoucherController {
             };
         }
 
-        String type = (cleanCode.contains("FREESHIP")) ? "freeship" : "discount";
+        String type = (cleanCode.contains("SHIP")) ? "freeship" : "discount";
 
         return ResponseEntity.ok(Map.of(
                 "valid", true,

@@ -89,15 +89,22 @@ public class Order {
 
     private Long refundAmount;
 
-    @Column(length = 500)
+    @Column(columnDefinition = "TEXT")
     private String refundPhotoUrl;
 
     private LocalDateTime refundRequestedAt;
 
     private LocalDateTime refundResolvedAt;
 
-    @Column(length = 255)
+    @Column(columnDefinition = "TEXT")
     private String refundNote;
+
+    @Builder.Default
+    @Column(name = "admin_support_requested")
+    private Boolean adminSupportRequested = false;
+
+    @Column(name = "admin_support_requested_at")
+    private LocalDateTime adminSupportRequestedAt;
 
     private LocalDateTime paidAt;
 

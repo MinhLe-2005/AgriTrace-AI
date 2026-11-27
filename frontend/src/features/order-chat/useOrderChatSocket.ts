@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Client, type IMessage } from "@stomp/stompjs";
 import { useAuthStore } from "@/stores/auth-store";
-import type { OrderMessage } from "@/services/order-chat.service";
+import type { ChatChannel, OrderMessage } from "@/services/order-chat.service";
 
 function getOrderWsUrl(): string {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1";
@@ -15,21 +15,35 @@ export interface TypingPayload {
   orderCode: string;
   senderRole: string;
   senderName: string;
+  channel?: ChatChannel;
   isTyping: boolean;
+}
+
+export interface AdminInboxEvent {
+  orderCode: string;
+  type: string;
+  customerName?: string;
+  timestamp?: string;
 }
 
 interface UseOrderChatSocketOptions {
   orderCode?: string | null;
+  channel?: ChatChannel | "ALL";
+  subscribeAdminInbox?: boolean;
   currentUserRole?: "CUSTOMER" | "FARMER" | "ADMIN";
   currentUserName?: string;
   onMessageReceived?: (message: OrderMessage) => void;
+  onAdminInboxEvent?: (event: AdminInboxEvent) => void;
 }
 
 export function useOrderChatSocket({
   orderCode,
+  channel = "SHOP",
+  subscribeAdminInbox = false,
   currentUserRole = "CUSTOMER",
   currentUserName = "Bạn",
   onMessageReceived,
+  onAdminInboxEvent,
 }: UseOrderChatSocketOptions) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const clientRef = useRef<Client | null>(null);
@@ -39,14 +53,15 @@ export function useOrderChatSocket({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const onMessageRef = useRef(onMessageReceived);
   onMessageRef.current = onMessageReceived;
+  const onAdminInboxRef = useRef(onAdminInboxEvent);
+  onAdminInboxRef.current = onAdminInboxEvent;
 
   const cleanCode = (orderCode || "").replace(/^#/, "").trim().toUpperCase();
 
-  // STOMP Client Lifecycle
   useEffect(() => {
-    if (!cleanCode) {
+    setTypingUser(null);
+    if (!cleanCode && !subscribeAdminInbox) {
       setConnected(false);
-      setTypingUser(null);
       return;
     }
 
@@ -67,53 +82,75 @@ export function useOrderChatSocket({
         if (!active) return;
         setConnected(true);
 
-        // 1. Subscribe to order real-time messages
-        client.subscribe(`/topic/orders/${cleanCode}/messages`, (frame: IMessage) => {
-          try {
-            const raw = JSON.parse(frame.body);
-            const msg: OrderMessage = raw.data || raw;
-            if (msg && msg.orderCode?.toUpperCase() === cleanCode) {
-              onMessageRef.current?.(msg);
-            }
-          } catch (e) {
-            console.warn("Failed to parse incoming WebSocket order message:", e);
-          }
-        });
-
-        // 2. Subscribe to typing indicator
-        client.subscribe(`/topic/orders/${cleanCode}/typing`, (frame: IMessage) => {
-          try {
-            const payload: TypingPayload = JSON.parse(frame.body);
-            if (payload && payload.orderCode?.toUpperCase() === cleanCode) {
-              // Ignore own typing echo
-              if (payload.senderRole?.toUpperCase() === currentUserRole.toUpperCase()) {
-                return;
-              }
-
-              if (payload.isTyping) {
-                setTypingUser({
-                  senderRole: payload.senderRole,
-                  senderName: payload.senderName || (payload.senderRole === "FARMER" ? "Chủ vườn" : "Khách hàng"),
-                });
-
-                if (typingTimeoutRef.current) {
-                  clearTimeout(typingTimeoutRef.current);
+        if (cleanCode) {
+          client.subscribe(`/topic/orders/${cleanCode}/messages`, (frame: IMessage) => {
+            try {
+              const raw = JSON.parse(frame.body);
+              const msg: OrderMessage = raw.data || raw;
+              if (msg && msg.orderCode?.toUpperCase() === cleanCode) {
+                const msgChannel = (msg.channel || "SHOP").toUpperCase();
+                if (channel === "ALL" || msgChannel === channel) {
+                  onMessageRef.current?.(msg);
                 }
-                // Auto-clear typing indicator after 3 seconds of silence
-                typingTimeoutRef.current = setTimeout(() => {
+              }
+            } catch (e) {
+              console.warn("Failed to parse incoming WebSocket order message:", e);
+            }
+          });
+
+          client.subscribe(`/topic/orders/${cleanCode}/typing`, (frame: IMessage) => {
+            try {
+              const payload: TypingPayload = JSON.parse(frame.body);
+              if (payload && payload.orderCode?.toUpperCase() === cleanCode) {
+                if (payload.senderRole?.toUpperCase() === currentUserRole.toUpperCase()) {
+                  return;
+                }
+                const payloadChannel = (payload.channel || "SHOP").toUpperCase();
+                if (channel !== "ALL" && payloadChannel !== channel) {
+                  return;
+                }
+
+                if (payload.isTyping) {
+                  const fallbackName =
+                    payload.senderRole === "ADMIN"
+                      ? "Quản trị viên CSKH"
+                      : payload.senderRole === "FARMER"
+                        ? "Chủ vườn"
+                        : "Khách hàng";
+                  setTypingUser({
+                    senderRole: payload.senderRole,
+                    senderName: payload.senderName || fallbackName,
+                  });
+
+                  if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                  }
+                  typingTimeoutRef.current = setTimeout(() => {
+                    setTypingUser(null);
+                  }, 3000);
+                } else {
                   setTypingUser(null);
-                }, 3000);
-              } else {
-                setTypingUser(null);
-                if (typingTimeoutRef.current) {
-                  clearTimeout(typingTimeoutRef.current);
+                  if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                  }
                 }
               }
+            } catch (e) {
+              console.warn("Failed to parse typing payload:", e);
             }
-          } catch (e) {
-            console.warn("Failed to parse typing payload:", e);
-          }
-        });
+          });
+        }
+
+        if (subscribeAdminInbox) {
+          client.subscribe("/topic/admin/inbox", (frame: IMessage) => {
+            try {
+              const raw = JSON.parse(frame.body);
+              onAdminInboxRef.current?.(raw);
+            } catch (e) {
+              console.warn("Failed to parse admin inbox event:", e);
+            }
+          });
+        }
       },
       onWebSocketClose: () => {
         if (active) setConnected(false);
@@ -135,14 +172,13 @@ export function useOrderChatSocket({
       setTypingUser(null);
       try {
         client.deactivate();
-      } catch (e) {
+      } catch {
         // ignore
       }
       clientRef.current = null;
     };
-  }, [cleanCode, accessToken, currentUserRole]);
+  }, [cleanCode, channel, subscribeAdminInbox, accessToken, currentUserRole]);
 
-  // Send typing event
   const lastSentTypingRef = useRef<boolean>(false);
   const typingDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -150,9 +186,7 @@ export function useOrderChatSocket({
     (isTyping: boolean) => {
       if (!clientRef.current || !clientRef.current.connected || !cleanCode) return;
 
-      // Avoid spamming the same status repeatedly
       if (lastSentTypingRef.current === isTyping && isTyping) {
-        // Reset stop-typing debounce
         if (typingDebounceTimerRef.current) clearTimeout(typingDebounceTimerRef.current);
         typingDebounceTimerRef.current = setTimeout(() => {
           sendTyping(false);
@@ -169,10 +203,11 @@ export function useOrderChatSocket({
             orderCode: cleanCode,
             senderRole: currentUserRole,
             senderName: currentUserName,
+            channel: channel === "ALL" ? "SHOP" : channel,
             isTyping,
           }),
         });
-      } catch (err) {
+      } catch {
         // non-fatal
       }
 
@@ -188,7 +223,7 @@ export function useOrderChatSocket({
         }
       }
     },
-    [cleanCode, currentUserRole, currentUserName]
+    [cleanCode, channel, currentUserRole, currentUserName]
   );
 
   return {

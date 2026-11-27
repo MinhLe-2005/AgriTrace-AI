@@ -6,6 +6,7 @@ import com.example.myfullstackapp.entity.User;
 import com.example.myfullstackapp.repository.LoyaltyMembershipRepository;
 import com.example.myfullstackapp.repository.LoyaltyTransactionRepository;
 import com.example.myfullstackapp.repository.UserRepository;
+import com.example.myfullstackapp.repository.UserVoucherRepository;
 import com.example.myfullstackapp.repository.VoucherRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -26,7 +27,7 @@ class LoyaltyServiceTest {
     private final LoyaltyTransactionRepository transactions = mock(LoyaltyTransactionRepository.class);
     private final UserRepository users = mock(UserRepository.class);
     private final LoyaltyService service =
-            new LoyaltyService(memberships, transactions, users, mock(VoucherRepository.class));
+            new LoyaltyService(memberships, transactions, users, mock(VoucherRepository.class), mock(UserVoucherRepository.class));
 
     private final User user = User.builder().id(UUID.randomUUID()).email(EMAIL).build();
 

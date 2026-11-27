@@ -46,6 +46,7 @@ export type ApiVoucher = {
   discount: string;
   minOrder: string;
   exp: string;
+  ownerEmail?: string | null;
   active: boolean;
 };
 
@@ -117,6 +118,8 @@ export type ApiOrder = {
   refundRequestedAt?: string | null;
   refundResolvedAt?: string | null;
   refundNote?: string | null;
+  adminSupportRequested?: boolean | null;
+  adminSupportRequestedAt?: string | null;
   items: ApiOrderItem[];
 };
 
@@ -141,8 +144,30 @@ export const catalogService = {
     return res.data;
   },
 
-  async getVouchers(): Promise<ApiVoucher[]> {
-    const res = await api.get<ApiVoucher[]>("/vouchers");
+  async getVouchers(email?: string): Promise<ApiVoucher[]> {
+    const res = await api.get<ApiVoucher[]>("/vouchers", {
+      params: email ? { email } : undefined,
+    });
+    return res.data;
+  },
+
+  async getWalletVouchers(email?: string): Promise<ApiVoucher[]> {
+    if (!email) return [];
+    try {
+      const res = await api.get<ApiVoucher[]>("/vouchers/wallet", {
+        params: { email },
+      });
+      return res.data || [];
+    } catch {
+      return [];
+    }
+  },
+
+  async saveVoucherToWallet(code: string, email?: string): Promise<ApiVoucher> {
+    const res = await api.post<ApiVoucher>("/vouchers/save", {
+      code,
+      email,
+    });
     return res.data;
   },
 

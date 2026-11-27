@@ -60,11 +60,12 @@ const INITIAL_MESSAGES: Message[] = [
 ];
 
 const SUGGESTIONS = [
-  "🍓 Dâu tây Mộc Châu giá bao nhiêu?",
-  "🍳 Gợi ý thực đơn món ngon từ rau củ?",
-  "❄️ Cách bảo quản dâu tây trong tủ lạnh?",
-  "🥬 Xà lách thủy canh có an toàn không?",
-  "🎁 Áp mã freeship xe lạnh như thế nào?",
+  "🛡️ Chính sách đổi trả 1-đổi-1 trong 24h?",
+  "❄️ Phí ship xe lạnh, freeship & giờ giao?",
+  "🔍 Cách quét QR GS1 kiểm định VietGAP?",
+  "💳 Thanh toán VietQR PayOS hay COD?",
+  "👑 Hạng hội viên AgriClub & mã giảm giá?",
+  "🍓 Giá Dâu tây Mộc Châu & thực đơn món ngon?",
 ];
 
 interface GeminiChatWidgetProps {
@@ -377,30 +378,78 @@ export function GeminiChatWidget({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {actions.map((act, aIdx) => {
-                        const isTraCuu = act.label.toLowerCase().includes("tra cứu") || act.label.toLowerCase().includes("lô") || act.label.toLowerCase().includes("nhật ký");
-                        const isVoucher = act.label.toLowerCase().includes("voucher") || act.label.toLowerCase().includes("điểm") || act.label.toLowerCase().includes("ví");
-                        const isDauTay = act.label.toLowerCase().includes("dâu");
-                        const isCam = act.label.toLowerCase().includes("cam");
-                        const isRau = act.label.toLowerCase().includes("rau") || act.label.toLowerCase().includes("cải") || act.label.toLowerCase().includes("thủy canh");
+                        const lowerLabel = act.label.toLowerCase();
+                        const lowerUrl = act.url.toLowerCase();
+                        const isFaq =
+                          lowerUrl.includes("/faq") ||
+                          lowerUrl.includes("/terms") ||
+                          lowerUrl.includes("/about") ||
+                          lowerUrl.includes("/contact");
+                        const isLoyalty = lowerUrl.includes("/loyalty");
+                        const isOrderOrSupport =
+                          lowerUrl.includes("tab=orders") ||
+                          lowerUrl.includes("tab=messages") ||
+                          lowerUrl.includes("/cart");
+                        const isTraCuu =
+                          !isFaq &&
+                          (lowerUrl.includes("/traceability") ||
+                            lowerLabel.includes("tra cứu") ||
+                            lowerLabel.includes("quét"));
+                        const isVoucher =
+                          !isFaq &&
+                          (lowerUrl.includes("tab=vouchers") || lowerLabel.includes("voucher"));
+                        const isProductUrl = lowerUrl.includes("/products");
+                        const isDauTay = isProductUrl && lowerLabel.includes("dâu");
+                        const isCam = isProductUrl && lowerLabel.includes("cam sành");
+                        const isRau =
+                          isProductUrl &&
+                          (lowerLabel.includes("rau") ||
+                            lowerLabel.includes("cải") ||
+                            lowerLabel.includes("xà lách") ||
+                            lowerLabel.includes("thủy canh"));
 
                         let cardStyle = "bg-white border-stone-200/90 hover:border-emerald-500 hover:bg-emerald-50/50 text-stone-900 shadow-2xs";
                         let icon = "⚡";
                         let iconBg = "bg-emerald-100 text-emerald-800 border-emerald-200";
                         let tagBadge = "Chuẩn VietGAP";
                         let tagBadgeStyle = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                        let footerLabel = "Chính hãng";
 
-                        if (isTraCuu) {
+                        if (isFaq) {
+                          cardStyle = "bg-gradient-to-br from-amber-50/85 via-white to-orange-50/40 border-amber-200/90 hover:border-amber-500 hover:shadow-xs text-stone-900 shadow-2xs";
+                          icon = lowerUrl.includes("/terms") ? "📜" : lowerUrl.includes("/contact") ? "📞" : "❓";
+                          iconBg = "bg-amber-100 text-amber-800 border-amber-200";
+                          tagBadge = "Hỗ trợ 24/7";
+                          tagBadgeStyle = "bg-amber-50 text-amber-800 border-amber-200";
+                          footerLabel = "Chính sách sàn";
+                        } else if (isLoyalty) {
+                          cardStyle = "bg-gradient-to-br from-purple-50/90 via-white to-amber-50/40 border-purple-200/90 hover:border-purple-500 hover:shadow-xs text-stone-900 shadow-2xs";
+                          icon = "👑";
+                          iconBg = "bg-purple-100 text-purple-800 border-purple-200";
+                          tagBadge = "AgriClub VIP";
+                          tagBadgeStyle = "bg-purple-50 text-purple-800 border-purple-200";
+                          footerLabel = "4 Cấp hạng";
+                        } else if (isOrderOrSupport) {
+                          cardStyle = "bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/40 border-emerald-200/90 hover:border-emerald-500 hover:shadow-xs text-stone-900 shadow-2xs";
+                          icon = lowerUrl.includes("messages") ? "🎧" : lowerUrl.includes("/cart") ? "🛍️" : "📦";
+                          iconBg = "bg-emerald-100 text-emerald-800 border-emerald-200";
+                          tagBadge = lowerUrl.includes("messages") ? "Chat & Khiếu nại" : "Đơn hàng";
+                          tagBadgeStyle = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                          footerLabel = lowerUrl.includes("messages") ? "Shop & Tổng đài" : "Theo dõi đơn";
+                        } else if (isTraCuu) {
                           cardStyle = "bg-gradient-to-br from-cyan-50/90 via-white to-sky-50/40 border-cyan-200/90 hover:border-cyan-500 hover:shadow-xs text-stone-900 shadow-2xs";
                           icon = "🔍";
                           iconBg = "bg-cyan-100 text-cyan-800 border-cyan-200";
                           tagBadge = "Minh bạch KCS";
                           tagBadgeStyle = "bg-cyan-50 text-cyan-800 border-cyan-200";
+                          footerLabel = "Chuẩn QR GS1";
                         } else if (isVoucher) {
                           cardStyle = "bg-gradient-to-br from-purple-50/90 via-white to-indigo-50/40 border-purple-200/90 hover:border-purple-500 hover:shadow-xs text-stone-900 shadow-2xs col-span-1 sm:col-span-2";
                           icon = "🎁";
                           iconBg = "bg-purple-100 text-purple-800 border-purple-200";
                           tagBadge = "Đặc quyền VIP";
                           tagBadgeStyle = "bg-purple-50 text-purple-800 border-purple-200";
+                          footerLabel = "Ví Voucher";
                         } else if (isDauTay) {
                           cardStyle = "bg-gradient-to-br from-rose-50/90 via-white to-pink-50/40 border-rose-200/90 hover:border-rose-400 hover:shadow-xs text-stone-900 shadow-2xs";
                           icon = "🍓";
@@ -421,20 +470,14 @@ export function GeminiChatWidget({
                           tagBadgeStyle = "bg-emerald-50 text-emerald-800 border-emerald-200";
                         }
 
-                        const priceMatch = act.label.match(/\(([^)]+)\)/);
+                        const priceMatch = act.label.match(/\(([\d.,]+\s*đ[^)]*)\)/i);
                         const price = priceMatch ? priceMatch[1] : null;
 
-                        let displayTitle = act.label
-                          .replace(/^[⚡🥦🥬🔍🎁\s]+/, "")
-                          .replace(/\([^)]+\)/, "")
+                        const displayTitle = act.label
+                          .replace(/^[\s⚡🥦🥬🔍🎁🍓🍊🥑🍅📦🛒🛍️❓📜📞🌿👑🛡️❄️💳🧑‍🌾🎧]+/u, "")
+                          .replace(/\(([\d.,]+\s*đ[^)]*)\)/i, "")
                           .replace(/^(Mua Ngay|Mua)\s*/i, "")
                           .trim();
-
-                        if (isTraCuu) displayTitle = "Tra Cứu Lô Nông Sản";
-                        else if (isVoucher) displayTitle = "Ví Voucher & Điểm VIP";
-                        else if (isDauTay) displayTitle = "Dâu Tây Mộc Châu";
-                        else if (isCam) displayTitle = "Cam Sành Hàm Yên";
-                        else if (isRau) displayTitle = "Rau Củ Thủy Canh";
 
                         // If Voucher (full-width row layout)
                         if (isVoucher) {
@@ -455,7 +498,7 @@ export function GeminiChatWidget({
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5">
                                     <span className="font-bold text-[11.5px] text-stone-900 group-hover:text-purple-950 whitespace-nowrap">
-                                      {displayTitle}
+                                      {displayTitle || "Ví Voucher & Điểm VIP"}
                                     </span>
                                     <span className={cn("text-[8.5px] font-bold px-1.5 py-0.2 rounded border shrink-0 whitespace-nowrap", tagBadgeStyle)}>
                                       AgriClub
@@ -473,7 +516,7 @@ export function GeminiChatWidget({
                           );
                         }
 
-                        // 2-column vertical card layout for products and lookup
+                        // 2-column vertical card layout for products, FAQ, and lookup
                         return (
                           <button
                             key={aIdx}
@@ -495,11 +538,11 @@ export function GeminiChatWidget({
 
                             <div>
                               <div className="font-bold text-[11px] text-stone-900 group-hover:text-emerald-950 leading-tight">
-                                {displayTitle}
+                                {displayTitle || act.label}
                               </div>
                               <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-stone-200/60">
                                 <span className="text-[10.5px] font-extrabold text-emerald-800">
-                                  {price || (isTraCuu ? "LOT-DT-2026-11" : "VietGAP")}
+                                  {price || footerLabel}
                                 </span>
                                 <span className="text-[9px] font-bold text-emerald-700 group-hover:text-emerald-900 flex items-center gap-0.5">
                                   {price ? "Mua" : "Xem"} <ArrowRight size={9} className="group-hover:translate-x-0.5 transition-transform" />

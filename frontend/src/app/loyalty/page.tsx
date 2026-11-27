@@ -19,7 +19,8 @@ import {
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { loyaltyService, type LoyaltyProfile, type LoyaltyTransaction } from "@/services/loyalty.service";
-import type { ApiVoucher } from "@/services/catalog.service";
+import { catalogService, type ApiVoucher } from "@/services/catalog.service";
+import { getApiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -202,17 +203,25 @@ export default function LoyaltyPage() {
   const [redeemedVoucher, setRedeemedVoucher] = useState<ApiVoucher | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [activeVoucherTab, setActiveVoucherTab] = useState<"all" | "points" | "tier" | "promo">("all");
-  const [savedCodes, setSavedCodes] = useState<string[]>(["VIP-FREESHIP"]);
+  const [savedCodes, setSavedCodes] = useState<string[]>([]);
+  const [walletVouchers, setWalletVouchers] = useState<ApiVoucher[]>([]);
+
+  async function refreshLoyaltyAndWallet(email: string) {
+    const [data, wallet] = await Promise.all([
+      loyaltyService.getLoyaltyMe(email),
+      catalogService.getWalletVouchers(email),
+    ]);
+    if (data) setProfile(data);
+    setWalletVouchers(wallet || []);
+    setSavedCodes((wallet || []).map((v) => v.code.toUpperCase()));
+  }
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
       try {
         if (!user) return;
-        const data = await loyaltyService.getLoyaltyMe(user.email);
-        if (data) {
-          setProfile(data);
-        }
+        await refreshLoyaltyAndWallet(user.email);
       } catch (err) {
         console.error("Error loading loyalty profile:", err);
       } finally {
@@ -222,16 +231,20 @@ export default function LoyaltyPage() {
     loadData();
   }, [user?.email]);
 
-  const currentPoints = profile?.currentPoints ?? 47;
-  const totalSpent = profile?.totalSpent ?? 487250;
+  const currentPoints = profile?.currentPoints ?? 0;
+  const totalSpent = profile?.totalSpent ?? 0;
   const tierKey = profile?.tier?.toUpperCase() ?? "BRONZE";
   const pointsMultiplier = profile?.pointsMultiplier ?? 1.0;
-  const progressPercent = profile?.progressPercent ?? 48.7;
+  const progressPercent = profile?.progressPercent ?? 0;
   const nextTier = profile?.nextTier ?? "SILVER";
   const nextTierThreshold = profile?.nextTierThreshold ?? 1000000;
   const transactions = profile?.recentTransactions ?? [];
 
   async function handleRedeem(item: (typeof redeemOptions)[0]) {
+    if (!user?.email) {
+      toast.error("Vui lòng đăng nhập tài khoản để đổi điểm lấy voucher!");
+      return;
+    }
     if (currentPoints < item.cost) {
       toast.error(`Bạn chưa đủ điểm! Cần ${item.cost} điểm (Hiện có: ${currentPoints} điểm).`);
       return;
@@ -243,29 +256,36 @@ export default function LoyaltyPage() {
         item.cost,
         item.type,
         item.title,
-        user?.email
+        user.email
       );
       setRedeemedVoucher(voucher);
-      toast.success(`Đổi thành công "${item.title}"! Mã: ${voucher.code}`);
+      toast.success(`Đổi thành công "${item.title}" (-${item.cost} điểm)! Mã [${voucher.code}] đã được lưu vào ví của bạn.`);
 
-      // Refresh loyalty data
-      const updated = await loyaltyService.getLoyaltyMe(user?.email);
-      if (updated) setProfile(updated);
+      await refreshLoyaltyAndWallet(user.email);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Đổi voucher thất bại";
-      toast.error(msg);
+      toast.error(getApiErrorMessage(err));
     } finally {
       setIsRedeeming(false);
     }
   }
 
-  function handleClaimPerk(code: string, title: string) {
-    if (savedCodes.includes(code)) {
-      toast.info(`Mã ${code} đã có trong ví voucher của bạn!`);
+  async function handleClaimPerk(code: string, title: string) {
+    if (!user?.email) {
+      toast.error("Vui lòng đăng nhập để lưu mã ưu đãi vào ví!");
       return;
     }
-    setSavedCodes((prev) => [...prev, code]);
-    toast.success(`Đã lưu "${title}" (Mã: ${code}) vào ví voucher của bạn!`);
+    const clean = code.trim().toUpperCase();
+    if (savedCodes.includes(clean)) {
+      toast.info(`Mã ${clean} đã có trong ví voucher của bạn!`);
+      return;
+    }
+    try {
+      await catalogService.saveVoucherToWallet(clean, user.email);
+      await refreshLoyaltyAndWallet(user.email);
+      toast.success(`Đã lưu "${title}" (Mã: ${clean}) vào ví voucher của bạn!`);
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
+    }
   }
 
   function handleCopy(code: string) {
@@ -481,10 +501,16 @@ export default function LoyaltyPage() {
                   <span>{copiedCode ? "Đã chép!" : "Sao chép mã"}</span>
                 </button>
                 <Link
-                  href="/checkout"
+                  href="/dashboard/customer?tab=vouchers"
                   className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold transition-colors text-center"
                 >
-                  Dùng ngay tại Checkout →
+                  Xem trong Ví Voucher →
+                </Link>
+                <Link
+                  href="/cart"
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-900 text-white hover:bg-black text-xs font-bold transition-colors text-center"
+                >
+                  Dùng tại Giỏ hàng →
                 </Link>
               </div>
             </div>
@@ -679,7 +705,7 @@ export default function LoyaltyPage() {
                               : "bg-gray-200 text-gray-400 cursor-not-allowed"
                           )}
                         >
-                          {isRedeeming ? "Đang xử lý…" : canRedeem ? `Đổi ngay (${opt.cost}đ)` : `Cần ${opt.cost} điểm`}
+                          {isRedeeming ? "Đang xử lý…" : canRedeem ? `Đổi ngay (${opt.cost} điểm)` : `Cần ${opt.cost} điểm`}
                         </button>
                       </div>
                     </div>
@@ -687,6 +713,48 @@ export default function LoyaltyPage() {
                 );
               })}
           </div>
+
+          {walletVouchers.length > 0 && (
+            <div className="pt-5 border-t border-gray-100 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-gray-900">
+                  Ví Voucher đã lưu & đã đổi của tài khoản ({walletVouchers.length})
+                </h3>
+                <Link
+                  href="/dashboard/customer?tab=vouchers"
+                  className="text-xs font-bold text-emerald-700 hover:underline"
+                >
+                  Quản lý trong Ví Voucher →
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {walletVouchers.map((wv) => (
+                  <div
+                    key={wv.code}
+                    className="p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/40 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-xs text-emerald-900">{wv.code}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                          {wv.badge || wv.discount}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-gray-800 truncate mt-0.5">{wv.title}</p>
+                      <p className="text-[11px] text-gray-500">HSD: {wv.exp}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(wv.code)}
+                      className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 hover:bg-emerald-100 text-[11px] font-bold shrink-0 cursor-pointer"
+                    >
+                      Chép
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── 4 Membership Tiers Display ── */}

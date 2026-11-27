@@ -5,18 +5,21 @@ import com.example.myfullstackapp.dto.review.CreateReviewRequest;
 import com.example.myfullstackapp.entity.Order;
 import com.example.myfullstackapp.entity.Product;
 import com.example.myfullstackapp.entity.Review;
+import com.example.myfullstackapp.entity.User;
 import com.example.myfullstackapp.repository.OrderRepository;
 import com.example.myfullstackapp.repository.ProductRepository;
 import com.example.myfullstackapp.repository.ReviewRepository;
+import com.example.myfullstackapp.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/reviews")
@@ -26,6 +29,7 @@ public class ReviewController {
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
     private final com.example.myfullstackapp.service.LoyaltyService loyaltyService;
 
     @GetMapping("/product/{productName}")
@@ -40,7 +44,8 @@ public class ReviewController {
 
     @GetMapping("/order/{orderCode}")
     public ApiResponse<List<Review>> getOrderReviews(@PathVariable String orderCode) {
-        return ApiResponse.ok("Lấy đánh giá đơn hàng thành công", reviewRepository.findByOrderCodeOrderByCreatedAtDesc(orderCode));
+        String cleanCode = orderCode.replace("#", "").trim().toUpperCase(Locale.ROOT);
+        return ApiResponse.ok("Lấy đánh giá đơn hàng thành công", reviewRepository.findByOrderCodeOrderByCreatedAtDesc(cleanCode));
     }
 
     @PostMapping
@@ -49,27 +54,31 @@ public class ReviewController {
             @Valid @RequestBody CreateReviewRequest request,
             Authentication authentication
     ) {
-        String email = "customer@gmail.com";
-        String name = "Khách hàng";
-        if (authentication != null && authentication.isAuthenticated()) {
-            email = authentication.getName();
-            name = authentication.getName();
-        }
+        String cleanCode = request.getOrderCode().replace("#", "").trim().toUpperCase(Locale.ROOT);
+        Order order = orderRepository.findByOrderCode(cleanCode)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + cleanCode));
 
-        // Check if order exists
-        Order order = orderRepository.findByOrderCode(request.getOrderCode())
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + request.getOrderCode()));
+        String email = (authentication != null && authentication.isAuthenticated()
+                && !"anonymousUser".equalsIgnoreCase(authentication.getName()))
+                ? authentication.getName().trim()
+                : (order.getUserEmail() != null && !order.getUserEmail().isBlank()
+                    ? order.getUserEmail().trim()
+                    : "customer@gmail.com");
 
-        if (order.getUserEmail() != null && !order.getUserEmail().equalsIgnoreCase(email)) {
-            // If user logged in has specific email, set name from order
-            name = order.getReceiverName() != null ? order.getReceiverName() : name;
-        } else if (order.getReceiverName() != null) {
-            name = order.getReceiverName();
+        Optional<User> dbUser = userRepository.findByEmailIgnoreCase(email);
+        String name = dbUser.map(User::getFullName).filter(n -> !n.isBlank())
+                .orElse(order.getReceiverName() != null && !order.getReceiverName().isBlank()
+                        ? order.getReceiverName()
+                        : "Khách hàng");
+
+        String cleanProductName = request.getProductName().trim();
+        if (reviewRepository.existsByOrderCodeAndProductName(cleanCode, cleanProductName)) {
+            throw new IllegalArgumentException("Bạn đã gửi đánh giá cho sản phẩm này ở đơn #" + cleanCode + " rồi.");
         }
 
         Review review = Review.builder()
-                .orderCode(request.getOrderCode())
-                .productName(request.getProductName())
+                .orderCode(cleanCode)
+                .productName(cleanProductName)
                 .userEmail(email)
                 .userName(name)
                 .rating(request.getRating())
@@ -79,17 +88,17 @@ public class ReviewController {
 
         Review saved = reviewRepository.save(review);
 
-        // Award +20 points for photo freshness co-inspection & review
+        // Chỉ thưởng +20 điểm tối đa 1 lần cho mỗi đơn hàng (chống cộng đúp)
+        boolean pointsAwardedNow = false;
         try {
-            loyaltyService.awardReviewPoints(email, request.getOrderCode(), 20);
-        } catch (Exception ex) {
+            pointsAwardedNow = loyaltyService.awardReviewPoints(email, cleanCode, 20);
+        } catch (Exception ignored) {
             // non-blocking
         }
 
-        // Update product rating and reviews count if matching product found
         List<Product> products = productRepository.findAll();
         for (Product product : products) {
-            if (product.getName() != null && product.getName().equalsIgnoreCase(request.getProductName())) {
+            if (product.getName() != null && product.getName().equalsIgnoreCase(cleanProductName)) {
                 List<Review> allReviews = reviewRepository.findByProductNameOrderByCreatedAtDesc(product.getName());
                 double avg = allReviews.stream().mapToInt(Review::getRating).average().orElse(5.0);
                 product.setRating(Math.round(avg * 10.0) / 10.0);
@@ -99,7 +108,10 @@ public class ReviewController {
             }
         }
 
-        return ApiResponse.ok("Cảm ơn bạn đã đánh giá sản phẩm!", saved);
+        String msg = pointsAwardedNow
+                ? "Cảm ơn bạn đã đánh giá! Bạn vừa nhận +20 điểm AgriClub."
+                : "Cảm ơn bạn đã đánh giá sản phẩm!";
+        return ApiResponse.ok(msg, saved);
     }
 
     @PostMapping("/{id}/like")

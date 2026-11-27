@@ -32,7 +32,7 @@ public class Review {
     @Column(nullable = false)
     private Integer rating; // 1 - 5 stars
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String comment;
 
     @Builder.Default

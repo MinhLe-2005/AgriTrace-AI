@@ -11,6 +11,7 @@ import java.util.List;
 public interface OrderMessageRepository extends JpaRepository<OrderMessage, Long> {
     List<OrderMessage> findByOrderCodeOrderByCreatedAtAsc(String orderCode);
     List<OrderMessage> findByOrderCodeInOrderByCreatedAtAsc(Collection<String> orderCodes);
+    List<OrderMessage> findByOrderCodeAndChannelOrderByCreatedAtAsc(String orderCode, String channel);
     List<OrderMessage> findByFarmNameOrderByCreatedAtDesc(String farmName);
     List<OrderMessage> findAllByOrderByCreatedAtDesc();
 }

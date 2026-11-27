@@ -102,6 +102,6 @@ export function unpack<T>(response: ApiResponse<T> | T) {
   return (response as ApiResponse<T>).data ?? (response as T);
 }
 
-export function getApiErrorMessage(error: unknown) {
-  return axios.isAxiosError<ApiErrorResponse>(error) ? messageFromError(error) : "Có lỗi xảy ra. Vui lòng thử lại.";
+export function getApiErrorMessage(error: unknown, fallback = "Có lỗi xảy ra. Vui lòng thử lại.") {
+  return axios.isAxiosError<ApiErrorResponse>(error) ? messageFromError(error) : fallback;
 }

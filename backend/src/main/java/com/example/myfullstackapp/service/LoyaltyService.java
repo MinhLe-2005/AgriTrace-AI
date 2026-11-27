@@ -3,10 +3,12 @@ package com.example.myfullstackapp.service;
 import com.example.myfullstackapp.entity.LoyaltyMembership;
 import com.example.myfullstackapp.entity.LoyaltyTransaction;
 import com.example.myfullstackapp.entity.User;
+import com.example.myfullstackapp.entity.UserVoucher;
 import com.example.myfullstackapp.entity.Voucher;
 import com.example.myfullstackapp.repository.LoyaltyMembershipRepository;
 import com.example.myfullstackapp.repository.LoyaltyTransactionRepository;
 import com.example.myfullstackapp.repository.UserRepository;
+import com.example.myfullstackapp.repository.UserVoucherRepository;
 import com.example.myfullstackapp.repository.VoucherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,10 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +30,7 @@ public class LoyaltyService {
     private final LoyaltyTransactionRepository loyaltyTransactionRepository;
     private final UserRepository userRepository;
     private final VoucherRepository voucherRepository;
+    private final UserVoucherRepository userVoucherRepository;
 
     private static final BigDecimal TIER_SILVER_THRESHOLD = BigDecimal.valueOf(1_000_000);
     private static final BigDecimal TIER_GOLD_THRESHOLD = BigDecimal.valueOf(3_000_000);
@@ -111,7 +113,7 @@ public class LoyaltyService {
             };
 
             int finalPoints = (int) Math.round(basePoints * multiplier);
-            if (finalPoints <= 0) finalPoints = 10;
+            if (finalPoints <= 0) finalPoints = 1;
 
             membership.setCurrentPoints(membership.getCurrentPoints() + finalPoints);
             membership.setLifetimePoints(membership.getLifetimePoints() + finalPoints);
@@ -156,19 +158,26 @@ public class LoyaltyService {
     }
 
     @Transactional
-    public void awardReviewPoints(String email, String orderCode, int points) {
+    public boolean awardReviewPoints(String email, String orderCode, int points) {
         try {
-            if (email == null || email.isBlank()) email = "customer@gmail.com";
+            if (email == null || email.isBlank() || orderCode == null || orderCode.isBlank()) {
+                return false;
+            }
+            String cleanCode = orderCode.replace("#", "").trim().toUpperCase(Locale.ROOT);
             LoyaltyMembership membership = getOrCreateMembership(email);
-            if (membership == null) return;
+            if (membership == null) return false;
 
-            String marker = "Đồng kiểm #" + orderCode;
-            List<LoyaltyTransaction> existingTxs = loyaltyTransactionRepository.findByUserEmailIgnoreCaseOrderByCreatedAtDesc(email);
-            boolean alreadyAwarded = existingTxs.stream().anyMatch(t ->
-                    t.getDescription() != null && t.getDescription().contains(marker));
+            List<LoyaltyTransaction> existingTxs = loyaltyTransactionRepository.findByUserEmailIgnoreCaseOrderByCreatedAtDesc(membership.getUser().getEmail());
+            String codeMarker = "#" + cleanCode;
+            boolean alreadyAwarded = existingTxs.stream().anyMatch(t -> {
+                String desc = t.getDescription() != null ? t.getDescription().toUpperCase(Locale.ROOT) : "";
+                return "BONUS".equalsIgnoreCase(t.getTransactionType())
+                        && desc.contains(codeMarker)
+                        && (desc.contains("ĐÁNH GIÁ") || desc.contains("ĐỒNG KIỂM"));
+            });
             if (alreadyAwarded) {
-                log.info("Review points already awarded for order #{}", orderCode);
-                return;
+                log.info("Review points already awarded for order #{}, skipping duplicate", cleanCode);
+                return false;
             }
 
             int cur = membership.getCurrentPoints() != null ? membership.getCurrentPoints() : 0;
@@ -181,42 +190,45 @@ public class LoyaltyService {
                     .user(membership.getUser())
                     .points(points)
                     .transactionType("BONUS")
-                    .description("Thưởng " + points + " điểm: Đồng kiểm độ tươi & Đánh giá đơn #" + orderCode)
+                    .description("Thưởng " + points + " điểm: Đồng kiểm độ tươi & Đánh giá đơn #" + cleanCode)
                     .build();
             loyaltyTransactionRepository.save(tx);
-            log.info("Awarded {} review points to user {} for order #{}", points, email, orderCode);
+            log.info("Awarded {} review points to user {} for order #{}", points, email, cleanCode);
+            return true;
         } catch (Exception e) {
             log.error("Failed to award review points: {}", e.getMessage(), e);
+            return false;
         }
     }
 
     @Transactional
-    public Voucher redeemVoucher(String email, int pointsCost, String voucherType, String title) {
+    public Voucher redeemVoucher(String email, int requestedCost, String voucherType, String title) {
         LoyaltyMembership membership = getOrCreateMembership(email);
         if (membership == null) {
             throw new IllegalArgumentException("Không tìm thấy thông tin hội viên của bạn.");
         }
 
-        if (membership.getCurrentPoints() < pointsCost) {
+        String normType = voucherType != null ? voucherType.trim().toUpperCase(Locale.ROOT) : "DISCOUNT10";
+        int pointsCost = switch (normType) {
+            case "FREESHIP" -> 200;
+            case "DISCOUNT30" -> 280;
+            case "DISCOUNT50" -> 500;
+            case "DISCOUNT10" -> 100;
+            default -> Math.max(10, requestedCost);
+        };
+
+        int currentPts = membership.getCurrentPoints() != null ? membership.getCurrentPoints() : 0;
+        if (currentPts < pointsCost) {
             throw new IllegalArgumentException(String.format("Bạn không đủ điểm! Cần %d điểm (Số dư hiện tại: %d điểm).",
-                    pointsCost, membership.getCurrentPoints()));
+                    pointsCost, currentPts));
         }
 
-        // Deduct points
-        membership.setCurrentPoints(membership.getCurrentPoints() - pointsCost);
+        String ownerEmail = membership.getUser().getEmail().trim().toLowerCase(Locale.ROOT);
+        membership.setCurrentPoints(currentPts - pointsCost);
         loyaltyMembershipRepository.save(membership);
 
-        // Record transaction
-        loyaltyTransactionRepository.save(LoyaltyTransaction.builder()
-                .user(membership.getUser())
-                .points(-pointsCost)
-                .transactionType("REDEEMED")
-                .description("Đổi điểm nhận ưu đãi: " + title)
-                .build());
-
-        // Generate unique code
-        String randomSuffix = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
-        String prefix = switch (voucherType.toUpperCase()) {
+        String randomSuffix = UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
+        String prefix = switch (normType) {
             case "FREESHIP" -> "FREESHIP-";
             case "DISCOUNT30" -> "AGRI30K-";
             case "DISCOUNT50" -> "VIPGOLD-";
@@ -224,21 +236,21 @@ public class LoyaltyService {
         };
         String code = prefix + randomSuffix;
 
-        String discount = switch (voucherType.toUpperCase()) {
+        String discount = switch (normType) {
             case "FREESHIP" -> "25000";
             case "DISCOUNT30" -> "30000";
             case "DISCOUNT50" -> "50000";
             default -> "10000";
         };
 
-        String minOrder = switch (voucherType.toUpperCase()) {
+        String minOrder = switch (normType) {
             case "FREESHIP" -> "100000";
             case "DISCOUNT30" -> "150000";
             case "DISCOUNT50" -> "200000";
             default -> "0";
         };
 
-        String badge = switch (voucherType.toUpperCase()) {
+        String badge = switch (normType) {
             case "FREESHIP" -> "FREESHIP";
             case "DISCOUNT30" -> "-30K";
             case "DISCOUNT50" -> "-50K";
@@ -257,12 +269,82 @@ public class LoyaltyService {
                 .discount(discount)
                 .minOrder(minOrder)
                 .exp(expStr)
+                .ownerEmail(ownerEmail)
                 .active(true)
                 .build();
 
         Voucher savedVoucher = voucherRepository.save(voucher);
-        log.info("User {} redeemed voucher [{}] with cost {} points", email, code, pointsCost);
+
+        loyaltyTransactionRepository.save(LoyaltyTransaction.builder()
+                .user(membership.getUser())
+                .points(-pointsCost)
+                .transactionType("REDEEMED")
+                .description("Đổi " + pointsCost + " điểm nhận mã [" + code + "]: " + title)
+                .build());
+
+        userVoucherRepository.save(UserVoucher.builder()
+                .userEmail(ownerEmail)
+                .voucherCode(code)
+                .savedAt(LocalDateTime.now())
+                .build());
+
+        log.info("User {} redeemed and saved voucher [{}] with exact cost {} points (remaining: {})",
+                ownerEmail, code, pointsCost, membership.getCurrentPoints());
         return savedVoucher;
+    }
+
+    @Transactional
+    public Voucher saveVoucherToWallet(String email, String voucherCode) {
+        if (email == null || email.isBlank() || voucherCode == null || voucherCode.isBlank()) {
+            throw new IllegalArgumentException("Thông tin tài khoản hoặc mã voucher không hợp lệ");
+        }
+        String cleanEmail = email.trim().toLowerCase(Locale.ROOT);
+        String cleanCode = voucherCode.trim().toUpperCase(Locale.ROOT);
+
+        Voucher voucher = voucherRepository.findByCodeIgnoreCaseAndActiveTrue(cleanCode)
+                .orElseThrow(() -> new IllegalArgumentException("Mã voucher [" + cleanCode + "] không tồn tại hoặc đã hết hạn"));
+
+        if (voucher.getOwnerEmail() != null && !voucher.getOwnerEmail().isBlank()
+                && !voucher.getOwnerEmail().equalsIgnoreCase(cleanEmail)) {
+            throw new IllegalArgumentException("Mã voucher [" + cleanCode + "] thuộc tài khoản hội viên khác");
+        }
+
+        if (!userVoucherRepository.existsByUserEmailIgnoreCaseAndVoucherCodeIgnoreCase(cleanEmail, cleanCode)) {
+            userVoucherRepository.save(UserVoucher.builder()
+                    .userEmail(cleanEmail)
+                    .voucherCode(cleanCode)
+                    .savedAt(LocalDateTime.now())
+                    .build());
+        }
+        return voucher;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Voucher> getWalletVouchers(String email) {
+        if (email == null || email.isBlank()) {
+            return List.of();
+        }
+        String cleanEmail = email.trim().toLowerCase(Locale.ROOT);
+        Map<String, Voucher> walletMap = new LinkedHashMap<>();
+
+        // 1. Vouchers cá nhân đã đổi bằng điểm của tài khoản này
+        for (Voucher owned : voucherRepository.findByActiveTrueAndOwnerEmailIgnoreCase(cleanEmail)) {
+            walletMap.put(owned.getCode().toUpperCase(Locale.ROOT), owned);
+        }
+
+        // 2. Vouchers công khai người dùng đã bấm Lưu
+        for (UserVoucher uv : userVoucherRepository.findByUserEmailIgnoreCaseOrderBySavedAtDesc(cleanEmail)) {
+            String code = uv.getVoucherCode().toUpperCase(Locale.ROOT);
+            if (!walletMap.containsKey(code)) {
+                voucherRepository.findByCodeIgnoreCaseAndActiveTrue(code).ifPresent(v -> {
+                    if (v.getOwnerEmail() == null || v.getOwnerEmail().isBlank()
+                            || v.getOwnerEmail().equalsIgnoreCase(cleanEmail)) {
+                        walletMap.put(code, v);
+                    }
+                });
+            }
+        }
+        return new ArrayList<>(walletMap.values());
     }
 
     @Transactional

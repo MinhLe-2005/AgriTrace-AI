@@ -35,12 +35,16 @@ public class OrderMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 
-    @Column(length = 500)
+    @Column(columnDefinition = "TEXT")
     private String imageUrl;
 
     @Builder.Default
+    @Column(length = 16)
+    private String channel = "SHOP"; // "SHOP" (Customer <-> Farmer) or "ADMIN" (Customer <-> Admin Support)
+
+    @Builder.Default
     @Column(length = 32)
-    private String messageType = "CHAT"; // "CHAT", "DISPUTE_SUBMITTED", "DISPUTE_APPROVED", "DISPUTE_REJECTED", "VOUCHER_OFFERED"
+    private String messageType = "CHAT"; // "CHAT", "DISPUTE_SUBMITTED", "DISPUTE_APPROVED", "DISPUTE_REJECTED", "SUPPORT_ESCALATED"
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

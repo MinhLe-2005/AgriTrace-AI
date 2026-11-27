@@ -4231,7 +4231,11 @@ function FarmerPortalContent() {
       {/* ========================================================================= */}
       {activeTab === "messages" && (
         <div className="w-full min-w-0 overflow-hidden">
-          <FarmerMessagesPanel />
+          <FarmerMessagesPanel
+            ownerId={activeOwnerId}
+            farmNames={visibleFarms.map((f) => f.name).filter(Boolean)}
+            farmerName={authUser?.name || undefined}
+          />
         </div>
       )}
 

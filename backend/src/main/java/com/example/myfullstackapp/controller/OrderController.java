@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -161,7 +162,7 @@ public class OrderController {
         long total = (req.getTotal() != null && req.getTotal() > 0L)
                 ? req.getTotal()
                 : Math.max(0L, subtotal + shippingFee - discount);
-        int points = (int) (total / 10000L); // 1 point for every 10k VND
+        int points = Math.max(1, (int) (total / 10000L)); // 1 điểm cho mỗi 10.000đ
 
         Order order = Order.builder()
                 .orderCode(orderCode)
@@ -180,7 +181,7 @@ public class OrderController {
                 .shippingFee(shippingFee)
                 .discount(discount)
                 .total(total)
-                .pointsAwarded(points > 0 ? points : 20)
+                .pointsAwarded(points)
                 .lotCode(req.getLotCode() != null ? req.getLotCode() : "XL-2026-08")
                 .createdAt(LocalDateTime.now())
                 .items(new ArrayList<>())
@@ -268,17 +269,32 @@ public class OrderController {
     }
 
     @PatchMapping("/{orderCode}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DISTRIBUTOR', 'WAREHOUSE', 'WAREHOUSE_STAFF', 'FARMER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DISTRIBUTOR', 'WAREHOUSE', 'WAREHOUSE_STAFF', 'FARMER', 'CUSTOMER')")
     @Transactional
     public ApiResponse<Order> updateStatus(
             @PathVariable String orderCode,
-            @Valid @RequestBody UpdateOrderStatusRequest request
+            @Valid @RequestBody UpdateOrderStatusRequest request,
+            Authentication authentication
     ) {
         Order order = orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderCode));
 
         String currentStatus = order.getStatus() != null ? order.getStatus().toUpperCase() : "CONFIRMED";
         String newStatus = request.getStatus().trim().toUpperCase();
+
+        boolean isStaff = authentication != null && authentication.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .anyMatch(role -> Set.of(
+                        "ROLE_ADMIN", "ROLE_DISTRIBUTOR", "ROLE_WAREHOUSE", "ROLE_WAREHOUSE_STAFF", "ROLE_FARMER"
+                ).contains(role));
+        if (!isStaff) {
+            String callerEmail = authentication != null ? authentication.getName() : null;
+            boolean isOwner = callerEmail != null && order.getUserEmail() != null
+                    && callerEmail.equalsIgnoreCase(order.getUserEmail().trim());
+            if (!isOwner || !"SHIPPING".equals(currentStatus) || !"DELIVERED".equals(newStatus)) {
+                throw new AccessDeniedException("Chỉ cho phép khách hàng xác nhận đã nhận đơn hàng đang giao của chính mình");
+            }
+        }
         if (!OrderStatusRules.KNOWN_STATUSES.contains(newStatus)) {
             throw new IllegalArgumentException("Trạng thái không hợp lệ: " + newStatus);
         }

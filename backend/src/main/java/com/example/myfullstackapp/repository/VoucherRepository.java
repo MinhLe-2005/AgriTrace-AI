@@ -10,6 +10,8 @@ import java.util.Optional;
 @Repository
 public interface VoucherRepository extends JpaRepository<Voucher, Long> {
     List<Voucher> findByActiveTrue();
+    List<Voucher> findByActiveTrueAndOwnerEmailIsNull();
+    List<Voucher> findByActiveTrueAndOwnerEmailIgnoreCase(String ownerEmail);
     boolean existsByCodeIgnoreCase(String code);
     Optional<Voucher> findByCodeIgnoreCaseAndActiveTrue(String code);
 }
