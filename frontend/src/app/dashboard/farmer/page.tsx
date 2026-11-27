@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   Award,
   BookOpen,
-  CalendarRange,
   Check,
   CheckCircle2,
   Clock,
@@ -28,8 +27,6 @@ import {
   Trash2,
   Star,
   MessageCircle,
-  MessageSquare,
-  TrendingUp,
   Truck,
   Upload,
   User,
@@ -558,6 +555,61 @@ function normalizeTransportStatus(
   return "Chưa vận chuyển";
 }
 
+function normalizeLogStageMeta(stage?: string): {
+  label: string;
+  badgeClass: string;
+  iconBg: string;
+} {
+  const lower = (stage || "").trim().toLowerCase();
+  if (lower.includes("gieo")) {
+    return {
+      label: "Gieo hạt",
+      badgeClass: "bg-lime-50 text-lime-800 border-lime-200",
+      iconBg: "bg-lime-100 text-lime-800",
+    };
+  }
+  if (lower.includes("bón") || lower.includes("bon")) {
+    return {
+      label: "Bón phân",
+      badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
+      iconBg: "bg-amber-100 text-amber-800",
+    };
+  }
+  if (lower.includes("tưới") || lower.includes("tuoi")) {
+    return {
+      label: "Tưới nước",
+      badgeClass: "bg-sky-50 text-sky-800 border-sky-200",
+      iconBg: "bg-sky-100 text-sky-800",
+    };
+  }
+  if (lower.includes("phun")) {
+    return {
+      label: "Phun sinh học",
+      badgeClass: "bg-purple-50 text-purple-800 border-purple-200",
+      iconBg: "bg-purple-100 text-purple-800",
+    };
+  }
+  if (lower.includes("kiểm") || lower.includes("kiem")) {
+    return {
+      label: "Kiểm tra chất lượng",
+      badgeClass: "bg-teal-50 text-teal-800 border-teal-200",
+      iconBg: "bg-teal-100 text-teal-800",
+    };
+  }
+  if (lower.includes("thu hoạch") || lower.includes("thu hoach")) {
+    return {
+      label: "Thu hoạch",
+      badgeClass: "bg-emerald-50 text-emerald-800 border-emerald-200",
+      iconBg: "bg-emerald-100 text-emerald-800",
+    };
+  }
+  return {
+    label: stage?.trim() || "Chăm sóc",
+    badgeClass: "bg-gray-50 text-gray-800 border-gray-200",
+    iconBg: "bg-gray-100 text-gray-700",
+  };
+}
+
 function getLocalIsoDate(offsetDays = 0): string {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -843,9 +895,21 @@ function FarmerPortalContent() {
     if (tab && ["farms", "batches", "logs", "products", "certs", "reviews", "seasons", "forecast", "messages"].includes(tab)) {
       setActiveTab(tab as "farms" | "batches" | "logs" | "products" | "certs" | "reviews" | "seasons" | "forecast" | "messages");
     } else if (!tab) {
-      setActiveTab((prev) => (prev === "forecast" || prev === "seasons" ? "farms" : prev));
+      setActiveTab((prev) =>
+        prev === "forecast" || prev === "seasons" || prev === "reviews" || prev === "messages" ? "farms" : prev
+      );
     }
   }, [searchParams]);
+
+  const selectCoreTab = (tab: "farms" | "batches" | "logs" | "products" | "certs") => {
+    setActiveTab(tab);
+    const currentQueryTab = searchParams.get("tab");
+    if (tab === "farms") {
+      if (currentQueryTab) router.push("/dashboard/farmer");
+    } else if (["messages", "reviews", "seasons", "forecast"].includes(currentQueryTab || "")) {
+      router.push(`/dashboard/farmer?tab=${tab}`);
+    }
+  };
 
   // =========================================================================
   // 1. DỮ LIỆU QUẢN LÝ NÔNG TRẠI (Quản lý nhiều nông trại canh tác)
@@ -967,6 +1031,7 @@ function FarmerPortalContent() {
   const [logProofImage, setLogProofImage] = useState("");
   const [logProofFileName, setLogProofFileName] = useState("");
   const [selectedLogFarm, setSelectedLogFarm] = useState<string>("ALL");
+  const [selectedLogBatch, setSelectedLogBatch] = useState<string>("ALL");
 
   // =========================================================================
   // 4. DỮ LIỆU SẢN PHẨM NÔNG NGHIỆP
@@ -2628,20 +2693,6 @@ function FarmerPortalContent() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setActiveTab("messages");
-              router.push("/dashboard/farmer?tab=messages");
-            }}
-            className={`px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all transform active:scale-95 cursor-pointer ${
-              activeTab === "messages"
-                ? "bg-amber-400 text-stone-950 ring-2 ring-amber-300 font-extrabold"
-                : "bg-amber-500 hover:bg-amber-400 text-stone-950"
-            }`}
-          >
-            <MessageSquare size={15} />
-            <span>Hộp Thư & Khiếu Nại</span>
-          </button>
-          <button
             onClick={openAddFarmModal}
             className="px-3.5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-emerald-700/60 transition-all cursor-pointer"
           >
@@ -2656,143 +2707,85 @@ function FarmerPortalContent() {
         </div>
       </div>
 
-      {/* 2. Navigation Tabs (5 Khối nghiệp vụ chuẩn bài nói, QUẢN LÝ NÔNG TRẠI đứng đầu tiên) */}
-      <div className="flex border-b border-gray-200 overflow-x-auto gap-2 text-xs font-bold">
+      {/* 2. Navigation Tabs (5 Khối nghiệp vụ cốt lõi; Hộp Thư, Đánh Giá, Mùa Vụ, AI Dự Báo truy cập ở Sidebar trái) */}
+      <div className="flex flex-wrap border-b border-gray-200 gap-x-1.5 gap-y-1 text-xs font-bold">
         <button
-          onClick={() => {
-            setActiveTab("farms");
-            router.push("/dashboard/farmer");
-          }}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          onClick={() => selectCoreTab("farms")}
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "farms"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Home size={16} /> Quản Lý Nông Trại
+          <Home size={15} /> Nông Trại
           <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleFarms.length} Trang trại
+            {visibleFarms.length}
           </span>
         </button>
 
         <button
-          onClick={() => {
-            setActiveTab("messages");
-            router.push("/dashboard/farmer?tab=messages");
-          }}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "messages"
-              ? "border-amber-600 text-amber-950 font-extrabold bg-amber-50/60"
-              : "border-transparent text-amber-800 hover:text-amber-950 hover:bg-amber-50/40"
-          }`}
-        >
-          <MessageSquare size={16} className="text-amber-600" />
-          <span>Hộp Thư & Khiếu Nại</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("batches")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          onClick={() => selectCoreTab("batches")}
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "batches"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Package size={16} /> Quản Lý Lô Thu Hoạch
+          <Package size={15} /> Lô Thu Hoạch
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleBatches.length} Lô
+            {visibleBatches.length}
           </span>
         </button>
 
         <button
-          onClick={() => setActiveTab("logs")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          onClick={() => selectCoreTab("logs")}
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "logs"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <FileText size={16} /> Sổ Nhật Ký Canh Tác
+          <FileText size={15} /> Nhật Ký Canh Tác
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleLogs.length} Ghi chép
+            {visibleLogs.length}
           </span>
         </button>
 
         <button
-          onClick={() => setActiveTab("products")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          onClick={() => selectCoreTab("products")}
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "products"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Sprout size={16} /> Quản Lý Sản Phẩm (Xoài, Sầu riêng...)
+          <Sprout size={15} /> Sản Phẩm
           <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
-            {visibleProducts.length} Loại
+            {visibleProducts.length}
           </span>
         </button>
 
         <button
-          onClick={() => setActiveTab("certs")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          onClick={() => selectCoreTab("certs")}
+          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "certs"
               ? "border-emerald-600 text-emerald-800 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-900"
           }`}
         >
-          <Award size={16} /> Chứng Nhận & Cảnh Báo
-          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full mr-1">
+          <Award size={15} /> Chứng Nhận
+          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
             {visibleCerts.length}
           </span>
           {visibleCerts.some((c) => c.status === "EXPIRED") ? (
-            <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
-              ⛔ Có chứng chỉ hết hạn
+            <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+              Hết hạn
             </span>
           ) : visibleCerts.some((c) => c.status === "EXPIRING_SOON") ? (
-            <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
-              ⚠️ Sắp hết hạn
+            <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+              Sắp hết hạn
             </span>
           ) : null}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("reviews")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "reviews"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
-          }`}
-        >
-          <Star size={16} className={activeTab === "reviews" ? "fill-amber-400 text-amber-500" : "text-gray-400"} />
-          <span>Đánh Giá Khách Hàng ({farmerReviews.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("seasons")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "seasons"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
-          }`}
-        >
-          <CalendarRange size={16} /> Mùa Vụ Canh Tác
-          <span className="bg-sky-100 text-sky-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-            4 Trạng thái
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("forecast")}
-          className={`pb-3 px-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "forecast"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
-          }`}
-        >
-          <TrendingUp size={16} /> AI Dự Báo Nhu Cầu
-          <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-            7-30 Ngày
-          </span>
         </button>
       </div>
 
@@ -3344,7 +3337,10 @@ function FarmerPortalContent() {
             </span>
             <button
               type="button"
-              onClick={() => setSelectedLogFarm("ALL")}
+              onClick={() => {
+                setSelectedLogFarm("ALL");
+                setSelectedLogBatch("ALL");
+              }}
               className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedLogFarm === "ALL"
                   ? "bg-emerald-700 text-white shadow-xs"
@@ -3372,7 +3368,10 @@ function FarmerPortalContent() {
                 <button
                   key={farm.id}
                   type="button"
-                  onClick={() => setSelectedLogFarm(farm.code)}
+                  onClick={() => {
+                    setSelectedLogFarm(farm.code);
+                    setSelectedLogBatch("ALL");
+                  }}
                   className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
                     active
                       ? "bg-emerald-700 text-white shadow-xs"
@@ -3393,122 +3392,280 @@ function FarmerPortalContent() {
             })}
           </div>
 
-          {/* Danh sách Thẻ Ghi Chép Nhật Ký */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
-            {displayedLogs.length === 0 ? (
-              <div className="text-center py-10 text-gray-400 text-xs">
-                Chưa có ghi chép nhật ký nào cho nông trại này. Hãy bấm <strong>&quot;Thêm Ghi Chép Mới&quot;</strong> để ghi nhận!
-              </div>
-            ) : (
-              displayedLogs.map((log) => {
-                const logFarmCode = log.farmCode || batches.find((b) => b.code === log.batchCode)?.farmCode;
-                const logFarm = farms.find((f) => f.code === logFarmCode);
-                const logBatch = batches.find((b) => b.code === log.batchCode);
+          {/* Tổng hợp & Chốt Nhật Ký Theo Từng Cây / Lô */}
+          {(() => {
+            const groupedMap = new Map<
+              string,
+              {
+                batchCode: string;
+                cropName: string;
+                farmCode: string;
+                farmName: string;
+                logs: FarmingLogItem[];
+              }
+            >();
 
-                return (
-                  <div
-                    key={log.id}
-                    className="flex flex-col sm:flex-row items-start gap-4 p-4 rounded-xl border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/20 transition-all bg-white"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
-                      {log.stage === "Gieo hạt" && "🌱"}
-                      {log.stage === "Bón phân" && "🍂"}
-                      {log.stage === "Tưới tiêu" && "💧"}
-                      {log.stage === "Phun sinh học" && "🛡️"}
-                      {log.stage === "Thu hoạch" && "🧺"}
-                    </div>
+            for (const log of displayedLogs) {
+              const matchedBatch = visibleBatches.find((b) => b.code === log.batchCode);
+              const fCode = log.farmCode || matchedBatch?.farmCode || "Chung";
+              const matchedFarm = visibleFarms.find((f) => f.code === fCode);
+              const groupKey = log.batchCode || `MISC-${fCode}`;
+              const existing = groupedMap.get(groupKey);
+              if (existing) {
+                existing.logs.push(log);
+              } else {
+                groupedMap.set(groupKey, {
+                  batchCode: groupKey,
+                  cropName: matchedBatch?.product || `Lô ${groupKey}`,
+                  farmCode: fCode,
+                  farmName: matchedFarm ? matchedFarm.name : `Nông trại ${fCode}`,
+                  logs: [log],
+                });
+              }
+            }
 
-                    <div className="flex-1 text-xs w-full">
-                      {/* Tiêu đề & Badges xác định rõ Nông trại + Lô + Giai đoạn + Ngày */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-gray-100">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {/* Nông Trại sở hữu */}
-                          <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                            <Home size={11} className="text-emerald-700" />
-                            {logFarm ? logFarm.name : `Nông trại: ${logFarmCode || "Chung"}`}
+            const allGroups = Array.from(groupedMap.values()).map((group) => {
+              const sortedLogs = [...group.logs].sort((a, b) => {
+                const da = parseVnOrIsoDate(a.date)?.getTime() ?? 0;
+                const db = parseVnOrIsoDate(b.date)?.getTime() ?? 0;
+                if (da !== db) return da - db;
+                return a.id.localeCompare(b.id);
+              });
+              const hasHarvested = sortedLogs.some(
+                (l) => normalizeLogStageMeta(l.stage).label === "Thu hoạch"
+              );
+              return { ...group, logs: sortedLogs, hasHarvested };
+            });
+
+            const filteredGroups =
+              selectedLogBatch === "ALL"
+                ? allGroups
+                : allGroups.filter((g) => g.batchCode === selectedLogBatch);
+
+            return (
+              <div className="space-y-4">
+                {allGroups.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-gray-500 font-semibold shrink-0 mr-1 flex items-center gap-1">
+                      <Sprout size={13} className="text-emerald-700" /> Chốt theo Cây / Lô:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLogBatch("ALL")}
+                      className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                        selectedLogBatch === "ALL"
+                          ? "bg-emerald-900 text-white shadow-xs"
+                          : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span>Tất cả cây ({allGroups.length} lô)</span>
+                    </button>
+                    {allGroups.map((g) => {
+                      const active = selectedLogBatch === g.batchCode;
+                      return (
+                        <button
+                          key={g.batchCode}
+                          type="button"
+                          onClick={() => setSelectedLogBatch(g.batchCode)}
+                          className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                            active
+                              ? "bg-emerald-900 text-white shadow-xs"
+                              : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                          }`}
+                        >
+                          <Sprout size={12} className={active ? "text-emerald-300" : "text-emerald-600"} />
+                          <span>{g.cropName}</span>
+                          <span
+                            className={`font-mono text-[10px] px-1.5 py-0.2 rounded ${
+                              active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {g.batchCode} ({g.logs.length})
                           </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                          {/* Lô Thu Hoạch & Tên Nông Sản */}
-                          <span className="font-mono font-bold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                            <Package size={11} className="text-gray-500" />
-                            Lô {log.batchCode} {logBatch ? `(${logBatch.product})` : ""}
-                          </span>
+                {filteredGroups.length === 0 ? (
+                  <div className="bg-white p-10 rounded-2xl border border-gray-200 shadow-xs text-center text-gray-400 text-xs">
+                    Chưa có ghi chép nhật ký nào cho lựa chọn này. Hãy bấm{" "}
+                    <strong>&quot;Thêm Ghi Chép Mới&quot;</strong> để ghi nhận!
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredGroups.map((group) => (
+                      <div
+                        key={group.batchCode}
+                        className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden"
+                      >
+                        {/* Header Chốt Sổ Cho Từng Cây / Lô */}
+                        <div className="bg-emerald-50/70 border-b border-emerald-100 px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-extrabold text-sm text-gray-900 flex items-center gap-1.5">
+                                <Sprout size={16} className="text-emerald-700 shrink-0" />
+                                {group.cropName}
+                              </h4>
+                              <span className="font-mono text-[11px] font-bold bg-white text-gray-700 border border-gray-200 px-2 py-0.5 rounded-md">
+                                Lô: {group.batchCode}
+                              </span>
+                              <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                <Home size={11} /> {group.farmName}
+                              </span>
+                              {group.hasHarvested ? (
+                                <span className="text-[11px] font-bold bg-emerald-700 text-white px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                  <CheckCircle2 size={11} /> Đã chốt thu hoạch ({group.logs.length} ghi chép)
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                  <Clock size={11} /> Đang chăm sóc ({group.logs.length} ghi chép)
+                                </span>
+                              )}
+                            </div>
 
-                          {/* Giai đoạn */}
-                          <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md font-semibold text-[10px]">
-                            {log.stage}
-                          </span>
-                        </div>
+                            {/* Chuỗi Tóm Tắt: Cây Này Đã Làm Những Gì */}
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                              <span className="font-bold text-gray-600 mr-1">Đã thực hiện:</span>
+                              {group.logs.map((stepLog, idx) => {
+                                const stepMeta = normalizeLogStageMeta(stepLog.stage);
+                                return (
+                                  <span key={stepLog.id} className="inline-flex items-center gap-1">
+                                    <span
+                                      className={`border px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1 ${stepMeta.badgeClass}`}
+                                    >
+                                      <span>{stepMeta.label}</span>
+                                      <span className="opacity-75 font-medium">({stepLog.date})</span>
+                                    </span>
+                                    {idx < group.logs.length - 1 && (
+                                      <span className="text-gray-400 font-bold">→</span>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 flex items-center gap-1 text-[11px] font-medium">
-                            <Clock size={12} /> {log.date}
-                          </span>
                           <button
                             type="button"
-                            onClick={() => handleDeleteLog(log.id, log.action)}
-                            className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
-                            title="Xóa ghi chép"
+                            onClick={() => openCreateLogModal(group.farmCode, group.batchCode)}
+                            className="px-3 py-1.5 bg-white hover:bg-emerald-700 text-emerald-800 hover:text-white border border-emerald-300 font-bold text-xs rounded-xl inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 self-start lg:self-center shadow-2xs"
                           >
-                            <Trash2 size={13} />
+                            <Plus size={14} /> Thêm ghi chép cho cây này
                           </button>
                         </div>
-                      </div>
 
-                      {/* Tên hành động canh tác */}
-                      <div className="mt-2.5">
-                        <h4 className="font-bold text-gray-900 text-sm">{log.action}</h4>
-                      </div>
+                        {/* Danh sách Ghi Chép Của Cây / Lô */}
+                        <div className="p-4 space-y-3">
+                          {group.logs.map((log) => {
+                            const stageMeta = normalizeLogStageMeta(log.stage);
+                            const StageIcon =
+                              stageMeta.label === "Gieo hạt"
+                                ? Sprout
+                                : stageMeta.label === "Bón phân"
+                                ? Leaf
+                                : stageMeta.label === "Tưới nước"
+                                ? Sparkles
+                                : stageMeta.label === "Phun sinh học"
+                                ? ShieldCheck
+                                : stageMeta.label === "Kiểm tra chất lượng"
+                                ? FileCheck
+                                : stageMeta.label === "Thu hoạch"
+                                ? Package
+                                : FileText;
+                            return (
+                              <div
+                                key={log.id}
+                                className="flex flex-col sm:flex-row items-start gap-3.5 p-3.5 rounded-xl border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/20 transition-all bg-white"
+                              >
+                                <div
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${stageMeta.iconBg}`}
+                                  title={stageMeta.label}
+                                >
+                                  <StageIcon size={16} />
+                                </div>
 
-                      {/* Chi tiết Vật tư & Ghi chú */}
-                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {log.materialsUsed && (
-                          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                            <span className="text-gray-400 block font-semibold text-[10px] uppercase">
-                              Vật tư / Chế phẩm sử dụng:
-                            </span>
-                            <span className="text-gray-700 font-medium">{log.materialsUsed}</span>
-                          </div>
-                        )}
-                        {log.notes && (
-                          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                            <span className="text-gray-400 block font-semibold text-[10px] uppercase">
-                              Ghi chú canh tác:
-                            </span>
-                            <span className="text-gray-600 italic">{log.notes}</span>
-                          </div>
-                        )}
-                      </div>
+                                <div className="flex-1 text-xs w-full">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-gray-100">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span
+                                        className={`border px-2 py-0.5 rounded-md font-bold text-[10px] ${stageMeta.badgeClass}`}
+                                      >
+                                        {stageMeta.label}
+                                      </span>
+                                      <span className="text-gray-500 flex items-center gap-1 text-[11px] font-semibold">
+                                        <Clock size={12} className="text-gray-400" /> {log.date}
+                                      </span>
+                                    </div>
 
-                      {/* Ảnh minh chứng thực tế */}
-                      {log.proofImage && (
-                        <div className="mt-2.5 flex items-center gap-3 bg-emerald-50/60 border border-emerald-200/80 p-2 rounded-xl">
-                          <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-emerald-200 shrink-0 bg-white">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={log.proofImage}
-                              alt="Ảnh minh chứng canh tác"
-                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
-                              onClick={() => window.open(log.proofImage, "_blank")}
-                              title="Bấm để xem ảnh kích thước lớn"
-                            />
-                          </div>
-                          <div className="text-xs">
-                            <span className="font-bold text-emerald-900 flex items-center gap-1 text-[11px]">
-                              📸 Ảnh minh chứng thực tế tại vườn
-                            </span>
-                            <p className="text-[10px] text-gray-500 mt-0.5">
-                              Đã lưu ảnh bằng chứng canh tác chuẩn VietGAP. Bấm vào ảnh để mở ảnh gốc.
-                            </p>
-                          </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteLog(log.id, log.action)}
+                                      className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
+                                      title="Xóa ghi chép"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+
+                                  <div className="mt-2">
+                                    <h5 className="font-bold text-gray-900 text-[13px]">{log.action}</h5>
+                                  </div>
+
+                                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                    {log.materialsUsed && (
+                                      <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                                        <span className="text-gray-400 block font-semibold text-[10px] uppercase">
+                                          Vật tư / Chế phẩm sử dụng:
+                                        </span>
+                                        <span className="text-gray-700 font-medium">{log.materialsUsed}</span>
+                                      </div>
+                                    )}
+                                    {log.notes && (
+                                      <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                                        <span className="text-gray-400 block font-semibold text-[10px] uppercase">
+                                          Ghi chú canh tác:
+                                        </span>
+                                        <span className="text-gray-600 italic">{log.notes}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {log.proofImage && (
+                                    <div className="mt-2.5 flex items-center gap-3 bg-emerald-50/60 border border-emerald-200/80 p-2 rounded-xl">
+                                      <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-emerald-200 shrink-0 bg-white">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                          src={log.proofImage}
+                                          alt="Ảnh minh chứng canh tác"
+                                          className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                                          onClick={() => window.open(log.proofImage, "_blank")}
+                                          title="Bấm để xem ảnh kích thước lớn"
+                                        />
+                                      </div>
+                                      <div className="text-xs">
+                                        <span className="font-bold text-emerald-900 flex items-center gap-1 text-[11px]">
+                                          Ảnh minh chứng thực tế tại vườn
+                                        </span>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">
+                                          Đã lưu ảnh bằng chứng canh tác chuẩn VietGAP. Bấm vào ảnh để mở ảnh gốc.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                );
-              })
-            )}
-          </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
