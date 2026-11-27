@@ -49,6 +49,12 @@ import jsQR from "jsqr";
 import { catalogService, ApiTraceability } from "@/services/catalog.service";
 import { farmerService, ApiHarvestLot, ApiFarmingLog } from "@/services/farmer.service";
 import { QrLabelModal, QrLabelLot } from "@/components/farmer/qr-label-modal";
+import {
+  buildRealQrImageUrl,
+  buildScannableQrLandingUrl,
+  extractBatchCodeFromQrPayload,
+  fetchServerLanIp,
+} from "@/lib/qr-url";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/utils/cn";
@@ -1089,6 +1095,18 @@ export default function TraceabilityPage() {
 
   // In tem QR chuẩn GS1 (Mục 1)
   const [isPrintQrOpen, setIsPrintQrOpen] = useState(false);
+  const [lanIp, setLanIp] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncUrl = () => {
+      fetchServerLanIp().then((ip) => {
+        if (ip) setLanIp(ip);
+      });
+    };
+    syncUrl();
+    const timer = setInterval(syncUrl, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Tải danh sách lô từ backend khi khởi động
   useEffect(() => {
@@ -1178,15 +1196,7 @@ export default function TraceabilityPage() {
 
   // Clean parsed batch code
   function cleanParsedCode(raw: string) {
-    let clean = raw.trim();
-    if (clean.startsWith("AGRITRACE-")) {
-      clean = clean.replace("AGRITRACE-", "");
-    } else if (clean.includes("batch=")) {
-      clean = clean.split("batch=")[1].split("&")[0];
-    } else if (clean.includes("lot=")) {
-      clean = clean.split("lot=")[1].split("&")[0];
-    }
-    return clean;
+    return extractBatchCodeFromQrPayload(raw);
   }
 
   // Camera Stream Handler
@@ -1336,11 +1346,43 @@ export default function TraceabilityPage() {
         b.code.toUpperCase() === cleanParsedCode(searchedBatch).toUpperCase()
     ) || null;
 
-  const currentData: TraceabilityData = resolveTraceabilityData(
-    searchedBatch,
-    liveRecord,
-    matchingFarmerBatch
-  );
+  const currentData: TraceabilityData = useMemo(() => {
+    const base = resolveTraceabilityData(searchedBatch, liveRecord, matchingFarmerBatch);
+    const snapshot = {
+      code: base.batchCode,
+      name: base.productName,
+      farm: base.farm.name,
+      location: base.farm.location,
+      harvestDate: base.farm.harvestDate,
+      expiryDate: base.warehouse.expiryDate,
+      cert: base.farm.cert,
+      qty: matchingFarmerBatch?.qty || "500",
+      unit: matchingFarmerBatch?.unit || "kg",
+      temp: base.warehouse.storageTemp,
+    };
+    return {
+      ...base,
+      qrImage: buildRealQrImageUrl(snapshot, 240, lanIp),
+    };
+  }, [searchedBatch, liveRecord, matchingFarmerBatch, lanIp]);
+
+  const scannableProductPageUrl = useMemo(() => {
+    return buildScannableQrLandingUrl(
+      {
+        code: currentData.batchCode,
+        name: currentData.productName,
+        farm: currentData.farm.name,
+        location: currentData.farm.location,
+        harvestDate: currentData.farm.harvestDate,
+        expiryDate: currentData.warehouse.expiryDate,
+        cert: currentData.farm.cert,
+        qty: matchingFarmerBatch?.qty || "500",
+        unit: matchingFarmerBatch?.unit || "kg",
+        temp: currentData.warehouse.storageTemp,
+      },
+      lanIp
+    );
+  }, [currentData, matchingFarmerBatch, lanIp]);
 
   // Lọc nhật ký canh tác theo mã lô hiện tại
   const cleanBatchUpper = cleanParsedCode(searchedBatch).toUpperCase();
@@ -1493,25 +1535,28 @@ export default function TraceabilityPage() {
   }, [currentData, matchingFarmerBatch]);
 
   return (
-    <div className="bg-[#f8faf8] min-h-screen py-8">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-6">
         {/* ── Breadcrumb ── */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700 transition-colors">
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534] transition-colors">
             Trang chủ
           </Link>
           <span>/</span>
-          <span className="font-semibold text-gray-800">Truy xuất nguồn gốc QR</span>
+          <span className="font-semibold text-[#16261E]">Truy xuất nguồn gốc QR</span>
         </div>
 
         {/* ── Page Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-[#E4DFD5]">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2.5">
-              <QrCode className="text-emerald-700" size={28} />
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#166534] block mb-1">
+              GS1 DIGITAL LOT PASSPORT · ISO/IEC 17025
+            </span>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] tracking-tight flex items-center gap-2.5">
+              <QrCode className="text-[#166534]" size={26} />
               <span>Truy Xuất Nguồn Gốc Lô Nông Sản</span>
             </h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            <p className="text-xs sm:text-sm text-stone-600 mt-1">
               Quét mã QR trên tem bao bì hoặc nhập mã lô để tra cứu toàn diện nhật ký canh tác, kiểm định VietGAP và hành trình xe lạnh.
             </p>
           </div>
@@ -1520,9 +1565,9 @@ export default function TraceabilityPage() {
             {(isFarmer || isAdmin) && (
               <Link
                 href="/dashboard/farmer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold text-xs transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 text-[#166534] border border-emerald-200 hover:bg-emerald-100 font-bold text-xs transition-colors shadow-2xs"
               >
-                <Leaf size={14} className="text-emerald-700" />
+                <Leaf size={14} className="text-[#166534]" />
                 <span>Tạo Lô Thu Hoạch (Nông Dân)</span>
               </Link>
             )}
@@ -1538,9 +1583,9 @@ export default function TraceabilityPage() {
             {(isDistributor || isAdmin) && (
               <Link
                 href="/dashboard/distributor/receive"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 font-bold text-xs transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-[#A3630A] border border-amber-200 hover:bg-amber-100 font-bold text-xs transition-colors shadow-2xs"
               >
-                <Truck size={14} className="text-amber-700" />
+                <Truck size={14} className="text-[#A3630A]" />
                 <span>Tiếp Nhận Vận Chuyển</span>
               </Link>
             )}
@@ -1548,11 +1593,11 @@ export default function TraceabilityPage() {
         </div>
 
         {/* ── Search & Scan Actions Bar ── */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-gray-200/90 space-y-4">
+        <div className="bento-card p-5 sm:p-6 space-y-4">
           <div className="flex flex-col lg:flex-row gap-3">
             {/* Input by code */}
             <div className="relative flex-1">
-              <QrCode size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-700" />
+              <QrCode size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#166534]" />
               <input
                 type="text"
                 value={batchCode}
@@ -1561,14 +1606,14 @@ export default function TraceabilityPage() {
                   if (e.key === "Enter") setSearchedBatch(batchCode);
                 }}
                 placeholder="Nhập mã lô nông sản (Ví dụ: XL-2026-08, DT-MC-2026-11, SP-KL-05, XC-2026-02)..."
-                className="w-full pl-10 pr-4 h-11 text-sm rounded-xl border border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/10 font-medium"
+                className="w-full pl-10 pr-4 h-11 text-sm rounded-xl border border-[#E4DFD5] bg-[#FBF9F5] focus:bg-white focus:outline-none focus:border-[#166534] focus:ring-2 focus:ring-[#166534]/15 font-mono font-bold text-[#16261E]"
               />
             </div>
 
             {/* Tra Cứu button */}
             <button
               onClick={() => setSearchedBatch(batchCode)}
-              className="px-6 h-11 bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors shrink-0 cursor-pointer"
+              className="px-6 h-11 bg-[#166534] hover:bg-[#14532D] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors shrink-0 cursor-pointer"
             >
               <Search size={16} />
               <span>Tra Cứu Lô Hàng</span>
@@ -1577,18 +1622,18 @@ export default function TraceabilityPage() {
             {/* Nút 1: Mở Camera Quét Mã QR */}
             <button
               onClick={startCameraScanner}
-              className="px-5 h-11 bg-emerald-950 hover:bg-black text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors shrink-0 cursor-pointer"
+              className="px-5 h-11 bg-[#16261E] hover:bg-stone-900 text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors shrink-0 cursor-pointer"
             >
-              <Camera size={16} className="text-emerald-400" />
+              <Camera size={16} className="text-amber-300" />
               <span>Mở Camera Quét Mã QR</span>
             </button>
 
             {/* Nút 2: Tải Ảnh Tem QR Lên */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-5 h-11 bg-white border border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 text-gray-700 text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shrink-0 cursor-pointer"
+              className="px-5 h-11 bg-white border border-[#E4DFD5] hover:border-[#166534] hover:bg-[#F3EFE6] text-[#16261E] text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shrink-0 cursor-pointer"
             >
-              <Upload size={16} className="text-emerald-700" />
+              <Upload size={16} className="text-[#166534]" />
               <span>Tải Ảnh Tem QR</span>
             </button>
 
@@ -1603,9 +1648,9 @@ export default function TraceabilityPage() {
           </div>
 
           {/* Quick Selection Pills (Lô Nông Sản Thu Hoạch Đang Hoạt Động Trong CSDL) */}
-          <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-gray-500 font-medium flex items-center gap-1">
-              <Calendar size={13} className="text-emerald-600" />
+          <div className="pt-3 border-t border-[#F0ECE1] flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-stone-500 font-medium flex items-center gap-1">
+              <Calendar size={13} className="text-[#166534]" />
               Lô nông sản có tem QR sẵn sàng:
             </span>
 
@@ -1619,21 +1664,21 @@ export default function TraceabilityPage() {
                 className={cn(
                   "px-3 py-1 rounded-lg border font-mono font-bold text-xs transition-colors cursor-pointer flex items-center gap-1",
                   searchedBatch === item.code
-                    ? "bg-emerald-100 text-emerald-900 border-emerald-300 shadow-2xs"
-                    : "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200"
+                    ? "bg-[#16261E] text-amber-300 border-[#16261E] shadow-2xs"
+                    : "bg-[#F6F3EC] text-[#16261E] border-[#E4DFD5] hover:bg-[#EAE5D9]"
                 )}
               >
                 <span>{item.code}</span>
-                <span className="font-sans font-normal text-gray-500 text-[11px]">({item.name})</span>
+                <span className={cn("font-sans font-normal text-[11px]", searchedBatch === item.code ? "text-stone-300" : "text-stone-500")}>({item.name})</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* ── Main Traceability Dossier Card ── */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-200/90 overflow-hidden space-y-6">
+        <div className="bento-card overflow-hidden space-y-6">
           {/* Top Banner with Real QR Code */}
-          <div className="p-6 sm:p-8 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+          <div className="p-6 sm:p-8 bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] text-white flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
             <div className="space-y-2 z-10">
               <div className="inline-flex items-center gap-2 bg-white/15 text-emerald-200 text-xs font-semibold px-3 py-1 rounded-full backdrop-blur-xs border border-white/20">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -1663,20 +1708,39 @@ export default function TraceabilityPage() {
             </div>
 
             {/* QR Code Container with Scan Label & Print Button */}
-            <div className="bg-white p-3.5 rounded-2xl shadow-xl flex flex-col items-center shrink-0 text-gray-900 z-10 self-start md:self-auto min-w-[130px]">
-              <img src={currentData.qrImage} alt="QR Code" className="w-28 h-28 object-contain" />
-              <span className="text-[10px] font-mono font-bold mt-1 text-emerald-800 flex items-center gap-1">
-                <ShieldCheck size={11} /> Tem GS1 Hợp Lệ
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsPrintQrOpen(true)}
-                className="mt-2 w-full py-1.5 px-2 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                title="In tem nhãn QR GS1 chuẩn dán thùng hàng / bao bì"
+            <div className="bg-white p-3.5 rounded-2xl shadow-xl flex flex-col items-center shrink-0 text-gray-900 z-10 self-start md:self-auto min-w-[150px]">
+              <a
+                href={scannableProductPageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Bấm hoặc dùng điện thoại quét mã QR để mở trang HTML thông tin sản phẩm"
+                className="group relative block"
               >
-                <Printer size={12} />
-                <span>In Tem QR</span>
-              </button>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={currentData.qrImage} alt="QR Code" className="w-28 h-28 object-contain" />
+              </a>
+              <span className="text-[10px] font-mono font-bold mt-1 text-emerald-800 flex items-center gap-1">
+                <ShieldCheck size={11} /> QR Thật • Quét Được Ngay
+              </span>
+              <div className="mt-2 w-full space-y-1.5">
+                <Link
+                  href={`/qr/${encodeURIComponent(currentData.batchCode)}?name=${encodeURIComponent(currentData.productName)}&farm=${encodeURIComponent(currentData.farm.name)}&loc=${encodeURIComponent(currentData.farm.location)}&hd=${encodeURIComponent(currentData.farm.harvestDate)}&cert=${encodeURIComponent(currentData.farm.cert)}`}
+                  target="_blank"
+                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 transition-colors"
+                >
+                  <ExternalLink size={11} />
+                  <span>Mở Trang HTML QR</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsPrintQrOpen(true)}
+                  className="w-full py-1.5 px-2 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                  title="In tem nhãn QR GS1 chuẩn dán thùng hàng / bao bì"
+                >
+                  <Printer size={12} />
+                  <span>In Tem QR</span>
+                </button>
+              </div>
             </div>
           </div>
 

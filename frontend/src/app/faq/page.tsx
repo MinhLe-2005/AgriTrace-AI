@@ -443,50 +443,50 @@ export default function FAQPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 via-white to-gray-50/60 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#FBF9F5] text-[#16261E] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700 transition-colors flex items-center gap-1 font-medium">
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534] transition-colors flex items-center gap-1 font-medium">
             <ArrowLeft size={13} />
             <span>Trang chủ</span>
           </Link>
-          <ChevronRight size={12} className="text-gray-400" />
-          <Link href="/terms" className="hover:text-emerald-700 transition-colors">
+          <ChevronRight size={12} className="text-stone-400" />
+          <Link href="/terms" className="hover:text-[#166534] transition-colors">
             Hỗ Trợ & Chính Sách
           </Link>
-          <ChevronRight size={12} className="text-gray-400" />
-          <span className="text-emerald-900 font-bold">Câu Hỏi Thường Gặp (FAQ)</span>
+          <ChevronRight size={12} className="text-stone-400" />
+          <span className="text-[#16261E] font-bold">Câu Hỏi Thường Gặp (FAQ)</span>
         </div>
 
         {/* ── HERO BANNER CHUYÊN NGHIỆP ── */}
-        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-emerald-500/15 to-transparent pointer-events-none" />
+        <div className="bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] border border-[#243B2E] text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-amber-300/15 to-transparent pointer-events-none" />
           
           <div className="relative z-10 max-w-2xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold shadow-inner">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-300/30 text-amber-300 text-xs font-mono font-bold shadow-inner">
               <HelpCircle size={14} />
-              <span>Trung Tâm Trợ Giúp & Giải Đáp 24/7</span>
+              <span>TRUNG TÂM TRỢ GIÚP & GIẢI ĐÁP 24/7</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
+            <h1 className="font-serif text-2xl sm:text-4xl font-bold tracking-tight leading-tight">
               Câu Hỏi Thường Gặp (FAQ) & Hướng Dẫn Mua Hàng
             </h1>
 
-            <p className="text-emerald-200/90 text-xs sm:text-sm leading-relaxed">
+            <p className="text-emerald-100/85 text-xs sm:text-sm leading-relaxed">
               Giải đáp chi tiết về quy chuẩn kiểm định VietGAP, công nghệ quét mã QR GS1, quy trình giao nhận xe lạnh 2°C - 5°C, chính sách đổi trả 24H và thanh toán tự động payOS.
             </p>
 
             {/* Smart Search Bar */}
             <div className="pt-2">
               <div className="relative max-w-xl">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-700" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#166534]" size={18} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm kiếm: đổi trả 24h, mã VietQR, bảo quản xe lạnh, VietGAP..."
-                  className="w-full h-12 pl-11 pr-10 bg-white text-gray-900 rounded-2xl shadow-lg border-2 border-emerald-500/40 focus:border-emerald-400 focus:outline-none text-xs sm:text-sm font-medium placeholder:text-gray-400 placeholder:font-normal"
+                  className="w-full h-12 pl-11 pr-10 bg-white text-[#16261E] rounded-2xl shadow-lg border-2 border-[#E4DFD5] focus:border-amber-300 focus:outline-none text-xs sm:text-sm font-medium placeholder:text-stone-400 placeholder:font-normal"
                 />
                 {searchQuery && (
                   <button

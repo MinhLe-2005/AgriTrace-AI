@@ -7,19 +7,19 @@ export const metadata = { title: "Đăng nhập | AgriTrace" };
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex bg-neutral-50/60 antialiased font-sans">
+    <div className="min-h-screen flex bg-[#FBF9F5] text-[#16261E] antialiased font-sans">
       {/* Showcase Visual Section */}
-      <div className="hidden lg:flex lg:w-[48%] relative flex-col justify-between p-12 overflow-hidden bg-gradient-to-br from-emerald-950 via-[#0d3b24] to-[#082818] text-white">
+      <div className="hidden lg:flex lg:w-[48%] relative flex-col justify-between p-12 overflow-hidden bg-gradient-to-br from-[#16261E] via-[#1B3326] to-[#112018] text-white border-r border-[#243B2E]">
         {/* Ambient background glows */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-green-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header Tagline */}
         <div className="relative z-10 animate-fade-in-up">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-xs font-medium text-emerald-300 mb-3">
-            <Sparkles className="h-3 w-3" /> Nền tảng AgriTrace AI
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-300/30 text-xs font-mono font-bold text-amber-300 mb-3">
+            <Sparkles className="h-3 w-3" /> NỀN TẢNG AGRITRACE AI
           </span>
-          <h2 className="text-2xl font-bold tracking-tight text-white/95">
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-white/95 leading-snug">
             Kết nối nông trại, nhà kho, phân phối và khách hàng.
           </h2>
         </div>
@@ -112,23 +112,23 @@ export default function LoginPage() {
         {/* Main Form Container */}
         <div className="max-w-md mx-auto w-full my-auto animate-fade-in-up">
           {/* Tabs: Đăng nhập / Đăng ký */}
-          <div className="flex p-1 bg-gray-100/80 rounded-xl mb-6">
-            <span className="flex-1 py-2 text-center text-xs font-semibold bg-white text-emerald-800 rounded-lg shadow-sm">
+          <div className="flex p-1 bg-[#F6F3EC] border border-[#E4DFD5] rounded-xl mb-6">
+            <span className="flex-1 py-2 text-center text-xs font-semibold bg-white text-[#16261E] rounded-lg shadow-sm">
               Đăng nhập
             </span>
             <Link
               href="/register"
-              className="flex-1 py-2 text-center text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors rounded-lg"
+              className="flex-1 py-2 text-center text-xs font-semibold text-stone-500 hover:text-[#16261E] transition-colors rounded-lg"
             >
               Đăng ký tài khoản
             </Link>
           </div>
 
           <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] tracking-tight">
               Chào mừng trở lại
             </h1>
-            <p className="text-sm text-gray-500 mt-1.5">
+            <p className="text-sm text-stone-600 mt-1.5">
               Đăng nhập vào tài khoản để tiếp tục quản lý chuỗi cung ứng.
             </p>
           </div>

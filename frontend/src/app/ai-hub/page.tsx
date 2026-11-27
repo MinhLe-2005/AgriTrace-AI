@@ -92,22 +92,22 @@ export default function AiHubPage() {
   ];
 
   return (
-    <div className="bg-[#f8faf8] min-h-screen py-8">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
         {/* Page Header */}
-        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white p-6 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-xl border border-emerald-900">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg">
+        <div className="bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] text-white p-6 sm:p-8 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-xl border border-[#243B2E]">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-300/30 flex items-center justify-center text-amber-300 shadow-lg">
               <Sparkles size={26} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-extrabold tracking-tight">Trung Tâm Trí Tuệ Nhân Tạo AgriTrace</h1>
-                <span className="text-[11px] bg-emerald-500/30 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full border border-emerald-400/30">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="font-serif text-xl sm:text-2xl font-bold tracking-tight">Trung Tâm Trí Tuệ Nhân Tạo AgriTrace</h1>
+                <span className="text-[11px] font-mono bg-amber-400/15 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-300/30">
                   AI Intelligence Hub
                 </span>
               </div>
-              <p className="text-xs text-emerald-200/80 mt-0.5">
+              <p className="text-xs sm:text-sm text-emerald-100/80 mt-1">
                 Giải pháp AI hỗ trợ tự động hóa chuỗi cung ứng nông sản sạch: Trợ lý tra cứu, dự báo nhu cầu & cảnh báo rủi ro kho lạnh.
               </p>
             </div>
@@ -120,45 +120,45 @@ export default function AiHubPage() {
             onClick={() => setActiveTab("chatbot")}
             className={`p-4 rounded-2xl border text-left transition-all ${
               activeTab === "chatbot"
-                ? "bg-white border-[#1a7a3a] shadow-md ring-2 ring-emerald-500/20"
-                : "bg-white/80 border-gray-200/80 hover:bg-white text-gray-600"
+                ? "bg-white border-[#166534] shadow-md ring-2 ring-emerald-700/15"
+                : "bg-[#F6F3EC] border-[#E4DFD5] hover:bg-white text-stone-600"
             }`}
           >
-            <div className="flex items-center gap-2 text-[#1a7a3a] font-bold text-sm mb-1">
+            <div className="flex items-center gap-2 text-[#166534] font-bold text-sm mb-1">
               <Bot size={18} />
               <span>AI 1: Chatbot Tư Vấn Nguồn Gốc</span>
             </div>
-            <p className="text-xs text-gray-500">Tra cứu trực tiếp lô hàng, ngày thu hoạch & chứng nhận VietGAP</p>
+            <p className="text-xs text-stone-500">Tra cứu trực tiếp lô hàng, ngày thu hoạch & chứng nhận VietGAP</p>
           </button>
 
           <button
             onClick={() => setActiveTab("forecast")}
             className={`p-4 rounded-2xl border text-left transition-all ${
               activeTab === "forecast"
-                ? "bg-white border-[#1a7a3a] shadow-md ring-2 ring-emerald-500/20"
-                : "bg-white/80 border-gray-200/80 hover:bg-white text-gray-600"
+                ? "bg-white border-[#166534] shadow-md ring-2 ring-emerald-700/15"
+                : "bg-[#F6F3EC] border-[#E4DFD5] hover:bg-white text-stone-600"
             }`}
           >
-            <div className="flex items-center gap-2 text-blue-700 font-bold text-sm mb-1">
-              <TrendingUp size={18} />
+            <div className="flex items-center gap-2 text-[#16261E] font-bold text-sm mb-1">
+              <TrendingUp size={18} className="text-emerald-700" />
               <span>AI 2: Dự Đoán Nhu Cầu 7 Ngày</span>
             </div>
-            <p className="text-xs text-gray-500">Dự báo lượng tiêu thụ & gợi ý nhập hàng kết hợp mùa vụ</p>
+            <p className="text-xs text-stone-500">Dự báo lượng tiêu thụ & gợi ý nhập hàng kết hợp mùa vụ</p>
           </button>
 
           <button
             onClick={() => setActiveTab("risks")}
             className={`p-4 rounded-2xl border text-left transition-all ${
               activeTab === "risks"
-                ? "bg-white border-[#1a7a3a] shadow-md ring-2 ring-emerald-500/20"
-                : "bg-white/80 border-gray-200/80 hover:bg-white text-gray-600"
+                ? "bg-white border-[#166534] shadow-md ring-2 ring-emerald-700/15"
+                : "bg-[#F6F3EC] border-[#E4DFD5] hover:bg-white text-stone-600"
             }`}
           >
-            <div className="flex items-center gap-2 text-amber-700 font-bold text-sm mb-1">
+            <div className="flex items-center gap-2 text-amber-800 font-bold text-sm mb-1">
               <AlertTriangle size={18} />
               <span>AI 3: Cảnh Báo Rủi Ro Chuỗi</span>
             </div>
-            <p className="text-xs text-gray-500">Lô cận hạn, tồn kho FEFO & nguy cơ giao hàng trễ</p>
+            <p className="text-xs text-stone-500">Lô cận hạn, tồn kho FEFO & nguy cơ giao hàng trễ</p>
           </button>
         </div>
 
@@ -171,17 +171,17 @@ export default function AiHubPage() {
 
         {/* TAB 2: DEMAND FORECASTING */}
         {activeTab === "forecast" && (
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 space-y-5">
-            <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+          <div className="bento-card p-6 space-y-5">
+            <div className="border-b border-[#F0ECE1] pb-3 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                  <TrendingUp size={20} className="text-blue-700" /> Bảng Dự Đoán Nhu Cầu Tiêu Thụ Trong 7 Ngày Tới
+                <h3 className="font-serif font-bold text-base text-[#16261E] flex items-center gap-2">
+                  <TrendingUp size={20} className="text-[#166534]" /> Bảng Dự Đoán Nhu Cầu Tiêu Thụ Trong 7 Ngày Tới
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-stone-500">
                   Phân tích chuỗi thời gian dựa trên lịch sử bán hàng, xu hướng mùa vụ và sự kiện khuyến mãi
                 </p>
               </div>
-              <span className="text-xs bg-blue-100 text-blue-800 font-semibold px-2.5 py-1 rounded-full">
+              <span className="text-xs font-mono bg-[#F6F3EC] text-[#16261E] border border-[#E4DFD5] font-semibold px-2.5 py-1 rounded-full">
                 7-Day ML Forecast
               </span>
             </div>
@@ -189,7 +189,7 @@ export default function AiHubPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-gray-200 text-gray-400 uppercase text-[11px] font-bold">
+                  <tr className="border-b border-[#E4DFD5] text-stone-500 uppercase text-[11px] font-mono font-bold">
                     <th className="py-2.5 px-3">Tên Nông Sản</th>
                     <th className="py-2.5 px-3">Tồn Kho Hiện Tại</th>
                     <th className="py-2.5 px-3">Dự Báo Cần (7 ngày)</th>
@@ -197,14 +197,14 @@ export default function AiHubPage() {
                     <th className="py-2.5 px-3">Gợi Ý Hành Động (AI Recommendation)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[#F0ECE1]">
                   {forecastData.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50/80">
-                      <td className="py-3 px-3 font-bold text-gray-900">{row.name}</td>
-                      <td className="py-3 px-3 text-gray-700">{row.currentStock}</td>
-                      <td className="py-3 px-3 font-bold text-[#1a7a3a]">{row.forecast7d}</td>
-                      <td className="py-3 px-3 font-semibold text-blue-700">{row.trend}</td>
-                      <td className="py-3 px-3 text-gray-600">{row.action}</td>
+                    <tr key={idx} className="hover:bg-[#FBF9F5]">
+                      <td className="py-3 px-3 font-bold text-[#16261E]">{row.name}</td>
+                      <td className="py-3 px-3 font-mono text-stone-700">{row.currentStock}</td>
+                      <td className="py-3 px-3 font-mono font-bold text-[#166534]">{row.forecast7d}</td>
+                      <td className="py-3 px-3 font-semibold text-amber-800">{row.trend}</td>
+                      <td className="py-3 px-3 text-stone-600">{row.action}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -215,17 +215,17 @@ export default function AiHubPage() {
 
         {/* TAB 3: RISK ALERTS */}
         {activeTab === "risks" && (
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 space-y-4">
-            <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+          <div className="bento-card p-6 space-y-4">
+            <div className="border-b border-[#F0ECE1] pb-3 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                  <AlertTriangle size={20} className="text-amber-600" /> Hệ Thống Cảnh Báo Rủi Ro Chuỗi Cung Ứng
+                <h3 className="font-serif font-bold text-base text-[#16261E] flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-amber-700" /> Hệ Thống Cảnh Báo Rủi Ro Chuỗi Cung Ứng
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-stone-500">
                   Tự động phát hiện nông sản sắp cận hạn, hàng tồn kho lệch chuẩn và cảnh báo nhiệt độ xe lạnh
                 </p>
               </div>
-              <span className="text-xs bg-red-100 text-red-800 font-semibold px-2.5 py-1 rounded-full">
+              <span className="text-xs font-mono bg-red-50 text-red-800 border border-red-200 font-semibold px-2.5 py-1 rounded-full">
                 Real-time Rule Engine
               </span>
             </div>
@@ -234,7 +234,7 @@ export default function AiHubPage() {
               {riskAlerts.map((alert, idx) => (
                 <div
                   key={idx}
-                  className="p-4 rounded-2xl border border-gray-200/90 bg-gray-50/50 space-y-2 hover:shadow-sm transition-all"
+                  className="p-4 rounded-2xl border border-[#E4DFD5] bg-[#FBF9F5] space-y-2 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-center justify-between">
                     <span

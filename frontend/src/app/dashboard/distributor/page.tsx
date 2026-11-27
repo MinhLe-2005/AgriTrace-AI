@@ -77,21 +77,21 @@ export default function DistributorPortalPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-900 bg-amber-950 p-5 text-white shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-800 text-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#243B2E] bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] p-6 text-white shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/20 border border-amber-300/30 text-amber-300">
             <Truck size={22} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-serif text-lg sm:text-xl font-bold">
                 Cổng Nhà Phân Phối & Vận Chuyển (Distributor)
               </h1>
-              <span className="rounded-full border border-amber-400/30 bg-amber-500/30 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
+              <span className="rounded-full border border-amber-300/30 bg-amber-400/15 px-2.5 py-0.5 text-[11px] font-mono font-bold text-amber-300">
                 Logistics & Chuỗi Lạnh IoT
               </span>
             </div>
-            <p className="text-xs text-amber-200/80">
+            <p className="text-xs text-emerald-100/80 mt-0.5">
               Điều phối xe thùng lạnh, giám sát cảm biến nhiệt độ hành trình và
               quét mã QR bàn giao lô hàng
             </p>
@@ -100,7 +100,7 @@ export default function DistributorPortalPage() {
         <Link
           href="/dashboard/distributor/receive"
           onClick={() => toast.success("Mở màn hình quét QR tiếp nhận hàng...")}
-          className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-bold text-amber-950 shadow-sm transition-all hover:bg-amber-400"
+          className="flex items-center gap-1.5 rounded-xl bg-amber-300 px-4 py-2.5 text-xs font-bold text-[#16261E] shadow-sm transition-all hover:bg-amber-200"
         >
           <QrCode size={15} /> Quét QR Bàn Giao Hàng
         </Link>
@@ -109,104 +109,104 @@ export default function DistributorPortalPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Link
           href="/dashboard/distributor/orders"
-          className="shadow-xs rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:border-amber-200 hover:shadow-sm"
+          className="bento-card p-4 transition-all hover:border-[#166534]"
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wide text-stone-500">
                 Đơn chờ điều phối
               </p>
-              <p className="mt-1 text-2xl font-extrabold text-gray-900">
+              <p className="mt-1 text-2xl font-mono font-extrabold text-[#16261E]">
                 {dashboardStats.pendingDeliveryOrders ?? 0}
               </p>
-              <p className="mt-1 text-[11px] text-gray-500">
+              <p className="mt-1 text-[11px] text-stone-500">
                 Dữ liệu từ hệ thống đơn hàng
               </p>
             </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-amber-700">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-800">
               <ClipboardList size={18} />
             </span>
           </div>
         </Link>
         <Link
           href="/dashboard/distributor/shipments"
-          className="shadow-xs rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:border-amber-200 hover:shadow-sm"
+          className="bento-card p-4 transition-all hover:border-[#166534]"
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wide text-stone-500">
                 Đang vận chuyển
               </p>
-              <p className="mt-1 text-2xl font-extrabold text-gray-900">
+              <p className="mt-1 text-2xl font-mono font-extrabold text-[#16261E]">
                 {dashboardStats.activeShipments}
               </p>
-              <p className="mt-1 text-[11px] text-gray-500">
+              <p className="mt-1 text-[11px] text-stone-500">
                 Xe lạnh đang trên lộ trình
               </p>
             </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-700">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E4DFD5] bg-[#F6F3EC] text-[#16261E]">
               <Truck size={18} />
             </span>
           </div>
         </Link>
         <Link
           href="/dashboard/distributor/history"
-          className="shadow-xs rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:border-amber-200 hover:shadow-sm"
+          className="bento-card p-4 transition-all hover:border-[#166534]"
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wide text-stone-500">
                 Đã giao hôm nay
               </p>
-              <p className="mt-1 text-2xl font-extrabold text-gray-900">
+              <p className="mt-1 text-2xl font-mono font-extrabold text-[#166534]">
                 {dashboardStats.deliveredToday}
               </p>
-              <p className="mt-1 text-[11px] text-gray-500">
+              <p className="mt-1 text-[11px] text-stone-500">
                 Xem lịch sử vận chuyển
               </p>
             </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-[#166534]">
               <CheckCircle2 size={18} />
             </span>
           </div>
         </Link>
         <Link
           href="/dashboard/distributor/receive"
-          className="shadow-xs rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:border-amber-200 hover:shadow-sm"
+          className="bento-card p-4 transition-all hover:border-[#166534]"
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wide text-stone-500">
                 Tiếp nhận QR
               </p>
-              <p className="mt-1 text-2xl font-extrabold text-gray-900">
+              <p className="mt-1 text-2xl font-mono font-extrabold text-[#16261E]">
                 {dashboardStats.pendingReceipts}
               </p>
-              <p className="mt-1 text-[11px] text-gray-500">
+              <p className="mt-1 text-[11px] text-stone-500">
                 Chuyến chờ xác nhận
               </p>
             </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-100 bg-violet-50 text-violet-700">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E4DFD5] bg-[#F6F3EC] text-[#16261E]">
               <PackageCheck size={18} />
             </span>
           </div>
         </Link>
       </div>
 
-      <div className="shadow-xs overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-4">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-            <Truck size={18} className="text-amber-700" /> Lộ Trình & Đơn Vận
+      <div className="bento-card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F0ECE1] p-4 bg-[#FBF9F5]">
+          <h3 className="font-serif flex items-center gap-2 text-sm font-bold text-[#16261E]">
+            <Truck size={18} className="text-[#166534]" /> Lộ Trình & Đơn Vận
             Chuyển Đang Xử Lý
           </h3>
-          <span className="text-xs font-semibold text-emerald-700">
+          <span className="text-xs font-mono font-semibold text-[#166534]">
             ● Đồng bộ trực tiếp
             {lastSyncedAt
               ? ` · ${lastSyncedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
               : ""}
           </span>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-[#F0ECE1]">
           {activeShipments.map((shipment) => (
             <div
               key={shipment.shipmentCode}

@@ -90,9 +90,11 @@ export const orderChatService = {
     }
   },
 
-  async markAsRead(orderCode: string): Promise<void> {
+  async markAsRead(orderCode: string, readerRole?: "CUSTOMER" | "FARMER" | "ADMIN"): Promise<void> {
     try {
-      await api.patch(`/orders/${encodeURIComponent(orderCode)}/messages/read`);
+      await api.patch(`/orders/${encodeURIComponent(orderCode)}/messages/read`, null, {
+        params: readerRole ? { readerRole } : undefined,
+      });
     } catch {
       // ignore
     }

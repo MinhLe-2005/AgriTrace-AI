@@ -73,31 +73,31 @@ function OrdersLookupContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8faf8] py-10 px-4 sm:px-6">
+    <div className="min-h-screen bg-[#FBF9F5] text-[#16261E] py-10 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700">Trang chủ</Link>
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534]">Trang chủ</Link>
           <span>/</span>
-          <span className="font-semibold text-gray-800">Tra cứu đơn hàng</span>
+          <span className="font-semibold text-[#16261E]">Tra cứu đơn hàng</span>
         </div>
 
         {/* Header */}
         <div className="text-center space-y-2 max-w-xl mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F3EFE6] text-[#166534] font-mono text-[11px] font-bold border border-[#E4DFD5]">
             <Truck size={13} />
-            <span>Hệ thống giám sát chuỗi lạnh 24/7</span>
+            <span>HỆ THỐNG GIÁM SÁT CHUỖI LẠNH 24/7</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] tracking-tight">
             Tra Cứu Đơn Hàng & Chuỗi Lạnh
           </h1>
-          <p className="text-xs sm:text-sm text-gray-500">
-            Nhập mã đơn hàng (ví dụ: <strong className="text-gray-700">AGRI-8790</strong>) kèm số điện thoại người nhận để theo dõi tiến độ thu hái, kiểm định và vận chuyển xe lạnh.
+          <p className="text-xs sm:text-sm text-stone-600">
+            Nhập mã đơn hàng (ví dụ: <strong className="font-mono text-[#16261E]">AGRI-8790</strong>) kèm số điện thoại người nhận để theo dõi tiến độ thu hái, kiểm định và vận chuyển xe lạnh.
           </p>
         </div>
 
         {/* Search Box */}
-        <div className="max-w-2xl mx-auto bg-white p-4 sm:p-5 rounded-3xl shadow-xs border border-gray-200/90 space-y-3">
+        <div className="max-w-2xl mx-auto bento-card p-4 sm:p-5 space-y-3">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -106,13 +106,13 @@ function OrdersLookupContent() {
             className="flex flex-col sm:flex-row gap-2.5"
           >
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
                 value={orderCodeInput}
                 onChange={(e) => setOrderCodeInput(e.target.value)}
                 placeholder="Nhập mã đơn hàng (VD: AGRI-8790, AGRI-5875...)"
-                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#E4DFD5] bg-[#FBF9F5] text-sm focus:bg-white focus:outline-none focus:border-[#166534] font-mono font-bold text-[#16261E]"
               />
             </div>
             <input
@@ -120,12 +120,12 @@ function OrdersLookupContent() {
               value={phoneInput}
               onChange={(e) => setPhoneInput(e.target.value)}
               placeholder="SĐT người nhận"
-              className="sm:w-44 px-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="sm:w-44 px-4 py-3 rounded-xl border border-[#E4DFD5] bg-[#FBF9F5] text-sm focus:bg-white focus:outline-none focus:border-[#166534]"
             />
             <button
               type="submit"
               disabled={isSearching}
-              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-6 py-3 rounded-xl bg-[#16261E] hover:bg-[#166534] text-white font-bold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isSearching ? "Đang tra cứu..." : "Tra Cứu Đơn"}
             </button>

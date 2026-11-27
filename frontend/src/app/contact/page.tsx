@@ -119,32 +119,32 @@ export default function ContactPage() {
   )}`;
 
   return (
-    <div className="bg-gray-50/50 min-h-screen py-10 sm:py-16">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-10 sm:py-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#16261E] text-amber-300 text-xs font-mono font-bold mb-3">
             <Mail size={14} /> LIÊN HỆ & HỢP TÁC NÔNG NGHIỆP
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#16261E] tracking-tight">
             Liên Hệ Với AgriTrace AI
           </h1>
-          <p className="mt-3 text-gray-600 text-sm sm:text-base leading-relaxed">
-            Chúng tôi luôn sẵn sàng lắng nghe ý kiến đóng góp, giải đáp thắc mắc và hỗ trợ hợp tác với bà con nông dân, nhà phân phối và khách hàng trên cả nước. Mọi yêu cầu được chuyển trực tiếp tới hòm thư điều phối <strong className="text-emerald-800">{targetEmail}</strong>.
+          <p className="mt-3 text-stone-600 text-sm sm:text-base leading-relaxed">
+            Chúng tôi luôn sẵn sàng lắng nghe ý kiến đóng góp, giải đáp thắc mắc và hỗ trợ hợp tác với bà con nông dân, nhà phân phối và khách hàng trên cả nước. Mọi yêu cầu được chuyển trực tiếp tới hòm thư điều phối <strong className="text-[#166534]">{targetEmail}</strong>.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-14">
           {/* Left Info Column */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="bg-gradient-to-br from-[#0c2616] via-[#133e21] to-[#1c5d33] rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-6 relative overflow-hidden">
-              <div className="absolute right-0 top-0 w-32 h-32 bg-radial from-emerald-400/15 to-transparent pointer-events-none" />
+            <div className="bg-gradient-to-br from-[#16261E] via-[#1B3326] to-[#12241B] border border-[#243B2E] rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-6 relative overflow-hidden">
+              <div className="absolute right-0 top-0 w-32 h-32 bg-radial from-amber-300/15 to-transparent pointer-events-none" />
 
               <div>
-                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                <span className="text-xs font-mono font-bold text-amber-300 uppercase tracking-wider">
                   Trụ sở điều hành
                 </span>
-                <h3 className="text-xl font-bold mt-1 text-white">
+                <h3 className="font-serif text-xl font-bold mt-1 text-white">
                   Trung Tâm Công Nghệ Chuỗi Nông Sản
                 </h3>
                 <p className="text-xs text-emerald-100/80 mt-1 leading-relaxed">

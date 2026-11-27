@@ -238,13 +238,13 @@ export default function PartnerRegisterPage() {
 
         {/* Hero Section */}
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-extrabold uppercase tracking-wider mb-3 shadow-2xs">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-700" /> Cổng Hợp Tác Doanh Nghiệp Nông Nghiệp Số
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#16261E] text-amber-300 text-xs font-mono font-bold uppercase tracking-wider mb-3 shadow-2xs">
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" /> CỔNG HỢP TÁC DOANH NGHIỆP NÔNG NGHIỆP SỐ
           </span>
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-[#16261E] tracking-tight leading-tight">
+          <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#16261E] tracking-tight leading-tight">
             Đăng Ký Đối Tác Cung Ứng & Vận Chuyển
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-3 leading-relaxed">
+          <p className="text-sm sm:text-base text-stone-600 mt-3 leading-relaxed">
             Hợp tác cùng AgriTrace để đưa nông sản tươi sạch trực tiếp từ nông trại đến bàn ăn người tiêu dùng, kết nối hệ thống truy xuất QR nguồn gốc và đội xe lạnh kiểm soát dải nhiệt 2°C – 5°C.
           </p>
         </div>

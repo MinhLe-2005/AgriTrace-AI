@@ -174,17 +174,17 @@ export default function GuidesPage() {
       : DISTRIBUTOR_STEPS;
 
   return (
-    <div className="bg-gray-50/50 min-h-screen py-10 sm:py-14">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-10 sm:py-14">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         {/* Header Hero */}
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#16261E] text-amber-300 text-xs font-mono font-bold mb-3">
             <Compass size={14} /> CẨM NANG HƯỚNG DẪN SỬ DỤNG HỆ THỐNG
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#16261E] tracking-tight">
             Hướng Dẫn Từng Bước Vận Hành
           </h1>
-          <p className="mt-3 text-gray-600 text-sm sm:text-base leading-relaxed">
+          <p className="mt-3 text-stone-600 text-sm sm:text-base leading-relaxed">
             Tài liệu hướng dẫn trực quan dành riêng cho từng vai trò trong chuỗi cung ứng nông sản sạch AgriTrace AI.
           </p>
         </div>
@@ -200,28 +200,28 @@ export default function GuidesPage() {
                 onClick={() => setActiveRole(tab.key)}
                 className={`p-4 rounded-2xl border text-left transition-all ${
                   isActive
-                    ? "bg-white border-[#1a7a3a] ring-2 ring-emerald-500/20 shadow-sm"
-                    : "bg-white/70 border-gray-200/80 hover:bg-white hover:border-gray-300"
+                    ? "bg-white border-[#166534] ring-2 ring-emerald-700/15 shadow-sm"
+                    : "bg-[#F6F3EC] border-[#E4DFD5] hover:bg-white hover:border-stone-300"
                 }`}
               >
-                <div className={`p-2 rounded-xl inline-block mb-2 ${isActive ? "bg-emerald-50 text-[#1a7a3a]" : "bg-gray-100 text-gray-600"}`}>
+                <div className={`p-2 rounded-xl inline-block mb-2 ${isActive ? "bg-emerald-50 text-[#166534]" : "bg-white text-stone-600"}`}>
                   <Icon size={18} />
                 </div>
-                <div className="font-bold text-gray-900 text-xs sm:text-sm">{tab.label}</div>
-                <div className="text-[11px] text-gray-500 mt-1 line-clamp-1">{tab.desc}</div>
+                <div className="font-bold text-[#16261E] text-xs sm:text-sm">{tab.label}</div>
+                <div className="text-[11px] text-stone-500 mt-1 line-clamp-1">{tab.desc}</div>
               </button>
             );
           })}
         </div>
 
         {/* Steps Timeline Card */}
-        <div className="bg-white rounded-3xl border border-gray-200/90 p-6 sm:p-10 shadow-xs mb-10">
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100">
+        <div className="bento-card p-6 sm:p-10 mb-10">
+          <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#F0ECE1]">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="font-serif text-xl font-bold text-[#16261E]">
                 Quy trình {ROLES_TABS.find((r) => r.key === activeRole)?.label}
               </h2>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
                 Các bước thực hiện chuẩn trên hệ thống AgriTrace AI
               </p>
             </div>

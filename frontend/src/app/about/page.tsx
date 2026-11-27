@@ -80,41 +80,41 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen">
       {/* ─── Hero Section ─── */}
-      <section className="relative py-16 sm:py-24 bg-gradient-to-b from-emerald-50/60 via-white to-white overflow-hidden border-b border-gray-100">
+      <section className="relative py-16 sm:py-24 bg-gradient-to-b from-[#F6F3EC] via-[#FBF9F5] to-[#FBF9F5] overflow-hidden border-b border-[#E4DFD5]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-100 text-[#156e34] text-xs font-bold mb-4 tracking-wide">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#16261E] text-amber-300 text-xs font-mono font-bold mb-4 tracking-wide">
               <Leaf size={14} /> VỀ CHÚNG TÔI • AGRITRACE AI
             </div>
-            <h1 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight leading-tight">
+            <h1 className="font-serif text-3xl sm:text-5xl font-bold text-[#16261E] tracking-tight leading-tight">
               Số Hóa Chuỗi Nông Sản Sạch
               <br />
-              <span className="text-[#1a7a3a]">Minh Bạch Từng Bữa Ăn Gia Đình</span>
+              <span className="text-[#166534]">Minh Bạch Từng Bữa Ăn Gia Đình</span>
             </h1>
-            <p className="mt-5 text-gray-600 text-base sm:text-lg leading-relaxed">
+            <p className="mt-5 text-stone-600 text-base sm:text-lg leading-relaxed">
               AgriTrace AI là giải pháp công nghệ kết hợp trí tuệ nhân tạo (AI) và mã QR định danh, kết nối khép kín từ khâu gieo trồng tại nông trại đến bàn ăn của người tiêu dùng trên khắp Việt Nam.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/products"
-                className="px-6 py-3 rounded-xl bg-[#1a7a3a] text-white font-semibold text-sm hover:bg-[#156e34] shadow-md shadow-emerald-700/20 transition-all"
+                className="px-6 py-3 rounded-xl bg-[#166534] text-white font-semibold text-sm hover:bg-[#14532D] shadow-md transition-all"
               >
                 Khám Phá Nông Sản Sạch
               </Link>
               <Link
                 href="/traceability"
-                className="px-6 py-3 rounded-xl bg-white text-gray-700 border border-gray-200 font-semibold text-sm hover:bg-gray-50 transition-all flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-white text-[#16261E] border border-[#E4DFD5] font-semibold text-sm hover:bg-[#F6F3EC] transition-all flex items-center gap-2"
               >
-                <QrCode size={16} className="text-emerald-600" /> Trải Nghiệm Quét QR
+                <QrCode size={16} className="text-[#166534]" /> Trải Nghiệm Quét QR
               </Link>
               <button
                 type="button"
                 onClick={() => openPartnerModal("distributor")}
-                className="px-6 py-3 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-sm hover:bg-emerald-100 transition-all flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-[#16261E] text-amber-300 font-semibold text-sm hover:bg-[#1E3328] transition-all flex items-center gap-2"
               >
-                <Truck size={16} className="text-emerald-700" /> Đăng Ký Đối Tác
+                <Truck size={16} className="text-amber-300" /> Đăng Ký Đối Tác
               </button>
             </div>
           </div>
@@ -122,14 +122,14 @@ export default function AboutPage() {
       </section>
 
       {/* ─── Stats Section ─── */}
-      <section className="py-12 bg-white border-b border-gray-100">
+      <section className="py-12 bg-[#FBF9F5] border-b border-[#E4DFD5]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {STATS.map((s, idx) => (
-              <div key={idx} className="p-5 rounded-2xl bg-gray-50/70 border border-gray-100 text-center">
-                <div className="text-3xl sm:text-4xl font-extrabold text-[#1a7a3a]">{s.num}</div>
-                <div className="font-semibold text-gray-800 text-sm mt-1">{s.label}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{s.desc}</div>
+              <div key={idx} className="bento-card p-5 text-center">
+                <div className="text-3xl sm:text-4xl font-mono font-extrabold text-[#166534]">{s.num}</div>
+                <div className="font-semibold text-[#16261E] text-sm mt-1">{s.label}</div>
+                <div className="text-xs text-stone-500 mt-0.5">{s.desc}</div>
               </div>
             ))}
           </div>
@@ -137,7 +137,7 @@ export default function AboutPage() {
       </section>
 
       {/* ─── Story & Mission Section ─── */}
-      <section className="py-16 sm:py-20 bg-white">
+      <section className="py-16 sm:py-20 bg-[#FBF9F5]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}

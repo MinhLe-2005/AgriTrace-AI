@@ -88,30 +88,30 @@ export function MainFooter() {
   ];
 
   return (
-    <footer className="bg-[#08170d] text-white border-t border-emerald-950">
+    <footer className="bg-[#16261E] text-stone-100 border-t border-[#E4DFD5]">
       {/* ─── Thanh Chứng Nhận & Bảo Chứng Chất Lượng Quốc Tế ─── */}
-      <div className="border-b border-white/10 bg-[#0c2013] py-5 px-4 sm:px-6">
+      <div className="border-b border-white/10 bg-[#122019] py-5 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-6 text-xs text-gray-300">
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-6 text-xs text-stone-300">
             <div className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-emerald-400" />
+              <ShieldCheck size={18} className="text-amber-300" />
               <span className="font-semibold text-white">Chứng nhận VietGAP số 284/2026/NNPTNT</span>
             </div>
             <span className="hidden sm:inline text-white/20">|</span>
             <div className="flex items-center gap-2">
-              <Award size={18} className="text-amber-400" />
+              <Award size={18} className="text-amber-300" />
               <span className="font-semibold text-white">Tiêu chuẩn GlobalGAP & HACCP</span>
             </div>
             <span className="hidden sm:inline text-white/20">|</span>
             <div className="flex items-center gap-2">
-              <Truck size={18} className="text-blue-400" />
+              <Truck size={18} className="text-emerald-400" />
               <span className="font-semibold text-white">Chuỗi lạnh Cold-Chain kiểm soát 24/7</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-emerald-300/80">
-            <Lock size={13} className="text-emerald-400" />
-            <span>Thanh toán bảo mật SSL 256-bit qua VNPay, MoMo, Visa</span>
+          <div className="flex items-center gap-2 font-mono text-[11px] text-amber-300/90">
+            <Lock size={13} className="text-amber-300" />
+            <span>Thanh toán bảo mật SSL 256-bit qua VietQR, VNPay, MoMo</span>
           </div>
         </div>
       </div>
@@ -121,22 +121,22 @@ export function MainFooter() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10 text-xs">
           {/* Cột 1: Thương hiệu & Giới thiệu */}
           <div className="space-y-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-md">
-                <Leaf size={20} />
+            <Link href="/" className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/10 text-amber-300 border border-white/15 flex items-center justify-center font-bold shadow-xs">
+                <Leaf size={19} />
               </div>
               <div>
-                <span className="font-extrabold text-base tracking-tight text-white">
-                  Agri<span className="text-emerald-400">Trace</span>
+                <span className="font-serif font-bold text-base tracking-tight text-white">
+                  Agri<span className="text-amber-300">Trace</span>
                 </span>
-                <span className="block text-[9px] uppercase tracking-wider text-emerald-400 font-bold">
-                  Nông sản sạch từ gốc
+                <span className="block font-mono text-[9px] uppercase tracking-[0.14em] text-stone-400 font-bold">
+                  BOTANICAL SUPPLY OS
                 </span>
               </div>
             </Link>
 
-            <p className="text-gray-400 leading-relaxed text-[11px]">
-              Hệ sinh thái số hóa quản lý chuỗi cung ứng nông sản sạch và truy xuất nguồn gốc bằng mã QR từ
+            <p className="text-stone-400 leading-relaxed text-[11px]">
+              Hệ sinh thái số hóa quản lý chuỗi cung ứng nông sản sạch và truy xuất nguồn gốc bằng mã QR độc bản từ
               nông trại đến bàn ăn người tiêu dùng.
             </p>
 

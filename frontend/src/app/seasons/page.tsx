@@ -106,47 +106,46 @@ export default function SeasonsPage() {
   });
 
   return (
-    <div className="bg-[#f8faf8] min-h-screen py-8">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Module Header */}
         {/* Page Header */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E4DFD5]">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
-              <Calendar className="text-emerald-700" size={24} />
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] tracking-tight flex items-center gap-2.5">
+              <Calendar className="text-[#166534]" size={24} />
               <span>Lịch Mùa Vụ & Biểu Giá Trợ Giá Nông Sản 2026</span>
             </h1>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs sm:text-sm text-stone-600 mt-1">
               Theo dõi lịch thu hoạch chính vụ của các loại nông sản sạch trên toàn quốc để chọn mua đúng thời điểm tươi ngon nhất và được hưởng mức trợ giá tự động tại vườn.
             </p>
           </div>
           <Link
             href="/ai-hub#forecasting"
-            className="text-xs font-semibold px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+            className="text-xs font-semibold px-3.5 py-2 rounded-xl bg-[#16261E] text-amber-300 hover:bg-[#1E3328] flex items-center gap-1.5 transition-colors self-start sm:self-auto"
           >
             <Sparkles size={14} /> AI Dự Báo Nhu Cầu Mùa Vụ
           </Link>
         </div>
 
         {/* ── Official Season Pricing Regulation Announcement Banner ── */}
-        <div className="mb-8 rounded-3xl overflow-hidden border border-amber-300/90 bg-gradient-to-br from-amber-500/10 via-yellow-50/70 to-emerald-50/70 p-5 sm:p-6 shadow-sm space-y-3">
+        <div className="mb-8 rounded-3xl overflow-hidden border border-[#E4DFD5] bg-[#F6F3EC] p-5 sm:p-6 shadow-sm space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white shadow-xs">
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#16261E] text-amber-300 shadow-xs">
                   📢 THÔNG BÁO MÙA VỤ
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
                   Chương Trình Trợ Giá Thu Đông
                 </span>
-                <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">
+                <span className="text-xs font-mono font-semibold text-[#166534] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                   Hiệu lực: 01/10/2026 – 31/12/2026
                 </span>
               </div>
-              <h2 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">
+              <h2 className="font-serif text-lg sm:text-xl font-bold text-[#16261E] tracking-tight">
                 Cơ Chế Trợ Giá Trực Tiếp Nông Sản Chính Vụ Thu Đông (Không Cần Nhập Mã)
               </h2>
-              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-3xl">
+              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed max-w-3xl">
                 Căn cứ năng suất thu hoạch đạt đỉnh tại các nông trại đối tác (Đà Lạt, Mộc Châu, Hàm Yên), hệ thống AgriTrace áp dụng <strong>khung trợ giá trực tiếp 13% – 18%</strong> trên giá niêm yết xuất kho trong 3 tháng cao điểm (Tháng 10 – Tháng 12). Khách hàng không cần nhập mã, giá bán hiển thị trên cửa hàng đã là giá tốt nhất!
               </p>
             </div>
@@ -154,13 +153,13 @@ export default function SeasonsPage() {
             <div className="flex items-center gap-2 shrink-0">
               <a
                 href="#pricing-policy"
-                className="px-4 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-amber-950 border border-amber-300 text-xs font-bold transition-all shadow-2xs"
+                className="px-4 py-2.5 rounded-xl bg-white hover:bg-[#FBF9F5] text-[#16261E] border border-[#E4DFD5] text-xs font-bold transition-all shadow-2xs"
               >
                 Xem Toàn Văn Cơ Chế →
               </a>
               <Link
                 href="/products"
-                className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-sm"
+                className="px-4 py-2.5 rounded-xl bg-[#166534] hover:bg-[#14532D] text-white text-xs font-bold transition-all shadow-sm"
               >
                 Đến Cửa Hàng Mua Ngay
               </Link>
@@ -173,7 +172,7 @@ export default function SeasonsPage() {
           <button
             onClick={() => setSelectedFilter("all")}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              selectedFilter === "all" ? "bg-[#1a7a3a] text-white shadow-sm" : "bg-white text-gray-700 border border-gray-200"
+              selectedFilter === "all" ? "bg-[#16261E] text-amber-300 shadow-sm" : "bg-white text-stone-700 border border-[#E4DFD5]"
             }`}
           >
             Tất cả mùa vụ ({seasonData.length})
@@ -181,7 +180,7 @@ export default function SeasonsPage() {
           <button
             onClick={() => setSelectedFilter("active")}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              selectedFilter === "active" ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-gray-700 border border-gray-200"
+              selectedFilter === "active" ? "bg-[#166534] text-white shadow-sm" : "bg-white text-stone-700 border border-[#E4DFD5]"
             }`}
           >
             Đang vào mùa / Chính vụ
@@ -189,7 +188,7 @@ export default function SeasonsPage() {
           <button
             onClick={() => setSelectedFilter("upcoming")}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              selectedFilter === "upcoming" ? "bg-blue-600 text-white shadow-sm" : "bg-white text-gray-700 border border-gray-200"
+              selectedFilter === "upcoming" ? "bg-[#16261E] text-white shadow-sm" : "bg-white text-stone-700 border border-[#E4DFD5]"
             }`}
           >
             Sắp vào mùa (Pre-order)
@@ -197,7 +196,7 @@ export default function SeasonsPage() {
           <button
             onClick={() => setSelectedFilter("ending")}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              selectedFilter === "ending" ? "bg-amber-600 text-white shadow-sm" : "bg-white text-gray-700 border border-gray-200"
+              selectedFilter === "ending" ? "bg-amber-700 text-white shadow-sm" : "bg-white text-stone-700 border border-[#E4DFD5]"
             }`}
           >
             Cuối mùa (Ưu đãi xả kho)

@@ -541,35 +541,35 @@ export default function BlogPage() {
   });
 
   return (
-    <div className="bg-gray-50/50 min-h-screen py-10 sm:py-14">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-10 sm:py-14">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#16261E] text-amber-300 text-xs font-mono font-bold mb-3">
             <Newspaper size={14} /> BẢN TIN & KIẾN THỨC NÔNG NGHIỆP SẠCH
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#16261E] tracking-tight">
             Tin Tức & Cẩm Nang Nông Sản
           </h1>
-          <p className="mt-3 text-gray-600 text-sm sm:text-base leading-relaxed">
+          <p className="mt-3 text-stone-600 text-sm sm:text-base leading-relaxed">
             Cập nhật xu hướng chuyển đổi số nông nghiệp, lịch mùa vụ tươi ngon, hướng dẫn nhận biết rau củ chuẩn VietGAP và công nghệ AI chuỗi cung ứng. Bấm vào bất kỳ bài viết nào để đọc nội dung chi tiết.
           </p>
 
           {/* Search Box */}
           <div className="relative mt-6 max-w-lg mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={17} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm bài viết: AI dự báo, quét mã QR, dâu tây, VietGAP, FEFO..."
-              className="w-full pl-11 pr-4 py-2.5 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 shadow-2xs"
+              className="w-full pl-11 pr-4 py-2.5 bg-white rounded-xl border border-[#E4DFD5] text-sm focus:outline-none focus:border-[#166534] focus:ring-2 focus:ring-emerald-700/15 shadow-2xs"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1 text-xs"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#16261E] p-1 text-xs"
               >
                 ✕
               </button>
@@ -581,22 +581,22 @@ export default function BlogPage() {
         {activeCategory === "all" && !searchQuery && featuredPost && (
           <div
             onClick={() => openPost(featuredPost)}
-            className="mb-12 bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden hover:shadow-xl hover:border-emerald-400 transition-all cursor-pointer group"
+            className="mb-12 bento-card overflow-hidden hover:shadow-xl hover:border-[#166534] transition-all cursor-pointer group"
           >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
               <div className="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-[#156e34] flex items-center gap-1 shadow-2xs">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#16261E] text-amber-300 flex items-center gap-1 shadow-2xs">
                       <Sparkles size={12} /> BÀI VIẾT NỔI BẬT
                     </span>
-                    <span className="text-xs text-gray-400">•</span>
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="text-xs text-stone-400">•</span>
+                    <span className="text-xs font-mono text-stone-500 flex items-center gap-1">
                       <Clock size={12} /> {featuredPost.readTime}
                     </span>
                   </div>
 
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-snug group-hover:text-[#1a7a3a] transition-colors">
+                  <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#16261E] leading-snug group-hover:text-[#166534] transition-colors">
                     {featuredPost.title}
                   </h2>
 

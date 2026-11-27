@@ -33,9 +33,15 @@ import {
 import { toast } from "@/stores/toast-store";
 import { useOrderChatSocket } from "./useOrderChatSocket";
 
-export function AdminMessagesPanel() {
+export function AdminMessagesPanel({
+  initialOrderCode,
+  onDisputeResolved,
+}: {
+  initialOrderCode?: string | null;
+  onDisputeResolved?: () => void;
+} = {}) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [selectedOrderCode, setSelectedOrderCode] = useState<string | null>(null);
+  const [selectedOrderCode, setSelectedOrderCode] = useState<string | null>(initialOrderCode || null);
   const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [searchQ, setSearchQ] = useState("");
   const [filterDispute, setFilterDispute] = useState<"ALL" | "PENDING_DISPUTE" | "RESOLVED">("ALL");
@@ -65,6 +71,13 @@ export function AdminMessagesPanel() {
       isNearBottomRef.current = true;
     }
   };
+
+  useEffect(() => {
+    if (initialOrderCode) {
+      setSelectedOrderCode(initialOrderCode);
+      orderChatService.markAsRead(initialOrderCode, "ADMIN");
+    }
+  }, [initialOrderCode]);
 
   // Load inbox
   useEffect(() => {
@@ -112,7 +125,10 @@ export function AdminMessagesPanel() {
       });
       setConversations(list);
       if (list.length > 0 && !selectedOrderCode) {
-        setSelectedOrderCode(list[0].orderCode);
+        const targetCode =
+          (initialOrderCode && list.find((c) => c.orderCode.toUpperCase() === initialOrderCode.toUpperCase())?.orderCode) ||
+          list[0].orderCode;
+        setSelectedOrderCode(targetCode);
       }
     } catch {
       // ignore
@@ -127,7 +143,7 @@ export function AdminMessagesPanel() {
     setConversations((prev) =>
       prev.map((c) => (c.orderCode === code ? { ...c, unreadCount: 0 } : c))
     );
-    orderChatService.markAsRead(code);
+    orderChatService.markAsRead(code, "ADMIN");
     loadMessages(code);
   }
 
@@ -222,6 +238,7 @@ export function AdminMessagesPanel() {
       });
 
       toast.success("Đã duyệt hoàn tiền thành công! Đơn hàng chuyển sang REFUNDED.");
+      onDisputeResolved?.();
       await loadInbox();
       await loadMessages(selectedOrderCode);
     } catch {
@@ -244,6 +261,7 @@ export function AdminMessagesPanel() {
       toast.success("Đã từ chối khiếu nại đơn hàng.");
       setRejectModalOpen(false);
       setRejectReason("");
+      onDisputeResolved?.();
       await loadInbox();
       await loadMessages(selectedOrderCode);
     } catch {
@@ -254,6 +272,7 @@ export function AdminMessagesPanel() {
   }
 
   const pendingDisputesCount = conversations.filter((c) => c.hasPendingDispute).length;
+  const connectedFarmsCount = new Set(conversations.map((c) => c.farmName).filter(Boolean)).size;
 
   const filteredConvs = conversations.filter((c) => {
     if (filterDispute === "PENDING_DISPUTE" && !c.hasPendingDispute) return false;
@@ -310,7 +329,7 @@ export function AdminMessagesPanel() {
         <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Chủ Nông Trại Đang Kết Nối</div>
-            <div className="text-xl font-extrabold text-emerald-800 mt-0.5">2 Hợp Tác Xã</div>
+            <div className="text-xl font-extrabold text-emerald-800 mt-0.5">{connectedFarmsCount || 1} Hợp Tác Xã</div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
             <Store size={18} />
@@ -440,7 +459,7 @@ export function AdminMessagesPanel() {
                       <XCircle size={11} /> Đã từ chối khiếu nại
                     </span>
                   ) : (
-                    <p className="text-[11px] text-gray-400 truncate italic">"{conv.lastMessage}"</p>
+                    <p className="text-[11px] text-gray-400 truncate italic">&ldquo;{conv.lastMessage}&rdquo;</p>
                   )}
                 </div>
               );

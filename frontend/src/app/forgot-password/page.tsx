@@ -210,19 +210,19 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-neutral-50/60 antialiased font-sans">
+    <div className="min-h-screen flex bg-[#FBF9F5] text-[#16261E] antialiased font-sans">
       {/* Showcase Visual Section */}
-      <div className="hidden lg:flex lg:w-[48%] relative flex-col justify-between p-12 overflow-hidden bg-gradient-to-br from-emerald-950 via-[#0d3b24] to-[#082818] text-white">
+      <div className="hidden lg:flex lg:w-[48%] relative flex-col justify-between p-12 overflow-hidden bg-gradient-to-br from-[#16261E] via-[#1B3326] to-[#112018] text-white border-r border-[#243B2E]">
         {/* Ambient background glows */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-green-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header Tagline */}
         <div className="relative z-10 animate-fade-in-up">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-xs font-medium text-emerald-300 mb-3">
-            <Sparkles className="h-3 w-3" /> Bảo mật tài khoản AgriTrace
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-300/30 text-xs font-mono font-bold text-amber-300 mb-3">
+            <Sparkles className="h-3 w-3" /> BẢO MẬT TÀI KHOẢN AGRITRACE
           </span>
-          <h2 className="text-2xl font-bold tracking-tight text-white/95">
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-white/95 leading-snug">
             Khôi phục mật khẩu an toàn & nhanh chóng qua Gmail.
           </h2>
         </div>
@@ -308,10 +308,10 @@ export default function ForgotPasswordPage() {
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#16261E] tracking-tight">
                   Quên mật khẩu?
                 </h1>
-                <p className="text-sm text-gray-500 mt-1.5">
+                <p className="text-sm text-stone-600 mt-1.5">
                   Nhập địa chỉ email tài khoản của bạn để nhận mã xác thực đặt lại mật khẩu mới.
                 </p>
               </div>

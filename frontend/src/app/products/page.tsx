@@ -915,31 +915,31 @@ function ProductsContent() {
       {/* ── 2 Cột: Sidebar Bộ Lọc Chuyên Nghiệp + Danh Sách Sản Phẩm ── */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         {/* ── CỘT TRÁI: SIDEBAR BỘ LỌC (Desktop) ── */}
-        <aside className="hidden lg:block lg:col-span-1 bg-white p-5 rounded-3xl border border-gray-200/90 shadow-xs sticky top-24">
+        <aside className="hidden lg:block lg:col-span-1 bento-card p-5 sticky top-24">
           {FilterSidebarContent}
         </aside>
 
         {/* ── CỘT PHẢI: KHU VỰC TOOLBAR & DANH SÁCH SẢN PHẨM ── */}
         <main className="lg:col-span-3 space-y-5">
           {/* ── Top Toolbar: Tìm kiếm, Nút Mobile Filter, Sắp xếp ── */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/90 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="bento-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             {/* Search Input */}
             <div className="relative flex-1">
               <Search
                 size={16}
-                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm nông sản, nông trại, mã lô (VD: Xà lách, DT-MC-2026-11)..."
-                className="w-full h-10 pl-10 pr-9 text-xs sm:text-sm rounded-xl border border-gray-200 bg-gray-50/60 outline-none focus:bg-white focus:border-emerald-600 transition-all font-medium"
+                className="w-full h-10 pl-10 pr-9 text-xs sm:text-sm rounded-xl border border-[#E4DFD5] bg-[#FBF9F5] outline-none focus:bg-white focus:border-[#166534] transition-all font-medium text-[#16261E]"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
                 >
                   <X size={14} />
                 </button>
@@ -951,12 +951,12 @@ function ProductsContent() {
               {/* Nút bật bộ lọc trên Mobile */}
               <button
                 onClick={() => setIsMobileFilterOpen(true)}
-                className="lg:hidden px-3.5 h-10 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold flex items-center gap-2 transition-colors shrink-0"
+                className="lg:hidden px-3.5 h-10 rounded-xl border border-[#E4DFD5] bg-white hover:bg-[#F3EFE6] text-[#16261E] text-xs font-bold flex items-center gap-2 transition-colors shrink-0"
               >
-                <Filter size={15} className="text-emerald-700" />
+                <Filter size={15} className="text-[#166534]" />
                 <span>Bộ Lọc</span>
                 {activeFiltersCount > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center">
+                  <span className="w-5 h-5 rounded-full bg-[#16261E] text-amber-300 text-[10px] font-bold flex items-center justify-center">
                     {activeFiltersCount}
                   </span>
                 )}
@@ -964,11 +964,11 @@ function ProductsContent() {
 
               {/* Sắp xếp */}
               <div className="relative flex items-center shrink-0">
-                <span className="hidden sm:inline-block text-xs text-gray-500 mr-2 font-medium">Sắp xếp:</span>
+                <span className="hidden sm:inline-block text-xs text-stone-500 mr-2 font-medium">Sắp xếp:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="h-10 pl-3 pr-8 text-xs font-semibold rounded-xl border border-gray-200 bg-gray-50/60 focus:bg-white focus:border-emerald-600 text-gray-800 outline-none cursor-pointer"
+                  className="h-10 pl-3 pr-8 text-xs font-semibold rounded-xl border border-[#E4DFD5] bg-[#FBF9F5] focus:bg-white focus:border-[#166534] text-[#16261E] outline-none cursor-pointer"
                 >
                   <option value="featured">Nổi bật nhất</option>
                   <option value="price_asc">Giá: Thấp đến Cao</option>

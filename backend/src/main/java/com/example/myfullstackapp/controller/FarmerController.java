@@ -1439,6 +1439,14 @@ public class FarmerController {
             @PathVariable String certNumber,
             @RequestBody CertificateDecisionRequest req
     ) {
+        Authentication auth = ownershipResolver.currentAuthentication();
+        boolean isAdmin = auth != null && auth.isAuthenticated() && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        if (!isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Chỉ Quản trị viên (ADMIN) mới có quyền duyệt chứng nhận nông trại!"));
+        }
+
         FarmerCertificate cert = certificateRepository.findByCertNumberIgnoreCase(certNumber.trim()).orElse(null);
         if (cert == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Không tìm thấy chứng chỉ " + certNumber));
@@ -1446,17 +1454,19 @@ public class FarmerController {
 
         boolean isApprove = "approve".equalsIgnoreCase(req.getAction());
         if (isApprove) {
-            if (cert.getPendingRequestedExpiryDate() != null && !cert.getPendingRequestedExpiryDate().isBlank()) {
-                cert.setExpiryDate(cert.getPendingRequestedExpiryDate());
-            } else if (req.getApprovedExpiryDate() != null && !req.getApprovedExpiryDate().isBlank()) {
+            if (req.getApprovedExpiryDate() != null && !req.getApprovedExpiryDate().isBlank()) {
                 cert.setExpiryDate(req.getApprovedExpiryDate().trim());
+            } else if (cert.getPendingRequestedExpiryDate() != null && !cert.getPendingRequestedExpiryDate().isBlank()) {
+                cert.setExpiryDate(cert.getPendingRequestedExpiryDate().trim());
             }
-            if (cert.getPendingNewCertNumber() != null && !cert.getPendingNewCertNumber().isBlank()) {
-                cert.setCertNumber(cert.getPendingNewCertNumber());
-            } else if (req.getNewCertNumber() != null && !req.getNewCertNumber().isBlank()) {
+            if (req.getNewCertNumber() != null && !req.getNewCertNumber().isBlank()) {
                 cert.setCertNumber(req.getNewCertNumber().trim().toUpperCase());
+            } else if (cert.getPendingNewCertNumber() != null && !cert.getPendingNewCertNumber().isBlank()) {
+                cert.setCertNumber(cert.getPendingNewCertNumber().trim().toUpperCase());
             }
-            cert.setStatus("VALID");
+            cert.setPendingRequestedExpiryDate(null);
+            cert.setPendingNewCertNumber(null);
+            cert.setStatus(cert.evaluateValidityStatus());
             cert.setApprovalStatus("APPROVED");
             cert.setLastAlertSentDate(null); // Reset để lịch quét ngầm hiểu chứng chỉ đã mới
             String note = req.getAdminNote() != null && !req.getAdminNote().isBlank()

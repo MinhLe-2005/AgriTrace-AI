@@ -184,31 +184,31 @@ export default function VouchersPage() {
   });
 
   return (
-    <div className="bg-[#f8faf8] min-h-screen py-8">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
         {/* ── Breadcrumb ── */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700 transition-colors">
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534] transition-colors">
             Trang chủ
           </Link>
           <span>/</span>
-          <span className="font-semibold text-gray-800">Mã ưu đãi & Voucher</span>
+          <span className="font-semibold text-[#16261E]">Mã ưu đãi & Voucher</span>
         </div>
 
-        {/* ── Hero Banner (Enterprise Commerce Style) ── */}
-        <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/10 to-transparent pointer-events-none" />
+        {/* ── Hero Banner (Warm Botanical Editorial Style) ── */}
+        <div className="bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] border border-[#243B2E] text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-300/10 to-transparent pointer-events-none" />
 
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
             <div className="space-y-2 max-w-2xl">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-semibold text-emerald-200">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-300/30 text-xs font-mono font-bold text-amber-300">
                 <Sparkles size={13} />
-                <span>Kho ưu đãi nông sản sạch AgriTrace</span>
+                <span>KHO ƯU ĐÃI NÔNG SẢN SẠCH AGRITRACE</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight">
                 Mã Giảm Giá & Miễn Phí Vận Chuyển
               </h1>
-              <p className="text-xs sm:text-sm text-emerald-100 leading-relaxed">
+              <p className="text-xs sm:text-sm text-emerald-100/85 leading-relaxed">
                 Lưu ngay các mã ưu đãi độc quyền để áp dụng khi thanh toán đơn hàng nông sản VietGAP.
                 Mã sau khi lưu sẽ tự động xuất hiện trong giỏ hàng của bạn.
               </p>
@@ -218,26 +218,26 @@ export default function VouchersPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/dashboard/customer?tab=vouchers"
-                className="px-4 py-2.5 rounded-xl bg-white text-emerald-900 hover:bg-emerald-50 text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+                className="px-4 py-2.5 rounded-xl bg-amber-300 text-[#16261E] hover:bg-amber-200 text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
               >
-                <Ticket size={15} className="text-emerald-700" />
+                <Ticket size={15} className="text-[#16261E]" />
                 <span>Ví voucher của tôi ({claimedCodes.length})</span>
               </Link>
               <Link
                 href="/loyalty"
-                className="px-4 py-2.5 rounded-xl bg-emerald-700/60 hover:bg-emerald-700 border border-emerald-500/40 text-white text-xs font-semibold transition-all flex items-center gap-2"
+                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs font-semibold transition-all flex items-center gap-2"
               >
-                <Award size={15} />
+                <Award size={15} className="text-amber-300" />
                 <span>Đổi điểm lấy mã</span>
               </Link>
             </div>
           </div>
 
           {/* Quick Input Box */}
-          <div className="mt-6 pt-5 border-t border-emerald-700/60 max-w-lg">
+          <div className="mt-6 pt-5 border-t border-white/15 max-w-lg">
             <form onSubmit={handleApplyCustomCode} className="flex gap-2">
               <div className="relative flex-1">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-emerald-300">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-amber-300">
                   <Tag size={15} />
                 </div>
                 <input
@@ -245,12 +245,12 @@ export default function VouchersPage() {
                   value={customCode}
                   onChange={(e) => setCustomCode(e.target.value)}
                   placeholder="Nhập mã voucher cá nhân (ví dụ: AGRI50)..."
-                  className="w-full h-10 pl-9 pr-3 text-xs uppercase font-medium rounded-xl bg-white/10 border border-white/20 text-white placeholder-emerald-200/60 outline-none focus:bg-white/20 focus:border-white transition-all"
+                  className="w-full h-10 pl-9 pr-3 text-xs font-mono uppercase font-medium rounded-xl bg-white/10 border border-white/20 text-white placeholder-emerald-200/60 outline-none focus:bg-white/20 focus:border-amber-300 transition-all"
                 />
               </div>
               <button
                 type="submit"
-                className="px-4 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-xs font-bold transition-colors shrink-0"
+                className="px-4 h-10 rounded-xl bg-amber-400 hover:bg-amber-300 text-[#16261E] text-xs font-bold transition-colors shrink-0"
               >
                 Lưu Mã
               </button>
@@ -275,17 +275,17 @@ export default function VouchersPage() {
               className={cn(
                 "px-3.5 py-2 rounded-xl font-semibold transition-all whitespace-nowrap flex items-center gap-1.5",
                 activeCategory === tab.key
-                  ? "bg-emerald-800 text-white shadow-xs"
-                  : "bg-white border border-gray-200/90 text-gray-600 hover:bg-gray-50"
+                  ? "bg-[#16261E] text-amber-300 shadow-xs"
+                  : "bg-white border border-[#E4DFD5] text-stone-600 hover:bg-[#F6F3EC]"
               )}
             >
               <span>{tab.label}</span>
               <span
                 className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold",
                   activeCategory === tab.key
-                    ? "bg-emerald-950 text-emerald-200"
-                    : "bg-gray-100 text-gray-500"
+                    ? "bg-amber-400/20 text-amber-200"
+                    : "bg-[#F6F3EC] text-stone-500"
                 )}
               >
                 {tab.count}
@@ -301,7 +301,7 @@ export default function VouchersPage() {
             return (
               <div
                 key={v.code}
-                className="bg-white rounded-2xl border border-gray-200/90 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row overflow-hidden relative group"
+                className="bento-card flex flex-col sm:flex-row overflow-hidden relative group"
               >
                 {/* Left Ticket Stub */}
                 <div

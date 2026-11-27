@@ -185,7 +185,7 @@ export function GeminiFloatingBubble() {
   // If chat drawer is open on the right (takes ~480px on desktop) and the bubble is located in that right area,
   // automatically dodge to the left of the drawer so it never blocks the Send button or chat input!
   let effectiveX = basePos.x;
-  let effectiveY = basePos.y;
+  const effectiveY = basePos.y;
 
   if (isDrawerOpen && typeof window !== "undefined") {
     const drawerOverlapThreshold = window.innerWidth - 500;

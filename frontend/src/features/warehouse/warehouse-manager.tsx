@@ -102,23 +102,23 @@ function Table({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border bg-white">
+    <div className="overflow-x-auto bento-card">
       <table className="w-full min-w-[640px] text-left text-sm">
-        <thead className="bg-slate-50 text-slate-500">
+        <thead className="bg-[#F6F3EC] text-stone-600 border-b border-[#E4DFD5] text-xs font-mono uppercase">
           <tr>
             {head.map((h) => (
-              <th className="p-3 font-medium" key={h}>
+              <th className="p-3.5 font-bold" key={h}>
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y [&_td]:p-3">
+        <tbody className="divide-y divide-[#F0ECE1] [&_td]:p-3.5 text-[#16261E]">
           {empty ? (
             <tr>
               <td
                 colSpan={head.length}
-                className="py-8 text-center text-slate-500"
+                className="py-8 text-center text-stone-500"
               >
                 Chưa có dữ liệu.
               </td>
@@ -420,12 +420,14 @@ export function WarehouseManager() {
     );
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-900 p-6 text-white">
-        <div className="flex gap-3">
-          <WarehouseIcon className="size-10 text-emerald-300" />
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] border border-[#243B2E] p-6 text-white shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400/20 border border-amber-300/30 text-amber-300">
+            <WarehouseIcon className="size-6" />
+          </div>
           <div>
-            <h1 className="text-xl font-semibold">Quản lý kho nông sản</h1>
-            <p className="mt-1 text-sm text-slate-300">
+            <h1 className="font-serif text-xl sm:text-2xl font-bold">Quản lý kho nông sản</h1>
+            <p className="mt-1 text-xs sm:text-sm text-emerald-100/80">
               Nhập kho · tồn theo lô · FEFO · kiểm kê và cảnh báo
             </p>
           </div>
@@ -514,7 +516,7 @@ export function WarehouseManager() {
           </div>
           <nav
             aria-label="Chức năng kho"
-            className="flex gap-1 overflow-x-auto border-b pb-2"
+            className="flex gap-1.5 overflow-x-auto border-b border-[#E4DFD5] pb-2"
           >
             {tabs.map((t) => (
               <button
@@ -522,10 +524,10 @@ export function WarehouseManager() {
                 aria-current={tab === t ? "page" : undefined}
                 onClick={() => setTab(t)}
                 className={
-                  "whitespace-nowrap rounded-lg px-3 py-2 text-sm " +
+                  "whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition-all " +
                   (tab === t
-                    ? "bg-emerald-700 text-white"
-                    : "text-slate-600 hover:bg-slate-100")
+                    ? "bg-[#16261E] text-amber-300 shadow-xs"
+                    : "text-stone-600 hover:bg-[#F6F3EC]")
                 }
               >
                 {t}
@@ -566,17 +568,17 @@ export function WarehouseManager() {
                     ].map(([label, value]) => (
                       <div
                         key={label}
-                        className="rounded-xl border bg-white p-4"
+                        className="bento-card p-4"
                       >
-                        <p className="text-sm text-slate-500">{label}</p>
-                        <p className="mt-2 text-2xl font-semibold">
+                        <p className="text-xs font-mono font-bold uppercase text-stone-500">{label}</p>
+                        <p className="mt-2 text-2xl font-mono font-extrabold text-[#16261E]">
                           {quantity(Number(value))}{" "}
-                          <span className="text-sm font-normal">kg</span>
+                          <span className="text-sm font-normal text-stone-500">kg</span>
                         </p>
                       </div>
                     ))}
                   </div>
-                  <p className="rounded-xl border bg-white p-4 text-sm">
+                  <p className="bento-card p-4 text-sm text-[#16261E]">
                     Trong kỳ: nhập{" "}
                     <strong>{quantity(dashboard.data.inboundKg)} kg</strong> ·
                     xuất{" "}

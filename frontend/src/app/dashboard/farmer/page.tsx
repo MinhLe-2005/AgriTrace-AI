@@ -2673,108 +2673,108 @@ function FarmerPortalContent() {
   return (
     <div className="space-y-6">
       {/* 1. Header Banner */}
-      <div className="bg-emerald-950 text-white p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-sm border border-emerald-900">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-emerald-800 flex items-center justify-center text-white shadow-inner">
+      <div className="bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] text-white p-6 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-xl border border-[#243B2E]">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-300/30 flex items-center justify-center text-amber-300 shadow-inner">
             <Leaf size={26} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold">Cổng Nông Dân & Quản Lý Sản Xuất (Farmer Portal)</h1>
-              <span className="text-xs bg-emerald-500/30 text-emerald-300 font-semibold px-2.5 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-serif text-xl sm:text-2xl font-bold">Cổng Nông Dân & Quản Lý Sản Xuất (Farmer Portal)</h1>
+              <span className="text-[11px] font-mono bg-amber-400/15 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-300/30 flex items-center gap-1">
                 <Sparkles size={11} /> Nguồn dữ liệu gốc AgriTrace AI
               </span>
             </div>
-            <p className="text-xs text-emerald-200/80 mt-0.5">
+            <p className="text-xs text-emerald-100/80 mt-0.5">
               Quản lý nông trại canh tác, sản phẩm, nhật ký chăm sóc cây, lô thu hoạch và chứng nhận chất lượng
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={openAddFarmModal}
-            className="px-3.5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-emerald-700/60 transition-all cursor-pointer"
+            className="px-3.5 py-2.5 bg-white/10 hover:bg-white/15 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer"
           >
             <Plus size={15} /> Thêm Nông Trại
           </button>
           <button
             onClick={() => openCreateBatchModal()}
-            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition-all transform active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-amber-300 hover:bg-amber-200 text-[#16261E] text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition-all transform active:scale-95 cursor-pointer"
           >
             <Plus size={16} /> Tạo Lô Thu Hoạch
           </button>
         </div>
       </div>
 
-      {/* 2. Navigation Tabs (5 Khối nghiệp vụ cốt lõi; Hộp Thư, Đánh Giá, Mùa Vụ, AI Dự Báo truy cập ở Sidebar trái) */}
-      <div className="flex flex-wrap border-b border-gray-200 gap-x-1.5 gap-y-1 text-xs font-bold">
+      {/* 2. Navigation Tabs */}
+      <div className="flex flex-wrap border-b border-[#E4DFD5] gap-x-2 gap-y-1 text-xs font-bold">
         <button
           onClick={() => selectCoreTab("farms")}
-          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "farms"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] font-extrabold"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           }`}
         >
-          <Home size={15} /> Nông Trại
-          <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full">
+          <Home size={15} className={activeTab === "farms" ? "text-[#166534]" : ""} /> Nông Trại
+          <span className="bg-[#F6F3EC] border border-[#E4DFD5] text-[#16261E] font-mono text-[10px] px-2 py-0.5 rounded-full">
             {visibleFarms.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("batches")}
-          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "batches"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] font-extrabold"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           }`}
         >
-          <Package size={15} /> Lô Thu Hoạch
-          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
+          <Package size={15} className={activeTab === "batches" ? "text-[#166534]" : ""} /> Lô Thu Hoạch
+          <span className="bg-[#F6F3EC] border border-[#E4DFD5] text-[#16261E] font-mono text-[10px] px-2 py-0.5 rounded-full">
             {visibleBatches.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("logs")}
-          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "logs"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] font-extrabold"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           }`}
         >
-          <FileText size={15} /> Nhật Ký Canh Tác
-          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
+          <FileText size={15} className={activeTab === "logs" ? "text-[#166534]" : ""} /> Nhật Ký Canh Tác
+          <span className="bg-[#F6F3EC] border border-[#E4DFD5] text-[#16261E] font-mono text-[10px] px-2 py-0.5 rounded-full">
             {visibleLogs.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("products")}
-          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "products"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] font-extrabold"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           }`}
         >
-          <Sprout size={15} /> Sản Phẩm
-          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
+          <Sprout size={15} className={activeTab === "products" ? "text-[#166534]" : ""} /> Sản Phẩm
+          <span className="bg-[#F6F3EC] border border-[#E4DFD5] text-[#16261E] font-mono text-[10px] px-2 py-0.5 rounded-full">
             {visibleProducts.length}
           </span>
         </button>
 
         <button
           onClick={() => selectCoreTab("certs")}
-          className={`pb-3 px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "certs"
-              ? "border-emerald-600 text-emerald-800 font-extrabold"
-              : "border-transparent text-gray-500 hover:text-gray-900"
+              ? "border-[#166534] text-[#16261E] font-extrabold"
+              : "border-transparent text-stone-500 hover:text-[#16261E]"
           }`}
         >
-          <Award size={15} /> Chứng Nhận
-          <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-full">
+          <Award size={15} className={activeTab === "certs" ? "text-[#166534]" : ""} /> Chứng Nhận
+          <span className="bg-[#F6F3EC] border border-[#E4DFD5] text-[#16261E] font-mono text-[10px] px-2 py-0.5 rounded-full">
             {visibleCerts.length}
           </span>
           {visibleCerts.some((c) => c.status === "EXPIRED") ? (
@@ -2790,23 +2790,23 @@ function FarmerPortalContent() {
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: QUẢN LÝ NÔNG TRẠI (Theo đúng bài nói: tên, địa chỉ, diện tích, liên hệ) */}
+      {/* TAB 1: QUẢN LÝ NÔNG TRẠI */}
       {/* ========================================================================= */}
       {activeTab === "farms" && (
         <div className="space-y-5">
           {/* Header Action Bar */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="bento-card p-5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-sm text-gray-900 flex items-center gap-2">
-                <Home size={18} className="text-emerald-700" /> Danh Sách Các Nông Trại Canh Tác Thuộc Quyền Sở Hữu
+              <h3 className="font-serif font-bold text-sm sm:text-base text-[#16261E] flex items-center gap-2">
+                <Home size={18} className="text-[#166534]" /> Danh Sách Các Nông Trại Canh Tác Thuộc Quyền Sở Hữu
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-stone-500 mt-0.5">
                 Quản lý quy mô diện tích, địa chỉ vườn, thông tin liên lạc và tiêu chuẩn an toàn của từng trang trại
               </p>
             </div>
             <button
               onClick={openAddFarmModal}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="px-4 py-2 bg-[#166534] hover:bg-[#14532D] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus size={15} /> Thêm Nông Trại Mới
             </button>

@@ -63,6 +63,7 @@ public class VoucherController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'FARMER')")
     public ResponseEntity<Voucher> createVoucher(@Valid @RequestBody CreateVoucherRequest req) {
         String code = req.getCode().trim().toUpperCase();
         if (voucherRepository.existsByCodeIgnoreCase(code)) {
@@ -103,6 +104,7 @@ public class VoucherController {
     }
 
     @PatchMapping("/{id}/toggle")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FARMER')")
     public ResponseEntity<Voucher> toggleVoucher(@PathVariable Long id) {
         Voucher voucher = voucherRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy voucher ID: " + id));
@@ -111,6 +113,7 @@ public class VoucherController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FARMER')")
     public ResponseEntity<Map<String, Object>> deleteVoucher(@PathVariable Long id) {
         if (!voucherRepository.existsById(id)) {
             throw new IllegalArgumentException("Không tìm thấy voucher ID: " + id);

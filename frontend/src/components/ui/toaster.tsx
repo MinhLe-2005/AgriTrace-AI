@@ -15,9 +15,9 @@ const toastConfig: Record<
 > = {
   success: {
     icon: CheckCircle2,
-    borderAccent: "border-l-emerald-600",
+    borderAccent: "border-l-[#166534]",
     iconBg: "bg-emerald-50 border border-emerald-200/80",
-    iconColor: "text-emerald-700",
+    iconColor: "text-[#166534]",
     title: "Thành công",
   },
   error: {
@@ -29,10 +29,10 @@ const toastConfig: Record<
   },
   info: {
     icon: Info,
-    borderAccent: "border-l-blue-600",
-    iconBg: "bg-blue-50 border border-blue-200/80",
-    iconColor: "text-blue-700",
-    title: "Thông báo",
+    borderAccent: "border-l-[#A3630A]",
+    iconBg: "bg-amber-50 border border-amber-200/80",
+    iconColor: "text-[#A3630A]",
+    title: "Thông báo hệ thống",
   },
 };
 
@@ -54,7 +54,7 @@ export function Toaster() {
           <div
             key={item.id}
             role="status"
-            className={`pointer-events-auto flex items-start gap-3 rounded-2xl border border-gray-200/90 border-l-4 ${config.borderAccent} bg-white p-3.5 shadow-xl shadow-gray-900/10 animate-fade-in-up transition-all`}
+            className={`pointer-events-auto flex items-start gap-3 rounded-2xl border border-[#E4DFD5] border-l-4 ${config.borderAccent} bg-[#FBF9F5] p-3.5 shadow-xl shadow-stone-900/10 animate-fade-in-up transition-all`}
           >
             <div
               className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${config.iconBg} ${config.iconColor}`}
@@ -63,10 +63,10 @@ export function Toaster() {
             </div>
 
             <div className="flex-1 min-w-0 pt-0.5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-0.5">
                 {config.title}
               </p>
-              <p className="text-xs sm:text-sm font-semibold text-gray-900 leading-snug break-words">
+              <p className="text-xs sm:text-sm font-semibold text-[#16261E] leading-snug break-words">
                 {item.message}
               </p>
             </div>

@@ -219,98 +219,57 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/60 pb-16 pt-6">
+    <div className="min-h-screen bg-[#FBF9F5] text-[#16261E] pb-16 pt-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700 transition-colors">
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534] transition-colors">
             Trang chủ
           </Link>
           <ChevronRight size={13} />
-          <span className="text-gray-900 font-semibold">
+          <span className="text-[#16261E] font-semibold">
             Sự Kiện & Mùa Vụ Khuyến Mãi
           </span>
         </div>
 
         {/* Hero Section */}
-        <div
-          className="relative overflow-hidden rounded-3xl p-6 sm:p-10 text-white shadow-xl"
-          style={{
-            backgroundColor: "#064e3b",
-            backgroundImage: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #022c22 100%)",
-            color: "#ffffff",
-          }}
-        >
+        <div className="relative overflow-hidden rounded-3xl p-6 sm:p-10 text-white shadow-xl bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] border border-[#243B2E]">
           <div className="relative z-10 max-w-2xl space-y-3">
-            <div
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold"
-              style={{
-                backgroundColor: "rgba(16, 185, 129, 0.2)",
-                border: "1px solid rgba(52, 211, 153, 0.4)",
-                color: "#6ee7b7",
-              }}
-            >
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-400/15 border border-amber-300/30 text-amber-300">
               <Sparkles size={14} />
-              <span>Chính Sách Trợ Giá Trực Tiếp Từ Vườn 2026</span>
+              <span>CHÍNH SÁCH TRỢ GIÁ TRỰC TIẾP TỪ VƯỜN 2026</span>
             </div>
-            <h1
-              className="text-2xl sm:text-4xl font-black tracking-tight leading-tight"
-              style={{ color: "#ffffff", textShadow: "0 2px 10px rgba(0,0,0,0.3)" }}
-            >
+            <h1 className="font-serif text-2xl sm:text-4xl font-bold tracking-tight leading-tight text-white">
               Sự Kiện & Lễ Hội Mùa Vụ Nông Sản Sạch
             </h1>
-            <p
-              className="text-xs sm:text-sm leading-relaxed"
-              style={{ color: "#ecfdf5" }}
-            >
+            <p className="text-xs sm:text-sm leading-relaxed text-emerald-100/85">
               Tổng hợp tất cả chiến dịch trợ giá nông sản thu hoạch rộ, xả kho bảo quản lạnh FEFO và tuần lễ đặc sản vùng miền. Giá giảm trực tiếp tại vườn theo từng giai đoạn mùa vụ và tự động ngưng áp dụng khi hết thời hạn.
             </p>
             <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
-              <div
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-xs"
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.12)",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                  color: "#ffffff",
-                }}
-              >
-                <ShieldCheck size={14} className="text-emerald-300" />
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 text-white">
+                <ShieldCheck size={14} className="text-amber-300" />
                 <span className="font-semibold">100% Chuẩn VietGAP / GlobalGAP</span>
               </div>
-              <div
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-xs"
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.12)",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                  color: "#ffffff",
-                }}
-              >
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 text-white">
                 <Truck size={14} className="text-emerald-300" />
                 <span className="font-semibold">Xe Lạnh 2°C - 5°C Trong 24H</span>
               </div>
-              <div
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-xs"
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.12)",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                  color: "#ffffff",
-                }}
-              >
-                <Clock size={14} className="text-emerald-300" />
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 text-white">
+                <Clock size={14} className="text-amber-300" />
                 <span className="font-semibold">Tự Động Kết Thúc Đúng Hạn</span>
               </div>
             </div>
           </div>
 
           {/* Decorative Vector Art */}
-          <div className="absolute -right-6 -bottom-10 opacity-20 pointer-events-none select-none flex items-center gap-4 text-emerald-200">
+          <div className="absolute -right-6 -bottom-10 opacity-15 pointer-events-none select-none flex items-center gap-4 text-amber-200">
             <Wheat size={180} strokeWidth={1} />
             <Sparkles size={140} strokeWidth={1} />
           </div>
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bento-card p-4">
           {/* Status Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             <button

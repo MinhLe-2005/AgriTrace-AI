@@ -5,7 +5,23 @@ import { toast } from "@/stores/toast-store";
 import type { ApiErrorResponse, ApiResponse } from "@/types/api";
 import type { AuthTokens } from "@/types/auth";
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1";
+function resolveBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host && host !== "localhost" && host !== "127.0.0.1") {
+      // Nếu truy cập qua Public HTTPS Tunnel (4G/Wi-Fi ngoài) như *.lhr.life hoặc *.trycloudflare.com,
+      // gọi qua Next.js rewrite proxy (/api/v1) cùng domain để không cần mở tunnel thứ 2 cho port 8080.
+      if (!host.startsWith("192.168.") && !host.startsWith("10.") && !host.startsWith("172.")) {
+        return "/api/v1";
+      }
+      return `${window.location.protocol}//${host}:8080/api/v1`;
+    }
+  }
+  return "http://localhost:8080/api/v1";
+}
+
+const baseURL = resolveBaseUrl();
 
 export const api = axios.create({ baseURL, headers: { "Content-Type": "application/json" } });
 const refreshApi = axios.create({ baseURL, headers: { "Content-Type": "application/json" } });

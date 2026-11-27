@@ -68,6 +68,7 @@ public class OrderController {
             Authentication authentication
     ) {
         return orderRepository.findByOrderCode(orderCode.trim().toUpperCase())
+                .filter(order -> canViewOrder(order, phone, authentication))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -267,6 +268,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{orderCode}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DISTRIBUTOR', 'WAREHOUSE', 'WAREHOUSE_STAFF', 'FARMER')")
     @Transactional
     public ApiResponse<Order> updateStatus(
             @PathVariable String orderCode,
@@ -341,6 +343,7 @@ public class OrderController {
     }
 
     @PostMapping("/{orderCode}/reject-transfer")
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ApiResponse<Order> rejectTransfer(
             @PathVariable String orderCode,

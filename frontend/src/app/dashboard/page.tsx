@@ -256,18 +256,18 @@ export default function DashboardRedirectPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 p-6 text-white shadow-md">
+      <div className="rounded-3xl bg-gradient-to-r from-[#16261E] via-[#1B3326] to-[#16261E] border border-[#243B2E] p-6 sm:p-8 text-white shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-200">
-              <ShieldCheck size={14} /> Cổng Xác Minh & Phân Quyền Vị Trí Chuỗi Cung Ứng
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 border border-amber-300/30 px-3 py-1 text-[11px] font-mono font-bold uppercase tracking-wider text-amber-300">
+              <ShieldCheck size={14} /> CỔNG XÁC MINH & PHÂN QUYỀN VỊ TRÍ CHUỖI CUNG ỨNG
             </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold">
+            <h1 className="font-serif text-xl sm:text-2xl font-bold">
               {latestRequest
                 ? `Hồ Sơ Vị Trí: ${ROLE_CONFIGS[latestRequest.type]?.label || latestRequest.type}`
                 : "Đăng Ký & Xét Duyệt Vị Trí Công Việc"}
             </h1>
-            <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl">
+            <p className="text-xs sm:text-sm text-emerald-100/85 max-w-2xl">
               Để đảm bảo tính minh bạch của chuỗi truy xuất nguồn gốc QR, các vị trí{" "}
               <strong>Nông dân, Nhân viên Kho lạnh, Nhà phân phối</strong> chỉ được mở khóa sau khi Ban Quản Trị thẩm định và phê duyệt hồ sơ năng lực.
             </p>
@@ -278,9 +278,9 @@ export default function DashboardRedirectPage() {
               type="button"
               disabled={refreshing}
               onClick={() => void syncStatus(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-emerald-900 shadow-sm hover:bg-emerald-50 transition-all shrink-0 cursor-pointer disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 py-2.5 text-xs font-bold text-[#16261E] shadow-sm hover:bg-amber-200 transition-all shrink-0 cursor-pointer disabled:opacity-60"
             >
-              <RefreshCw size={15} className={refreshing ? "animate-spin text-emerald-700" : "text-emerald-700"} />
+              <RefreshCw size={15} className={refreshing ? "animate-spin text-[#16261E]" : "text-[#16261E]"} />
               <span>{refreshing ? "Đang kiểm tra..." : "Kiểm tra kết quả duyệt"}</span>
             </button>
           )}
@@ -289,8 +289,8 @@ export default function DashboardRedirectPage() {
 
       {/* Progress Stepper */}
       {latestRequest && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">
+        <div className="bento-card p-5">
+          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-stone-500 mb-4">
             Tiến trình phê duyệt vào vị trí công việc
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">

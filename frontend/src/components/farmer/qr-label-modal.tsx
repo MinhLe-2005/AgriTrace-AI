@@ -1,8 +1,10 @@
 "use client";
 
-import { CheckCircle2, Copy, Download, FileText, Layers, Printer, ShieldCheck, Sparkles, X } from "lucide-react";
+import { CheckCircle2, Copy, Download, ExternalLink, FileText, Layers, Printer, ShieldCheck, Sparkles, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPdfBlobFromCanvas } from "@/lib/pdf-label";
+import { buildRealQrImageUrl, buildScannableQrLandingUrl, fetchServerLanIp } from "@/lib/qr-url";
 import { toast } from "@/stores/toast-store";
 
 function formatGs1Date(raw?: string): string {
@@ -92,7 +94,19 @@ export function QrLabelModal({
   const [packSpec, setPackSpec] = useState("Thùng carton vi lỗ thở 15-20kg");
   const [storageTemp, setStorageTemp] = useState("Chuỗi lạnh 2°C – 6°C • Độ ẩm 85%");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [lanIp, setLanIp] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const syncUrl = () => {
+      fetchServerLanIp().then((ip) => {
+        if (ip) setLanIp(ip);
+      });
+    };
+    syncUrl();
+    const timer = setInterval(syncUrl, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -109,11 +123,20 @@ export function QrLabelModal({
   const farmName = lot.farmName || defaultFarmName;
   const farmAddress = lot.farmAddress || defaultFarmAddress;
   const certName = lot.cert || "VietGAP";
-  const originUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-  const publicTraceUrl = `${originUrl}/traceability?batch=${encodeURIComponent(lot.code)}`;
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=4&data=${encodeURIComponent(
-    publicTraceUrl
-  )}`;
+  const qrSnapshot = {
+    code: lot.code,
+    name: lot.product,
+    farm: farmName,
+    location: farmAddress,
+    harvestDate: lot.harvestDate,
+    expiryDate: lot.expiryDate,
+    cert: certName,
+    qty: lot.qty,
+    unit: lot.unit,
+    temp: storageTemp,
+  };
+  const publicTraceUrl = buildScannableQrLandingUrl(qrSnapshot, lanIp);
+  const qrImageUrl = buildRealQrImageUrl(qrSnapshot, 280, lanIp);
 
   const handlePrint = () => {
     toast.info("Đang mở hộp thoại in tem nhãn nông sản...");
@@ -527,13 +550,22 @@ export function QrLabelModal({
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCopyUrl}
-                className="px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <Copy size={12} /> Sao chép URL tra cứu
-              </button>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  href={`/qr/${encodeURIComponent(lot.code)}?name=${encodeURIComponent(lot.product)}&farm=${encodeURIComponent(farmName)}&loc=${encodeURIComponent(farmAddress)}&hd=${encodeURIComponent(lot.harvestDate)}&cert=${encodeURIComponent(certName)}`}
+                  target="_blank"
+                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <ExternalLink size={12} /> Mở trang HTML khi quét
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleCopyUrl}
+                  className="px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Copy size={12} /> Sao chép URL QR
+                </button>
+              </div>
             </div>
 
             {/* Xem trước tem nhãn */}

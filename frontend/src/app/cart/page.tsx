@@ -455,29 +455,29 @@ function CartContent() {
   }
 
   return (
-    <div className="bg-[#f8faf8] min-h-screen py-8">
+    <div className="bg-[#FBF9F5] text-[#16261E] min-h-screen py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
         {/* ── Breadcrumb ── */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-emerald-700 transition-colors">
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#166534] transition-colors">
             Trang chủ
           </Link>
           <span>/</span>
-          <Link href="/products" className="hover:text-emerald-700 transition-colors">
+          <Link href="/products" className="hover:text-[#166534] transition-colors">
             Nông sản sạch
           </Link>
           <span>/</span>
-          <span className="font-semibold text-gray-800">Đặt hàng & Thanh toán</span>
+          <span className="font-semibold text-[#16261E]">Đặt hàng & Thanh toán</span>
         </div>
 
         {/* ── 3-Step Checkout Stepper Header ── */}
         {currentStep !== 4 && (
-          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-gray-200/80 shadow-xs">
+          <div className="bento-card p-4 sm:p-6">
             <div className="flex items-center justify-between max-w-3xl mx-auto relative">
               {/* Stepper Connect Bar */}
-              <div className="absolute left-8 right-8 top-1/2 -translate-y-1/2 h-1 bg-gray-100 z-0">
+              <div className="absolute left-8 right-8 top-1/2 -translate-y-1/2 h-1 bg-[#E4DFD5] z-0">
                 <div
-                  className="h-full bg-emerald-600 transition-all duration-500"
+                  className="h-full bg-[#166534] transition-all duration-500"
                   style={{
                     width: currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%",
                   }}
@@ -487,24 +487,24 @@ function CartContent() {
               {/* Step 1 Pill */}
               <button
                 onClick={() => setCurrentStep(1)}
-                className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none"
+                className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
               >
                 <div
                   className={cn(
-                    "w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center font-bold text-xs sm:text-sm transition-all shadow-xs",
+                    "w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center font-mono font-bold text-xs sm:text-sm transition-all shadow-xs",
                     currentStep === 1
-                      ? "bg-emerald-700 text-white ring-4 ring-emerald-100"
+                      ? "bg-[#16261E] text-amber-300 ring-4 ring-[#F3EFE6]"
                       : currentStep > 1
-                      ? "bg-emerald-600 text-white"
-                      : "bg-gray-100 text-gray-400 border border-gray-200"
+                      ? "bg-[#166534] text-white"
+                      : "bg-[#F3EFE6] text-stone-400 border border-[#E4DFD5]"
                   )}
                 >
-                  {currentStep > 1 ? <Check size={16} /> : "1"}
+                  {currentStep > 1 ? <Check size={16} /> : "01"}
                 </div>
                 <span
                   className={cn(
                     "text-xs font-bold transition-colors whitespace-nowrap",
-                    currentStep === 1 ? "text-emerald-800" : "text-gray-500"
+                    currentStep === 1 ? "text-[#16261E]" : "text-stone-500"
                   )}
                 >
                   1. Giỏ Hàng
@@ -517,24 +517,24 @@ function CartContent() {
                   if (items.length > 0) setCurrentStep(2);
                 }}
                 disabled={items.length === 0}
-                className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none"
+                className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
               >
                 <div
                   className={cn(
-                    "w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center font-bold text-xs sm:text-sm transition-all shadow-xs",
+                    "w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center font-mono font-bold text-xs sm:text-sm transition-all shadow-xs",
                     currentStep === 2
-                      ? "bg-emerald-700 text-white ring-4 ring-emerald-100"
+                      ? "bg-[#16261E] text-amber-300 ring-4 ring-[#F3EFE6]"
                       : currentStep > 2
-                      ? "bg-emerald-600 text-white"
-                      : "bg-gray-100 text-gray-400 border border-gray-200"
+                      ? "bg-[#166534] text-white"
+                      : "bg-[#F3EFE6] text-stone-400 border border-[#E4DFD5]"
                   )}
                 >
-                  {currentStep > 2 ? <Check size={16} /> : "2"}
+                  {currentStep > 2 ? <Check size={16} /> : "02"}
                 </div>
                 <span
                   className={cn(
                     "text-xs font-bold transition-colors whitespace-nowrap",
-                    currentStep === 2 ? "text-emerald-800" : "text-gray-500"
+                    currentStep === 2 ? "text-[#16261E]" : "text-stone-500"
                   )}
                 >
                   2. Giao Hàng & Xe Lạnh
@@ -547,7 +547,7 @@ function CartContent() {
                   if (items.length > 0 && receiverAddress) setCurrentStep(3);
                 }}
                 disabled={items.length === 0}
-                className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none"
+                className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
               >
                 <div
                   className={cn(
