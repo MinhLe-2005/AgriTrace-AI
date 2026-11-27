@@ -63,7 +63,7 @@ public class DistributorShipmentController {
             @Valid @RequestBody CreateShipmentRequest request,
             Authentication authentication
     ) {
-        return ApiResponse.ok("Shipment created", distributorShipmentService.create(request, actor(authentication)));
+        return ApiResponse.ok("Shipment created", distributorShipmentService.create(request, actor(authentication), isAdmin(authentication)));
     }
 
     @PutMapping("/shipments/{shipmentCode}")
@@ -128,6 +128,42 @@ public class DistributorShipmentController {
             Authentication authentication
     ) {
         return ApiResponse.ok("Shipment receipt recorded", distributorShipmentService.receive(shipmentCode, request, actor(authentication), isAdmin(authentication)));
+    }
+
+    @GetMapping("/notifications")
+    public ApiResponse<List<DistributorNotificationResponse>> notifications(
+            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok("Distributor notifications retrieved", distributorShipmentService.notifications(actor(authentication), unreadOnly));
+    }
+
+    @GetMapping("/notifications/unread-count")
+    public ApiResponse<Long> unreadNotificationCount(Authentication authentication) {
+        return ApiResponse.ok("Distributor unread notification count retrieved", distributorShipmentService.unreadNotificationCount(actor(authentication)));
+    }
+
+    @PostMapping("/notifications/{notificationId}/read")
+    public ApiResponse<DistributorNotificationResponse> markNotificationRead(
+            @PathVariable java.util.UUID notificationId,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok("Notification marked as read", distributorShipmentService.markNotificationRead(notificationId, actor(authentication)));
+    }
+
+    @PostMapping("/notifications/read-all")
+    public ApiResponse<Long> markAllNotificationsRead(Authentication authentication) {
+        return ApiResponse.ok("Notifications marked as read", distributorShipmentService.markAllNotificationsRead(actor(authentication)));
+    }
+
+    @PostMapping("/shipments/{shipmentCode}/support-requests")
+    public ApiResponse<Void> requestSupport(
+            @PathVariable String shipmentCode,
+            @Valid @RequestBody CreateShipmentSupportRequest request,
+            Authentication authentication
+    ) {
+        distributorShipmentService.requestSupport(shipmentCode, request, actor(authentication), isAdmin(authentication));
+        return ApiResponse.ok("Support request sent", null);
     }
 
     private String actor(Authentication authentication) {

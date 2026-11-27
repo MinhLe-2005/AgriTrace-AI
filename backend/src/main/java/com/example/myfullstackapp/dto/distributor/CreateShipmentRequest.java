@@ -2,6 +2,7 @@ package com.example.myfullstackapp.dto.distributor;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -20,5 +21,6 @@ public record CreateShipmentRequest(
         @DecimalMin(value = ShipmentValidation.MIN_TEMPERATURE_C, message = "Nhiệt độ phải từ -30 đến 40°C")
         @DecimalMax(value = ShipmentValidation.MAX_TEMPERATURE_C, message = "Nhiệt độ phải từ -30 đến 40°C") Double temperatureC,
         @ValidShipmentTimestamp String dispatchTime,
-        @ValidShipmentTimestamp String estimatedArrival
+        @ValidShipmentTimestamp String estimatedArrival,
+        @Email @Size(max = 254) String distributorEmail
 ) { }
